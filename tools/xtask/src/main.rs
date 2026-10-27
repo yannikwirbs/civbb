@@ -48,10 +48,12 @@ fn main() -> ExitCode {
 }
 
 fn root() -> PathBuf {
+    // Not canonicalised: on Windows that adds a verbatim path prefix that cargo metadata paths lack.
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
+        .ancestors()
+        .nth(2)
         .expect("repo root")
+        .to_path_buf()
 }
 
 fn run(cmd: &str, args: &[&str]) -> Result<(), String> {

@@ -1,7 +1,11 @@
-//! The avatar root type tying hierarchy, meshes, materials and textures together.
+//! The avatar root type tying every part of an avatar together.
 
 use serde::{Deserialize, Serialize};
 
+use crate::animator::{Animator, Clip};
+use crate::constraint::Constraint;
+use crate::dynamics::{Contacts, Dynamics};
+use crate::expressions::Expressions;
 use crate::hierarchy::{Hierarchy, Humanoid};
 use crate::material::{Material, Texture};
 use crate::mesh::Mesh;
@@ -21,4 +25,16 @@ pub struct Avatar {
     pub materials: Vec<Material>,
     /// Textures referenced by materials; pixels live in blobs.
     pub textures: Vec<Texture>,
+    /// Animator controller; `None` plays the rest pose.
+    pub animator: Option<Animator>,
+    /// Clips referenced by the animator.
+    pub clips: Vec<Clip>,
+    /// Expression menu and synced parameters.
+    pub expressions: Option<Expressions>,
+    /// Bone dynamics.
+    pub dynamics: Dynamics,
+    /// Contacts.
+    pub contacts: Contacts,
+    /// Constraints in evaluation order.
+    pub constraints: Vec<Constraint>,
 }

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::avatar::Avatar;
 use crate::blob::BlobId;
 use crate::cbor::{self, CborError};
+use crate::cost::CostProfile;
 
 const MAGIC: &[u8; 8] = b"CIVBBPKG";
 const CONTAINER_VERSION: u32 = 1;
@@ -54,6 +55,8 @@ pub struct Header {
     pub platform: Platform,
     /// The blob holding the CBOR-encoded root object (an [`Avatar`] for avatars).
     pub root: BlobId,
+    /// Measured cost; `None` before the measure stage has run.
+    pub cost: Option<CostProfile>,
 }
 
 /// One listed blob.
@@ -295,6 +298,7 @@ mod tests {
                 kind: ContentKind::Avatar,
                 platform: Platform::Desktop,
                 root: BlobId([0; 32]),
+                cost: Some(CostProfile::default()),
             },
             blobs: BTreeMap::new(),
         };
