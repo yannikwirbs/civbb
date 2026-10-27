@@ -1,0 +1,24 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "tools/xtask"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yannikwirbs/civbb"
+publish = false
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[workspace.dependencies]
+civbb-format = { path = "crates/format" }
+
+# Optimise dependencies in dev builds: crypto, decoding and later the renderer are unusably slow at opt-level 0.
+[profile.dev.package."*"]
+opt-level = 2

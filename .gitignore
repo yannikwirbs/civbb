@@ -1,0 +1,6 @@
+/target
+# Third-party avatars used for local testing only; never commit (design doc §21, licences).
+/corpus/local/
+# Generated outputs of local runs
+/out/
+*.civpkg
