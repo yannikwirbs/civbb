@@ -25,7 +25,7 @@ const ENGINE: &[&str] = &[
 /// Glue crates: binaries that wire systems together; nothing may depend on them.
 const GLUE: &[&str] = &["civbb-client", "civbb-node", "civbb-pipeline"];
 /// Crates exempt from classification.
-const TOOLS: &[&str] = &["xtask"];
+const TOOLS: &[&str] = &["xtask", "civbb-corpus"];
 
 const CODEMAP: &str = "docs/ai/CODEMAP.md";
 

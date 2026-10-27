@@ -25,6 +25,14 @@ Internal deps: none
 - `src/package.rs`: Runtime packages: a signed CBOR manifest followed by the BLAKE3-addressed blobs it lists.
 - `src/validate.rs`: Structural validation and hard caps for untrusted avatars. After [`validate`] passes, every index is in range.
 
+## `tools/corpus` (civbb-corpus)
+
+Deterministic generator of synthetic test avatars (lean control and deliberately bloated), CC0.
+
+Internal deps: civbb-format
+
+- `src/lib.rs`: Deterministic synthetic avatars: a lean control and a deliberately bloated worst case (design doc §21).
+
 ## `tools/xtask` (xtask)
 
 Repo automation: CI gate, architecture rules, code map.
@@ -43,5 +51,6 @@ Internal deps: none
 - `docs/adr/0004-roadmap-phases.md`: 0004: Roadmap phases and milestones
 - `docs/adr/0005-ai-workflow.md`: 0005: How AI sessions track work and state
 - `docs/ai/LESSONS.md`: Lessons
+- `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status
 - `docs/design-doc.md`: CIVBB — Design Doc

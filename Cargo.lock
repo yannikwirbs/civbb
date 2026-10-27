@@ -80,6 +80,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "civbb-corpus"
+version = "0.0.0"
+dependencies = [
+ "civbb-format",
+]
+
+[[package]]
 name = "civbb-format"
 version = "0.0.0"
 dependencies = [
