@@ -6,6 +6,7 @@ use civbb_format::Avatar;
 use civbb_format::animator::*;
 use civbb_format::dynamics::*;
 use civbb_format::expressions::*;
+use civbb_format::face::{Face, ShapeBind, Viseme};
 use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, Node, NodeIndex};
 use civbb_format::material::{AlphaMode, Material, MaterialModel, Toon};
 use civbb_format::math::{Transform, Vec3};
@@ -685,6 +686,24 @@ pub fn generate(spec: &Spec) -> Avatar {
         hierarchy: Hierarchy { nodes: b.nodes },
         humanoid: Some(humanoid),
         meshes,
+        // The first 15 shape keys on the body are the visemes, in legacy order.
+        face: Some(Face {
+            visemes: Viseme::ALL
+                .into_iter()
+                .zip(0..spec.shape_keys.min(15))
+                .map(|(v, shape)| {
+                    (
+                        v,
+                        vec![ShapeBind {
+                            mesh: 0,
+                            shape,
+                            weight: 1.0,
+                        }],
+                    )
+                })
+                .collect(),
+            blink: vec![],
+        }),
         materials,
         textures: vec![],
         animator: Some(animator),

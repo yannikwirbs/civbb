@@ -8,6 +8,7 @@ pub mod constraint;
 pub mod cost;
 pub mod dynamics;
 pub mod expressions;
+pub mod face;
 pub mod hierarchy;
 pub mod material;
 pub mod math;
@@ -22,7 +23,7 @@ pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the data model. Bump on any incompatible change to the types in this crate.
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -30,6 +31,7 @@ pub(crate) mod testutil {
     use crate::constraint::*;
     use crate::dynamics::*;
     use crate::expressions::*;
+    use crate::face::*;
     use crate::hierarchy::{HumanBone, Humanoid, Node};
     use crate::material::*;
     use crate::math::Transform;
@@ -84,6 +86,17 @@ pub(crate) mod testutil {
                 }],
                 ..Mesh::default()
             }],
+            face: Some(Face {
+                visemes: vec![(
+                    Viseme::Aa,
+                    vec![ShapeBind {
+                        mesh: 0,
+                        shape: 0,
+                        weight: 1.0,
+                    }],
+                )],
+                blink: vec![],
+            }),
             materials: vec![Material {
                 name: "Skin".into(),
                 model: MaterialModel::Toon(Toon {

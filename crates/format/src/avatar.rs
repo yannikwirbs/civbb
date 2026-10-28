@@ -6,6 +6,7 @@ use crate::animator::{Animator, Clip};
 use crate::constraint::Constraint;
 use crate::dynamics::{Contacts, Dynamics};
 use crate::expressions::Expressions;
+use crate::face::Face;
 use crate::hierarchy::{Hierarchy, Humanoid};
 use crate::material::{Material, Texture};
 use crate::mesh::Mesh;
@@ -21,6 +22,8 @@ pub struct Avatar {
     pub humanoid: Option<Humanoid>,
     /// Meshes.
     pub meshes: Vec<Mesh>,
+    /// Lip sync and blink blendshapes; `None` for avatars without a face.
+    pub face: Option<Face>,
     /// Materials referenced by submeshes.
     pub materials: Vec<Material>,
     /// Textures referenced by materials; pixels live in blobs.

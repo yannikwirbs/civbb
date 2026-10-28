@@ -17,6 +17,7 @@ Internal deps: none
 - `src/cost.rs`: Cost profile: counted and measured CPU, GPU, memory and network cost of content (design doc §8).
 - `src/dynamics.rs`: Bone dynamics (PhysBone-compatible chains and colliders) and contact senders and receivers.
 - `src/expressions.rs`: Expression menu and synced expression parameters (design doc §7).
+- `src/face.rs`: Face setup: blendshapes driven by lip sync and automatic blinking (design doc §7, `X_avatar`).
 - `src/hierarchy.rs`: Node hierarchy (bones and other transforms) and the humanoid bone mapping.
 - `src/lib.rs`: CIVBB content format: the avatar data model and signed, content-addressed runtime packages (design doc §9).
 - `src/material.rs`: Materials (PBR, Toon, Unlit models) and texture references.
@@ -62,6 +63,7 @@ Internal deps: none
 - `docs/adr/0003-phase0-parallelism.md`: 0003: Phase 0 uses rayon over plain per-avatar data; bevy_ecs and the fiber scheduler come with the client
 - `docs/adr/0004-roadmap-phases.md`: 0004: Roadmap phases and milestones
 - `docs/adr/0005-ai-workflow.md`: 0005: How AI sessions track work and state
+- `docs/adr/0006-facing-face-and-vrm-mapping.md`: 0006: Avatars face +Z, faces are shape binds, VRM maps to native types by documented heuristics
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

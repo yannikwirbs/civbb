@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// `[x, y, z]`. Right-handed, Y up, metres (glTF conventions).
+/// `[x, y, z]`. Right-handed, Y up, metres, avatars facing +Z (glTF conventions, ADR 0006).
 pub type Vec3 = [f32; 3];
 /// `[x, y, z, w]` unit quaternion.
 pub type Quat = [f32; 4];

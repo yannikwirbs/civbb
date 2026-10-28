@@ -260,6 +260,21 @@ impl V {
                 );
             }
         }
+        if let Some(f) = &a.face {
+            let mut seen = HashSet::new();
+            for (v, _) in &f.visemes {
+                self.ensure(seen.insert(*v), || format!("face.{v:?}"), "mapped twice");
+            }
+            let binds = f.visemes.iter().flat_map(|(_, b)| b).chain(&f.blink);
+            for (i, b) in binds.enumerate() {
+                let p = || format!("face.binds[{i}]");
+                match a.meshes.get(b.mesh as usize) {
+                    Some(m) => self.index(b.shape as usize, m.blend_shapes.len(), p, "blend shape"),
+                    None => self.fail(p, format!("mesh index {} out of range", b.mesh)),
+                }
+                self.finite(&[b.weight], p);
+            }
+        }
         self.cap(verts, c.vertices, "total vertices");
         self.cap(indices, c.indices, "total indices");
         self.cap(shapes, c.blend_shapes, "total blend shapes");
@@ -635,6 +650,12 @@ mod tests {
             }),
             ("meshes[0].blend_shapes[0]", |a| {
                 a.meshes[0].blend_shapes[0].deltas[0].vertex = 3
+            }),
+            ("face.binds[0]", |a| a.face.as_mut().unwrap().visemes[0].1[0].shape = 1),
+            ("face.binds[0]", |a| a.face.as_mut().unwrap().visemes[0].1[0].mesh = 1),
+            ("face.Aa", |a| {
+                let f = a.face.as_mut().unwrap();
+                f.visemes.push(f.visemes[0].clone())
             }),
             ("materials[0]", |a| a.textures.clear()),
             ("animator.layers[0]", |a| {
