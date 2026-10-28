@@ -21,7 +21,7 @@ pub struct Mesh {
     pub normals: Vec<Vec3>,
     /// Tangents with handedness in `w`; empty if absent.
     pub tangents: Vec<[f32; 4]>,
-    /// Primary UVs; empty if absent.
+    /// Primary UVs, glTF convention (origin top-left, V down); empty if absent.
     pub uv0: Vec<[f32; 2]>,
     /// Secondary UVs (lightmaps, decals); empty if absent.
     pub uv1: Vec<[f32; 2]>,

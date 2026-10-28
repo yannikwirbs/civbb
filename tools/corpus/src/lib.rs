@@ -1,5 +1,7 @@
 //! Deterministic synthetic avatars: a lean control and a deliberately bloated worst case (design doc §21).
 
+pub mod gltf;
+
 use civbb_format::Avatar;
 use civbb_format::animator::*;
 use civbb_format::dynamics::*;

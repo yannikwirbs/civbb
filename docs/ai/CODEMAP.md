@@ -25,12 +25,24 @@ Internal deps: none
 - `src/package.rs`: Runtime packages: a signed CBOR manifest followed by the BLAKE3-addressed blobs it lists.
 - `src/validate.rs`: Structural validation and hard caps for untrusted avatars. After [`validate`] passes, every index is in range.
 
+## `crates/pipeline` (civbb-pipeline)
+
+Content compiler: imports glTF/VRM sources into the format model and builds runtime packages.
+
+Internal deps: civbb-format
+
+- `src/accessor.rs`: Bounded glTF accessor reading: every offset, stride, count and sparse index is checked before use.
+- `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`].
+- `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
+- `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
+
 ## `tools/corpus` (civbb-corpus)
 
 Deterministic generator of synthetic test avatars (lean control and deliberately bloated), CC0.
 
 Internal deps: civbb-format
 
+- `src/gltf.rs`: Exports an avatar's node, mesh, skin and morph subset as GLB, the importer's test input.
 - `src/lib.rs`: Deterministic synthetic avatars: a lean control and a deliberately bloated worst case (design doc §21).
 
 ## `tools/xtask` (xtask)
