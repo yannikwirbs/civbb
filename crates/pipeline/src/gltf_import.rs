@@ -1,4 +1,5 @@
-//! glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`].
+//! glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
+//! plus VRM 0.x and 1.0 extensions when present.
 //!
 //! Input is untrusted. Every count is checked against [`Caps`] before allocating, the total input against
 //! [`Limits::bytes`], and the result passes [`civbb_format::validate`]. Coordinates and UVs keep glTF conventions.
@@ -21,6 +22,8 @@ use gltf::mesh::{Mode, Semantic};
 
 use crate::accessor::{arrays, floats, uints};
 
+mod vrm;
+
 /// Limits for one import.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
@@ -42,7 +45,7 @@ impl Default for Limits {
 /// An imported avatar and the blobs its textures reference.
 #[derive(Debug)]
 pub struct Imported {
-    /// The avatar. No humanoid, animator or dynamics: plain glTF has none.
+    /// The avatar. Humanoid, face, dynamics, animator and expressions come only from VRM extensions.
     pub avatar: Avatar,
     /// Encoded images by id.
     pub blobs: BTreeMap<BlobId, Vec<u8>>,
@@ -77,6 +80,7 @@ pub fn import(
     let gltf = gltf::Gltf::from_slice(bytes).map_err(|e| ImportError(e.to_string()))?;
     let mut im = Importer {
         doc: &gltf.document,
+        resolve: &resolve,
         caps: limits.caps,
         budget: limits.bytes - bytes.len(),
         buffers: Vec::new(),
@@ -95,16 +99,17 @@ pub fn import(
         deltas_left: limits.caps.shape_deltas,
         shapes_left: limits.caps.blend_shapes,
     };
-    im.buffers(gltf.blob.as_deref(), &resolve)?;
+    im.buffers(gltf.blob.as_deref())?;
     let name = im.hierarchy()?;
     for m in im.doc.materials() {
-        let material = im.material(&m, &resolve);
+        let material = im.material(&m);
         im.materials.push(material);
     }
     im.meshes()?;
-    let clips = im.animations()?;
+    let mut clips = im.animations()?;
+    let vrm = im.vrm(&mut clips)?;
     let avatar = Avatar {
-        name,
+        name: vrm.as_ref().and_then(|v| v.name.clone()).unwrap_or(name),
         hierarchy: Hierarchy {
             nodes: std::mem::take(&mut im.nodes),
         },
@@ -112,12 +117,24 @@ pub fn import(
         materials: std::mem::take(&mut im.materials),
         textures: std::mem::take(&mut im.textures),
         clips,
-        ..Avatar::default()
+        ..match vrm {
+            Some(v) => Avatar {
+                humanoid: Some(v.humanoid),
+                face: v.face,
+                dynamics: v.dynamics,
+                animator: v.animator,
+                expressions: v.expressions,
+                ..Avatar::default()
+            },
+            None => Avatar::default(),
+        }
     };
     civbb_format::validate(&avatar, &limits.caps, |id| im.blobs.contains_key(&id)).map_err(|errors| {
         let list: Vec<String> = errors.iter().map(ToString::to_string).collect();
         ImportError(format!("invalid result: {}", list.join("; ")))
     })?;
+    let mut seen = HashSet::new();
+    im.warnings.retain(|w| seen.insert(w.clone()));
     Ok(Imported {
         avatar,
         blobs: im.blobs,
@@ -158,8 +175,9 @@ fn percent_decode(s: &str) -> Option<String> {
     String::from_utf8(out).ok().filter(|s| !s.contains('\0'))
 }
 
-struct Importer<'a> {
-    doc: &'a Document,
+pub(crate) struct Importer<'a> {
+    pub(crate) doc: &'a Document,
+    resolve: &'a dyn Fn(&str) -> Option<Vec<u8>>,
     caps: Caps,
     /// Bytes still allowed from external files and data URIs.
     budget: usize,
@@ -192,7 +210,7 @@ impl Importer<'_> {
     }
 
     /// Loads a URI: base64 data URIs inline, anything else through `resolve`.
-    fn load_uri(&mut self, uri: &str, resolve: &impl Fn(&str) -> Option<Vec<u8>>) -> Result<Vec<u8>, String> {
+    fn load_uri(&mut self, uri: &str) -> Result<Vec<u8>, String> {
         let bytes = if let Some(rest) = uri.strip_prefix("data:") {
             let (_, data) = rest
                 .split_once(";base64,")
@@ -202,18 +220,18 @@ impl Importer<'_> {
                 .decode(data)
                 .map_err(|e| format!("data URI: {e}"))?
         } else {
-            let bytes = resolve(uri).ok_or_else(|| format!("cannot load `{uri}`"))?;
+            let bytes = (self.resolve)(uri).ok_or_else(|| format!("cannot load `{uri}`"))?;
             self.take_budget(bytes.len(), uri)?;
             bytes
         };
         Ok(bytes)
     }
 
-    fn buffers(&mut self, blob: Option<&[u8]>, resolve: &impl Fn(&str) -> Option<Vec<u8>>) -> Result<(), String> {
+    fn buffers(&mut self, blob: Option<&[u8]>) -> Result<(), String> {
         for b in self.doc.buffers() {
             let data = match b.source() {
                 gltf::buffer::Source::Bin => blob.ok_or("GLB binary chunk missing")?.to_vec(),
-                gltf::buffer::Source::Uri(uri) => self.load_uri(uri, resolve)?,
+                gltf::buffer::Source::Uri(uri) => self.load_uri(uri)?,
             };
             if data.len() < b.length() {
                 return Err(format!("buffer {}: shorter than byteLength", b.index()));
@@ -322,7 +340,7 @@ impl Importer<'_> {
         Ok(parts.join("/"))
     }
 
-    fn material(&mut self, m: &gltf::Material, resolve: &impl Fn(&str) -> Option<Vec<u8>>) -> Material {
+    fn material(&mut self, m: &gltf::Material) -> Material {
         let pbr = m.pbr_metallic_roughness();
         let (alpha, render_queue) = match m.alpha_mode() {
             gltf::material::AlphaMode::Opaque => (AlphaMode::Opaque, 2000),
@@ -336,7 +354,7 @@ impl Importer<'_> {
         };
         let base_tex = pbr
             .base_color_texture()
-            .and_then(|t| self.info_slot(&t, ColorSpace::Srgb, resolve));
+            .and_then(|t| self.info_slot(&t, ColorSpace::Srgb));
         let model = if m.unlit() {
             MaterialModel::Unlit(Unlit {
                 color: pbr.base_color_factor(),
@@ -352,18 +370,16 @@ impl Importer<'_> {
                 roughness: pbr.roughness_factor(),
                 metallic_roughness_tex: pbr
                     .metallic_roughness_texture()
-                    .and_then(|t| self.info_slot(&t, ColorSpace::Linear, resolve)),
+                    .and_then(|t| self.info_slot(&t, ColorSpace::Linear)),
                 normal_tex: normal
                     .as_ref()
-                    .and_then(|t| self.slot(&t.texture(), t.tex_coord(), None, ColorSpace::Linear, resolve)),
+                    .and_then(|t| self.slot(&t.texture(), t.tex_coord(), None, ColorSpace::Linear)),
                 normal_scale: normal.as_ref().map_or(1.0, |t| t.scale()),
                 occlusion_tex: occlusion
                     .as_ref()
-                    .and_then(|t| self.slot(&t.texture(), t.tex_coord(), None, ColorSpace::Linear, resolve)),
+                    .and_then(|t| self.slot(&t.texture(), t.tex_coord(), None, ColorSpace::Linear)),
                 emissive: m.emissive_factor(),
-                emissive_tex: m
-                    .emissive_texture()
-                    .and_then(|t| self.info_slot(&t, ColorSpace::Srgb, resolve)),
+                emissive_tex: m.emissive_texture().and_then(|t| self.info_slot(&t, ColorSpace::Srgb)),
             })
         };
         Material {
@@ -375,12 +391,7 @@ impl Importer<'_> {
         }
     }
 
-    fn info_slot(
-        &mut self,
-        info: &gltf::texture::Info,
-        space: ColorSpace,
-        resolve: &impl Fn(&str) -> Option<Vec<u8>>,
-    ) -> Option<TextureSlot> {
+    fn info_slot(&mut self, info: &gltf::texture::Info, space: ColorSpace) -> Option<TextureSlot> {
         let transform = info.texture_transform();
         let tex_coord = transform
             .as_ref()
@@ -394,7 +405,7 @@ impl Importer<'_> {
             let (s, o) = (t.scale(), t.offset());
             [s[0], s[1], o[0], o[1]]
         });
-        self.slot(&info.texture(), tex_coord, scale_offset, space, resolve)
+        self.slot(&info.texture(), tex_coord, scale_offset, space)
     }
 
     fn slot(
@@ -403,7 +414,6 @@ impl Importer<'_> {
         tex_coord: u32,
         scale_offset: Option<[f32; 4]>,
         space: ColorSpace,
-        resolve: &impl Fn(&str) -> Option<Vec<u8>>,
     ) -> Option<TextureSlot> {
         if tex_coord > 1 {
             self.warnings.push(format!(
@@ -418,7 +428,7 @@ impl Importer<'_> {
             Some(i) => *i,
             None => {
                 let name = texture.name().unwrap_or("texture");
-                let i = match self.image(image, name, space, resolve) {
+                let i = match self.image(image, name, space) {
                     Ok(i) => Some(i),
                     Err(e) => {
                         self.warnings.push(format!("image {image}: {e}; slot dropped"));
@@ -437,13 +447,7 @@ impl Importer<'_> {
     }
 
     /// Stores an image's encoded bytes as a blob. Read from the JSON: the wrapper panics on malformed images.
-    fn image(
-        &mut self,
-        image: usize,
-        name: &str,
-        space: ColorSpace,
-        resolve: &impl Fn(&str) -> Option<Vec<u8>>,
-    ) -> Result<u32, String> {
+    fn image(&mut self, image: usize, name: &str, space: ColorSpace) -> Result<u32, String> {
         let doc = self.doc;
         let json = &doc.as_json().images[image];
         let bytes = match (&json.buffer_view, &json.uri) {
@@ -455,7 +459,7 @@ impl Importer<'_> {
                     .ok_or("bufferView out of bounds")?
                     .to_vec()
             }
-            (None, Some(uri)) => self.load_uri(uri, resolve)?,
+            (None, Some(uri)) => self.load_uri(uri)?,
             (None, None) => return Err("no source".into()),
         };
         let format = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {

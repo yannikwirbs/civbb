@@ -219,7 +219,19 @@ fn dir_resolver_refuses_escapes() {
 /// Imports every Khronos sample in `corpus/local/khronos/` (gitignored; fetch list on issue #9). Skips if absent.
 #[test]
 fn khronos_samples_import() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/local/khronos");
+    import_local("khronos");
+}
+
+/// Imports every VRM in `corpus/local/vrm/` (gitignored; third-party avatars never go in git). Skips if absent.
+#[test]
+fn local_vrms_import() {
+    import_local("vrm");
+}
+
+fn import_local(sub: &str) {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/local")
+        .join(sub);
     let Ok(entries) = std::fs::read_dir(&dir) else {
         eprintln!("skipped: {} not present", dir.display());
         return;
@@ -227,7 +239,7 @@ fn khronos_samples_import() {
     let mut files: Vec<_> = entries
         .flatten()
         .flat_map(|e| walk(&e.path()))
-        .filter(|p| p.extension().is_some_and(|x| x == "gltf" || x == "glb"))
+        .filter(|p| p.extension().is_some_and(|x| x == "gltf" || x == "glb" || x == "vrm"))
         .collect();
     files.sort();
     let mut failures = Vec::new();
@@ -240,24 +252,29 @@ fn khronos_samples_import() {
                 let verts: usize = a.meshes.iter().map(|m| m.positions.len()).sum();
                 let shapes: usize = a.meshes.iter().map(|m| m.blend_shapes.len()).sum();
                 let skinned = a.meshes.iter().filter(|m| m.skin.is_some()).count();
+                let toon = a
+                    .materials
+                    .iter()
+                    .filter(|m| matches!(m.model, MaterialModel::Toon(_)))
+                    .count();
                 eprintln!(
-                    "{}: {} nodes, {} meshes ({skinned} skinned), {verts} verts, {shapes} shapes, {} textures, {} clips, warnings {:?}",
+                    "{}: {} nodes, {} meshes ({skinned} skinned), {verts} verts, {shapes} shapes, {} textures, {} clips, {} human bones, {} visemes, {} chains, {} colliders, {toon} toon, warnings {:?}",
                     f.file_name().unwrap().display(),
                     a.hierarchy.nodes.len(),
                     a.meshes.len(),
                     a.textures.len(),
                     a.clips.len(),
+                    a.humanoid.as_ref().map_or(0, |h| h.bones.len()),
+                    a.face.as_ref().map_or(0, |f| f.visemes.len()),
+                    a.dynamics.chains.len(),
+                    a.dynamics.colliders.len(),
                     i.warnings
                 );
             }
             Err(e) => failures.push(format!("{}: {e}", f.display())),
         }
     }
-    eprintln!(
-        "imported {} of {} Khronos samples",
-        files.len() - failures.len(),
-        files.len()
-    );
+    eprintln!("imported {} of {} in {sub}", files.len() - failures.len(), files.len());
     assert!(failures.is_empty(), "{failures:#?}");
 }
 
@@ -266,4 +283,214 @@ fn walk(p: &std::path::Path) -> Vec<std::path::PathBuf> {
         Ok(entries) => entries.flatten().flat_map(|e| walk(&e.path())).collect(),
         Err(_) => vec![p.to_path_buf()],
     }
+}
+
+/// A tiny rig: root, hips, spine, head (at z 0.1), a two-bone hair strand on the head and a face mesh with four
+/// morph targets (`A`, `Blink`, `Joy`, `Wink`).
+fn vrm_rig() -> (Value, Vec<u8>) {
+    let mut bin = f32s(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
+    bin.extend(f32s(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0]));
+    let doc = json!({
+        "scenes": [{"nodes": [0]}],
+        "nodes": [
+            {"name": "Root", "children": [1, 6]},
+            {"name": "Hips", "translation": [0.0, 1.0, 0.0], "children": [2]},
+            {"name": "Spine", "translation": [0.0, 0.1, 0.0], "children": [3]},
+            {"name": "Head", "translation": [0.0, 0.5, 0.1], "children": [4]},
+            {"name": "Hair", "translation": [0.0, 0.1, 0.0], "children": [5]},
+            {"name": "HairEnd", "translation": [0.0, 0.0, -0.1]},
+            {"name": "Face", "mesh": 0},
+        ],
+        "meshes": [{
+            "primitives": [{"attributes": {"POSITION": 0}, "material": 0,
+                "targets": [{"POSITION": 1}, {"POSITION": 1}, {"POSITION": 1}, {"POSITION": 1}]}],
+            "extras": {"targetNames": ["A", "Blink", "Joy", "Wink"]},
+        }],
+        "materials": [{"name": "Skin"}],
+        "bufferViews": [{"buffer": 0, "byteLength": 36}, {"buffer": 0, "byteOffset": 36, "byteLength": 36}],
+        "accessors": [
+            {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 0]},
+            {"bufferView": 1, "componentType": 5126, "count": 3, "type": "VEC3"},
+        ],
+    });
+    (doc, bin)
+}
+
+fn close(a: [f32; 3], b: [f32; 3]) -> bool {
+    a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-5)
+}
+
+#[test]
+fn vrm0_imports() {
+    use civbb_format::dynamics::Shape;
+    use civbb_format::face::{ShapeBind, Viseme};
+    use civbb_format::hierarchy::HumanBone;
+    use civbb_format::material::AlphaMode;
+
+    let (mut doc, bin) = vrm_rig();
+    doc["extensionsUsed"] = json!(["VRM"]);
+    doc["extensions"] = json!({"VRM": {
+        "meta": {"title": "Vroid"},
+        "humanoid": {"humanBones": [
+            {"bone": "hips", "node": 1}, {"bone": "spine", "node": 2}, {"bone": "head", "node": 3},
+            {"bone": "head", "node": 2}, {"bone": "tail", "node": 4},
+        ]},
+        "firstPerson": {"firstPersonBone": 3, "firstPersonBoneOffset": {"x": 0, "y": 0.06, "z": 0}},
+        "blendShapeMaster": {"blendShapeGroups": [
+            {"name": "A", "presetName": "a", "binds": [{"mesh": 0, "index": 0, "weight": 100}]},
+            {"name": "Blink", "presetName": "blink", "binds": [{"mesh": 0, "index": 1, "weight": 100}]},
+            {"name": "Joy", "presetName": "joy", "binds": [{"mesh": 0, "index": 2, "weight": 50}]},
+            {"name": "Broken", "presetName": "unknown", "binds": [{"mesh": 0, "index": 9, "weight": 100}]},
+        ]},
+        "secondaryAnimation": {
+            "boneGroups": [{"stiffiness": 2.0, "gravityPower": 0.5, "gravityDir": {"x": 0, "y": -1, "z": 0},
+                "dragForce": 0.4, "hitRadius": 0.05, "bones": [4], "colliderGroups": [0]}],
+            "colliderGroups": [{"node": 3, "colliders": [{"offset": {"x": 0, "y": 0.1, "z": 0}, "radius": 0.1}]}],
+        },
+        "materialProperties": [{"name": "Skin", "shader": "VRM/MToon", "renderQueue": 2450,
+            "floatProperties": {"_BlendMode": 1, "_Cutoff": 0.3, "_OutlineWidthMode": 1, "_OutlineWidth": 0.5,
+                "_CullMode": 0, "_ShadeToony": 0.7},
+            "vectorProperties": {"_Color": [0.5, 0.5, 0.5, 1.0], "_ShadeColor": [1, 1, 1, 1]},
+            "textureProperties": {}}],
+    }});
+    let imported = import(&gltf(doc, &bin), &Limits::default(), no_files).unwrap();
+    let a = &imported.avatar;
+    assert_eq!(a.name, "Vroid");
+    assert_eq!(
+        a.hierarchy.nodes[0].rest.rotation,
+        [0.0, 1.0, 0.0, 0.0],
+        "turned to face +Z"
+    );
+
+    let h = a.humanoid.as_ref().unwrap();
+    assert_eq!(h.bones.len(), 3, "duplicate and unknown bones skipped");
+    assert_eq!(h.node(HumanBone::Head), Some(3));
+    assert!(close(h.viewpoint, [0.0, 1.66, -0.1]), "{:?}", h.viewpoint);
+
+    let face = a.face.as_ref().unwrap();
+    let bind = |shape| ShapeBind {
+        mesh: 0,
+        shape,
+        weight: 1.0,
+    };
+    assert_eq!(face.visemes, [(Viseme::Aa, vec![bind(0)])]);
+    assert_eq!(face.blink, [bind(1)]);
+
+    let joy = a.clips.iter().find(|c| c.name == "Joy").unwrap();
+    assert_eq!(joy.curves[0].binding.path, "Face");
+    assert_eq!(joy.curves[0].binding.property, Property::BlendShape("Joy".into()));
+    assert_eq!(joy.curves[0].keys[0].value, 50.0);
+    assert_eq!(
+        a.expressions.as_ref().unwrap().menu.controls.len(),
+        1,
+        "empty `Broken` gets no toggle"
+    );
+    assert!(imported.warnings.iter().any(|w| w.contains("missing blendshape")));
+
+    let chain = &a.dynamics.chains[0];
+    assert_eq!(chain.root, 4);
+    assert_eq!(
+        (chain.pull.value, chain.spring.value, chain.gravity.value),
+        (0.5, 0.6, 0.5)
+    );
+    assert_eq!((chain.radius.value, chain.colliders.as_slice()), (0.05, &[0][..]));
+    assert!(close(chain.endpoint, [0.0, 0.0, -0.07]), "{:?}", chain.endpoint);
+    assert_eq!(a.dynamics.colliders[0].node, 3);
+    assert_eq!(a.dynamics.colliders[0].shape, Shape::Sphere { radius: 0.1 });
+
+    let m = &a.materials[0];
+    let MaterialModel::Toon(t) = &m.model else {
+        panic!("not toon: {m:?}")
+    };
+    assert_eq!(
+        (m.alpha, m.double_sided, m.render_queue),
+        (AlphaMode::Mask { cutoff: 0.3 }, true, 2450)
+    );
+    assert!(
+        (t.base_color[0] - 0.214).abs() < 1e-3,
+        "sRGB 0.5 linearised: {}",
+        t.base_color[0]
+    );
+    assert_eq!((t.outline_width, t.shade_toony), (0.005, 0.7));
+}
+
+#[test]
+fn vrm1_imports() {
+    use civbb_format::dynamics::Shape;
+    use civbb_format::face::Viseme;
+    use civbb_format::hierarchy::HumanBone;
+
+    let (mut doc, bin) = vrm_rig();
+    doc["extensionsUsed"] = json!(["VRMC_vrm", "VRMC_springBone", "VRMC_materials_mtoon"]);
+    doc["materials"][0]["extensions"] = json!({"VRMC_materials_mtoon": {
+        "shadeColorFactor": [0.2, 0.3, 0.4], "outlineWidthMode": "worldCoordinates", "outlineWidthFactor": 0.002,
+    }});
+    doc["extensions"] = json!({
+        "VRMC_vrm": {
+            "specVersion": "1.0",
+            "meta": {"name": "Robo"},
+            "humanoid": {"humanBones": {"hips": {"node": 1}, "spine": {"node": 2}, "head": {"node": 3}}},
+            "lookAt": {"offsetFromHeadBone": [0.0, 0.05, 0.02]},
+            "expressions": {
+                "preset": {
+                    "aa": {"morphTargetBinds": [{"node": 6, "index": 0, "weight": 1.0}]},
+                    "blink": {"morphTargetBinds": [{"node": 6, "index": 1, "weight": 1.0}]},
+                    "happy": {"morphTargetBinds": [{"node": 6, "index": 2, "weight": 0.5}]},
+                    "lookUp": {"morphTargetBinds": [{"node": 6, "index": 3, "weight": 1.0}]},
+                },
+                "custom": {"Wink": {"morphTargetBinds": [{"node": 6, "index": 3, "weight": 1.0}]}},
+            },
+        },
+        "VRMC_springBone": {
+            "specVersion": "1.0",
+            "colliders": [{"node": 3, "shape": {"capsule": {"offset": [0, 0, 0], "tail": [0, 0.2, 0], "radius": 0.05}}}],
+            "colliderGroups": [{"colliders": [0]}],
+            "springs": [{"joints": [
+                {"node": 4, "stiffness": 1.0, "dragForce": 0.5, "hitRadius": 0.02},
+                {"node": 5, "stiffness": 2.0},
+            ], "colliderGroups": [0]}],
+        },
+    });
+    let imported = import(&gltf(doc, &bin), &Limits::default(), no_files).unwrap();
+    let a = &imported.avatar;
+    assert_eq!(a.name, "Robo");
+    assert_eq!(
+        a.hierarchy.nodes[0].rest.rotation,
+        [0.0, 0.0, 0.0, 1.0],
+        "1.0 already faces +Z"
+    );
+    let h = a.humanoid.as_ref().unwrap();
+    assert_eq!(h.node(HumanBone::Spine), Some(2));
+    assert!(close(h.viewpoint, [0.0, 1.65, 0.12]), "{:?}", h.viewpoint);
+
+    let face = a.face.as_ref().unwrap();
+    assert_eq!(face.visemes[0].0, Viseme::Aa);
+    assert_eq!(face.blink[0].shape, 1);
+    let names: Vec<&str> = a.clips.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, ["happy", "Wink"], "look expressions wait for #44");
+    assert_eq!(a.animator.as_ref().unwrap().parameters.len(), 2);
+
+    let chain = &a.dynamics.chains[0];
+    assert_eq!(
+        (chain.root, chain.ignore.as_slice(), chain.endpoint),
+        (4, &[][..], [0.0; 3])
+    );
+    assert_eq!(
+        (chain.pull.value, chain.spring.value, chain.radius.value),
+        (0.25, 0.5, 0.02)
+    );
+    let c = &a.dynamics.colliders[0];
+    assert_eq!(
+        c.shape,
+        Shape::Capsule {
+            radius: 0.05,
+            height: 0.3
+        }
+    );
+    assert!(close(c.position, [0.0, 0.1, 0.0]));
+
+    let MaterialModel::Toon(t) = &a.materials[0].model else {
+        panic!("not toon")
+    };
+    assert_eq!((t.shade_color, t.outline_width), ([0.2, 0.3, 0.4], 0.002));
 }
