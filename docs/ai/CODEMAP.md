@@ -11,10 +11,15 @@ Internal deps: civbb-format
 
 - `src/bind.rs`: Compile-time binding: resolves curve paths to slots in one flat buffer with per-slot defaults (ADR 0007).
 - `src/clip.rs`: A clip bound to slots, and sampling it into the slot buffer.
+- `src/controller.rs`: A compiled animator controller and one running instance of it: parameters, layers, the evaluated pose.
 - `src/curve.rs`: Evaluates a curve of Hermite keys with Unity `AnimationCurve` semantics (ADR 0007).
 - `src/lib.rs`: Animation runtime: compile-time curve binding, clip sampling, Mecanim state machines and blend trees (design doc §7).
+- `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
+- `src/mix.rs`: Layer pose mixing: weighted sources, the default fill, override and additive layers, masks (ADR 0008).
+- `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
 - `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order.
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
+- `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
 
 ## `crates/format` (civbb-format)
 
@@ -82,6 +87,7 @@ Internal deps: none
 - `docs/adr/0005-ai-workflow.md`: 0005: How AI sessions track work and state
 - `docs/adr/0006-facing-face-and-vrm-mapping.md`: 0006: Avatars face +Z, faces are shape binds, VRM maps to native types by documented heuristics
 - `docs/adr/0007-curve-slots-and-key-semantics.md`: 0007: Curves bind to a flat slot buffer at compile time; keys follow Unity's AnimationCurve
+- `docs/adr/0008-state-machine-and-layer-mixing.md`: 0008: Mecanim state machine timing, interruption and layer mixing
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

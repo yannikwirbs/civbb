@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
 use civbb_format::animator::{ClipIndex, Curve, Key, ParamIndex, ParamKind, Property};
-use civbb_format::hierarchy::NodeIndex;
+use civbb_format::hierarchy::{Hierarchy, NodeIndex};
 use civbb_format::mesh::MeshIndex;
 
 use crate::clip::{BoundClip, BoundCurve, EulerCurves, quat_to_euler};
@@ -75,6 +75,19 @@ pub struct Bound {
     pub unbound: Vec<Unbound>,
 }
 
+/// Unity-style binding path of every node: names below the root joined by `/`; the root's is empty.
+pub fn node_paths(h: &Hierarchy) -> Vec<String> {
+    let mut paths: Vec<String> = Vec::with_capacity(h.nodes.len());
+    for n in &h.nodes {
+        paths.push(match n.parent {
+            None => String::new(),
+            Some(0) => n.name.clone(),
+            Some(p) => format!("{}/{}", paths[p as usize], n.name),
+        });
+    }
+    paths
+}
+
 /// Binds every clip of a validated avatar.
 pub fn bind(avatar: &Avatar) -> Bound {
     let mut b = Binder::new(avatar);
@@ -110,17 +123,10 @@ struct NodeRotation<'a> {
 
 impl<'a> Binder<'a> {
     fn new(avatar: &'a Avatar) -> Self {
-        let mut paths: Vec<String> = Vec::with_capacity(avatar.hierarchy.nodes.len());
         let mut nodes = HashMap::new();
-        for (i, n) in avatar.hierarchy.nodes.iter().enumerate() {
-            let path = match n.parent {
-                None => String::new(),
-                Some(0) => n.name.clone(),
-                Some(p) => format!("{}/{}", paths[p as usize], n.name),
-            };
+        for (i, path) in node_paths(&avatar.hierarchy).into_iter().enumerate() {
             // Sibling names should be unique; if not, the first node wins, as Unity's `Transform.Find` does.
-            nodes.entry(path.clone()).or_insert(i as NodeIndex);
-            paths.push(path);
+            nodes.entry(path).or_insert(i as NodeIndex);
         }
         let mut meshes: HashMap<NodeIndex, Vec<MeshIndex>> = HashMap::new();
         for (i, m) in avatar.meshes.iter().enumerate() {
