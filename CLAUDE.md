@@ -18,7 +18,8 @@ CIVBB is a social VR platform on a custom Rust + Vulkan engine. The product spec
 - New file: start it with a `//!` line saying its one job (the code map uses it). New crate: `description` in Cargo.toml, a `README.md`, and a layer in `tools/xtask/src/main.rs`.
 - A decision the design doc doesn't make, or a deviation from it: write an ADR in `docs/adr/` (copy `0000-template.md`). ADRs are not edited after acceptance; supersede them.
 - Found work outside the current issue: open an issue with labels and milestone, don't do it now.
-- Something the human must do (install, hardware test, licence call, Unity run): open an issue labelled `needs-user` and list it in STATUS.md.
+- Something the human must do (install, hardware test, licence call): open an issue labelled `needs-user` and list it in STATUS.md.
+- Sessions may run Unity themselves (batch mode via the Unity CLI or `Unity.exe -batchmode`) on projects inside this repo. Never drive an Editor the human has open on another project.
 
 ## End of every session (always, even when stopping early)
 
