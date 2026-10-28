@@ -110,6 +110,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "civbb-dynamics"
+version = "0.0.0"
+dependencies = [
+ "civbb-corpus",
+ "civbb-format",
+]
+
+[[package]]
 name = "civbb-format"
 version = "0.0.0"
 dependencies = [

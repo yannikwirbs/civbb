@@ -1,0 +1,16 @@
+[package]
+name = "civbb-dynamics"
+description = "Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+civbb-format.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+civbb-corpus.workspace = true

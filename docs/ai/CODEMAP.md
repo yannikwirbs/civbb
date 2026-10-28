@@ -27,6 +27,18 @@ Internal deps: civbb-format
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
 - `tests/muscle.rs`: Humanoid muscles (ADR 0014): the table against Unity's, hand-derived muscle space, poses recorded from Unity's
 
+## `crates/dynamics` (civbb-dynamics)
+
+Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose.
+
+Internal deps: civbb-format
+
+- `src/lib.rs`: Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose (design doc §7, ADR 0015).
+- `src/math.rs`: Vector and quaternion helpers for the solver; they move to `civbb-core` with #22.
+- `src/rig.rs`: Compiles an avatar's chains into one flat particle list, parents first, with per-particle parameters (ADR 0015).
+- `src/solver.rs`: Steps an avatar's chains against the animated pose (inertia, gravity, pull, stiffness, lengths, immobile, grab and
+- `tests/solver.rs`: Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness,
+
 ## `crates/format` (civbb-format)
 
 Content format: avatar data model and signed, content-addressed runtime packages. No engine deps.
@@ -101,6 +113,7 @@ Internal deps: none
 - `docs/adr/0012-eye-look-first-person-and-licence.md`: 0012: Eye look, first-person visibility and licence metadata (format v3)
 - `docs/adr/0013-unity-ground-truth-in-batch-mode.md`: 0013: Unity ground truth is recorded in batch mode by `tools/unity-truth`
 - `docs/adr/0014-humanoid-muscle-space.md`: 0014: Humanoid muscles follow Unity's muscle space, recorded per bone (format v4)
+- `docs/adr/0015-chain-solver-model.md`: 0015: PhysBone chains are solved as XPBD particles against the animated pose
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status
