@@ -171,6 +171,10 @@ fn hostile_input_is_rejected_without_panicking() {
         d["nodes"] = json!([{"children": [1]}, {"children": [0]}])
     });
     reject("listed twice", &|d| d["scenes"][0]["nodes"] = json!([0, 0]));
+    // Fuzz crash 703dba39: gltf-json indexed POSITION accessors before checking the index.
+    reject("POSITION accessor", &|d| {
+        d["meshes"][0]["primitives"][0]["attributes"]["POSITION"] = json!(5)
+    });
     reject("unsigned integer", &|d| {
         d["meshes"][0]["primitives"][0]["indices"] = json!(0)
     });

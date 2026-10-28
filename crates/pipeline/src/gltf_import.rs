@@ -18,6 +18,7 @@ use civbb_format::mesh::{BlendShape, Mesh, ShapeDelta, Skin, Submesh};
 use civbb_format::{Avatar, BlobId, Caps};
 use gltf::Document;
 use gltf::animation::{Interpolation, Property as GltfProperty};
+use gltf::json::validation::Checked;
 use gltf::mesh::{Mode, Semantic};
 
 use crate::accessor::{arrays, floats, uints};
@@ -84,7 +85,7 @@ pub fn import(
     if bytes.starts_with(b"glTF") && glb_length.is_some_and(|l| l < 12) {
         return Err(ImportError("GLB length shorter than its header".into()));
     }
-    let gltf = gltf::Gltf::from_slice(bytes).map_err(|e| ImportError(e.to_string()))?;
+    let gltf = parse(bytes).map_err(|e| ImportError(e.to_string()))?;
     let mut im = Importer {
         doc: &gltf.document,
         resolve: &resolve,
@@ -146,6 +147,31 @@ pub fn import(
         avatar,
         blobs: im.blobs,
         warnings: im.warnings,
+    })
+}
+
+/// Parses and validates the document. gltf-json's validation indexes each primitive's POSITION accessor before
+/// checking that index (fuzz crash 703dba39), so that check runs first.
+fn parse(bytes: &[u8]) -> Result<gltf::Gltf, gltf::Error> {
+    let unchecked = gltf::Gltf::from_slice_without_validation(bytes)?;
+    let json = unchecked.document.into_json();
+    let positions = Checked::Valid(gltf::json::mesh::Semantic::Positions);
+    let bad = json
+        .meshes
+        .iter()
+        .flat_map(|m| &m.primitives)
+        .filter_map(|p| p.attributes.get(&positions))
+        .any(|i| i.value() >= json.accessors.len());
+    if bad {
+        let error = gltf::json::validation::Error::IndexOutOfBounds;
+        return Err(gltf::Error::Validation(vec![(
+            gltf::json::Path::new().field("POSITION accessor"),
+            error,
+        )]));
+    }
+    Ok(gltf::Gltf {
+        document: Document::from_json(json)?,
+        blob: unchecked.blob,
     })
 }
 
