@@ -1,0 +1,25 @@
+{
+  "source": "Hand-derived. VRCFury, Write Default Bugs, 'Mixed Write Defaults', and VRC School: one WD-off state makes the controller behave as WD off, so a WD-on empty state no longer resets the hat.",
+  "nodes": [{ "name": "Hat", "active": false }, { "name": "B" }],
+  "params": [{ "name": "p", "kind": "Bool", "default": 0 }],
+  "clips": {
+    "B2": { "length": 1, "curves": [["B.x", [[0, 2]]]] },
+    "HatOn": { "length": 1, "curves": [["Hat.active", [[0, 1]]]] }
+  },
+  "layers": [
+    { "name": "Fixed", "states": [{ "name": "B2", "motion": { "clip": "B2" }, "wd": false }] },
+    {
+      "name": "Toggle",
+      "states": [
+        { "name": "Off", "motion": null, "wd": true, "transitions": [{ "to": "On", "if": ["p"] }] },
+        { "name": "On", "motion": { "clip": "HatOn" }, "wd": true, "transitions": [{ "to": "Off", "if_not": ["p"] }] }
+      ]
+    }
+  ],
+  "dt": 0.1,
+  "frames": [
+    { "expect": { "Hat.active": 0, "B.x": 2 } },
+    { "set": { "p": 1 }, "expect": { "Toggle": "On", "Hat.active": 1 } },
+    { "set": { "p": 0 }, "expect": { "Toggle": "Off", "Hat.active": 1 } }
+  ]
+}

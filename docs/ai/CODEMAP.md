@@ -15,11 +15,12 @@ Internal deps: civbb-format
 - `src/curve.rs`: Evaluates a curve of Hermite keys with Unity `AnimationCurve` semantics (ADR 0007).
 - `src/lib.rs`: Animation runtime: compile-time curve binding, clip sampling, Mecanim state machines and blend trees (design doc §7).
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
-- `src/mix.rs`: Layer pose mixing: weighted sources, the default fill, override and additive layers, masks (ADR 0008, 0009).
+- `src/mix.rs`: Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
 - `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order.
 - `tests/blend.rs`: Blend tree weights, hand-derived (ADR 0009): 1D, 2D simple directional, freeform cartesian and polar gradient
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
+- `tests/golden.rs`: Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
 
 ## `crates/format` (civbb-format)
@@ -90,6 +91,7 @@ Internal deps: none
 - `docs/adr/0007-curve-slots-and-key-semantics.md`: 0007: Curves bind to a flat slot buffer at compile time; keys follow Unity's AnimationCurve
 - `docs/adr/0008-state-machine-and-layer-mixing.md`: 0008: Mecanim state machine timing, interruption and layer mixing
 - `docs/adr/0009-blend-tree-weights.md`: 0009: Blend tree weights, time sync and weights that do not sum to 1
+- `docs/adr/0010-write-defaults-model.md`: 0010: Write Defaults model and golden-file conformance cases
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

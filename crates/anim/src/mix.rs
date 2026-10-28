@@ -1,4 +1,4 @@
-//! Layer pose mixing: weighted sources, the default fill, override and additive layers, masks (ADR 0008, 0009).
+//! Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 
 use civbb_format::animator::{LayerBlending, State};
 use civbb_format::math::Quat;
@@ -15,6 +15,8 @@ const IDENTITY: Quat = [0.0, 0.0, 0.0, 1.0];
 pub(crate) struct Mixer {
     /// Weighted sum of (value - default) per slot; additive layers: of (value - first-frame value).
     acc: Vec<f32>,
+    /// Weight of Write Defaults off sources that animate the slot; the rest of their weight holds the input.
+    held: Vec<f32>,
     /// Layer values (override) or deltas (additive) of the written slots.
     val: Vec<f32>,
     mark: Vec<bool>,
@@ -28,6 +30,7 @@ impl Mixer {
     pub(crate) fn new(slots: usize) -> Self {
         Self {
             acc: vec![0.0; slots],
+            held: vec![0.0; slots],
             val: vec![0.0; slots],
             mark: vec![false; slots],
             written: Vec::new(),
@@ -37,16 +40,22 @@ impl Mixer {
         }
     }
 
-    /// Evaluates layer `li` into `val` for every slot a source with weight above 0 animates.
-    pub(crate) fn layer(&mut self, c: &Controller, li: usize, run: &LayerRun, params: &[f32]) {
+    /// Evaluates layer `li` over the incoming pose `inp` into `val`, for every slot a source with weight above 0
+    /// animates. A source not animating a written slot contributes the default (Write Defaults on) or the
+    /// incoming value (off); weight short of 1 goes to the default.
+    pub(crate) fn layer(&mut self, c: &Controller, li: usize, run: &LayerRun, params: &[f32], inp: &[f32]) {
         for &s in &self.written {
             self.acc[s as usize] = 0.0;
+            self.held[s as usize] = 0.0;
             self.mark[s as usize] = false;
         }
         self.written.clear();
         let additive = c.animator.layers[li].blending == LayerBlending::Additive;
         let defaults = &c.bound.bindings.defaults;
+        let states = &c.animator.layers[li].state_machine.states;
         let progress = run.active.map_or(0.0, |a| a.progress.clamp(0.0, 1.0));
+        // Total weight of Write Defaults off sources.
+        let mut off = 0.0;
         let mut sources: [Option<(f32, Src)>; 2] = [None, None];
         sources[0] = Some((
             1.0 - progress,
@@ -62,11 +71,18 @@ impl Mixer {
             if ws <= 0.0 {
                 continue;
             }
+            let wd = match src {
+                // A snapshot keeps the Write Defaults of the state it was taken in.
+                Src::Snapshot => states[run.current as usize].write_defaults,
+                Src::State(p) => states[p.state as usize].write_defaults,
+            };
+            let hold = if wd || additive { 0.0 } else { ws };
             match src {
                 Src::Snapshot => {
                     let From::Snapshot(snap) = &run.from else {
                         unreachable!()
                     };
+                    off += hold;
                     for &(s, v) in snap {
                         let su = s as usize;
                         let reference = match (additive, c.rot[su]) {
@@ -75,10 +91,11 @@ impl Mixer {
                             (true, k) => IDENTITY[k as usize - 1],
                         };
                         self.add(s, ws * (v - reference));
+                        self.held[su] += hold;
                     }
                 }
                 Src::State(p) => {
-                    let state = &c.animator.layers[li].state_machine.states[p.state as usize];
+                    let state = &states[p.state as usize];
                     self.leaves.clear();
                     if let Some(m) = &state.motion {
                         motion::leaves(
@@ -89,9 +106,11 @@ impl Mixer {
                             &mut self.leaves,
                         );
                     }
+                    let total: f32 = self.leaves.iter().map(|l| l.weight).sum();
+                    off += hold * if self.leaves.is_empty() { 1.0 } else { total };
                     for k in 0..self.leaves.len() {
                         let leaf = self.leaves[k];
-                        self.leaf(c, leaf, ws * leaf.weight, additive);
+                        self.leaf(c, leaf, ws * leaf.weight, hold * leaf.weight, additive);
                     }
                 }
             }
@@ -100,22 +119,33 @@ impl Mixer {
         let mut i = 0;
         while i < self.written.len() {
             let s = self.written[i] as usize;
+            let keep = off - self.held[s];
             if c.rot[s] == 1 {
+                let d = quat(defaults, s);
+                let input = align(quat(inp, s), d);
                 let q: [f32; 4] = std::array::from_fn(|k| {
-                    let base = if additive { IDENTITY[k] } else { defaults[s + k] };
-                    base + self.acc[s + k]
+                    if additive {
+                        IDENTITY[k] + self.acc[s + k]
+                    } else {
+                        d[k] + self.acc[s + k] + keep * (input[k] - d[k])
+                    }
                 });
                 self.val[s..s + 4].copy_from_slice(&normalize(q));
                 i += 4;
             } else {
-                self.val[s] = if additive { 0.0 } else { defaults[s] } + self.acc[s];
+                self.val[s] = if additive {
+                    self.acc[s]
+                } else {
+                    defaults[s] + self.acc[s] + keep * (inp[s] - defaults[s])
+                };
                 i += 1;
             }
         }
     }
 
     /// Adds one clip at weight `w`: its values relative to the default, or to its first frame (additive).
-    fn leaf(&mut self, c: &Controller, leaf: Leaf, w: f32, additive: bool) {
+    /// `hold` is its weight if its state has Write Defaults off.
+    fn leaf(&mut self, c: &Controller, leaf: Leaf, w: f32, hold: f32, additive: bool) {
         let clip = &c.bound.clips[leaf.clip as usize];
         let defaults = &c.bound.bindings.defaults;
         clip.sample(leaf.time, &mut self.sample);
@@ -137,10 +167,12 @@ impl Mixer {
                 for k in 0..4 {
                     self.add(s + k as Slot, w * (d[k] - reference[k]));
                 }
+                self.held[su] += hold;
                 i += 4;
             } else {
                 let reference = if additive { self.base[su] } else { defaults[su] };
                 self.add(s, w * (self.sample[su] - reference));
+                self.held[su] += hold;
                 i += 1;
             }
         }

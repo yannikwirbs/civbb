@@ -97,6 +97,8 @@ version = "0.0.0"
 dependencies = [
  "civbb-corpus",
  "civbb-format",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

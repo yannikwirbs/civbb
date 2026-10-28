@@ -1,0 +1,20 @@
+{
+  "source": "Hand-derived. VRC School, Write Defaults: a WD-off direct blend tree child at weight x, with siblings weighing S that do not animate the property, converges to x / (1 - S) of its value: P' = x * 1 + S * P.",
+  "nodes": [{ "name": "A" }, { "name": "B" }],
+  "params": [
+    { "name": "x", "kind": "Float", "default": 0.5 },
+    { "name": "s", "kind": "Float", "default": 0.25 }
+  ],
+  "clips": {
+    "P": { "length": 1, "curves": [["A.x", [[0, 1]]]] },
+    "Q": { "length": 1, "curves": [["B.x", [[0, 1]]]] }
+  },
+  "layers": [{ "name": "Direct", "states": [{ "name": "Tree", "motion": { "direct": [["x", "P"], ["s", "Q"]] }, "wd": false }] }],
+  "dt": 0.1,
+  "frames": [
+    { "expect": { "A.x": 0.5, "B.x": 0.25 } },
+    { "expect": { "A.x": 0.625, "B.x": 0.375 } },
+    { "expect": { "A.x": 0.65625, "B.x": 0.4375 } },
+    { "expect": { "A.x": 0.6640625, "B.x": 0.46875 } }
+  ]
+}

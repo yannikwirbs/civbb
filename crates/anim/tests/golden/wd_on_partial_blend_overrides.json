@@ -1,0 +1,19 @@
+{
+  "source": "Hand-derived. VRCFury, Write Default Bugs, 'WD On Blending Is Not Additive': default 0, layer 1 animates 5, a lower layer's blend tree animates 10 at weight 0.1: result 1; at weight 0 the result is 5.",
+  "nodes": [{ "name": "A" }, { "name": "B" }],
+  "params": [{ "name": "w", "kind": "Float", "default": 0.1 }],
+  "clips": {
+    "Five": { "length": 1, "curves": [["A.x", [[0, 5]]]] },
+    "Other": { "length": 1, "curves": [["B.x", [[0, 1]]]] },
+    "Ten": { "length": 1, "curves": [["A.x", [[0, 10]]]] }
+  },
+  "layers": [
+    { "name": "Base", "states": [{ "name": "Five", "motion": { "clip": "Five" }, "wd": true }] },
+    { "name": "Tree", "states": [{ "name": "Tree", "motion": { "simple1d": ["w", [[0, "Other"], [1, "Ten"]]] }, "wd": true }] }
+  ],
+  "dt": 0.1,
+  "frames": [
+    { "expect": { "A.x": 1, "B.x": 0.9 } },
+    { "set": { "w": 0 }, "expect": { "A.x": 5, "B.x": 1 } }
+  ]
+}

@@ -22,6 +22,8 @@ pub struct Controller {
     pub(crate) rot: Vec<u8>,
     /// Per layer, whether it is the first of its group, whose weight Unity fixes at 1.
     first_in_group: Vec<bool>,
+    /// Some state has Write Defaults off: frames start from the last pose instead of defaults (ADR 0010).
+    pub wd_off: bool,
 }
 
 impl Controller {
@@ -67,12 +69,18 @@ impl Controller {
             .collect();
         let mut seen = HashSet::new();
         let first_in_group = animator.layers.iter().map(|l| seen.insert(l.group)).collect();
+        let wd_off = animator
+            .layers
+            .iter()
+            .flat_map(|l| &l.state_machine.states)
+            .any(|s| !s.write_defaults);
         Some(Self {
             animator,
             bound,
             masks,
             rot,
             first_in_group,
+            wd_off,
         })
     }
 
@@ -126,10 +134,13 @@ impl Instance {
         self.runs[i].as_ref()
     }
 
-    /// Advances every layer by `dt` seconds, takes transitions and evaluates the pose. Animated parameters
-    /// take their new values at the end, so conditions see them next frame.
+    /// Advances every layer by `dt` seconds, takes transitions and evaluates the pose, starting from defaults or,
+    /// with any Write Defaults off state, from the last pose. Animated parameters take their new values at the
+    /// end, so conditions see them next frame.
     pub fn update(&mut self, c: &Controller, dt: f32) {
-        self.pose.copy_from_slice(&c.bound.bindings.defaults);
+        if !c.wd_off {
+            self.pose.copy_from_slice(&c.bound.bindings.defaults);
+        }
         self.written.fill(false);
         for (li, layer) in c.animator.layers.iter().enumerate() {
             let ctx = Ctx {
@@ -142,7 +153,7 @@ impl Instance {
                     run.advance(&ctx, &self.params, dt);
                     if let Some(t) = run.select(&ctx, &self.params) {
                         let snapshot = run.active.is_some().then(|| {
-                            self.mixer.layer(c, li, run, &self.params);
+                            self.mixer.layer(c, li, run, &self.params, &self.pose);
                             self.mixer.snapshot()
                         });
                         run.fire(&ctx, &mut self.params, t, snapshot);
@@ -158,7 +169,7 @@ impl Instance {
             };
             let w = (lw * self.group_weights[layer.group as usize]).clamp(0.0, 1.0);
             if w > 0.0 {
-                self.mixer.layer(c, li, run, &self.params);
+                self.mixer.layer(c, li, run, &self.params, &self.pose);
                 self.mixer.apply(c, li, w, &mut self.pose, &mut self.written);
             }
         }

@@ -1,0 +1,110 @@
+{
+  "source": "Hand-derived from ADR 0010: the same cross-fade with WD off: properties the other state lacks hold their incoming value, so A.x stays 1.",
+  "nodes": [
+    {
+      "name": "A"
+    },
+    {
+      "name": "B"
+    }
+  ],
+  "params": [
+    {
+      "name": "p",
+      "kind": "Bool",
+      "default": 0
+    }
+  ],
+  "clips": {
+    "A1": {
+      "length": 1,
+      "curves": [
+        [
+          "A.x",
+          [
+            [
+              0,
+              1
+            ]
+          ]
+        ]
+      ]
+    },
+    "B1": {
+      "length": 1,
+      "curves": [
+        [
+          "B.x",
+          [
+            [
+              0,
+              1
+            ]
+          ]
+        ]
+      ]
+    }
+  },
+  "layers": [
+    {
+      "name": "L",
+      "states": [
+        {
+          "name": "S1",
+          "motion": {
+            "clip": "A1"
+          },
+          "wd": false,
+          "transitions": [
+            {
+              "to": "S2",
+              "if": [
+                "p"
+              ],
+              "duration": 1
+            }
+          ]
+        },
+        {
+          "name": "S2",
+          "motion": {
+            "clip": "B1"
+          },
+          "wd": false
+        }
+      ]
+    }
+  ],
+  "dt": 0.5,
+  "frames": [
+    {
+      "expect": {
+        "A.x": 1,
+        "B.x": 0
+      }
+    },
+    {
+      "set": {
+        "p": 1
+      },
+      "expect": {
+        "L": "S1",
+        "A.x": 1,
+        "B.x": 0
+      }
+    },
+    {
+      "expect": {
+        "A.x": 1,
+        "B.x": 0.5
+      }
+    },
+    {
+      "expect": {
+        "L": "S2",
+        "A.x": 1,
+        "B.x": 1
+      }
+    }
+  ]
+}
