@@ -92,6 +92,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "civbb-anim"
+version = "0.0.0"
+dependencies = [
+ "civbb-corpus",
+ "civbb-format",
+]
+
+[[package]]
 name = "civbb-corpus"
 version = "0.0.0"
 dependencies = [

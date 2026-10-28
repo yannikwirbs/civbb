@@ -1,0 +1,16 @@
+[package]
+name = "civbb-anim"
+description = "Animation runtime: compile-time curve binding, clip sampling, Mecanim state machines and blend trees."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+civbb-format.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+civbb-corpus.workspace = true

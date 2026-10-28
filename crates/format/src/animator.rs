@@ -400,7 +400,7 @@ pub enum Property {
     Position(u8),
     /// Local rotation quaternion component (0 = x .. 3 = w).
     Rotation(u8),
-    /// Local Euler angle component in degrees (Unity `localEulerAnglesRaw`).
+    /// Local Euler angle component in degrees about our axes, applied Z, X, Y (Unity `localEulerAnglesRaw`, ADR 0007).
     EulerRotation(u8),
     /// Local scale component.
     Scale(u8),
