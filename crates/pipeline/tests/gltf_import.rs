@@ -234,6 +234,12 @@ fn local_vrms_import() {
     import_local("vrm");
 }
 
+/// Imports every GLB in `corpus/local/glb/` (gitignored; Booth avatars converted from FBX). Skips if absent.
+#[test]
+fn local_glbs_import() {
+    import_local("glb");
+}
+
 fn import_local(sub: &str) {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../corpus/local")

@@ -8,5 +8,5 @@ Continue CIVBB. Follow the session protocol in CLAUDE.md: read docs/ai/STATUS.md
 
 ## For the human, optional
 
-- #11: download 3-5 free popular Booth avatars plus one well-optimised control avatar, export them as VRM, and drop them in `corpus/local/vrm/` (gitignored). `cargo test -p civbb-pipeline local_vrms -- --nocapture` then imports each and lists anything skipped. Three sample VRMs from vrm-c are already there.
+- More Booth avatars: drop the zips in `corpus/local/` and ask the session to convert them (`corpus/README.md`).
 - Local fuzzing is optional (CI runs it): `rustup toolchain install nightly`, `cargo install cargo-fuzz`, see `fuzz/README.md`.
