@@ -1,0 +1,37 @@
+# Fuzzes every parser of untrusted input (design doc §16): one minute per target on push, ten every night.
+name: fuzz
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [package_decode, avatar_validate, gltf_import]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - run: cargo run --release --manifest-path fuzz/Cargo.toml --bin seeds
+      - name: fuzz
+        run: |
+          seconds=60
+          if [ "${{ github.event_name }}" = "schedule" ]; then seconds=600; fi
+          cargo fuzz run ${{ matrix.target }} -- -max_total_time=$seconds -rss_limit_mb=4096 -timeout=10
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: fuzz/artifacts/

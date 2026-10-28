@@ -1,0 +1,48 @@
+[package]
+name = "civbb-fuzz"
+description = "cargo-fuzz targets for every parser of untrusted input (design doc §16). Nightly only."
+version = "0.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+civbb-corpus = { path = "../tools/corpus" }
+civbb-format = { path = "../crates/format" }
+civbb-pipeline = { path = "../crates/pipeline" }
+ed25519-dalek = "2"
+libfuzzer-sys = "0.4"
+
+# Its own workspace: it needs nightly and libFuzzer, so the main gate never builds it.
+[workspace]
+
+[[bin]]
+name = "package_decode"
+path = "fuzz_targets/package_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "avatar_validate"
+path = "fuzz_targets/avatar_validate.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gltf_import"
+path = "fuzz_targets/gltf_import.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "seeds"
+path = "src/bin/seeds.rs"
+test = false
+doc = false
+bench = false
