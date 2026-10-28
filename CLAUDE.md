@@ -40,4 +40,4 @@ CIVBB is a social VR platform on a custom Rust + Vulkan engine. The product spec
 
 ## Environment
 
-Windows 11, PowerShell and Git Bash. i5-12600K (6P+4E), RTX 5070 Ti, 32 GB RAM. This matches the design doc's reference PC. Rust stable MSVC via rustup. No Unity installed yet (see ADR 0002).
+Windows 11, PowerShell and Git Bash. i5-12600K (6P+4E), RTX 5070 Ti, 32 GB RAM. This matches the design doc's reference PC. Rust stable MSVC via rustup. Unity 6000.3.27f1 at `G:/Unity6/Editor/Unity.exe` (Personal licence active); Unity CLI at `C:/Users/xxsay/AppData/Local/Unity/bin/unity.exe`. No VRChat SDK or Creator Companion.

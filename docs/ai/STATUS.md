@@ -14,7 +14,7 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Blockers and needs-user
 
-- #37, #38 Unity tasks (M0.10, later).
+- #37, #38 Unity tasks (M0.10, later). Unity 6.3 is now installed and licensed (CLAUDE.md, Environment), so sessions can run it in batch mode; ADR 0002's "hand-derived until the exporter" can be revisited.
 
 ## Decisions in flight
 
