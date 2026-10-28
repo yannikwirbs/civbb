@@ -132,6 +132,7 @@ pub fn import(
                 dynamics: v.dynamics,
                 animator: v.animator,
                 expressions: v.expressions,
+                meta: v.meta,
                 ..Avatar::default()
             },
             None => Avatar::default(),

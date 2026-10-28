@@ -10,6 +10,7 @@ use crate::face::Face;
 use crate::hierarchy::{Hierarchy, Humanoid};
 use crate::material::{Material, Texture};
 use crate::mesh::Mesh;
+use crate::meta::Meta;
 
 /// A complete avatar. Cross references are indices into the vectors here; `validate` checks them.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -22,8 +23,10 @@ pub struct Avatar {
     pub humanoid: Option<Humanoid>,
     /// Meshes.
     pub meshes: Vec<Mesh>,
-    /// Lip sync and blink blendshapes; `None` for avatars without a face.
+    /// Lip sync, blink and eye look; `None` for avatars without a face.
     pub face: Option<Face>,
+    /// Creator and licence metadata; `None` when the source has none.
+    pub meta: Option<Meta>,
     /// Materials referenced by submeshes.
     pub materials: Vec<Material>,
     /// Textures referenced by materials; pixels live in blobs.

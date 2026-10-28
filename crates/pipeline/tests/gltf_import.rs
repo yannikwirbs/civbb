@@ -335,23 +335,31 @@ fn close(a: [f32; 3], b: [f32; 3]) -> bool {
 #[test]
 fn vrm0_imports() {
     use civbb_format::dynamics::Shape;
-    use civbb_format::face::{ShapeBind, Viseme};
+    use civbb_format::face::{EyeDriver, RangeMap, ShapeBind, Viseme};
     use civbb_format::hierarchy::HumanBone;
     use civbb_format::material::AlphaMode;
+    use civbb_format::mesh::FirstPerson;
+    use civbb_format::meta::{AvatarUse, Commercial, Modification};
 
     let (mut doc, bin) = vrm_rig();
     doc["extensionsUsed"] = json!(["VRM"]);
     doc["extensions"] = json!({"VRM": {
-        "meta": {"title": "Vroid"},
+        "meta": {"title": "Vroid", "author": "Ann", "allowedUserName": "Everyone", "violentUssageName": "Disallow",
+            "sexualUssageName": "Allow", "commercialUssageName": "Allow", "licenseName": "CC_BY_NC",
+            "otherPermissionUrl": "https://example.com/terms"},
         "humanoid": {"humanBones": [
             {"bone": "hips", "node": 1}, {"bone": "spine", "node": 2}, {"bone": "head", "node": 3},
             {"bone": "head", "node": 2}, {"bone": "tail", "node": 4},
         ]},
-        "firstPerson": {"firstPersonBone": 3, "firstPersonBoneOffset": {"x": 0, "y": 0.06, "z": 0}},
+        "firstPerson": {"firstPersonBone": 3, "firstPersonBoneOffset": {"x": 0, "y": 0.06, "z": 0},
+            "lookAtTypeName": "BlendShape",
+            "lookAtVerticalUp": {"curve": [0, 0, 0, 1, 1, 1, 1, 0], "xRange": 45, "yRange": 0.8},
+            "meshAnnotations": [{"mesh": 0, "firstPersonFlag": "ThirdPersonOnly"}]},
         "blendShapeMaster": {"blendShapeGroups": [
             {"name": "A", "presetName": "a", "binds": [{"mesh": 0, "index": 0, "weight": 100}]},
             {"name": "Blink", "presetName": "blink", "binds": [{"mesh": 0, "index": 1, "weight": 100}]},
             {"name": "Joy", "presetName": "joy", "binds": [{"mesh": 0, "index": 2, "weight": 50}]},
+            {"name": "LookUp", "presetName": "lookup", "binds": [{"mesh": 0, "index": 3, "weight": 100}]},
             {"name": "Broken", "presetName": "unknown", "binds": [{"mesh": 0, "index": 9, "weight": 100}]},
         ]},
         "secondaryAnimation": {
@@ -387,6 +395,45 @@ fn vrm0_imports() {
     };
     assert_eq!(face.visemes, [(Viseme::Aa, vec![bind(0)])]);
     assert_eq!(face.blink, [bind(1)]);
+    let eyes = face.eyes.as_ref().unwrap();
+    assert_eq!(
+        eyes.driver,
+        EyeDriver::Shapes {
+            up: vec![bind(3)],
+            down: vec![],
+            left: vec![],
+            right: vec![]
+        }
+    );
+    assert_eq!(
+        (eyes.vertical_up, eyes.horizontal_inner),
+        (
+            RangeMap {
+                input_max: 45.0,
+                output_scale: 0.8
+            },
+            RangeMap {
+                input_max: 90.0,
+                output_scale: 1.0
+            }
+        )
+    );
+    assert_eq!(a.meshes[0].first_person, FirstPerson::ThirdPersonOnly);
+
+    // CC BY-NC: redistribution and modification with credit, never commercial even though 0.x allowed it.
+    let m = a.meta.as_ref().unwrap();
+    let l = &m.licence;
+    assert_eq!(m.authors, ["Ann"]);
+    assert_eq!(
+        (l.avatar_use, l.violent, l.sexual, l.commercial),
+        (AvatarUse::Everyone, false, true, Commercial::PersonalNonProfit)
+    );
+    assert_eq!(
+        (l.credit_required, l.redistribution, l.modification),
+        (true, true, Modification::AllowRedistribution)
+    );
+    assert_eq!(l.url, "https://creativecommons.org/licenses/by-nc/");
+    assert_eq!(l.other_terms_url, "https://example.com/terms");
 
     let joy = a.clips.iter().find(|c| c.name == "Joy").unwrap();
     assert_eq!(joy.curves[0].binding.path, "Face");
@@ -429,8 +476,10 @@ fn vrm0_imports() {
 #[test]
 fn vrm1_imports() {
     use civbb_format::dynamics::Shape;
-    use civbb_format::face::Viseme;
+    use civbb_format::face::{EyeDriver, RangeMap, Viseme};
     use civbb_format::hierarchy::HumanBone;
+    use civbb_format::mesh::FirstPerson;
+    use civbb_format::meta::{AvatarUse, Commercial, Modification};
 
     let (mut doc, bin) = vrm_rig();
     doc["extensionsUsed"] = json!(["VRMC_vrm", "VRMC_springBone", "VRMC_materials_mtoon"]);
@@ -440,9 +489,14 @@ fn vrm1_imports() {
     doc["extensions"] = json!({
         "VRMC_vrm": {
             "specVersion": "1.0",
-            "meta": {"name": "Robo"},
-            "humanoid": {"humanBones": {"hips": {"node": 1}, "spine": {"node": 2}, "head": {"node": 3}}},
-            "lookAt": {"offsetFromHeadBone": [0.0, 0.05, 0.02]},
+            "meta": {"name": "Robo", "authors": ["A", "B"], "avatarPermission": "onlySeparatelyLicensedPerson",
+                "commercialUsage": "personalProfit", "creditNotation": "unnecessary", "allowRedistribution": true,
+                "modification": "allowModification", "licenseUrl": "https://vrm.dev/licenses/1.0/"},
+            "humanoid": {"humanBones": {"hips": {"node": 1}, "spine": {"node": 2}, "head": {"node": 3},
+                "leftEye": {"node": 4}}},
+            "lookAt": {"offsetFromHeadBone": [0.0, 0.05, 0.02], "type": "bone",
+                "rangeMapHorizontalOuter": {"inputMaxValue": 60, "outputScale": 12}},
+            "firstPerson": {"meshAnnotations": [{"node": 6, "type": "firstPersonOnly"}, {"node": 0, "type": "both"}]},
             "expressions": {
                 "preset": {
                     "aa": {"morphTargetBinds": [{"node": 6, "index": 0, "weight": 1.0}]},
@@ -479,7 +533,48 @@ fn vrm1_imports() {
     assert_eq!(face.visemes[0].0, Viseme::Aa);
     assert_eq!(face.blink[0].shape, 1);
     let names: Vec<&str> = a.clips.iter().map(|c| c.name.as_str()).collect();
-    assert_eq!(names, ["happy", "Wink"], "look expressions wait for #44");
+    assert_eq!(names, ["happy", "Wink"], "look expressions are not toggles");
+    let eyes = face.eyes.as_ref().unwrap();
+    assert_eq!(
+        eyes.driver,
+        EyeDriver::Bones {
+            left: Some(4),
+            right: None
+        }
+    );
+    assert_eq!(
+        (eyes.horizontal_outer, eyes.vertical_up),
+        (
+            RangeMap {
+                input_max: 60.0,
+                output_scale: 12.0
+            },
+            RangeMap {
+                input_max: 90.0,
+                output_scale: 10.0
+            }
+        )
+    );
+    assert_eq!(a.meshes[0].first_person, FirstPerson::FirstPersonOnly);
+    assert!(
+        imported
+            .warnings
+            .iter()
+            .any(|w| w.contains("first-person annotation of a missing mesh"))
+    );
+
+    let l = &a.meta.as_ref().unwrap().licence;
+    assert_eq!(a.meta.as_ref().unwrap().authors, ["A", "B"]);
+    assert_eq!(
+        (l.avatar_use, l.commercial, l.credit_required),
+        (AvatarUse::OnlySeparatelyLicensed, Commercial::PersonalProfit, false)
+    );
+    assert_eq!((l.redistribution, l.modification), (true, Modification::Allow));
+    assert!(
+        !l.violent && !l.political_or_religious,
+        "missing permissions are denied"
+    );
+    assert_eq!(l.url, "https://vrm.dev/licenses/1.0/");
     assert_eq!(a.animator.as_ref().unwrap().parameters.len(), 2);
 
     let chain = &a.dynamics.chains[0];

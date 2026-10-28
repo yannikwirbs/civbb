@@ -6,10 +6,12 @@
 use civbb_format::animator::*;
 use civbb_format::dynamics::{Chain, Collider, Dynamics, Graded, ImmobileType, Integration, Limit, MultiChild, Shape};
 use civbb_format::expressions::{Control, ControlKind, ExpressionParam, ExpressionParamKind, Expressions, Menu};
-use civbb_format::face::{Face, ShapeBind, Viseme};
+use civbb_format::face::{EyeDriver, EyeLook, Face, RangeMap, ShapeBind, Viseme};
 use civbb_format::hierarchy::{HumanBone, Humanoid, NodeIndex};
 use civbb_format::material::{AlphaMode, ColorSpace, Material, MaterialModel, TextureSlot, Toon};
 use civbb_format::math::{Quat, Vec3};
+use civbb_format::mesh::FirstPerson;
+use civbb_format::meta::{AvatarUse, Commercial, Licence, Meta, Modification};
 use serde_json::Value;
 
 use super::Importer;
@@ -22,6 +24,7 @@ pub(super) struct Vrm {
     pub dynamics: Dynamics,
     pub animator: Option<Animator>,
     pub expressions: Option<Expressions>,
+    pub meta: Option<Meta>,
 }
 
 /// One VRM expression after resolving its binds.
@@ -60,23 +63,9 @@ impl Importer<'_> {
         } else {
             self.expressions_v0(&root["blendShapeMaster"]["blendShapeGroups"])
         };
-        if root["firstPerson"]["meshAnnotations"]
-            .as_array()
-            .is_some_and(|a| !a.is_empty())
-        {
-            self.warnings
-                .push("VRM first-person mesh visibility not imported yet (#44)".into());
-        }
+        self.first_person(&root["firstPerson"]["meshAnnotations"], v1);
         if doc.nodes().any(|n| n.extension_value("VRMC_node_constraint").is_some()) {
             self.warnings.push("VRMC_node_constraint not imported yet (#46)".into());
-        }
-        let look = if v1 {
-            &root["lookAt"]
-        } else {
-            &root["firstPerson"]["lookAtTypeName"]
-        };
-        if !look.is_null() {
-            self.warnings.push("VRM eye look not imported yet (#44)".into());
         }
         let title = if v1 {
             &root["meta"]["name"]
@@ -90,8 +79,12 @@ impl Importer<'_> {
             dynamics,
             animator: None,
             expressions: None,
+            meta: meta(&root["meta"], v1),
         };
-        self.expression_parts(exprs, clips, &mut vrm)?;
+        let look = self.expression_parts(exprs, clips, &mut vrm)?;
+        if let Some(eyes) = self.eye_look(root, v1, &vrm.humanoid, look) {
+            vrm.face.get_or_insert_with(Face::default).eyes = Some(eyes);
+        }
         Ok(Some(vrm))
     }
 
@@ -480,18 +473,12 @@ impl Importer<'_> {
     }
 
     fn expressions_v0(&mut self, groups: &Value) -> Vec<Expression> {
-        let doc = self.doc;
         let mut out = Vec::new();
         for g in groups.as_array().into_iter().flatten() {
             let mut binds = Vec::new();
             for b in g["binds"].as_array().into_iter().flatten() {
                 // 0.x binds name a glTF mesh; every node instancing it gets the bind.
-                let mesh = index(&b["mesh"]);
-                let targets: Vec<usize> = doc
-                    .nodes()
-                    .filter(|n| n.mesh().map(|m| m.index()) == mesh && mesh.is_some())
-                    .filter_map(|n| self.node_meshes.get(&self.map[n.index()]?).copied())
-                    .collect();
+                let targets = self.meshes_of(index(&b["mesh"]));
                 if targets.is_empty() {
                     self.warnings
                         .push("VRM expression bind to a missing mesh skipped".into());
@@ -541,8 +528,15 @@ impl Importer<'_> {
     }
 
     /// Visemes and blink go to the face; the rest become clips in one Direct blend tree, toggled from the menu.
-    fn expression_parts(&mut self, exprs: Vec<Expression>, clips: &mut Vec<Clip>, out: &mut Vrm) -> Result<(), String> {
+    /// Returns the look up, down, left and right binds for eye look.
+    fn expression_parts(
+        &mut self,
+        exprs: Vec<Expression>,
+        clips: &mut Vec<Clip>,
+        out: &mut Vrm,
+    ) -> Result<[Vec<ShapeBind>; 4], String> {
         let mut face = Face::default();
+        let mut look: [Vec<ShapeBind>; 4] = Default::default();
         let mut toggles = Vec::new();
         for e in exprs {
             let viseme = match e.preset.as_deref() {
@@ -557,9 +551,12 @@ impl Importer<'_> {
                 (Some(v), _) if face.visemes.iter().all(|(x, _)| *x != v) => face.visemes.push((v, e.binds)),
                 (Some(_), _) => {}
                 (None, Some("blink")) => face.blink = e.binds,
-                // Eye look and one-eye blinks belong to the eye-look setup (#44).
+                // One-eye blinks have no format field yet.
                 (None, Some("blink_l" | "blink_r" | "blinkleft" | "blinkright")) => {}
-                (None, Some("lookup" | "lookdown" | "lookleft" | "lookright")) => {}
+                (None, Some("lookup")) => look[0] = e.binds,
+                (None, Some("lookdown")) => look[1] = e.binds,
+                (None, Some("lookleft")) => look[2] = e.binds,
+                (None, Some("lookright")) => look[3] = e.binds,
                 _ if e.binds.is_empty() => {}
                 _ if toggles.iter().any(|(n, _)| *n == e.name) => {
                     self.warnings.push(format!("VRM expression `{}` defined twice", e.name));
@@ -569,7 +566,7 @@ impl Importer<'_> {
         }
         out.face = (!face.visemes.is_empty() || !face.blink.is_empty()).then_some(face);
         if toggles.is_empty() {
-            return Ok(());
+            return Ok(look);
         }
 
         let mut children = Vec::new();
@@ -678,8 +675,237 @@ impl Importer<'_> {
             parameters: expr_params,
             menu: Menu { controls },
         });
-        Ok(())
+        Ok(look)
     }
+
+    /// Every format mesh instancing glTF mesh `mesh` (VRM 0.x names meshes, not nodes).
+    fn meshes_of(&self, mesh: Option<usize>) -> Vec<usize> {
+        let Some(mesh) = mesh else {
+            return Vec::new();
+        };
+        self.doc
+            .nodes()
+            .filter(|n| n.mesh().map(|m| m.index()) == Some(mesh))
+            .filter_map(|n| self.node_meshes.get(&self.map[n.index()]?).copied())
+            .collect()
+    }
+
+    /// First-person visibility per mesh (`firstPerson.meshAnnotations`).
+    fn first_person(&mut self, list: &Value, v1: bool) {
+        for a in list.as_array().into_iter().flatten() {
+            let flag = if v1 { &a["type"] } else { &a["firstPersonFlag"] };
+            let fp = match flag.as_str().map(str::to_ascii_lowercase).as_deref() {
+                Some("auto") => FirstPerson::Auto,
+                Some("both") => FirstPerson::Both,
+                Some("firstpersononly") => FirstPerson::FirstPersonOnly,
+                Some("thirdpersononly") => FirstPerson::ThirdPersonOnly,
+                _ => {
+                    self.warnings
+                        .push("VRM first-person annotation with an unknown type skipped".into());
+                    continue;
+                }
+            };
+            let meshes = if v1 {
+                let mesh = self
+                    .vrm_node(&a["node"])
+                    .and_then(|n| self.node_meshes.get(&n).copied());
+                mesh.into_iter().collect()
+            } else {
+                self.meshes_of(index(&a["mesh"]))
+            };
+            if meshes.is_empty() {
+                self.warnings
+                    .push("VRM first-person annotation of a missing mesh skipped".into());
+            }
+            for m in meshes {
+                self.meshes[m].first_person = fp;
+            }
+        }
+    }
+
+    /// Eye look from `lookAt` (1.0) or `firstPerson.lookAt*` (0.x); `look` holds the up, down, left and right
+    /// expression binds for blendshape eye look.
+    fn eye_look(&mut self, root: &Value, v1: bool, humanoid: &Humanoid, look: [Vec<ShapeBind>; 4]) -> Option<EyeLook> {
+        let (kind, maps, names) = if v1 {
+            let la = &root["lookAt"];
+            let names = [
+                "rangeMapHorizontalInner",
+                "rangeMapHorizontalOuter",
+                "rangeMapVerticalDown",
+                "rangeMapVerticalUp",
+            ];
+            (la["type"].as_str()?.to_ascii_lowercase(), la, names)
+        } else {
+            let fp = &root["firstPerson"];
+            let names = [
+                "lookAtHorizontalInner",
+                "lookAtHorizontalOuter",
+                "lookAtVerticalDown",
+                "lookAtVerticalUp",
+            ];
+            (fp["lookAtTypeName"].as_str()?.to_ascii_lowercase(), fp, names)
+        };
+        let bones = kind == "bone";
+        if !bones && kind != "expression" && kind != "blendshape" {
+            self.warnings.push(format!("VRM eye look type `{kind}` not supported"));
+            return None;
+        }
+        // VRM defaults: 90 degrees in, 10 degrees (bones) or full weight (expressions) out.
+        let default_out = if bones { 10.0 } else { 1.0 };
+        let [inner, outer, down, up] = names.map(|n| {
+            let m = &maps[n];
+            let linear = |c: &Vec<Value>| c.iter().map(Value::as_f64).eq(LINEAR_CURVE.map(Some));
+            if !v1 && m["curve"].as_array().is_some_and(|c| !linear(c)) {
+                self.warnings.push("VRM eye look curve treated as linear".into());
+            }
+            let (input, output) = if v1 {
+                ("inputMaxValue", "outputScale")
+            } else {
+                ("xRange", "yRange")
+            };
+            RangeMap {
+                input_max: num(&m[input], 90.0),
+                output_scale: num(&m[output], default_out),
+            }
+        });
+        let driver = if bones {
+            let (left, right) = (humanoid.node(HumanBone::LeftEye), humanoid.node(HumanBone::RightEye));
+            if left.is_none() && right.is_none() {
+                self.warnings.push("VRM bone eye look without eye bones skipped".into());
+                return None;
+            }
+            EyeDriver::Bones { left, right }
+        } else {
+            if look.iter().all(Vec::is_empty) {
+                self.warnings
+                    .push("VRM expression eye look without look expressions skipped".into());
+                return None;
+            }
+            let [up, down, left, right] = look;
+            EyeDriver::Shapes { up, down, left, right }
+        };
+        Some(EyeLook {
+            driver,
+            horizontal_inner: inner,
+            horizontal_outer: outer,
+            vertical_down: down,
+            vertical_up: up,
+        })
+    }
+}
+
+/// UniVRM's default lookAt curve, a straight line: `[time, value, in, out]` for two keys.
+const LINEAR_CURVE: [f64; 8] = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0];
+
+/// Creator and licence metadata; unknown or missing licence fields take the most restrictive value (ADR 0012).
+fn meta(m: &Value, v1: bool) -> Option<Meta> {
+    m.as_object()?;
+    let text = |k: &str| m[k].as_str().unwrap_or_default().to_owned();
+    let list = |v: &Value| -> Vec<String> {
+        match v {
+            Value::Array(a) => a.iter().filter_map(Value::as_str).map(str::to_owned).collect(),
+            Value::String(s) if !s.is_empty() => vec![s.clone()],
+            _ => Vec::new(),
+        }
+    };
+    let allowed = |k: &str| m[k].as_bool().unwrap_or(false);
+    if v1 {
+        let avatar_use = match m["avatarPermission"].as_str() {
+            Some("everyone") => AvatarUse::Everyone,
+            Some("onlySeparatelyLicensedPerson") => AvatarUse::OnlySeparatelyLicensed,
+            _ => AvatarUse::OnlyAuthor,
+        };
+        let commercial = match m["commercialUsage"].as_str() {
+            Some("corporation") => Commercial::Corporation,
+            Some("personalProfit") => Commercial::PersonalProfit,
+            _ => Commercial::PersonalNonProfit,
+        };
+        let modification = match m["modification"].as_str() {
+            Some("allowModificationRedistribution") => Modification::AllowRedistribution,
+            Some("allowModification") => Modification::Allow,
+            _ => Modification::Prohibited,
+        };
+        return Some(Meta {
+            authors: list(&m["authors"]),
+            version: text("version"),
+            copyright: text("copyrightInformation"),
+            contact: text("contactInformation"),
+            references: list(&m["references"]),
+            licence: Licence {
+                url: text("licenseUrl"),
+                avatar_use,
+                violent: allowed("allowExcessivelyViolentUsage"),
+                sexual: allowed("allowExcessivelySexualUsage"),
+                political_or_religious: allowed("allowPoliticalOrReligiousUsage"),
+                antisocial_or_hate: allowed("allowAntisocialOrHateUsage"),
+                commercial,
+                credit_required: m["creditNotation"].as_str() != Some("unnecessary"),
+                redistribution: allowed("allowRedistribution"),
+                modification,
+                other_terms_url: text("otherLicenseUrl"),
+            },
+        });
+    }
+    let allow = |k: &str| m[k].as_str() == Some("Allow");
+    let avatar_use = match m["allowedUserName"].as_str() {
+        Some("Everyone") => AvatarUse::Everyone,
+        Some("ExplicitlyLicensedPerson") => AvatarUse::OnlySeparatelyLicensed,
+        _ => AvatarUse::OnlyAuthor,
+    };
+    // VRM 0.x names a licence; its terms become our fields, its deed our URL.
+    let licence = m["licenseName"].as_str().unwrap_or_default();
+    let (redistribution, modification, credit, non_commercial, deed) = match licence {
+        "CC0" => (
+            true,
+            Modification::AllowRedistribution,
+            false,
+            false,
+            "publicdomain/zero/1.0/",
+        ),
+        "CC_BY" => (true, Modification::AllowRedistribution, true, false, "licenses/by/"),
+        "CC_BY_SA" => (true, Modification::AllowRedistribution, true, false, "licenses/by-sa/"),
+        "CC_BY_NC" => (true, Modification::AllowRedistribution, true, true, "licenses/by-nc/"),
+        "CC_BY_NC_SA" => (
+            true,
+            Modification::AllowRedistribution,
+            true,
+            true,
+            "licenses/by-nc-sa/",
+        ),
+        "CC_BY_ND" => (true, Modification::Allow, true, false, "licenses/by-nd/"),
+        "CC_BY_NC_ND" => (true, Modification::Allow, true, true, "licenses/by-nc-nd/"),
+        _ => (false, Modification::Prohibited, true, false, ""),
+    };
+    let url = if deed.is_empty() {
+        text("otherLicenseUrl")
+    } else {
+        format!("https://creativecommons.org/{deed}")
+    };
+    let commercial = if allow("commercialUssageName") && !non_commercial {
+        Commercial::Corporation
+    } else {
+        Commercial::PersonalNonProfit
+    };
+    Some(Meta {
+        authors: list(&m["author"]),
+        version: text("version"),
+        copyright: String::new(),
+        contact: text("contactInformation"),
+        references: list(&m["reference"]),
+        licence: Licence {
+            url,
+            avatar_use,
+            violent: allow("violentUssageName"),
+            sexual: allow("sexualUssageName"),
+            political_or_religious: false,
+            antisocial_or_hate: false,
+            commercial,
+            credit_required: credit,
+            redistribution,
+            modification,
+            other_terms_url: text("otherPermissionUrl"),
+        },
+    })
 }
 
 /// Maps a VRM bone name to a humanoid bone. VRM 1.0 renamed the thumb: its metacarpal is Unity's proximal.

@@ -33,6 +33,22 @@ pub struct Mesh {
     pub submeshes: Vec<Submesh>,
     /// Morph targets.
     pub blend_shapes: Vec<BlendShape>,
+    /// Visibility in the owner's first-person view.
+    pub first_person: FirstPerson,
+}
+
+/// First-person visibility of a mesh (VRM `firstPerson.meshAnnotations`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FirstPerson {
+    /// Visible, except the parts skinned to the head (legacy head shrinking).
+    #[default]
+    Auto,
+    /// Visible in both views.
+    Both,
+    /// Only in the owner's first-person view.
+    FirstPersonOnly,
+    /// Hidden from the owner's first-person view.
+    ThirdPersonOnly,
 }
 
 /// Linear blend skinning with up to four influences per vertex.

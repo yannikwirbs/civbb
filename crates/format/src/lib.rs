@@ -13,6 +13,7 @@ pub mod hierarchy;
 pub mod material;
 pub mod math;
 pub mod mesh;
+pub mod meta;
 pub mod package;
 pub mod validate;
 
@@ -23,7 +24,7 @@ pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the data model. Bump on any incompatible change to the types in this crate.
-pub const FORMAT_VERSION: u32 = 2;
+pub const FORMAT_VERSION: u32 = 3;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -96,6 +97,32 @@ pub(crate) mod testutil {
                     }],
                 )],
                 blink: vec![],
+                eyes: Some(EyeLook {
+                    driver: EyeDriver::Bones {
+                        left: Some(1),
+                        right: None,
+                    },
+                    horizontal_inner: RangeMap {
+                        input_max: 90.0,
+                        output_scale: 10.0,
+                    },
+                    horizontal_outer: RangeMap {
+                        input_max: 90.0,
+                        output_scale: 10.0,
+                    },
+                    vertical_down: RangeMap {
+                        input_max: 90.0,
+                        output_scale: 10.0,
+                    },
+                    vertical_up: RangeMap {
+                        input_max: 90.0,
+                        output_scale: 10.0,
+                    },
+                }),
+            }),
+            meta: Some(meta::Meta {
+                authors: vec!["CIVBB".into()],
+                ..meta::Meta::default()
             }),
             materials: vec![Material {
                 name: "Skin".into(),

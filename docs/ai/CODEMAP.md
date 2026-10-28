@@ -39,12 +39,13 @@ Internal deps: none
 - `src/cost.rs`: Cost profile: counted and measured CPU, GPU, memory and network cost of content (design doc §8).
 - `src/dynamics.rs`: Bone dynamics (PhysBone-compatible chains and colliders) and contact senders and receivers.
 - `src/expressions.rs`: Expression menu and synced expression parameters (design doc §7).
-- `src/face.rs`: Face setup: blendshapes driven by lip sync and automatic blinking (design doc §7, `X_avatar`).
+- `src/face.rs`: Face setup: blendshapes driven by lip sync, automatic blinking and eye look (design doc §7, `X_avatar`).
 - `src/hierarchy.rs`: Node hierarchy (bones and other transforms) and the humanoid bone mapping.
 - `src/lib.rs`: CIVBB content format: the avatar data model and signed, content-addressed runtime packages (design doc §9).
 - `src/material.rs`: Materials (PBR, Toon, Unlit models) and texture references.
 - `src/math.rs`: Plain math types used by the format: vectors, quaternions and transforms as arrays.
 - `src/mesh.rs`: Meshes: vertex streams, skinning, submeshes and sparse blendshapes.
+- `src/meta.rs`: Creator and licence metadata (VRM `meta`): who made an avatar and what others may do with it (ADR 0012).
 - `src/package.rs`: Runtime packages: a signed CBOR manifest followed by the BLAKE3-addressed blobs it lists.
 - `src/validate.rs`: Structural validation and hard caps for untrusted avatars. After [`validate`] passes, every index is in range.
 
@@ -95,6 +96,7 @@ Internal deps: none
 - `docs/adr/0009-blend-tree-weights.md`: 0009: Blend tree weights, time sync and weights that do not sum to 1
 - `docs/adr/0010-write-defaults-model.md`: 0010: Write Defaults model and golden-file conformance cases
 - `docs/adr/0011-builtins-and-behaviours.md`: 0011: Built-in parameters and state behaviours
+- `docs/adr/0012-eye-look-first-person-and-licence.md`: 0012: Eye look, first-person visibility and licence metadata (format v3)
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

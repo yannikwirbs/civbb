@@ -703,7 +703,9 @@ pub fn generate(spec: &Spec) -> Avatar {
                 })
                 .collect(),
             blink: vec![],
+            eyes: None,
         }),
+        meta: None,
         materials,
         textures: vec![],
         animator: Some(animator),

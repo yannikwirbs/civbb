@@ -11,6 +11,7 @@ use crate::animator::{
 use crate::avatar::Avatar;
 use crate::dynamics::{ContactVolume, Graded, Limit};
 use crate::expressions::{ControlKind, Menu};
+use crate::face::{EyeDriver, ShapeBind};
 use crate::material::{MaterialModel, TextureSlot};
 use crate::math::Transform;
 
@@ -89,6 +90,8 @@ pub struct ValidationError {
 
 /// Stop collecting after this many errors; one bad array can otherwise produce millions.
 const MAX_ERRORS: usize = 100;
+/// Authors plus references in [`crate::meta::Meta`].
+const META_LISTS: usize = 256;
 
 /// Checks every cross reference, stream length, ordering and cap. `has_blob` reports whether a texture's blob exists.
 pub fn validate(a: &Avatar, caps: &Caps, has_blob: impl Fn(BlobId) -> bool) -> Result<(), Vec<ValidationError>> {
@@ -265,14 +268,42 @@ impl V {
             for (v, _) in &f.visemes {
                 self.ensure(seen.insert(*v), || format!("face.{v:?}"), "mapped twice");
             }
-            let binds = f.visemes.iter().flat_map(|(_, b)| b).chain(&f.blink);
-            for (i, b) in binds.enumerate() {
+            let mut binds: Vec<&ShapeBind> = f.visemes.iter().flat_map(|(_, b)| b).chain(&f.blink).collect();
+            if let Some(e) = &f.eyes {
+                let maps = [e.horizontal_inner, e.horizontal_outer, e.vertical_down, e.vertical_up];
+                self.finite(&maps.map(|m| [m.input_max, m.output_scale]).concat(), || {
+                    "face.eyes".into()
+                });
+                match &e.driver {
+                    EyeDriver::Bones { left, right } => {
+                        for n in left.iter().chain(right) {
+                            self.index(*n as usize, nodes, || "face.eyes".into(), "eye node");
+                        }
+                    }
+                    EyeDriver::Shapes { up, down, left, right } => {
+                        binds.extend(up.iter().chain(down).chain(left).chain(right))
+                    }
+                }
+            }
+            for (i, b) in binds.into_iter().enumerate() {
                 let p = || format!("face.binds[{i}]");
                 match a.meshes.get(b.mesh as usize) {
                     Some(m) => self.index(b.shape as usize, m.blend_shapes.len(), p, "blend shape"),
                     None => self.fail(p, format!("mesh index {} out of range", b.mesh)),
                 }
                 self.finite(&[b.weight], p);
+            }
+        }
+        if let Some(m) = &a.meta {
+            let l = &m.licence;
+            let strings = m.authors.iter().chain(&m.references);
+            self.ensure(
+                m.authors.len() + m.references.len() <= META_LISTS,
+                || "meta".into(),
+                "too many authors or references",
+            );
+            for s in strings.chain([&m.version, &m.copyright, &m.contact, &l.url, &l.other_terms_url]) {
+                self.string(s, || "meta".into());
             }
         }
         self.cap(verts, c.vertices, "total vertices");
@@ -653,6 +684,12 @@ mod tests {
             }),
             ("face.binds[0]", |a| a.face.as_mut().unwrap().visemes[0].1[0].shape = 1),
             ("face.binds[0]", |a| a.face.as_mut().unwrap().visemes[0].1[0].mesh = 1),
+            ("face.eyes", |a| {
+                a.face.as_mut().unwrap().eyes.as_mut().unwrap().driver = crate::face::EyeDriver::Bones {
+                    left: Some(9),
+                    right: None,
+                }
+            }),
             ("face.Aa", |a| {
                 let f = a.face.as_mut().unwrap();
                 f.visemes.push(f.visemes[0].clone())
