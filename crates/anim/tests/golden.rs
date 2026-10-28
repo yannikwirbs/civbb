@@ -325,7 +325,7 @@ fn run(path: &Path) {
         .unwrap_or_else(|e| panic!("{name}: invalid case: {e:?}"));
     let c = Controller::new(&a).unwrap();
     assert!(c.bound.unbound.is_empty(), "{name}: {:?}", c.bound.unbound);
-    let mut inst = Instance::new(&c);
+    let mut inst = Instance::new(&c, true);
     for (f, frame) in case.frames.iter().enumerate() {
         for (p, v) in &frame.set {
             inst.params[case.param(p) as usize] = *v;

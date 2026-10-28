@@ -3,8 +3,9 @@
 use std::collections::HashSet;
 
 use civbb_format::Avatar;
-use civbb_format::animator::{Animator, ParamIndex};
+use civbb_format::animator::{Animator, Behaviour, ParamIndex, TrackingMode};
 
+use crate::behaviour::{Builtin, Rng, Tracking, coerce, drive, part_index};
 use crate::bind::{Bound, Target, bind, node_paths};
 use crate::machine::{Ctx, LayerRun};
 use crate::mix::Mixer;
@@ -102,25 +103,58 @@ pub struct Instance {
     pub layer_weights: Vec<f32>,
     /// Group weights.
     pub group_weights: Vec<f32>,
+    /// Who drives each body part, set by tracking control behaviours.
+    pub tracking: Tracking,
+    /// Locomotion disabled by a locomotion control behaviour.
+    pub locomotion_disabled: bool,
+    /// The avatar's owner runs this instance; local-only drivers run only then.
+    local: bool,
+    blends: Vec<Blend>,
+    rng: Rng,
     runs: Vec<Option<LayerRun>>,
     pose: Vec<f32>,
     written: Vec<bool>,
     mixer: Mixer,
 }
 
+/// A layer or group weight moving linearly to a goal (layer control behaviours).
+struct Blend {
+    group: bool,
+    index: u32,
+    from: f32,
+    goal: f32,
+    duration: f32,
+    elapsed: f32,
+}
+
 impl Instance {
     /// A fresh instance at the parameters' defaults; the first [`Instance::update`] enters the start states.
-    pub fn new(c: &Controller) -> Self {
+    /// `local` is true for the owner's own avatar; it also sets the `IsLocal` built-in.
+    pub fn new(c: &Controller, local: bool) -> Self {
         let a = &c.animator;
         let n = c.bound.bindings.len();
-        Self {
+        let mut i = Self {
             params: a.parameters.iter().map(|p| p.default).collect(),
             layer_weights: a.layers.iter().map(|l| l.weight).collect(),
             group_weights: a.groups.iter().map(|g| g.weight).collect(),
+            tracking: [TrackingMode::Tracking; 10],
+            locomotion_disabled: false,
+            local,
+            blends: Vec::new(),
+            rng: Rng(0x9e37_79b9_7f4a_7c15),
             runs: vec![None; a.layers.len()],
             pose: c.bound.bindings.defaults.clone(),
             written: vec![false; n],
             mixer: Mixer::new(n),
+        };
+        i.set_builtin(c, Builtin::IsLocal, f32::from(u8::from(local)));
+        i
+    }
+
+    /// Sets a built-in parameter if the animator declares it, converted to the declared type.
+    pub fn set_builtin(&mut self, c: &Controller, b: Builtin, value: f32) {
+        if let Some(p) = c.param(b.name()) {
+            self.params[p as usize] = coerce(c.animator.parameters[p as usize].kind, value);
         }
     }
 
@@ -134,10 +168,11 @@ impl Instance {
         self.runs[i].as_ref()
     }
 
-    /// Advances every layer by `dt` seconds, takes transitions and evaluates the pose, starting from defaults or,
-    /// with any Write Defaults off state, from the last pose. Animated parameters take their new values at the
-    /// end, so conditions see them next frame.
+    /// Advances every layer by `dt` seconds, takes transitions, runs entered states' behaviours and evaluates the
+    /// pose, starting from defaults or, with any Write Defaults off state, from the last pose. Animated parameters
+    /// take their new values at the end, so conditions see them next frame.
     pub fn update(&mut self, c: &Controller, dt: f32) {
+        self.blend_weights(dt);
         if !c.wd_off {
             self.pose.copy_from_slice(&c.bound.bindings.defaults);
         }
@@ -148,20 +183,22 @@ impl Instance {
                 clips: &c.bound.clips,
                 decls: &c.animator.parameters,
             };
-            let run = match &mut self.runs[li] {
+            let entered = match &mut self.runs[li] {
                 Some(run) => {
                     run.advance(&ctx, &self.params, dt);
-                    if let Some(t) = run.select(&ctx, &self.params) {
+                    run.select(&ctx, &self.params).map(|t| {
                         let snapshot = run.active.is_some().then(|| {
                             self.mixer.layer(c, li, run, &self.params, &self.pose);
                             self.mixer.snapshot()
                         });
-                        run.fire(&ctx, &mut self.params, t, snapshot);
-                    }
-                    run
+                        run.fire(&ctx, &mut self.params, t, snapshot)
+                    })
                 }
-                slot @ None => slot.insert(LayerRun::start(&ctx, &mut self.params)),
+                slot @ None => Some(slot.insert(LayerRun::start(&ctx, &mut self.params)).current),
             };
+            if let Some(s) = entered {
+                self.behave(c, &layer.state_machine.states[s as usize].behaviours);
+            }
             let lw = if c.first_in_group[li] {
                 1.0
             } else {
@@ -169,6 +206,7 @@ impl Instance {
             };
             let w = (lw * self.group_weights[layer.group as usize]).clamp(0.0, 1.0);
             if w > 0.0 {
+                let run = self.runs[li].as_ref().expect("started above");
                 self.mixer.layer(c, li, run, &self.params, &self.pose);
                 self.mixer.apply(c, li, w, &mut self.pose, &mut self.written);
             }
@@ -180,5 +218,64 @@ impl Instance {
                 self.params[*p as usize] = self.pose[s];
             }
         }
+    }
+
+    /// Runs a state's behaviours on entering it.
+    fn behave(&mut self, c: &Controller, behaviours: &[Behaviour]) {
+        for b in behaviours {
+            match b {
+                Behaviour::ParameterDriver { local_only, ops } => {
+                    if self.local || !local_only {
+                        drive(ops, &c.animator.parameters, &mut self.params, &mut self.rng);
+                    }
+                }
+                Behaviour::TrackingControl(parts) => {
+                    for &(part, mode) in parts {
+                        self.tracking[part_index(part)] = mode;
+                    }
+                }
+                &Behaviour::LayerWeight { layer, goal, duration } => self.start_blend(false, layer, goal, duration),
+                &Behaviour::GroupWeight { group, goal, duration } => self.start_blend(true, group, goal, duration),
+                Behaviour::Locomotion { disabled } => self.locomotion_disabled = *disabled,
+            }
+        }
+    }
+
+    fn start_blend(&mut self, group: bool, index: u32, goal: f32, duration: f32) {
+        let weights = if group {
+            &self.group_weights
+        } else {
+            &self.layer_weights
+        };
+        let from = weights[index as usize];
+        self.blends.retain(|b| (b.group, b.index) != (group, index));
+        self.blends.push(Blend {
+            group,
+            index,
+            from,
+            goal,
+            duration,
+            elapsed: 0.0,
+        });
+        self.blend_weights(0.0);
+    }
+
+    /// Moves blending weights `dt` seconds on; finished blends end at their goal.
+    fn blend_weights(&mut self, dt: f32) {
+        for b in &mut self.blends {
+            b.elapsed += dt;
+            let t = if b.duration > 0.0 {
+                (b.elapsed / b.duration).min(1.0)
+            } else {
+                1.0
+            };
+            let w = if b.group {
+                &mut self.group_weights
+            } else {
+                &mut self.layer_weights
+            };
+            w[b.index as usize] = b.from + t * (b.goal - b.from);
+        }
+        self.blends.retain(|b| b.elapsed < b.duration);
     }
 }

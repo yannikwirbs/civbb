@@ -9,6 +9,7 @@ Animation runtime: compile-time curve binding, clip sampling, Mecanim state mach
 
 Internal deps: civbb-format
 
+- `src/behaviour.rs`: Legacy built-in parameters and state behaviours: parameter drivers, tracking, layer and locomotion control.
 - `src/bind.rs`: Compile-time binding: resolves curve paths to slots in one flat buffer with per-slot defaults (ADR 0007).
 - `src/clip.rs`: A clip bound to slots, and sampling it into the slot buffer.
 - `src/controller.rs`: A compiled animator controller and one running instance of it: parameters, layers, the evaluated pose.
@@ -17,6 +18,7 @@ Internal deps: civbb-format
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
 - `src/mix.rs`: Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
+- `tests/behaviour.rs`: Built-in parameters and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
 - `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order.
 - `tests/blend.rs`: Blend tree weights, hand-derived (ADR 0009): 1D, 2D simple directional, freeform cartesian and polar gradient
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
@@ -92,6 +94,7 @@ Internal deps: none
 - `docs/adr/0008-state-machine-and-layer-mixing.md`: 0008: Mecanim state machine timing, interruption and layer mixing
 - `docs/adr/0009-blend-tree-weights.md`: 0009: Blend tree weights, time sync and weights that do not sum to 1
 - `docs/adr/0010-write-defaults-model.md`: 0010: Write Defaults model and golden-file conformance cases
+- `docs/adr/0011-builtins-and-behaviours.md`: 0011: Built-in parameters and state behaviours
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

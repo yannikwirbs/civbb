@@ -190,7 +190,7 @@ fn blend_tree_states_sync_children_and_average_lengths() {
     let a = avatar(tree_1d());
     civbb_format::validate(&a, &civbb_format::Caps::default(), |_| true).unwrap();
     let c = Controller::new(&a).unwrap();
-    let mut i = Instance::new(&c);
+    let mut i = Instance::new(&c, true);
     i.params[0] = 0.5;
     // Length is the weighted average: 0.5 * 1 + 0.5 * 3 = 2 s.
     assert_eq!(
@@ -220,7 +220,7 @@ fn nested_and_direct_trees_multiply_weights_and_leave_the_rest_at_default() {
         normalize: false,
     })));
     let c = Controller::new(&a).unwrap();
-    let mut i = Instance::new(&c);
+    let mut i = Instance::new(&c, true);
     i.params = vec![0.5, 0.0];
     i.update(&c, 0.0);
     // The 1D tree has weight 0, so it writes nothing; A.y is half of 4 with the remainder at its default 0.

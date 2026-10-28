@@ -156,7 +156,7 @@ fn single(states: Vec<State>, looping: bool) -> (Controller, Instance) {
 
 fn run(a: Avatar) -> (Controller, Instance) {
     let c = Controller::new(&a).expect("animator");
-    let i = Instance::new(&c);
+    let i = Instance::new(&c, true);
     (c, i)
 }
 
