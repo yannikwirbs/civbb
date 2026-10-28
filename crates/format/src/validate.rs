@@ -171,6 +171,32 @@ impl V {
                 self.ensure(seen.insert(*bone), || format!("humanoid.{bone:?}"), "mapped twice");
             }
             self.finite(&h.viewpoint, || "humanoid.viewpoint".into());
+            let mut framed = HashSet::new();
+            for (i, f) in h.muscle_frames.iter().enumerate() {
+                let p = || format!("humanoid.muscle_frames[{i}]");
+                self.ensure(h.node(f.bone).is_some(), p, "bone not mapped");
+                self.ensure(framed.insert(f.bone), p, "bone framed twice");
+                let all = [f.pre.as_slice(), &f.post, &f.sign, &f.min, &f.max, &[f.twist]].concat();
+                self.finite(&all, p);
+                let unit = |q: &[f32; 4]| (q.iter().map(|c| c * c).sum::<f32>() - 1.0).abs() < 1e-3;
+                self.ensure(
+                    unit(&f.pre) && unit(&f.post),
+                    p,
+                    "pre and post must be unit quaternions",
+                );
+                self.ensure(f.sign.iter().all(|s| s.abs() == 1.0), p, "signs must be 1 or -1");
+                self.ensure(
+                    f.min.iter().all(|m| *m <= 0.0) && f.max.iter().all(|m| *m >= 0.0),
+                    p,
+                    "min above 0 or max below 0",
+                );
+                let twist_ok = if f.bone.twist_child().is_some() {
+                    (0.0..=1.0).contains(&f.twist)
+                } else {
+                    f.twist == 1.0
+                };
+                self.ensure(twist_ok, p, "twist must be in 0..=1 on limb bones and 1 elsewhere");
+            }
         }
 
         self.cap(a.meshes.len(), c.meshes, "meshes");
@@ -669,6 +695,15 @@ mod tests {
         let cases: &[(&str, Mutation)] = &[
             ("hierarchy.nodes[1]", |a| a.hierarchy.nodes[1].parent = Some(5)),
             ("humanoid", |a| a.humanoid.as_mut().unwrap().bones[0].1 = 99),
+            ("humanoid.muscle_frames[0]", |a| {
+                a.humanoid.as_mut().unwrap().muscle_frames[0].bone = crate::hierarchy::HumanBone::Head
+            }),
+            ("humanoid.muscle_frames[0]", |a| {
+                a.humanoid.as_mut().unwrap().muscle_frames[0].twist = 0.5
+            }),
+            ("humanoid.muscle_frames[0]", |a| {
+                a.humanoid.as_mut().unwrap().muscle_frames[0].pre = [0.0; 4]
+            }),
             ("meshes[0].node", |a| a.meshes[0].node = 99),
             ("meshes[0].indices", |a| a.meshes[0].indices[0] = 3),
             ("meshes[0].submeshes[0]", |a| a.meshes[0].submeshes[0].material = 1),

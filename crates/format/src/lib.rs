@@ -24,7 +24,7 @@ pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the data model. Bump on any incompatible change to the types in this crate.
-pub const FORMAT_VERSION: u32 = 3;
+pub const FORMAT_VERSION: u32 = 4;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -33,7 +33,7 @@ pub(crate) mod testutil {
     use crate::dynamics::*;
     use crate::expressions::*;
     use crate::face::*;
-    use crate::hierarchy::{HumanBone, Humanoid, Node};
+    use crate::hierarchy::{HumanBone, Humanoid, MuscleFrame, Node};
     use crate::material::*;
     use crate::math::Transform;
     use crate::mesh::*;
@@ -55,6 +55,15 @@ pub(crate) mod testutil {
             humanoid: Some(Humanoid {
                 bones: vec![(HumanBone::Hips, 1)],
                 viewpoint: [0.0, 1.5, 0.1],
+                muscle_frames: vec![MuscleFrame {
+                    bone: HumanBone::Hips,
+                    pre: [0.0, 0.0, 0.0, 1.0],
+                    post: [0.0, 0.0, 0.0, 1.0],
+                    sign: [1.0; 3],
+                    min: [0.0; 3],
+                    max: [0.0; 3],
+                    twist: 1.0,
+                }],
             }),
             meshes: vec![Mesh {
                 name: "Body".into(),

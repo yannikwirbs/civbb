@@ -14,16 +14,18 @@ Internal deps: civbb-format
 - `src/clip.rs`: A clip bound to slots, and sampling it into the slot buffer.
 - `src/controller.rs`: A compiled animator controller and one running instance of it: parameters, layers, the evaluated pose.
 - `src/curve.rs`: Evaluates a curve of Hermite keys with Unity `AnimationCurve` semantics (ADR 0007).
-- `src/lib.rs`: Animation runtime: compile-time curve binding, clip sampling, Mecanim state machines and blend trees (design doc §7).
+- `src/lib.rs`: Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles (design doc §7).
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
 - `src/mix.rs`: Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
+- `src/muscle.rs`: Humanoid muscles: Unity's muscle table, and muscle values to human bones' local rotations (ADR 0014).
 - `tests/behaviour.rs`: Built-in parameters and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
 - `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order.
 - `tests/blend.rs`: Blend tree weights, hand-derived (ADR 0009): 1D, 2D simple directional, freeform cartesian and polar gradient
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
 - `tests/golden.rs`: Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
+- `tests/muscle.rs`: Humanoid muscles (ADR 0014): the table against Unity's, hand-derived muscle space, poses recorded from Unity's
 
 ## `crates/format` (civbb-format)
 
@@ -97,6 +99,8 @@ Internal deps: none
 - `docs/adr/0010-write-defaults-model.md`: 0010: Write Defaults model and golden-file conformance cases
 - `docs/adr/0011-builtins-and-behaviours.md`: 0011: Built-in parameters and state behaviours
 - `docs/adr/0012-eye-look-first-person-and-licence.md`: 0012: Eye look, first-person visibility and licence metadata (format v3)
+- `docs/adr/0013-unity-ground-truth-in-batch-mode.md`: 0013: Unity ground truth is recorded in batch mode by `tools/unity-truth`
+- `docs/adr/0014-humanoid-muscle-space.md`: 0014: Humanoid muscles follow Unity's muscle space, recorded per bone (format v4)
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

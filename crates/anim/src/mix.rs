@@ -252,11 +252,11 @@ fn lerp(a: Quat, b: Quat, t: f32) -> Quat {
     std::array::from_fn(|k| a[k] + t * (b[k] - a[k]))
 }
 
-fn conj(q: Quat) -> Quat {
+pub(crate) fn conj(q: Quat) -> Quat {
     [-q[0], -q[1], -q[2], q[3]]
 }
 
-fn mul(a: Quat, b: Quat) -> Quat {
+pub(crate) fn mul(a: Quat, b: Quat) -> Quat {
     let [ax, ay, az, aw] = a;
     let [bx, by, bz, bw] = b;
     [

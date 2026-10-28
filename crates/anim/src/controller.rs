@@ -3,12 +3,15 @@
 use std::collections::HashSet;
 
 use civbb_format::Avatar;
-use civbb_format::animator::{Animator, Behaviour, ParamIndex, TrackingMode};
+use civbb_format::animator::{Animator, Behaviour, BodyPart, ParamIndex, TrackingMode};
+use civbb_format::hierarchy::NodeIndex;
+use civbb_format::math::Quat;
 
 use crate::behaviour::{Builtin, Rng, Tracking, coerce, drive, part_index};
 use crate::bind::{Bound, Target, bind, node_paths};
 use crate::machine::{Ctx, LayerRun};
 use crate::mix::Mixer;
+use crate::muscle::{COUNT, MUSCLES};
 
 /// An avatar's animator with its clips bound to slots and its masks resolved. Shared by every instance.
 #[derive(Clone, Debug)]
@@ -36,25 +39,29 @@ impl Controller {
         let node_of = |t: &Target| match *t {
             Target::Position(n, _) | Target::Rotation(n, _) | Target::Scale(n, _) | Target::Active(n) => Some(n),
             Target::BlendShape(m, _) | Target::RendererEnabled(m) => Some(avatar.meshes[m as usize].node),
-            Target::Parameter(_) => None,
+            Target::Parameter(_) | Target::Muscle(_) => None,
         };
+        // Muscles follow the mask's body parts; other targets its transform paths, if it lists any.
         let masks = animator
             .layers
             .iter()
             .map(|l| {
-                let allowed: HashSet<&str> = l
-                    .mask
-                    .as_ref()?
-                    .transforms
-                    .as_ref()?
-                    .iter()
-                    .map(String::as_str)
-                    .collect();
+                let mask = l.mask.as_ref()?;
+                let allowed: Option<HashSet<&str>> =
+                    mask.transforms.as_ref().map(|t| t.iter().map(String::as_str).collect());
                 let targets = &bound.bindings.targets;
                 Some(
                     targets
                         .iter()
-                        .map(|t| node_of(t).is_none_or(|n| allowed.contains(paths[n as usize].as_str())))
+                        .map(|t| match (t, &allowed) {
+                            (Target::Muscle(m), _) => {
+                                mask.body_parts.contains(&BodyPart::of(MUSCLES[*m as usize].bone))
+                            }
+                            (t, Some(allowed)) => {
+                                node_of(t).is_none_or(|n| allowed.contains(paths[n as usize].as_str()))
+                            }
+                            (_, None) => true,
+                        })
                         .collect(),
                 )
             })
@@ -161,6 +168,24 @@ impl Instance {
     /// Slot values after the last update.
     pub fn pose(&self) -> &[f32] {
         &self.pose
+    }
+
+    /// Local rotations of the humanoid's framed bones from the muscle slots, parents first; muscles no clip binds
+    /// hold their rest values. Empty when no clip animates muscles, so the bones keep their rotation slots. Where it
+    /// is not empty it takes precedence over rotation slots of the same bones (ADR 0014).
+    pub fn human_pose(&self, c: &Controller) -> Vec<(NodeIndex, Quat)> {
+        let Some(rig) = &c.bound.rig else {
+            return Vec::new();
+        };
+        let mut muscles: [f32; COUNT] = rig.rest;
+        let mut any = false;
+        for (s, t) in c.bound.bindings.targets.iter().enumerate() {
+            if let Target::Muscle(m) = t {
+                muscles[*m as usize] = self.pose[s];
+                any = true;
+            }
+        }
+        if any { rig.rotations(&muscles) } else { Vec::new() }
     }
 
     /// Layer `i`'s state machine; `None` before the first update.

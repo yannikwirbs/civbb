@@ -386,6 +386,7 @@ pub fn generate(spec: &Spec) -> Avatar {
     let mut humanoid = Humanoid {
         bones: Vec::new(),
         viewpoint: [0.0, 1.55, 0.08],
+        muscle_frames: Vec::new(),
     };
     for (name, parent, offset, human) in SKELETON {
         let parent = if *parent == "Armature" {

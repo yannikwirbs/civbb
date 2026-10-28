@@ -159,12 +159,12 @@ fn reports_what_does_not_bind() {
         ),
         (curve("Body", Property::Active, &[]), "no keys"),
         (
-            curve("Body", Property::Muscle("Jaw Close".into()), &[(0.0, 1.0)]),
-            "humanoid curves not supported yet (#48)",
+            curve("", Property::Muscle("Jaw Close".into()), &[(0.0, 1.0)]),
+            "no muscle frames (#53)",
         ),
         (
-            curve("Body", Property::RootMotion(0), &[(0.0, 1.0)]),
-            "humanoid curves not supported yet (#48)",
+            curve("", Property::RootMotion(0), &[(0.0, 1.0)]),
+            "body pose curves not supported yet (#52)",
         ),
         (
             curve("Body", Property::Material("_Color.r".into()), &[(0.0, 1.0)]),

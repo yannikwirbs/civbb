@@ -4,3 +4,13 @@
 # Generated outputs of local runs
 /out/
 *.civpkg
+# Unity's generated state for tools/unity-truth; only the scripts, manifest and editor version are source.
+/tools/unity-truth/*/
+!/tools/unity-truth/Assets/
+!/tools/unity-truth/Packages/
+!/tools/unity-truth/ProjectSettings/
+/tools/unity-truth/*.csproj
+/tools/unity-truth/*.sln*
+/tools/unity-truth/Packages/packages-lock.json
+/tools/unity-truth/ProjectSettings/*
+!/tools/unity-truth/ProjectSettings/ProjectVersion.txt

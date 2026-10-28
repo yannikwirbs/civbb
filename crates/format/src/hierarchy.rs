@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::math::{Transform, Vec3};
+use crate::math::{Quat, Transform, Vec3};
 
 /// Index into [`Hierarchy::nodes`].
 pub type NodeIndex = u32;
@@ -95,11 +95,54 @@ pub struct Humanoid {
     pub bones: Vec<(HumanBone, NodeIndex)>,
     /// Eye position in avatar space, used for first-person view and eye-height calibration.
     pub viewpoint: Vec3,
+    /// Muscle frames of mapped bones, at most one each; empty when the source has none (glTF and VRM, #53).
+    pub muscle_frames: Vec<MuscleFrame>,
+}
+
+/// How muscle values turn one humanoid bone (Unity's per-bone axes, ADR 0014). With angles `a` in degrees from the
+/// bone's muscles, its local rotation is `pre * zyroll(a) * post⁻¹`, where `zyroll` twists about X, then swings
+/// about Y and Z.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MuscleFrame {
+    /// The bone.
+    pub bone: HumanBone,
+    /// Muscle space to the parent node's space.
+    pub pre: Quat,
+    /// Muscle space to the bone node's space.
+    pub post: Quat,
+    /// Per axis (X twist, Y, Z), the sign applied to muscle angles: 1 or -1.
+    pub sign: Vec3,
+    /// Per axis, the angle at muscle -1 in degrees (zero or negative).
+    pub min: Vec3,
+    /// Per axis, the angle at muscle +1 in degrees (zero or positive).
+    pub max: Vec3,
+    /// Share of the X twist the bone keeps; the rest turns the next bone of the limb about the same axis. Unity's
+    /// arm and leg twist settings (default 0.5) on upper and lower arms and legs, 1 on every other bone.
+    pub twist: f32,
 }
 
 impl Humanoid {
     /// The node mapped to `bone`, if any.
     pub fn node(&self, bone: HumanBone) -> Option<NodeIndex> {
         self.bones.iter().find(|(b, _)| *b == bone).map(|(_, n)| *n)
+    }
+}
+
+impl HumanBone {
+    /// The bone that takes the rest of this bone's twist ([`MuscleFrame::twist`]), for the four limb bones that
+    /// split their twist.
+    pub fn twist_child(self) -> Option<HumanBone> {
+        use HumanBone as H;
+        Some(match self {
+            H::LeftUpperArm => H::LeftLowerArm,
+            H::LeftLowerArm => H::LeftHand,
+            H::RightUpperArm => H::RightLowerArm,
+            H::RightLowerArm => H::RightHand,
+            H::LeftUpperLeg => H::LeftLowerLeg,
+            H::LeftLowerLeg => H::LeftFoot,
+            H::RightUpperLeg => H::RightLowerLeg,
+            H::RightLowerLeg => H::RightFoot,
+            _ => return None,
+        })
     }
 }

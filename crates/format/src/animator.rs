@@ -404,7 +404,7 @@ pub enum Property {
     EulerRotation(u8),
     /// Local scale component.
     Scale(u8),
-    /// Humanoid muscle, by Unity muscle name (e.g. `Left Arm Down-Up`).
+    /// Humanoid muscle, by Unity clip property name (`Left Arm Down-Up`, `LeftHand.Index.1 Stretched`; ADR 0014).
     Muscle(String),
     /// Humanoid root motion: position (0..3) or rotation (3..7) component.
     RootMotion(u8),

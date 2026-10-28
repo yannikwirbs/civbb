@@ -8,6 +8,7 @@ use civbb_format::hierarchy::{Hierarchy, NodeIndex};
 use civbb_format::mesh::MeshIndex;
 
 use crate::clip::{BoundClip, BoundCurve, EulerCurves, quat_to_euler};
+use crate::muscle::{self, MUSCLES, Rig};
 
 /// Index into the slot buffer.
 pub type Slot = u32;
@@ -30,6 +31,8 @@ pub enum Target {
     RendererEnabled(MeshIndex),
     /// Float animator parameter.
     Parameter(ParamIndex),
+    /// Humanoid muscle, by index into [`MUSCLES`].
+    Muscle(u8),
 }
 
 /// Every slot of an avatar: what it drives and its default (the Write Defaults value).
@@ -73,6 +76,8 @@ pub struct Bound {
     pub clips: Vec<BoundClip>,
     /// Curves left out.
     pub unbound: Vec<Unbound>,
+    /// The humanoid's muscle frames; `None` without them, and then muscle curves are unbound.
+    pub rig: Option<Rig>,
 }
 
 /// Unity-style binding path of every node: names below the root joined by `/`; the root's is empty.
@@ -99,6 +104,7 @@ pub fn bind(avatar: &Avatar) -> Bound {
         },
         clips,
         unbound: b.unbound,
+        rig: b.rig,
     }
 }
 
@@ -107,6 +113,7 @@ struct Binder<'a> {
     nodes: HashMap<String, NodeIndex>,
     meshes: HashMap<NodeIndex, Vec<MeshIndex>>,
     params: HashMap<&'a str, ParamIndex>,
+    rig: Option<Rig>,
     slots: HashMap<Target, Slot>,
     targets: Vec<Target>,
     defaults: Vec<f32>,
@@ -136,11 +143,14 @@ impl<'a> Binder<'a> {
         for (i, p) in avatar.animator.iter().flat_map(|a| a.parameters.iter()).enumerate() {
             params.entry(p.name.as_str()).or_insert(i as ParamIndex);
         }
+        let rest = |n: NodeIndex| avatar.hierarchy.nodes[n as usize].rest.rotation;
+        let rig = avatar.humanoid.as_ref().and_then(|h| Rig::new(h, rest));
         Self {
             avatar,
             nodes,
             meshes,
             params,
+            rig,
             slots: HashMap::new(),
             targets: Vec::new(),
             defaults: Vec::new(),
@@ -260,6 +270,14 @@ impl<'a> Binder<'a> {
                 _ => Err("only float parameters can be animated"),
             };
         }
+        if let Property::Muscle(name) = &b.property {
+            let m = muscle::find(name).ok_or("no such muscle")?;
+            let rig = self.rig.as_ref().ok_or("no muscle frames (#53)")?;
+            return match rig.has(MUSCLES[m as usize].bone) {
+                true => Ok(Resolved::Target(Target::Muscle(m))),
+                false => Err("no muscle frame for the muscle's bone"),
+            };
+        }
         let node = *self.nodes.get(&b.path).ok_or("no node at path")?;
         let on_node = self.meshes.get(&node).map_or(&[][..], Vec::as_slice);
         let t = match &b.property {
@@ -282,10 +300,10 @@ impl<'a> Binder<'a> {
                     })
                     .ok_or("no such blendshape")?
             }
-            Property::Muscle(_) | Property::RootMotion(_) => return Err("humanoid curves not supported yet (#48)"),
+            Property::RootMotion(_) => return Err("body pose curves not supported yet (#52)"),
             Property::Material(_) => return Err("material curves not supported yet (#49)"),
             Property::Component { .. } => return Err("unsupported component property"),
-            Property::Parameter(_) => unreachable!("handled above"),
+            Property::Parameter(_) | Property::Muscle(_) => unreachable!("handled above"),
         };
         Ok(Resolved::Target(t))
     }
@@ -305,6 +323,7 @@ impl<'a> Binder<'a> {
             Target::Active(n) => f32::from(u8::from(a.hierarchy.nodes[n as usize].active)),
             Target::RendererEnabled(_) => 1.0,
             Target::Parameter(p) => a.animator.as_ref().expect("bound").parameters[p as usize].default,
+            Target::Muscle(m) => self.rig.as_ref().expect("bound").rest[m as usize],
         };
         self.slots.insert(t, s);
         self.targets.push(t);

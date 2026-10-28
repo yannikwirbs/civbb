@@ -1,6 +1,6 @@
 # 0002: Phase 0 starts from glTF/VRM and generated avatars, Unity exporter later
 
-Status: accepted
+Status: accepted; the Consequences paragraph is superseded by 0013
 Date: 2026-10-28
 
 ## Context
