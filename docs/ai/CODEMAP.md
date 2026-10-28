@@ -36,6 +36,9 @@ Internal deps: civbb-format
 - `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`) to native types (ADR 0006).
 - `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
 - `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
+- `src/main.rs`: `civbb`: build, validate and inspect avatar packages from the command line (design doc §9, creator tooling).
+- `src/package.rs`: Turns imports into runtime packages and summarises avatars for `civbb inspect`.
+- `tests/cli.rs`: `civbb` end to end: keygen, build, validate and inspect on a corpus avatar, plus tamper and wrong-key rejection.
 - `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
 
 ## `tools/corpus` (civbb-corpus)

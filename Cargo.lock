@@ -117,6 +117,7 @@ dependencies = [
  "base64",
  "civbb-corpus",
  "civbb-format",
+ "getrandom",
  "gltf",
  "serde_json",
  "thiserror",

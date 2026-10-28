@@ -2,5 +2,7 @@
 
 mod accessor;
 pub mod gltf_import;
+pub mod package;
 
 pub use gltf_import::{ImportError, Imported, Limits, import};
+pub use package::{COMPILER, Stats, package, stats};
