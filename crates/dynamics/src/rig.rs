@@ -1,9 +1,11 @@
 //! Compiles an avatar's chains into one flat particle list, parents first, with per-particle parameters (ADR 0015).
 
 use civbb_format::Avatar;
-use civbb_format::dynamics::{Chain, Graded, ImmobileType, Integration, MultiChild};
+use civbb_format::dynamics::{Chain, Collider, Graded, ImmobileType, Integration, Limit, MultiChild};
 use civbb_format::hierarchy::NodeIndex;
-use civbb_format::math::Vec3;
+use civbb_format::math::{Quat, Vec3};
+
+use crate::math::euler_to_quat;
 
 /// Particles per chain at most, as PhysBones limit one component to 256 transforms; deeper nodes are not simulated.
 pub const MAX_PARTICLES: usize = 256;
@@ -32,6 +34,25 @@ pub struct ChainRig {
     pub allow_grab: bool,
     /// Posing allowed.
     pub allow_posing: bool,
+    /// Indices into [`Rig::colliders`].
+    pub colliders: Vec<u32>,
+    /// Limit shape.
+    pub limit: LimitKind,
+    /// Limit frame relative to the parent node's rotation.
+    pub limit_rotation: Quat,
+}
+
+/// Rotation limit shapes; the angles are per particle ([`Rig::limit_a`], [`Rig::limit_b`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LimitKind {
+    /// Unlimited.
+    None,
+    /// Cone of `limit_a` around the rest direction.
+    Angle,
+    /// Within `limit_a` of the rest direction in the limit frame's YZ plane (turning about its X).
+    Hinge,
+    /// Elliptical cone: `limit_a` pitch (about X), `limit_b` yaw (about the axis across).
+    Polar,
 }
 
 /// An avatar's chains as structure-of-arrays particles, chains contiguous, every parent before its children.
@@ -41,6 +62,8 @@ pub struct Rig {
     pub chains: Vec<ChainRig>,
     /// Every node's parent node, to place the animated pose in the world.
     pub parents: Vec<Option<NodeIndex>>,
+    /// The avatar's colliders.
+    pub colliders: Vec<Collider>,
     /// The node a particle drives; `None` for endpoint tips.
     pub node: Vec<Option<NodeIndex>>,
     /// Parent particle, or [`NO_PARENT`].
@@ -65,6 +88,12 @@ pub struct Rig {
     pub max_stretch: Vec<f32>,
     /// Max squish as a fraction of rest length, 0 to 1.
     pub max_squish: Vec<f32>,
+    /// Collision radius, 0 or more.
+    pub radius: Vec<f32>,
+    /// Limit angle (angle, hinge) or pitch (polar), radians, 0 to pi.
+    pub limit_a: Vec<f32>,
+    /// Limit yaw (polar), radians, 0 to pi.
+    pub limit_b: Vec<f32>,
 }
 
 impl Rig {
@@ -79,6 +108,7 @@ impl Rig {
         }
         let mut rig = Self {
             parents: nodes.iter().map(|n| n.parent).collect(),
+            colliders: avatar.dynamics.colliders.clone(),
             ..Self::default()
         };
         for chain in &avatar.dynamics.chains {
@@ -126,6 +156,16 @@ impl Rig {
         let deepest = order.iter().map(|o| o.2).max().unwrap_or(0).max(1) as f32;
         let first = self.node.len() as u32;
         let advanced = c.integration == Integration::Advanced;
+        let (limit, a, b, rotation) = match &c.limit {
+            Limit::None => (LimitKind::None, None, None, [0.0; 3]),
+            Limit::Angle { max_angle, rotation } => (LimitKind::Angle, Some(max_angle), None, *rotation),
+            Limit::Hinge { max_angle, rotation } => (LimitKind::Hinge, Some(max_angle), None, *rotation),
+            Limit::Polar {
+                max_pitch,
+                max_yaw,
+                rotation,
+            } => (LimitKind::Polar, Some(max_pitch), Some(max_yaw), *rotation),
+        };
         for &(node, parent, depth) in &order {
             let d = depth as f32 / deepest;
             let unit = |g: &Graded| eval(g, d).clamp(0.0, 1.0);
@@ -142,6 +182,10 @@ impl Rig {
             self.immobile.push(unit(&c.immobile));
             self.max_stretch.push(eval(&c.max_stretch, d).max(0.0));
             self.max_squish.push(unit(&c.max_squish));
+            self.radius.push(eval(&c.radius, d).max(0.0));
+            let angle = |g: Option<&Graded>| g.map_or(0.0, |g| eval(g, d).clamp(0.0, 180.0).to_radians());
+            self.limit_a.push(angle(a));
+            self.limit_b.push(angle(b));
         }
         self.chains.push(ChainRig {
             root: c.root,
@@ -158,6 +202,9 @@ impl Rig {
             },
             allow_grab: c.allow_grab,
             allow_posing: c.allow_posing,
+            colliders: c.colliders.clone(),
+            limit,
+            limit_rotation: euler_to_quat(rotation),
         });
     }
 }

@@ -37,7 +37,7 @@ Internal deps: civbb-format
 - `src/math.rs`: Vector and quaternion helpers for the solver; they move to `civbb-core` with #22.
 - `src/rig.rs`: Compiles an avatar's chains into one flat particle list, parents first, with per-particle parameters (ADR 0015).
 - `src/solver.rs`: Steps an avatar's chains against the animated pose (inertia, gravity, pull, stiffness, lengths, immobile, grab and
-- `tests/solver.rs`: Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness,
+- `tests/solver.rs`: Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness, limits,
 
 ## `crates/format` (civbb-format)
 
@@ -114,6 +114,7 @@ Internal deps: none
 - `docs/adr/0013-unity-ground-truth-in-batch-mode.md`: 0013: Unity ground truth is recorded in batch mode by `tools/unity-truth`
 - `docs/adr/0014-humanoid-muscle-space.md`: 0014: Humanoid muscles follow Unity's muscle space, recorded per bone (format v4)
 - `docs/adr/0015-chain-solver-model.md`: 0015: PhysBone chains are solved as XPBD particles against the animated pose
+- `docs/adr/0016-colliders-and-limits.md`: 0016: Chain colliders and rotation limits
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

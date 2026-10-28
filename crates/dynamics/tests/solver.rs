@@ -1,5 +1,5 @@
-//! Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness,
-//! immobile, frame-rate independence, multi-child roots, grab, pose and the reported parameters.
+//! Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness, limits,
+//! colliders, immobile, frame-rate independence, multi-child roots, grab, pose and the reported parameters.
 
 use civbb_dynamics::math::{Pose, length, normalize, sub};
 use civbb_dynamics::rig::eval;
@@ -431,4 +431,133 @@ fn the_bloated_corpus_avatar_stays_finite() {
         let p = s.params(&rig, c);
         assert!([p.angle, p.stretch, p.squish].iter().all(|x| (0.0..=1.0).contains(x)));
     }
+}
+
+/// One horizontal bone falling without pull, with a limit or colliders.
+fn hang(c: Chain, colliders: Vec<Collider>) -> (f32, f32) {
+    let mut a = avatar(1, Chain { pull: g(0.0), ..c });
+    a.dynamics.colliders = colliders;
+    let rig = Rig::new(&a);
+    let mut s = State::new(&rig);
+    let l = run(&a, &mut s, &rig, 3.0, 60.0, |_| [0.0; 3]);
+    (droop(&a, &l, 1, 2), s.params(&rig, 0).squish)
+}
+
+fn limited(limit: Limit) -> f32 {
+    hang(
+        Chain {
+            gravity: g(1.0),
+            limit,
+            ..chain(1)
+        },
+        Vec::new(),
+    )
+    .0
+}
+
+#[test]
+fn limits_bound_the_bone_around_its_rest_direction() {
+    // The limit frame is the parent's rotation swung so Y runs along the bone (+X here): frame X is world -Y, frame
+    // Z is world Z. Turned 90 degrees about the bone, frame X becomes world -Z.
+    let turned = [0.0, 90.0, 0.0];
+    assert!((limited(Limit::None) - 90.0).abs() < 0.5);
+    let angle = Limit::Angle {
+        max_angle: g(30.0),
+        rotation: [0.0; 3],
+    };
+    assert!((limited(angle) - 30.0).abs() < 0.1);
+    // A hinge turns about frame X: about the vertical, gravity cannot move the bone; about -Z, it droops to the max.
+    let hinge = |rotation| Limit::Hinge {
+        max_angle: g(30.0),
+        rotation,
+    };
+    assert!(limited(hinge([0.0; 3])).abs() < 0.1);
+    assert!((limited(hinge(turned)) - 30.0).abs() < 0.1);
+    // Polar: pitch (about frame X) limits travel along frame Z, yaw travel along frame X.
+    let polar = |rotation| Limit::Polar {
+        max_pitch: g(20.0),
+        max_yaw: g(60.0),
+        rotation,
+    };
+    assert!((limited(polar([0.0; 3])) - 60.0).abs() < 0.1);
+    assert!((limited(polar(turned)) - 20.0).abs() < 0.1);
+    // Rotation tilts the cone: its axis 40 degrees down, 10 wide, so a bone pulled level rests at 30.
+    let tilted = Chain {
+        gravity: g(0.0),
+        pull: g(1.0),
+        limit: Limit::Angle {
+            max_angle: g(10.0),
+            rotation: [0.0, 0.0, -40.0],
+        },
+        ..chain(1)
+    };
+    let a = avatar(1, tilted);
+    let rig = Rig::new(&a);
+    let mut s = State::new(&rig);
+    let l = run(&a, &mut s, &rig, 1.0, 60.0, |_| [0.0; 3]);
+    assert!((droop(&a, &l, 1, 2) - 30.0).abs() < 0.1);
+}
+
+fn collider(shape: Shape, position: Vec3, rotation: [f32; 4], inside: bool) -> Collider {
+    Collider {
+        node: 0,
+        shape,
+        position,
+        rotation,
+        inside,
+    }
+}
+
+#[test]
+fn colliders_push_bones_out_or_keep_them_in() {
+    // Gravity 0.2 moves the tip 2 cm per step: a bone that moves its whole length in one step can pass through
+    // a collider thinner than that (ADR 0015).
+    let with = |radius: f32, col: Collider| {
+        hang(
+            Chain {
+                gravity: g(0.2),
+                radius: g(radius),
+                colliders: vec![0],
+                ..chain(1)
+            },
+            vec![col],
+        )
+    };
+    const I: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+    // A floor at y = 0.95 under the bone (base at y = 1, length 0.1): the tip stops 0.05 down, asin(0.5) = 30
+    // degrees; with a 0.02 bone radius 0.03 down, asin(0.3).
+    let floor = collider(Shape::Plane, [0.0, 0.95, 0.0], I, false);
+    let rest = with(0.0, floor.clone()).0;
+    assert!((rest - 30.0).abs() < 0.2, "{rest}");
+    assert!((with(0.02, floor).0 - 17.458).abs() < 0.2);
+    // A ball of radius 0.06 at (0.1, 0.9): the tip's circle meets it where sin(t + 45) = 1.32 / sqrt(2), t = 23.97.
+    let ball = collider(Shape::Sphere { radius: 0.06 }, [0.1, 0.9, 0.0], I, false);
+    let rest = with(0.0, ball).0;
+    assert!((rest - 23.97).abs() < 1.5, "{rest}");
+    // The same circle across a capsule lying along Z through that point.
+    let h = std::f32::consts::FRAC_1_SQRT_2;
+    let rod = collider(
+        Shape::Capsule {
+            radius: 0.06,
+            height: 0.5,
+        },
+        [0.1, 0.9, 0.0],
+        [h, 0.0, 0.0, h],
+        false,
+    );
+    assert!((with(0.0, rod).0 - 23.97).abs() < 1.5);
+    // Inside a ball of radius 0.15 around the base, a bone of radius 0.07 has 0.08 of room: it squishes to 0.8 of
+    // its length, 0.4 of its 0.5 max squish.
+    let cage = collider(Shape::Sphere { radius: 0.15 }, [0.0, 1.0, 0.0], I, true);
+    let (_, squish) = hang(
+        Chain {
+            gravity: g(0.2),
+            radius: g(0.07),
+            colliders: vec![0],
+            max_squish: g(0.5),
+            ..chain(1)
+        },
+        vec![cage],
+    );
+    assert!((squish - 0.4).abs() < 1e-3, "{squish}");
 }

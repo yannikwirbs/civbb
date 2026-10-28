@@ -1,11 +1,11 @@
 //! Steps an avatar's chains against the animated pose (inertia, gravity, pull, stiffness, lengths, immobile, grab and
 //! pose) and writes the simulated rotations back into the local pose (ADR 0015).
 
-use civbb_format::dynamics::MultiChild;
+use civbb_format::dynamics::{MultiChild, Shape};
 use civbb_format::math::{Transform, Vec3};
 
-use crate::math::{Pose, add, conj, dot, from_to, length, mul, normalize, qnormalize, rotate, scale, sub};
-use crate::rig::{NO_PARENT, Rig};
+use crate::math::{Pose, add, conj, cross, dot, from_to, length, mul, normalize, qnormalize, rotate, scale, sub};
+use crate::rig::{LimitKind, NO_PARENT, Rig};
 
 /// The step that per-step parameters (pull, spring) refer to, seconds.
 pub const REFERENCE_STEP: f32 = 1.0 / 60.0;
@@ -13,6 +13,8 @@ pub const REFERENCE_STEP: f32 = 1.0 / 60.0;
 pub const MAX_STEP: f32 = 1.0 / 60.0;
 /// Longer frames (hitches) are simulated as this long.
 pub const MAX_FRAME: f32 = 0.1;
+/// Collider and length projections per particle and substep, at most.
+pub const COLLISION_PASSES: u32 = 8;
 
 /// What a chain reports to the animator under its parameter prefix (`_IsGrabbed`, `_IsPosed`, `_Angle`,
 /// `_Stretch`, `_Squish`).
@@ -28,6 +30,15 @@ pub struct ChainParams {
     pub stretch: f32,
     /// How close the most squished bone is to its max squish, 0 to 1.
     pub squish: f32,
+}
+
+/// A collider placed in the world for this step.
+#[derive(Clone, Copy, Debug)]
+enum Placed {
+    /// A segment from `a` to `b` (a point for spheres) with a radius.
+    Capsule { a: Vec3, b: Vec3, radius: f32 },
+    /// A plane through `point` with unit `normal`.
+    Plane { point: Vec3, normal: Vec3 },
 }
 
 /// One avatar's simulation state, for the [`Rig`] it was made for.
@@ -68,6 +79,36 @@ impl State {
             let parent = rig.parents[i].map_or(origin, |p| world[p as usize]);
             world.push(parent.then(l));
         }
+        let placed: Vec<(Placed, bool)> = rig
+            .colliders
+            .iter()
+            .map(|col| {
+                let w = world[col.node as usize];
+                let center = w.point(col.position);
+                let up = rotate(mul(w.rot, col.rotation), [0.0, 1.0, 0.0]);
+                let shape = match col.shape {
+                    Shape::Sphere { radius } => Placed::Capsule {
+                        a: center,
+                        b: center,
+                        radius: radius.max(0.0) * w.scale,
+                    },
+                    Shape::Capsule { radius, height } => {
+                        let radius = radius.max(0.0) * w.scale;
+                        let half = (height * 0.5 * w.scale - radius).max(0.0);
+                        Placed::Capsule {
+                            a: add(center, scale(up, -half)),
+                            b: add(center, scale(up, half)),
+                            radius,
+                        }
+                    }
+                    Shape::Plane => Placed::Plane {
+                        point: center,
+                        normal: up,
+                    },
+                };
+                (shape, col.inside)
+            })
+            .collect();
         let dt = dt.clamp(0.0, MAX_FRAME);
         let steps = (dt / MAX_STEP).ceil().max(1.0);
         let h = dt / steps;
@@ -94,6 +135,21 @@ impl State {
                     (None, p) => sub(a(k), a(p as usize)),
                 };
             }
+            // Each particle's limit frame: the parent node's animated rotation swung so its Y (Unity bones point
+            // along Y) lies along the rest direction, then turned by the limit rotation. Returns its Y and X.
+            let axes: Vec<(Vec3, Vec3)> = range
+                .clone()
+                .map(|k| {
+                    let p = rig.parent[k];
+                    if p == NO_PARENT || ch.limit == LimitKind::None {
+                        return ([0.0; 3], [0.0; 3]);
+                    }
+                    let parent = rig.node[p as usize].map_or(Pose::IDENTITY, |n| world[n as usize]).rot;
+                    let swing = from_to(rotate(parent, [0.0, 1.0, 0.0]), normalize(self.rest[k]));
+                    let frame = mul(mul(swing, parent), ch.limit_rotation);
+                    (rotate(frame, [0.0, 1.0, 0.0]), rotate(frame, [1.0, 0.0, 0.0]))
+                })
+                .collect();
             let Some(last) = self.frame[c].replace(frame) else {
                 for k in range {
                     self.pos[k] = a(k);
@@ -118,14 +174,24 @@ impl State {
             }
             if dt > 0.0 {
                 for _ in 0..steps as u32 {
-                    self.substep(rig, c, &anim, h, r);
+                    self.substep(rig, c, &anim, &axes, &placed, h, r);
                 }
             }
             self.write(rig, c, origin, &mut world, locals);
         }
     }
 
-    fn substep(&mut self, rig: &Rig, c: usize, anim: &[Vec3], h: f32, r: f32) {
+    #[allow(clippy::too_many_arguments)]
+    fn substep(
+        &mut self,
+        rig: &Rig,
+        c: usize,
+        anim: &[Vec3],
+        axes: &[(Vec3, Vec3)],
+        placed: &[(Placed, bool)],
+        h: f32,
+        r: f32,
+    ) {
         let ch = &rig.chains[c];
         let first = ch.first as usize;
         let h2 = h * h;
@@ -163,10 +229,30 @@ impl State {
                     x = add(target, scale(normalize(off), max));
                 }
             }
-            // Motion keeps bone lengths; only grabs stretch and squish.
-            let d = sub(x, self.pos[p]);
-            if length(d) > 1e-9 {
-                x = add(self.pos[p], scale(normalize(d), len));
+            // Motion keeps bone lengths, within the limit; colliders push out, and may squish or stretch the bone
+            // within its range.
+            let mut dir = normalize(sub(x, self.pos[p]));
+            if ch.limit != LimitKind::None {
+                let (axis, across) = axes[k - first];
+                dir = limit(ch.limit, axis, across, rig.limit_a[k], rig.limit_b[k], dir);
+            }
+            x = add(self.pos[p], scale(dir, len));
+            // Alternating collider and length projections slide the bone along a collider instead of leaving it
+            // where one pass would (re-extending the bone through the surface).
+            for _ in 0..COLLISION_PASSES {
+                let before = x;
+                for &ci in &ch.colliders {
+                    let (shape, inside) = placed[ci as usize];
+                    x = collide(shape, inside, rig.radius[k], x);
+                }
+                if x == before {
+                    break;
+                }
+                let d = sub(x, self.pos[p]);
+                let reach = length(d).clamp(len * (1.0 - rig.max_squish[k]), len * (1.0 + rig.max_stretch[k]));
+                if length(d) > 1e-9 {
+                    x = add(self.pos[p], scale(normalize(d), reach));
+                }
             }
             self.pos[k] = x;
         }
@@ -313,5 +399,80 @@ impl State {
             out.angle = cos.acos().to_degrees() / 180.0;
         }
         out
+    }
+}
+
+/// Direction `d` brought within a limit around `axis` (the limit frame's Y); `across` is the frame's X, which the
+/// hinge and pitch turn about (yaw turns about the third axis). Angles in radians.
+fn limit(kind: LimitKind, axis: Vec3, across: Vec3, a: f32, b: f32, d: Vec3) -> Vec3 {
+    let mut x = sub(across, scale(axis, dot(across, axis)));
+    if length(x) < 1e-6 {
+        x = cross(
+            axis,
+            if axis[0].abs() < 0.9 {
+                [1.0, 0.0, 0.0]
+            } else {
+                [0.0, 1.0, 0.0]
+            },
+        );
+    }
+    let x = normalize(x);
+    let z = cross(axis, x);
+    let (along, px, pz) = (dot(d, axis), dot(d, x), dot(d, z));
+    if kind == LimitKind::Hinge {
+        // Turning about X keeps the direction in the plane of the axis and Z.
+        let angle = pz.atan2(along).clamp(-a, a);
+        return add(scale(axis, angle.cos()), scale(z, angle.sin()));
+    }
+    let theta = along.clamp(-1.0, 1.0).acos();
+    let phi = pz.atan2(px);
+    let max = match kind {
+        // Pitch (about X) limits travel along Z, yaw (about Z) travel along X: an elliptical cone.
+        LimitKind::Polar => {
+            let term = |c: f32, m: f32| if c == 0.0 { 0.0 } else { (c / m).powi(2) };
+            1.0 / (term(phi.cos(), b) + term(phi.sin(), a)).sqrt()
+        }
+        _ => a,
+    };
+    if theta <= max {
+        return d;
+    }
+    let side = add(scale(x, phi.cos()), scale(z, phi.sin()));
+    add(scale(axis, max.cos()), scale(side, max.sin()))
+}
+
+/// Point `x` of radius `r` pushed out of a collider, or kept inside it.
+fn collide(shape: Placed, inside: bool, r: f32, x: Vec3) -> Vec3 {
+    match shape {
+        Placed::Capsule { a, b, radius } => {
+            let ab = sub(b, a);
+            let t = if dot(ab, ab) > 1e-12 {
+                (dot(sub(x, a), ab) / dot(ab, ab)).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let center = add(a, scale(ab, t));
+            let d = sub(x, center);
+            let l = length(d);
+            let dir = if l > 1e-9 { scale(d, 1.0 / l) } else { [0.0, 1.0, 0.0] };
+            if inside {
+                let room = (radius - r).max(0.0);
+                if l > room { add(center, scale(dir, room)) } else { x }
+            } else if l < radius + r {
+                add(center, scale(dir, radius + r))
+            } else {
+                x
+            }
+        }
+        Placed::Plane { point, normal } => {
+            let s = dot(sub(x, point), normal);
+            if inside && s > -r {
+                sub(x, scale(normal, s + r))
+            } else if !inside && s < r {
+                add(x, scale(normal, r - s))
+            } else {
+                x
+            }
+        }
     }
 }

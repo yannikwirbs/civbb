@@ -92,6 +92,18 @@ pub fn from_to(a: Vec3, b: Vec3) -> Quat {
     qnormalize([c[0], c[1], c[2], 1.0 + d])
 }
 
+/// `[x, y, z]` degrees to a rotation about Z, then X, then Y (`qy * qx * qz`), the Euler order of ADR 0007.
+pub fn euler_to_quat(deg: Vec3) -> Quat {
+    let [(sx, cx), (sy, cy), (sz, cz)] = deg.map(|d| (d.to_radians() * 0.5).sin_cos());
+    mul(mul([0.0, sy, 0.0, cy], [sx, 0.0, 0.0, cx]), [0.0, 0.0, sz, cz])
+}
+
+/// `v` turned by `angle` radians about unit `axis`.
+pub fn turn(v: Vec3, axis: Vec3, angle: f32) -> Vec3 {
+    let (s, c) = (angle * 0.5).sin_cos();
+    rotate([axis[0] * s, axis[1] * s, axis[2] * s, c], v)
+}
+
 /// A world placement with uniform scale; non-uniform node scale is approximated by its X component.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Pose {

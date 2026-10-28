@@ -9,6 +9,6 @@ Bone dynamics (design doc §7 "Bone dynamics"). Engine crate: depends only on `c
   rotations back; grab, release and pose; the `_IsGrabbed`, `_IsPosed`, `_Angle`, `_Stretch` and `_Squish` values.
 - `math`: the few vector and quaternion helpers the solver needs (move to `civbb-core` with #22).
 
-The model and its unverified constants are in ADR 0015. Colliders and limits are #19.
+The model and its unverified constants are in ADR 0015; colliders and limits in ADR 0016.
 
 Input is an avatar that passed `civbb_format::validate`; indices are not re-checked, parameter ranges are clamped.
