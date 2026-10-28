@@ -86,8 +86,8 @@ impl Ctx<'_> {
         }
     }
 
-    fn length(&self, s: StateIndex) -> f32 {
-        motion::length(self.state(s).motion.as_ref(), self.clips)
+    fn length(&self, s: StateIndex, params: &[f32]) -> f32 {
+        motion::length(self.state(s).motion.as_ref(), self.clips, params)
     }
 
     fn enter(&self, s: StateIndex, offset: f32, params: &[f32]) -> Playing {
@@ -110,7 +110,7 @@ impl Ctx<'_> {
             Some(tp) => params[tp as usize],
             None => {
                 let speed = s.speed * s.speed_param.map_or(1.0, |sp| params[sp as usize]);
-                p.time + dt * speed / self.length(p.state)
+                p.time + dt * speed / self.length(p.state, params)
             }
         };
     }
@@ -294,7 +294,7 @@ impl LayerRun {
         let duration = if tr.fixed_duration {
             tr.duration
         } else {
-            tr.duration * ctx.length(owner)
+            tr.duration * ctx.length(owner, params)
         };
         if let Some(old) = self.active.take() {
             self.from = From::Snapshot(snapshot.unwrap_or_default());

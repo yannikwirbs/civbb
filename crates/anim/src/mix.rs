@@ -1,4 +1,4 @@
-//! Layer pose mixing: weighted sources, the default fill, override and additive layers, masks (ADR 0008).
+//! Layer pose mixing: weighted sources, the default fill, override and additive layers, masks (ADR 0008, 0009).
 
 use civbb_format::animator::{LayerBlending, State};
 use civbb_format::math::Quat;
@@ -13,7 +13,7 @@ const IDENTITY: Quat = [0.0, 0.0, 0.0, 1.0];
 
 /// Scratch buffers for evaluating one layer at a time.
 pub(crate) struct Mixer {
-    /// Weighted sum of (value - fill) per slot; additive layers: of (value - first-frame value).
+    /// Weighted sum of (value - default) per slot; additive layers: of (value - first-frame value).
     acc: Vec<f32>,
     /// Layer values (override) or deltas (additive) of the written slots.
     val: Vec<f32>,
@@ -47,8 +47,6 @@ impl Mixer {
         let additive = c.animator.layers[li].blending == LayerBlending::Additive;
         let defaults = &c.bound.bindings.defaults;
         let progress = run.active.map_or(0.0, |a| a.progress.clamp(0.0, 1.0));
-        // Sum of source weights that fall back to the fill value (here the default; #16 adds Write Defaults off).
-        let mut fill = 0.0;
         let mut sources: [Option<(f32, Src)>; 2] = [None, None];
         sources[0] = Some((
             1.0 - progress,
@@ -69,7 +67,6 @@ impl Mixer {
                     let From::Snapshot(snap) = &run.from else {
                         unreachable!()
                     };
-                    fill += ws;
                     for &(s, v) in snap {
                         let su = s as usize;
                         let reference = match (additive, c.rot[su]) {
@@ -84,16 +81,17 @@ impl Mixer {
                     let state = &c.animator.layers[li].state_machine.states[p.state as usize];
                     self.leaves.clear();
                     if let Some(m) = &state.motion {
-                        motion::leaves(m, &c.bound.clips, normalized(state, &p, params), &mut self.leaves);
+                        motion::leaves(
+                            m,
+                            &c.bound.clips,
+                            params,
+                            normalized(state, &p, params),
+                            &mut self.leaves,
+                        );
                     }
-                    let total: f32 = self.leaves.iter().map(|l| l.weight).sum();
-                    fill += if self.leaves.is_empty() { ws } else { ws * total };
-                    for li in 0..self.leaves.len() {
-                        let leaf = self.leaves[li];
-                        let w = ws * leaf.weight;
-                        if w > 0.0 {
-                            self.leaf(c, leaf, w, additive);
-                        }
+                    for k in 0..self.leaves.len() {
+                        let leaf = self.leaves[k];
+                        self.leaf(c, leaf, ws * leaf.weight, additive);
                     }
                 }
             }
@@ -104,19 +102,19 @@ impl Mixer {
             let s = self.written[i] as usize;
             if c.rot[s] == 1 {
                 let q: [f32; 4] = std::array::from_fn(|k| {
-                    let base = if additive { IDENTITY[k] } else { fill * defaults[s + k] };
+                    let base = if additive { IDENTITY[k] } else { defaults[s + k] };
                     base + self.acc[s + k]
                 });
                 self.val[s..s + 4].copy_from_slice(&normalize(q));
                 i += 4;
             } else {
-                self.val[s] = if additive { 0.0 } else { fill * defaults[s] } + self.acc[s];
+                self.val[s] = if additive { 0.0 } else { defaults[s] } + self.acc[s];
                 i += 1;
             }
         }
     }
 
-    /// Adds one clip at weight `w`: its values relative to the fill, or relative to its first frame (additive).
+    /// Adds one clip at weight `w`: its values relative to the default, or to its first frame (additive).
     fn leaf(&mut self, c: &Controller, leaf: Leaf, w: f32, additive: bool) {
         let clip = &c.bound.clips[leaf.clip as usize];
         let defaults = &c.bound.bindings.defaults;
