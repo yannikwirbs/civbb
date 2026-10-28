@@ -77,6 +77,13 @@ pub fn import(
             limits.bytes
         )));
     }
+    // gltf subtracts the 12-byte header from the declared GLB length unchecked (fuzz crash d184ff83).
+    let glb_length = bytes
+        .get(8..12)
+        .map(|l| u32::from_le_bytes(l.try_into().expect("4 bytes")));
+    if bytes.starts_with(b"glTF") && glb_length.is_some_and(|l| l < 12) {
+        return Err(ImportError("GLB length shorter than its header".into()));
+    }
     let gltf = gltf::Gltf::from_slice(bytes).map_err(|e| ImportError(e.to_string()))?;
     let mut im = Importer {
         doc: &gltf.document,

@@ -187,7 +187,9 @@ fn hostile_input_is_rejected_without_panicking() {
     doc["accessors"][0]["count"] = json!(0);
     let _ = import(&gltf(doc, &bin), &Limits::default(), no_files);
 
-    for bytes in [&b"glTF\x02\x00\x00\x00\xff\xff\xff\xff"[..], b"{", b""] {
+    // The second is fuzz crash d184ff83: a GLB length below the 12-byte header.
+    let short_glb = b"glTF\x02\x00\x00\x00\x02\x00\x00\x00";
+    for bytes in [&b"glTF\x02\x00\x00\x00\xff\xff\xff\xff"[..], short_glb, b"{", b""] {
         assert!(import(bytes, &Limits::default(), no_files).is_err());
     }
     let (doc, bin) = triangle_doc();
