@@ -4,7 +4,9 @@
 use civbb_format::dynamics::{MultiChild, Shape};
 use civbb_format::math::{Transform, Vec3};
 
-use crate::math::{Pose, add, conj, cross, dot, from_to, length, mul, normalize, qnormalize, rotate, scale, sub};
+use crate::math::{
+    Pose, add, conj, cross, dot, from_to, length, mul, normalize, qnormalize, rotate, scale, sub, world_poses,
+};
 use crate::rig::{LimitKind, NO_PARENT, Rig};
 
 /// The step that per-step parameters (pull, spring) refer to, seconds.
@@ -74,11 +76,7 @@ impl State {
     /// overwritten with the simulated rotations, and translations where bones stretch; `origin` places the avatar
     /// root's parent in the world.
     pub fn step(&mut self, rig: &Rig, origin: Pose, locals: &mut [Transform], dt: f32) {
-        let mut world: Vec<Pose> = Vec::with_capacity(locals.len());
-        for (i, l) in locals.iter().enumerate() {
-            let parent = rig.parents[i].map_or(origin, |p| world[p as usize]);
-            world.push(parent.then(l));
-        }
+        let mut world = world_poses(&rig.parents, origin, locals);
         let placed: Vec<(Placed, bool)> = rig
             .colliders
             .iter()

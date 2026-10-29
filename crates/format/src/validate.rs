@@ -9,7 +9,7 @@ use crate::animator::{
     Animator, Behaviour, BlendTreeKind, Clip, DriverOp, Motion, Property, Transition, TransitionDest,
 };
 use crate::avatar::Avatar;
-use crate::dynamics::{ContactVolume, Graded, Limit};
+use crate::dynamics::{ContactVolume, Graded, Limit, Shape};
 use crate::expressions::{ControlKind, Menu};
 use crate::face::{EyeDriver, ShapeBind};
 use crate::material::{MaterialModel, TextureSlot};
@@ -483,7 +483,17 @@ impl V {
 
     fn volume(&mut self, v: &ContactVolume, nodes: usize, path: impl Fn() -> String) {
         self.index(v.node as usize, nodes, &path, "node");
-        self.finite(&[v.position.as_slice(), &v.rotation].concat(), path);
+        let dims = match v.shape {
+            Shape::Sphere { radius } => vec![radius],
+            Shape::Capsule { radius, height } => vec![radius, height],
+            Shape::Plane => {
+                self.fail(&path, "contact shape is a plane");
+                vec![]
+            }
+        };
+        let ok = dims.iter().all(|d| *d >= 0.0);
+        self.ensure(ok, &path, "negative or non-finite contact size");
+        self.finite(&[v.position.as_slice(), &v.rotation, &dims].concat(), path);
     }
 
     fn menu(&mut self, m: &Menu, depth: usize, textures: usize, controls: &mut usize) {
@@ -744,6 +754,7 @@ mod tests {
             ("dynamics.chains[0]", |a| a.dynamics.chains[0].colliders[0] = 4),
             ("dynamics.colliders[0]", |a| a.dynamics.colliders[0].node = 40),
             ("contacts[0]", |a| a.contacts.receivers[0].volume.node = 40),
+            ("contacts[0]", |a| a.contacts.receivers[0].volume.shape = Shape::Plane),
             ("constraints[0]", |a| a.constraints[0].sources[0].node = 40),
         ];
         for (path, mutate) in cases {
@@ -763,6 +774,26 @@ mod tests {
         let curve = &mut a.clips[0].curves[0];
         curve.keys.push(curve.keys[0]);
         expect_error(&a, "clips[0].curves[0]");
+    }
+
+    #[test]
+    fn contact_shapes_are_checked() {
+        for (shape, problem) in [
+            (Shape::Plane, "contact shape is a plane"),
+            (Shape::Sphere { radius: -1.0 }, "negative or non-finite contact size"),
+            (
+                Shape::Capsule {
+                    radius: 0.1,
+                    height: f32::NAN,
+                },
+                "negative or non-finite contact size",
+            ),
+        ] {
+            let mut a = sample_avatar();
+            a.contacts.receivers[0].volume.shape = shape;
+            let errors = check(&a).expect_err("expected a validation error");
+            assert!(errors.iter().any(|e| e.problem == problem), "{shape:?}: {errors:?}");
+        }
     }
 
     #[test]

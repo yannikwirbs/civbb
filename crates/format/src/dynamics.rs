@@ -196,6 +196,8 @@ pub struct ContactSender {
     pub volume: ContactVolume,
     /// Collision tags.
     pub tags: Vec<String>,
+    /// Exists only on the avatar owner's client.
+    pub local_only: bool,
 }
 
 /// Detects senders with matching tags and writes an animator parameter.
@@ -213,9 +215,9 @@ pub struct ContactReceiver {
     pub allow_self: bool,
     /// Senders on other avatars count.
     pub allow_others: bool,
-    /// Evaluate only for the avatar's owner.
+    /// Exists only on the avatar owner's client.
     pub local_only: bool,
-    /// Minimum sender speed for `OnEnter`.
+    /// Minimum sender speed relative to the receiver for `OnEnter`, metres per second.
     pub min_velocity: f32,
 }
 

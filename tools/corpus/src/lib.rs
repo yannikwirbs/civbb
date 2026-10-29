@@ -668,6 +668,7 @@ pub fn generate(spec: &Spec) -> Avatar {
             .map(|h| ContactSender {
                 volume: volume(b.find(h), 0.05),
                 tags: vec!["Hand".into()],
+                local_only: false,
             })
             .collect(),
         receivers: vec![ContactReceiver {

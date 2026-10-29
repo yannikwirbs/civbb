@@ -29,14 +29,16 @@ Internal deps: civbb-format
 
 ## `crates/dynamics` (civbb-dynamics)
 
-Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose.
+Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose, and contacts.
 
 Internal deps: civbb-format
 
-- `src/lib.rs`: Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose (design doc §7, ADR 0015).
+- `src/contact.rs`: Contact senders and receivers: compiled volumes, a grid broadphase across avatars and receiver values (ADR 0017).
+- `src/lib.rs`: Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose, and contacts (design doc §7, ADRs 0015 to
 - `src/math.rs`: Vector and quaternion helpers for the solver; they move to `civbb-core` with #22.
 - `src/rig.rs`: Compiles an avatar's chains into one flat particle list, parents first, with per-particle parameters (ADR 0015).
 - `src/solver.rs`: Steps an avatar's chains against the animated pose (inertia, gravity, pull, stiffness, lengths, immobile, grab and
+- `tests/contact.rs`: Contact conformance, hand-derived from ADR 0017: receiver types, tags, self and others, permits, local-only,
 - `tests/solver.rs`: Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness, limits,
 
 ## `crates/format` (civbb-format)
@@ -115,6 +117,7 @@ Internal deps: none
 - `docs/adr/0014-humanoid-muscle-space.md`: 0014: Humanoid muscles follow Unity's muscle space, recorded per bone (format v4)
 - `docs/adr/0015-chain-solver-model.md`: 0015: PhysBone chains are solved as XPBD particles against the animated pose
 - `docs/adr/0016-colliders-and-limits.md`: 0016: Chain colliders and rotation limits
+- `docs/adr/0017-contact-model-and-broadphase.md`: 0017: Contact model and a grid broadphase in `civbb-dynamics`
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

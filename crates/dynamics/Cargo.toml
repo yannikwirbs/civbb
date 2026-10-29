@@ -1,6 +1,6 @@
 [package]
 name = "civbb-dynamics"
-description = "Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose."
+description = "Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose, and contacts."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

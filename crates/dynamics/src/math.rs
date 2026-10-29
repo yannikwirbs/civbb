@@ -1,5 +1,6 @@
 //! Vector and quaternion helpers for the solver; they move to `civbb-core` with #22.
 
+use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform, Vec3};
 
 /// `a + b`.
@@ -136,4 +137,14 @@ impl Pose {
     pub fn point(&self, local: Vec3) -> Vec3 {
         add(self.pos, rotate(self.rot, scale(local, self.scale)))
     }
+}
+
+/// Every node's world placement from its local transform, parents first; `origin` places the root's parent.
+pub fn world_poses(parents: &[Option<NodeIndex>], origin: Pose, locals: &[Transform]) -> Vec<Pose> {
+    let mut world: Vec<Pose> = Vec::with_capacity(locals.len());
+    for (i, l) in locals.iter().enumerate() {
+        let parent = parents[i].map_or(origin, |p| world[p as usize]);
+        world.push(parent.then(l));
+    }
+    world
 }
