@@ -14,12 +14,14 @@ The avatar animation runtime (design doc §7 "Animation"). Engine crate: depends
   ADR 0011).
 - `muscle`: Unity's 95 humanoid muscles and muscle space: muscle values to local bone rotations through each bone's
   muscle frame, and back (ADR 0014, verified against Unity recordings).
+- `constraint`: position, rotation, scale, parent, aim and look-at constraints, ordered by dependency at load and
+  applied in one pass (ADR 0018, verified against Unity recordings).
 - `mix` and `controller`: a `Controller` (compiled, shared) and per-avatar `Instance`s that update parameters,
   layers and the pose, with Write Defaults on, off and mixed (ADR 0010).
 
 Conformance: `tests/curve.rs` (key semantics), `tests/machine.rs` (state machine), `tests/blend.rs` (weights),
-`tests/behaviour.rs` (built-ins and behaviours), `tests/muscle.rs` (muscle space against `tests/unity/*.json`,
-recorded by `tools/unity-truth`),
+`tests/behaviour.rs` (built-ins and behaviours), `tests/muscle.rs` and `tests/constraint.rs` (muscle space and
+constraints against `tests/unity/*.json`, recorded by `tools/unity-truth`),
 `tests/golden/*.json` run by `tests/golden.rs` (frame-by-frame cases citing their sources).
 
 Input is an avatar that passed `civbb_format::validate`; indices are not re-checked.

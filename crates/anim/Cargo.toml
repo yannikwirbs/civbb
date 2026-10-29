@@ -1,6 +1,6 @@
 [package]
 name = "civbb-anim"
-description = "Animation runtime: compile-time curve binding, clip sampling, Mecanim state machines and blend trees."
+description = "Animation runtime: compile-time curve binding, clip sampling, Mecanim state machines, blend trees and constraints."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

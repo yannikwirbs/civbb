@@ -5,16 +5,17 @@ Each line is a file and the first line of its module doc. Read this instead of w
 
 ## `crates/anim` (civbb-anim)
 
-Animation runtime: compile-time curve binding, clip sampling, Mecanim state machines and blend trees.
+Animation runtime: compile-time curve binding, clip sampling, Mecanim state machines, blend trees and constraints.
 
 Internal deps: civbb-format
 
 - `src/behaviour.rs`: Legacy built-in parameters and state behaviours: parameter drivers, tracking, layer and locomotion control.
 - `src/bind.rs`: Compile-time binding: resolves curve paths to slots in one flat buffer with per-slot defaults (ADR 0007).
 - `src/clip.rs`: A clip bound to slots, and sampling it into the slot buffer.
+- `src/constraint.rs`: Constraints: ordered by dependency once when compiled, then evaluated in one pass over the local pose (ADR 0018).
 - `src/controller.rs`: A compiled animator controller and one running instance of it: parameters, layers, the evaluated pose.
 - `src/curve.rs`: Evaluates a curve of Hermite keys with Unity `AnimationCurve` semantics (ADR 0007).
-- `src/lib.rs`: Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles (design doc §7).
+- `src/lib.rs`: Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles and constraints (design
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
 - `src/mix.rs`: Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
@@ -22,6 +23,7 @@ Internal deps: civbb-format
 - `tests/behaviour.rs`: Built-in parameters and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
 - `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order.
 - `tests/blend.rs`: Blend tree weights, hand-derived (ADR 0009): 1D, 2D simple directional, freeform cartesian and polar gradient
+- `tests/constraint.rs`: Constraints (ADR 0018): every case recorded from Unity's constraints (`tests/unity/constraints.json`), and
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
 - `tests/golden.rs`: Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
@@ -51,7 +53,7 @@ Internal deps: none
 - `src/avatar.rs`: The avatar root type tying every part of an avatar together.
 - `src/blob.rs`: Content addresses: BLAKE3 hashes identifying blobs.
 - `src/cbor.rs`: CBOR encoding helpers with bounded decoding for untrusted input.
-- `src/constraint.rs`: Transform constraints (position, rotation, scale, parent, aim, look-at), evaluated in list order.
+- `src/constraint.rs`: Transform constraints (position, rotation, scale, parent, aim, look-at) with Unity's semantics (ADR 0018).
 - `src/cost.rs`: Cost profile: counted and measured CPU, GPU, memory and network cost of content (design doc §8).
 - `src/dynamics.rs`: Bone dynamics (PhysBone-compatible chains and colliders) and contact senders and receivers.
 - `src/expressions.rs`: Expression menu and synced expression parameters (design doc §7).
@@ -118,6 +120,7 @@ Internal deps: none
 - `docs/adr/0015-chain-solver-model.md`: 0015: PhysBone chains are solved as XPBD particles against the animated pose
 - `docs/adr/0016-colliders-and-limits.md`: 0016: Chain colliders and rotation limits
 - `docs/adr/0017-contact-model-and-broadphase.md`: 0017: Contact model and a grid broadphase in `civbb-dynamics`
+- `docs/adr/0018-constraint-model.md`: 0018: Constraints follow Unity's semantics, sorted by dependency at load (format v6)
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

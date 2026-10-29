@@ -9,6 +9,7 @@ use crate::animator::{
     Animator, Behaviour, BlendTreeKind, Clip, DriverOp, Motion, Property, Transition, TransitionDest,
 };
 use crate::avatar::Avatar;
+use crate::constraint::{ConstraintKind, WorldUp};
 use crate::dynamics::{ContactVolume, Graded, Limit, Shape};
 use crate::expressions::{ControlKind, Menu};
 use crate::face::{EyeDriver, ShapeBind};
@@ -470,8 +471,39 @@ impl V {
             for s in &k.sources {
                 self.index(s.node as usize, nodes, p, "source node");
                 self.transform(&s.offset, p);
+                self.finite(&[s.weight], p);
             }
             self.transform(&k.rest, p);
+            self.finite(&[k.weight], p);
+            let (numbers, up) = match &k.kind {
+                ConstraintKind::Position { offset }
+                | ConstraintKind::Rotation { offset }
+                | ConstraintKind::Scale { offset } => (offset.to_vec(), None),
+                ConstraintKind::Parent { .. } => (vec![], None),
+                ConstraintKind::Aim {
+                    offset,
+                    aim_axis,
+                    up_axis,
+                    world_up,
+                } => {
+                    let (node, v) = match *world_up {
+                        WorldUp::Vector(v) => (None, v),
+                        WorldUp::ObjectUp(n) => (Some(n), [0.0; 3]),
+                        WorldUp::ObjectRotationUp(n, v) => (Some(n), v),
+                        WorldUp::SceneUp | WorldUp::None => (None, [0.0; 3]),
+                    };
+                    ([offset.as_slice(), aim_axis, up_axis, &v].concat(), node)
+                }
+                ConstraintKind::LookAt {
+                    offset,
+                    roll,
+                    world_up_node,
+                } => ([offset.as_slice(), &[*roll]].concat(), *world_up_node),
+            };
+            self.finite(&numbers, p);
+            if let Some(n) = up {
+                self.index(n as usize, nodes, p, "up node");
+            }
         }
     }
 
@@ -756,6 +788,13 @@ mod tests {
             ("contacts[0]", |a| a.contacts.receivers[0].volume.node = 40),
             ("contacts[0]", |a| a.contacts.receivers[0].volume.shape = Shape::Plane),
             ("constraints[0]", |a| a.constraints[0].sources[0].node = 40),
+            ("constraints[0]", |a| {
+                a.constraints[0].kind = ConstraintKind::LookAt {
+                    offset: [0.0; 3],
+                    roll: 0.0,
+                    world_up_node: Some(40),
+                }
+            }),
         ];
         for (path, mutate) in cases {
             let mut a = sample_avatar();

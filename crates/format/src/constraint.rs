@@ -1,11 +1,11 @@
-//! Transform constraints (position, rotation, scale, parent, aim, look-at), evaluated in list order.
+//! Transform constraints (position, rotation, scale, parent, aim, look-at) with Unity's semantics (ADR 0018).
 
 use serde::{Deserialize, Serialize};
 
 use crate::hierarchy::NodeIndex;
 use crate::math::{Transform, Vec3};
 
-/// A constraint. The compiler sorts an avatar's constraints topologically, so list order is evaluation order.
+/// A constraint. The runtime orders an avatar's constraints by dependency when it loads them; list order breaks ties.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Constraint {
     /// Constraint type.
@@ -18,9 +18,10 @@ pub struct Constraint {
     pub weight: f32,
     /// Enabled at start.
     pub active: bool,
-    /// Per-axis enable for position, rotation or scale (x, y, z).
+    /// Constrained axes (x, y, z) of position, rotation (Euler) or scale; a parent constraint's position axes. Other
+    /// axes keep the animated value.
     pub axes: [bool; 3],
-    /// Transform of `target` when the constraint has zero weight.
+    /// Local at-rest values `weight` blends from (the parts the kind constrains).
     pub rest: Transform,
 }
 
@@ -54,9 +55,14 @@ pub enum ConstraintKind {
         offset: Vec3,
     },
     /// Follows sources as if parented, with per-source offsets.
-    Parent,
+    Parent {
+        /// Constrained rotation axes (Euler x, y, z).
+        rotation_axes: [bool; 3],
+    },
     /// Points `aim_axis` at the weighted source position.
     Aim {
+        /// Rotation offset (Euler degrees), applied in local space.
+        offset: Vec3,
         /// Local axis that points at the target.
         aim_axis: Vec3,
         /// Local up axis.
@@ -66,9 +72,11 @@ pub enum ConstraintKind {
     },
     /// Points local Z at the weighted source position.
     LookAt {
+        /// Rotation offset (Euler degrees), applied in local space.
+        offset: Vec3,
         /// Roll in degrees around the look direction.
         roll: f32,
-        /// Node whose up vector is used; `None` uses world up.
+        /// Node the up vector points towards; `None` uses scene up.
         world_up_node: Option<NodeIndex>,
     },
 }
@@ -80,8 +88,8 @@ pub enum WorldUp {
     SceneUp,
     /// A fixed vector.
     Vector(Vec3),
-    /// Up axis of a node.
-    ObjectUp(NodeIndex, Vec3),
+    /// Towards a node.
+    ObjectUp(NodeIndex),
     /// Rotation of a node applied to a vector.
     ObjectRotationUp(NodeIndex, Vec3),
     /// No up constraint.
