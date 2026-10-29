@@ -270,7 +270,7 @@ fn import_local(sub: &str) {
                     .filter(|m| matches!(m.model, MaterialModel::Toon(_)))
                     .count();
                 eprintln!(
-                    "{}: {} nodes, {} meshes ({skinned} skinned), {verts} verts, {shapes} shapes, {} textures, {} clips, {} human bones, {} visemes, {} chains, {} colliders, {toon} toon, warnings {:?}",
+                    "{}: {} nodes, {} meshes ({skinned} skinned), {verts} verts, {shapes} shapes, {} textures, {} clips, {} human bones, {} visemes, {} chains, {} colliders, {} constraints, {toon} toon, warnings {:?}",
                     f.file_name().unwrap().display(),
                     a.hierarchy.nodes.len(),
                     a.meshes.len(),
@@ -280,6 +280,7 @@ fn import_local(sub: &str) {
                     a.face.as_ref().map_or(0, |f| f.visemes.len()),
                     a.dynamics.chains.len(),
                     a.dynamics.colliders.len(),
+                    a.constraints.len(),
                     i.warnings
                 );
             }
@@ -517,6 +518,13 @@ fn vrm1_imports() {
             ], "colliderGroups": [0]}],
         },
     });
+    let constrain = |c: Value| json!({"VRMC_node_constraint": {"specVersion": "1.0", "constraint": c}});
+    doc["nodes"][5]["extensions"] = constrain(json!({"roll": {"source": 4, "rollAxis": "Z", "weight": 0.5}}));
+    doc["nodes"][6]["extensions"] = constrain(json!({"aim": {"source": 3, "aimAxis": "NegativeY"}}));
+    doc["nodes"][2]["extensions"] = constrain(json!({"rotation": {"source": 1, "weight": 2.0}}));
+    // Unusable: an unknown axis and a node constraining itself.
+    doc["nodes"][3]["extensions"] = constrain(json!({"aim": {"source": 1, "aimAxis": "Up"}}));
+    doc["nodes"][1]["extensions"] = constrain(json!({"rotation": {"source": 1}}));
     let imported = import(&gltf(doc, &bin), &Limits::default(), no_files).unwrap();
     let a = &imported.avatar;
     assert_eq!(a.name, "Robo");
@@ -595,6 +603,28 @@ fn vrm1_imports() {
         }
     );
     assert!(close(c.position, [0.0, 0.1, 0.0]));
+
+    use civbb_format::constraint::ConstraintKind;
+    let constraints: Vec<_> = a
+        .constraints
+        .iter()
+        .map(|c| (c.target, c.kind.clone(), c.sources[0].node, c.weight))
+        .collect();
+    assert_eq!(
+        constraints,
+        [
+            (2, ConstraintKind::RestRotation, 1, 1.0),
+            (5, ConstraintKind::RestRoll { axis: [0.0, 0.0, 1.0] }, 4, 0.5),
+            (6, ConstraintKind::RestAim { axis: [0.0, -1.0, 0.0] }, 3, 1.0),
+        ]
+    );
+    assert_eq!(a.constraints[1].rest, a.hierarchy.nodes[5].rest);
+    let skipped = imported
+        .warnings
+        .iter()
+        .filter(|w| w.contains("unusable VRMC_node_constraint"))
+        .count();
+    assert_eq!(skipped, 2, "{:?}", imported.warnings);
 
     let MaterialModel::Toon(t) = &a.materials[0].model else {
         panic!("not toon")

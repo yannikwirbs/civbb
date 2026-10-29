@@ -74,7 +74,7 @@ Content compiler: imports glTF/VRM sources into the format model and builds runt
 Internal deps: civbb-format
 
 - `src/accessor.rs`: Bounded glTF accessor reading: every offset, stride, count and sparse index is checked before use.
-- `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`) to native types (ADR 0006).
+- `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`, `VRMC_node_constraint`) to native
 - `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
 - `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
 - `src/main.rs`: `civbb`: build, validate and inspect avatar packages from the command line (design doc §9, creator tooling).
@@ -121,6 +121,7 @@ Internal deps: none
 - `docs/adr/0016-colliders-and-limits.md`: 0016: Chain colliders and rotation limits
 - `docs/adr/0017-contact-model-and-broadphase.md`: 0017: Contact model and a grid broadphase in `civbb-dynamics`
 - `docs/adr/0018-constraint-model.md`: 0018: Constraints follow Unity's semantics, sorted by dependency at load (format v6)
+- `docs/adr/0019-vrm-node-constraints.md`: 0019: VRM node constraints become rest-relative constraint kinds (format v7)
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

@@ -171,3 +171,99 @@ fn inactive_and_sourceless_constraints_leave_the_pose() {
         assert_eq!(run(&avatar(vec![c]))[1], [1.0, 0.0, 0.0]);
     }
 }
+
+/// `[x, y, z]` degrees about one axis.
+fn turn(axis: usize, deg: f32) -> Quat {
+    let (s, c) = (deg.to_radians() * 0.5).sin_cos();
+    let mut q = [0.0, 0.0, 0.0, c];
+    q[axis] = s;
+    q
+}
+
+fn qmul(a: Quat, b: Quat) -> Quat {
+    let [ax, ay, az, aw] = a;
+    let [bx, by, bz, bw] = b;
+    [
+        aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+        aw * bw - ax * bx - ay * by - az * bz,
+    ]
+}
+
+const X: usize = 0;
+const Y: usize = 1;
+const Z: usize = 2;
+
+/// Root with children S (the source) and T (the target, at the origin), rests given; one constraint on T from S.
+fn rest_pair(kind: ConstraintKind, source_rest: Quat, target_rest: Quat, weight: f32) -> (Avatar, Vec<Transform>) {
+    let mut s = node("S", Some(0), [1.0, 0.0, 0.0]);
+    s.rest.rotation = source_rest;
+    let mut t = node("T", Some(0), [0.0; 3]);
+    t.rest.rotation = target_rest;
+    let mut c = position(2, 1);
+    c.kind = kind;
+    c.weight = weight;
+    c.rest.rotation = target_rest;
+    let a = Avatar {
+        hierarchy: Hierarchy {
+            nodes: vec![node("Root", None, [0.0; 3]), s, t],
+        },
+        constraints: vec![c],
+        ..Avatar::default()
+    };
+    let locals = a.hierarchy.nodes.iter().map(|n| n.rest).collect();
+    (a, locals)
+}
+
+fn rest_run(a: &Avatar, mut locals: Vec<Transform>, source_rotation: Quat) -> Quat {
+    locals[1].rotation = source_rotation;
+    Constraints::new(a).evaluate(&mut locals);
+    locals[2].rotation
+}
+
+fn assert_rotation(got: Quat, want: Quat) {
+    assert!(same_rotation(got, want, 1e-5), "got {got:?}, want {want:?}");
+}
+
+#[test]
+fn rest_rotation_copies_the_local_change_onto_the_target_rest() {
+    // Source rest Z 30, now Z 30 then X 40: a change of X 40, put on the target's rest Y 90; weight slerps.
+    let src = qmul(turn(Z, 30.0), turn(X, 40.0));
+    for (w, deg) in [(1.0, 40.0), (0.5, 20.0), (0.0, 0.0)] {
+        let (a, l) = rest_pair(ConstraintKind::RestRotation, turn(Z, 30.0), turn(Y, 90.0), w);
+        assert_rotation(rest_run(&a, l, src), qmul(turn(Y, 90.0), turn(X, deg)));
+    }
+}
+
+#[test]
+fn rest_roll_keeps_the_twist_about_the_axis_in_the_target_rest_frame() {
+    // A change of Z 20 then X 60 twists 60 about X (the swing Z 20 is dropped); weight 0.5 gives 30.
+    let roll = ConstraintKind::RestRoll { axis: [1.0, 0.0, 0.0] };
+    let change = qmul(turn(Z, 20.0), turn(X, 60.0));
+    let (a, l) = rest_pair(roll.clone(), [0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0], 0.5);
+    assert_rotation(rest_run(&a, l, change), turn(X, 30.0));
+    // Target rest Y 90: its X is the parent's -Z. A change of Z 60 in the parent is X -60 for the target.
+    let (a, l) = rest_pair(roll.clone(), [0.0, 0.0, 0.0, 1.0], turn(Y, 90.0), 1.0);
+    assert_rotation(rest_run(&a, l, turn(Z, 60.0)), qmul(turn(Y, 90.0), turn(X, -60.0)));
+    // ...and a change about the parent's X is pure swing for it.
+    let (a, l) = rest_pair(roll, [0.0, 0.0, 0.0, 1.0], turn(Y, 90.0), 1.0);
+    assert_rotation(rest_run(&a, l, turn(X, 50.0)), turn(Y, 90.0));
+}
+
+#[test]
+fn rest_aim_turns_the_axis_at_the_source_by_the_shortest_rotation() {
+    // Target at the origin aiming +Y; the source at (1, 0, 0): Z -90, half of it at weight 0.5.
+    let aim = ConstraintKind::RestAim { axis: [0.0, 1.0, 0.0] };
+    for (w, deg) in [(1.0, -90.0), (0.5, -45.0)] {
+        let (a, l) = rest_pair(aim.clone(), [0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0], w);
+        assert_rotation(rest_run(&a, l, [0.0, 0.0, 0.0, 1.0]), turn(Z, deg));
+    }
+    // Under a parent turned Y 90, the world turn Z -90 is X 90 in the parent's space.
+    let (mut a, mut l) = rest_pair(aim, [0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0], 1.0);
+    a.hierarchy.nodes[0].rest.rotation = turn(Y, 90.0);
+    l[0].rotation = turn(Y, 90.0);
+    // The source sits at the parent's local (0, 0, 1), world (1, 0, 0).
+    l[1].translation = [0.0, 0.0, 1.0];
+    assert_rotation(rest_run(&a, l, [0.0, 0.0, 0.0, 1.0]), turn(X, 90.0));
+}

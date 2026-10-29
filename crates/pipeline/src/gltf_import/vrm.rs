@@ -1,15 +1,17 @@
-//! VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`) to native types (ADR 0006).
+//! VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`, `VRMC_node_constraint`) to native
+//! types (ADRs 0006, 0018).
 //!
 //! Runs after the glTF import and reads the extension JSON tolerantly: a missing or malformed field takes the
 //! VRM default, an unresolvable reference is skipped with a warning. Validation still checks the result.
 
 use civbb_format::animator::*;
+use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
 use civbb_format::dynamics::{Chain, Collider, Dynamics, Graded, ImmobileType, Integration, Limit, MultiChild, Shape};
 use civbb_format::expressions::{Control, ControlKind, ExpressionParam, ExpressionParamKind, Expressions, Menu};
 use civbb_format::face::{EyeDriver, EyeLook, Face, RangeMap, ShapeBind, Viseme};
 use civbb_format::hierarchy::{HumanBone, Humanoid, NodeIndex};
 use civbb_format::material::{AlphaMode, ColorSpace, Material, MaterialModel, TextureSlot, Toon};
-use civbb_format::math::{Quat, Vec3};
+use civbb_format::math::{Quat, Transform, Vec3};
 use civbb_format::mesh::FirstPerson;
 use civbb_format::meta::{AvatarUse, Commercial, Licence, Meta, Modification};
 use serde_json::Value;
@@ -25,6 +27,7 @@ pub(super) struct Vrm {
     pub animator: Option<Animator>,
     pub expressions: Option<Expressions>,
     pub meta: Option<Meta>,
+    pub constraints: Vec<Constraint>,
 }
 
 /// One VRM expression after resolving its binds.
@@ -64,9 +67,7 @@ impl Importer<'_> {
             self.expressions_v0(&root["blendShapeMaster"]["blendShapeGroups"])
         };
         self.first_person(&root["firstPerson"]["meshAnnotations"], v1);
-        if doc.nodes().any(|n| n.extension_value("VRMC_node_constraint").is_some()) {
-            self.warnings.push("VRMC_node_constraint not imported yet (#46)".into());
-        }
+        let constraints = self.node_constraints();
         let title = if v1 {
             &root["meta"]["name"]
         } else {
@@ -80,12 +81,62 @@ impl Importer<'_> {
             animator: None,
             expressions: None,
             meta: meta(&root["meta"], v1),
+            constraints,
         };
         let look = self.expression_parts(exprs, clips, &mut vrm)?;
         if let Some(eyes) = self.eye_look(root, v1, &vrm.humanoid, look) {
             vrm.face.get_or_insert_with(Face::default).eyes = Some(eyes);
         }
         Ok(Some(vrm))
+    }
+
+    /// `VRMC_node_constraint` on nodes: roll, aim and rotation as rest-relative constraints with one source.
+    fn node_constraints(&mut self) -> Vec<Constraint> {
+        let doc = self.doc;
+        let mut out = Vec::new();
+        for n in doc.nodes() {
+            let Some(ext) = n.extension_value("VRMC_node_constraint") else {
+                continue;
+            };
+            let Some(target) = self.map.get(n.index()).copied().flatten() else {
+                continue;
+            };
+            let c = &ext["constraint"];
+            let (kind, body) = if let Some(b) = c.get("rotation") {
+                (Some(ConstraintKind::RestRotation), b)
+            } else if let Some(b) = c.get("roll") {
+                (axis(&b["rollAxis"]).map(|axis| ConstraintKind::RestRoll { axis }), b)
+            } else if let Some(b) = c.get("aim") {
+                (axis(&b["aimAxis"]).map(|axis| ConstraintKind::RestAim { axis }), b)
+            } else {
+                (None, c)
+            };
+            let source = self.vrm_node(&body["source"]);
+            let (Some(kind), Some(source)) = (kind, source.filter(|&s| s != target)) else {
+                self.warnings
+                    .push(format!("node {}: unusable VRMC_node_constraint skipped", n.index()));
+                continue;
+            };
+            if out.len() == self.caps.constraints {
+                self.warnings
+                    .push("VRMC_node_constraint: over the constraint cap, rest skipped".into());
+                break;
+            }
+            out.push(Constraint {
+                kind,
+                target,
+                sources: vec![ConstraintSource {
+                    node: source,
+                    weight: 1.0,
+                    offset: Transform::IDENTITY,
+                }],
+                weight: num(&body["weight"], 1.0).clamp(0.0, 1.0),
+                active: true,
+                axes: [true; 3],
+                rest: self.nodes[target as usize].rest,
+            });
+        }
+        out
     }
 
     fn vrm_node(&self, v: &Value) -> Option<NodeIndex> {
@@ -1033,6 +1084,19 @@ fn capsule(node: NodeIndex, a: Vec3, b: Vec3, radius: f32) -> Collider {
 
 fn index(v: &Value) -> Option<usize> {
     v.as_u64().and_then(|x| usize::try_from(x).ok())
+}
+
+/// A VRM axis name (`X`, `PositiveX`, `NegativeY` ...) as a unit vector.
+fn axis(v: &Value) -> Option<Vec3> {
+    let s = v.as_str()?;
+    let (sign, name) = match s.strip_prefix("Negative") {
+        Some(rest) => (-1.0, rest),
+        None => (1.0, s.strip_prefix("Positive").unwrap_or(s)),
+    };
+    let k = ["X", "Y", "Z"].iter().position(|a| *a == name)?;
+    let mut out = [0.0; 3];
+    out[k] = sign;
+    Some(out)
 }
 
 fn num(v: &Value, default: f32) -> f32 {

@@ -479,7 +479,8 @@ impl V {
                 ConstraintKind::Position { offset }
                 | ConstraintKind::Rotation { offset }
                 | ConstraintKind::Scale { offset } => (offset.to_vec(), None),
-                ConstraintKind::Parent { .. } => (vec![], None),
+                ConstraintKind::Parent { .. } | ConstraintKind::RestRotation => (vec![], None),
+                ConstraintKind::RestRoll { axis } | ConstraintKind::RestAim { axis } => (axis.to_vec(), None),
                 ConstraintKind::Aim {
                     offset,
                     aim_axis,

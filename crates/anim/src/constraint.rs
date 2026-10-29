@@ -15,6 +15,8 @@ use crate::mix::{conj, mul};
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Constraints {
     parents: Vec<Option<NodeIndex>>,
+    /// Every node's rest rotation, for the rest-relative kinds.
+    rests: Vec<Quat>,
     /// The constraints, sorted.
     pub list: Vec<Constraint>,
 }
@@ -74,6 +76,7 @@ impl Constraints {
         }
         Self {
             parents,
+            rests: avatar.hierarchy.nodes.iter().map(|n| n.rest.rotation).collect(),
             list: order.into_iter().map(|i| list[i].clone()).collect(),
         }
     }
@@ -92,7 +95,7 @@ impl Constraints {
         for c in &self.list {
             let t = c.target as usize;
             let parent = self.parents[t].map_or(Place::IDENTITY, |p| world[p as usize]);
-            let Some(new) = solve(c, &world, &parent, &locals[t]) else {
+            let Some(new) = solve(c, &world, &parent, locals, &self.rests) else {
                 continue;
             };
             locals[t] = new;
@@ -154,10 +157,11 @@ impl Place {
 }
 
 /// The constrained local transform, or `None` to leave the node as animated.
-fn solve(c: &Constraint, world: &[Place], parent: &Place, cur: &Transform) -> Option<Transform> {
+fn solve(c: &Constraint, world: &[Place], parent: &Place, locals: &[Transform], rests: &[Quat]) -> Option<Transform> {
     if !c.active || c.sources.is_empty() {
         return None;
     }
+    let cur = &locals[c.target as usize];
     let total: f32 = c.sources.iter().map(|s| s.weight.max(0.0)).sum();
     let mut out = *cur;
     if total <= 0.0 {
@@ -245,6 +249,27 @@ fn solve(c: &Constraint, world: &[Place], parent: &Place, cur: &Transform) -> Op
             let q = mul(q, euler_to_quat([0.0, 0.0, -roll]));
             out.rotation = rotated(local_rotation(q, offset), [true; 3]);
         }
+        ConstraintKind::RestRotation | ConstraintKind::RestRoll { .. } => {
+            let s = c.sources[0].node as usize;
+            let (dr, sr) = (c.rest.rotation, rests[s]);
+            let mut delta = mul(conj(sr), locals[s].rotation);
+            if let ConstraintKind::RestRoll { axis } = c.kind {
+                // The change in the source's parent space, then in the target's rest space, then its twist.
+                let in_parent = mul(mul(sr, delta), conj(sr));
+                delta = mul(mul(conj(dr), in_parent), dr);
+                let axis = unit(axis)?;
+                let swing = from_to(axis, unit(rotate(delta, axis))?);
+                delta = mul(conj(swing), delta);
+            }
+            out.rotation = slerp(dr, mul(dr, delta), w);
+        }
+        ConstraintKind::RestAim { axis } => {
+            let dr = c.rest.rotation;
+            let from = unit(rotate(mul(parent.rot, dr), axis))?;
+            let to = unit(sub(place(c.sources[0].node).pos, me))?;
+            let turn = mul(mul(conj(parent.rot), from_to(from, to)), parent.rot);
+            out.rotation = slerp(dr, mul(turn, dr), w);
+        }
     }
     Some(out)
 }
@@ -307,6 +332,18 @@ fn from_to(a: Vec3, b: Vec3) -> Quat {
     }
     let c = cross(a, b);
     normalize([c[0], c[1], c[2], 1.0 + d])
+}
+
+/// Spherical lerp on the shorter arc.
+fn slerp(a: Quat, b: Quat, t: f32) -> Quat {
+    let d: f32 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
+    let (b, d) = if d < 0.0 { (b.map(|x| -x), -d) } else { (b, d) };
+    if d > 0.9995 {
+        return nlerp(a, b, t);
+    }
+    let angle = d.acos();
+    let (wa, wb) = (((1.0 - t) * angle).sin(), (t * angle).sin());
+    normalize(std::array::from_fn(|k| a[k] * wa + b[k] * wb))
 }
 
 /// Normalised lerp on the shorter arc.

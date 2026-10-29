@@ -133,6 +133,7 @@ pub fn import(
                 animator: v.animator,
                 expressions: v.expressions,
                 meta: v.meta,
+                constraints: v.constraints,
                 ..Avatar::default()
             },
             None => Avatar::default(),

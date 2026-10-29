@@ -79,6 +79,21 @@ pub enum ConstraintKind {
         /// Node the up vector points towards; `None` uses scene up.
         world_up_node: Option<NodeIndex>,
     },
+    /// The first source's local rotation change from its rest, applied to the target's rest rotation (VRM
+    /// `rotation`; Blender's local-to-local copy rotation). `weight` slerps from `rest`; `axes` are ignored.
+    RestRotation,
+    /// As [`ConstraintKind::RestRotation`], keeping only the change's twist about `axis` in the target's rest space
+    /// (VRM `roll`).
+    RestRoll {
+        /// Unit roll axis.
+        axis: Vec3,
+    },
+    /// Turns the target from its rest rotation by the shortest rotation pointing local `axis` at the first source
+    /// (VRM `aim`, no up vector). `weight` slerps from `rest`; `axes` are ignored.
+    RestAim {
+        /// Unit aim axis.
+        axis: Vec3,
+    },
 }
 
 /// World-up references for aim constraints.
