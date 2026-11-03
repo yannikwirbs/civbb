@@ -1,0 +1,32 @@
+name: Bug report
+description: Something is broken or behaves wrong.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands, input files (CC0 or generated only, no third-party avatars) and settings.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit
+      description: Output of `git rev-parse --short HEAD`.
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, GPU and driver version, headset if relevant.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      render: text
