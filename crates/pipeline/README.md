@@ -8,6 +8,9 @@ The content compiler (design doc §9). Glue crate: nothing depends on it.
 - `gltf_import/vrm.rs`: VRM 0.x and 1.0 on top of the glTF import: humanoid, viewpoint, spring bones, MToon,
   expressions (ADR 0006 has the mapping and its heuristics).
 
+- `prune.rs`, `merge.rs`, `collapse.rs`: compile stages `civbb build` runs in that order: prune unused joints,
+  nodes and shapes (ADR 0026), merge meshes that show together (ADR 0027), collapse toggle layers into one direct
+  blend tree (ADR 0028). Each keeps the avatar's behaviour; tests compare islands before and after.
 - `package.rs`: an import to a runtime package (texture blobs plus the avatar as root), and avatar stats.
 - `main.rs`: the `civbb` CLI: `keygen`, `build`, `validate`, `inspect` (`cargo run -p civbb-pipeline --bin civbb`).
 

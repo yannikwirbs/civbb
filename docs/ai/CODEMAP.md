@@ -99,9 +99,10 @@ Internal deps: none
 
 Content compiler: imports glTF/VRM sources into the format model and builds runtime packages.
 
-Internal deps: civbb-format
+Internal deps: civbb-anim, civbb-format
 
 - `src/accessor.rs`: Bounded glTF accessor reading: every offset, stride, count and sparse index is checked before use.
+- `src/collapse.rs`: Compiler stage 5 toggle collapsing: layers that only switch between two constant clips on one bool collapse
 - `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`, `VRMC_node_constraint`) to native
 - `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
 - `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
@@ -110,6 +111,7 @@ Internal deps: civbb-format
 - `src/package.rs`: Turns imports into runtime packages and summarises avatars for `civbb inspect`.
 - `src/prune.rs`: Compiler stage 3 pruning: skin joints no vertex uses, nodes nothing references and blendshapes nothing drives,
 - `tests/cli.rs`: `civbb` end to end: keygen, build (pruning and merging, ADRs 0026 and 0027), validate and inspect on a corpus avatar, plus tamper and
+- `tests/collapse.rs`: Toggle collapsing (ADR 0028): the corpus avatars' toggle layers become one direct blend tree layer, layers that
 - `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
 - `tests/merge.rs`: Mesh merging (ADR 0027): meshes always visible together merge and same-material submeshes join, everything
 - `tests/prune.rs`: Pruning (ADR 0026): unused skin joints, unreferenced nodes and undriven blendshapes go; everything referenced,
@@ -189,6 +191,7 @@ Internal deps: none
 - `docs/adr/0025-animated-material-properties.md`: 0025: Material curves bind per renderer to native fields; animated renderers get per-island material records
 - `docs/adr/0026-pruning-joints-nodes-and-shapes.md`: 0026: The compiler prunes unweighted joints, unreferenced nodes and undriven blendshapes
 - `docs/adr/0027-merging-meshes-that-show-together.md`: 0027: The compiler merges meshes that show together and joins submeshes that share a material
+- `docs/adr/0028-collapsing-toggle-layers.md`: 0028: Toggle layers collapse into one direct blend tree layer per group
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

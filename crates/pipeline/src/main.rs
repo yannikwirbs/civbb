@@ -8,7 +8,7 @@ use std::process::ExitCode;
 use civbb_format::package::Platform;
 use civbb_format::{Caps, Package, ReadLimits, SigningKey, validate};
 use civbb_pipeline::gltf_import::dir_resolver;
-use civbb_pipeline::{Imported, Limits, import, merge, package, prune, stats};
+use civbb_pipeline::{Imported, Limits, collapse, import, merge, package, prune, stats};
 
 const USAGE: &str = "usage:
   civbb keygen <key-file>
@@ -89,6 +89,7 @@ fn run(args: &[String]) -> Result<(), Error> {
             );
             let merged = merge(&mut imported.avatar);
             println!("merged {} meshes, {} submeshes", merged.meshes, merged.submeshes);
+            println!("collapsed {} toggle layers", collapse(&mut imported.avatar));
             let platform = if a.quest { Platform::Quest } else { Platform::Desktop };
             let bytes = package(imported, platform).encode_signed(&key);
             let out = a.out.unwrap_or_else(|| a.input.with_extension("civpkg"));

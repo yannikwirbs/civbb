@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 base64 = "0.23.1"
+civbb-anim.workspace = true
 civbb-format.workspace = true
 getrandom = "0.2"
 gltf = { version = "1.4.1", default-features = false, features = ["names", "extras", "extensions", "KHR_materials_unlit", "KHR_texture_transform"] }
@@ -20,7 +21,6 @@ workspace = true
 [dev-dependencies]
 civbb-client = { path = "../client" }
 civbb-core.workspace = true
-civbb-anim.workspace = true
 civbb-corpus.workspace = true
 
 [[bin]]
