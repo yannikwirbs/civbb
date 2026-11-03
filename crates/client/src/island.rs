@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use civbb_anim::behaviour::coerce;
-use civbb_anim::{Constraints, Controller, Instance};
+use civbb_anim::{Constraints, Controller, Instance, Target};
 use civbb_core::math::{Pose, world_poses_into};
 use civbb_core::{Counters, System};
 use civbb_dynamics::contact::Participant;
@@ -23,6 +23,8 @@ pub struct Model {
     parents: Vec<Option<NodeIndex>>,
     rest: Vec<Transform>,
     active: Vec<bool>,
+    /// Per mesh, each blendshape's default weight (0 to 1).
+    shapes: Vec<Vec<f32>>,
     /// Per contact receiver, the animator parameter its value goes to; `None` when the animator lacks it.
     receivers: Vec<Option<(ParamIndex, ParamKind)>>,
 }
@@ -50,6 +52,11 @@ impl Model {
             parents: nodes.iter().map(|n| n.parent).collect(),
             rest: nodes.iter().map(|n| n.rest).collect(),
             active: nodes.iter().map(|n| n.active).collect(),
+            shapes: avatar
+                .meshes
+                .iter()
+                .map(|m| m.blend_shapes.iter().map(|s| s.default_weight).collect())
+                .collect(),
             receivers,
         }
     }
@@ -121,6 +128,19 @@ impl Island {
     /// Whether each node is active after the last step, its ancestors included.
     pub fn active(&self) -> &[bool] {
         &self.active
+    }
+
+    /// Writes each mesh's blendshape weights (0 to 1) after the last step into `out`: the animator's value where a
+    /// clip binds the shape, its default weight elsewhere.
+    pub fn shape_weights(&self, out: &mut Vec<Vec<f32>>) {
+        out.clone_from(&self.model.shapes);
+        if let (Some(c), Some(a)) = (&self.model.controller, &self.animator) {
+            for (t, &v) in c.bound.bindings.targets.iter().zip(a.pose()) {
+                if let Target::BlendShape(m, s) = *t {
+                    out[m as usize][s as usize] = v / 100.0;
+                }
+            }
+        }
     }
 
     /// Each contact receiver's value from the last contact pass.

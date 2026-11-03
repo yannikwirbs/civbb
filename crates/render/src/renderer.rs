@@ -30,6 +30,11 @@ struct Frame {
 pub struct Renderer {
     frames: Vec<Frame>,
     transients: Transients,
+    /// Two timestamps per frame in flight (null if the queue has no timestamps), nanoseconds per tick, and
+    /// whether each frame's pair was written.
+    timestamps: (vk::QueryPool, f32, [bool; FRAMES_IN_FLIGHT]),
+    gpu_ms: Option<f32>,
+    blocked_ms: f32,
     swapchain: Option<Swapchain>,
     extent: vk::Extent2D,
     stale: bool,
@@ -50,6 +55,9 @@ impl Renderer {
         let mut r = Renderer {
             frames: Vec::new(),
             transients: Transients::default(),
+            timestamps: (vk::QueryPool::null(), 0.0, [false; FRAMES_IN_FLIGHT]),
+            gpu_ms: None,
+            blocked_ms: 0.0,
             swapchain: None,
             extent: vk::Extent2D { width, height },
             stale: true,
@@ -57,6 +65,23 @@ impl Renderer {
             ctx,
         };
         let device = r.ctx.device();
+        // SAFETY: plain queries; a valid create info on the context's device, destroyed in `Drop`.
+        unsafe {
+            let instance = r.ctx.instance();
+            let family =
+                instance.get_physical_device_queue_family_properties(r.ctx.physical())[r.ctx.queue_family() as usize];
+            if family.timestamp_valid_bits > 0 {
+                let period = instance
+                    .get_physical_device_properties(r.ctx.physical())
+                    .limits
+                    .timestamp_period;
+                let info = vk::QueryPoolCreateInfo::default()
+                    .query_type(vk::QueryType::TIMESTAMP)
+                    .query_count(2 * FRAMES_IN_FLIGHT as u32);
+                r.timestamps.0 = device.create_query_pool(&info, None)?;
+                r.timestamps.1 = period;
+            }
+        }
         for _ in 0..FRAMES_IN_FLIGHT {
             // SAFETY: valid create infos on the context's device; on failure, `Drop` destroys what exists.
             unsafe {
@@ -108,6 +133,18 @@ impl Renderer {
         Ok(choose_format(&formats).format)
     }
 
+    /// GPU time of the last finished frame in milliseconds, from timestamps at the start and end of its commands;
+    /// `None` until a frame finished or if the queue has no timestamps.
+    pub fn gpu_ms(&self) -> Option<f32> {
+        self.gpu_ms
+    }
+
+    /// How long the last [`Renderer::frame`] waited for the GPU and the swapchain (frame fence and acquire), in
+    /// milliseconds: the part of its time that is not CPU work.
+    pub fn blocked_ms(&self) -> f32 {
+        self.blocked_ms
+    }
+
     /// The swapchain's current size, once it exists.
     pub fn extent(&self) -> Option<vk::Extent2D> {
         self.swapchain.as_ref().map(|s| s.extent)
@@ -128,7 +165,16 @@ impl Renderer {
         // SAFETY: every handle belongs to this renderer's device; the fence wait guarantees the frame's command
         // buffer and semaphore are no longer in use before they are reused.
         unsafe {
+            let wait = std::time::Instant::now();
             device.wait_for_fences(&[frame.done], true, u64::MAX)?;
+            let (queries, period, written) = &mut self.timestamps;
+            let first = 2 * self.current as u32;
+            if written[self.current] {
+                let mut ticks = [0u64; 2];
+                let flags = vk::QueryResultFlags::TYPE_64 | vk::QueryResultFlags::WAIT;
+                device.get_query_pool_results(*queries, first, &mut ticks, flags)?;
+                self.gpu_ms = Some(ticks[1].saturating_sub(ticks[0]) as f32 * *period / 1e6);
+            }
             // The fence wait finished the frame before last, the oldest that could use a transient image.
             self.transients.next_frame(&self.ctx);
             let index = match sc
@@ -145,11 +191,17 @@ impl Renderer {
                 }
                 Err(e) => return Err(e.into()),
             };
+            self.blocked_ms = wait.elapsed().as_secs_f32() * 1000.0;
             device.reset_command_pool(frame.pool, vk::CommandPoolResetFlags::empty())?;
             device.begin_command_buffer(
                 frame.cmd,
                 &vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
             )?;
+            let timed = *queries != vk::QueryPool::null();
+            if timed {
+                device.cmd_reset_query_pool(frame.cmd, *queries, first, 2);
+                device.cmd_write_timestamp2(frame.cmd, vk::PipelineStageFlags2::ALL_COMMANDS, *queries, first);
+            }
             let mut graph = Graph::new();
             let target = graph.import(
                 sc.images[index],
@@ -160,6 +212,9 @@ impl Renderer {
             );
             build(&mut graph, target);
             graph.record(&self.ctx, &mut self.transients, frame.cmd)?;
+            if timed {
+                device.cmd_write_timestamp2(frame.cmd, vk::PipelineStageFlags2::ALL_COMMANDS, *queries, first + 1);
+            }
             device.end_command_buffer(frame.cmd)?;
 
             let waits = [vk::SemaphoreSubmitInfo::default()
@@ -176,6 +231,7 @@ impl Renderer {
             // Only right before the submit that signals it again, so an earlier error can't leave it unsignalled.
             device.reset_fences(&[frame.done])?;
             device.queue_submit2(self.ctx.queue(), &[submit], frame.done)?;
+            written[self.current] = timed;
 
             let wait = [sc.rendered[index]];
             let swapchains = [sc.handle];
@@ -225,6 +281,7 @@ impl Drop for Renderer {
                 sc.destroy(device);
             }
             self.transients.destroy(&self.ctx);
+            device.destroy_query_pool(self.timestamps.0, None);
             for f in self.frames.drain(..) {
                 device.destroy_fence(f.done, None);
                 device.destroy_semaphore(f.acquired, None);

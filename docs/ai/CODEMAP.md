@@ -31,17 +31,19 @@ Internal deps: civbb-core, civbb-format
 
 ## `crates/client` (civbb-client)
 
-Client: wires the avatar systems into per-avatar islands and frames; a headless benchmark in Phase 0.
+Client: wires the avatar systems into per-avatar islands and frames; a headless benchmark and a desktop viewer in Phase 0.
 
-Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-format
+Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-format, civbb-render
 
 - `src/bench.rs`: Headless CPU benchmark: N avatar islands stepped for a number of frames at each worker count (design doc §21).
 - `src/frame.rs`: One simulation frame's avatar work: every island as its own parallel job, then the cross-avatar contact pass
 - `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
-- `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020).
-- `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`).
+- `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020),
+- `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`) and a desktop
+- `src/view.rs`: Desktop viewer: N copies of an avatar in a grid with animator and dynamics running, drawn in a window with an
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count; bad arguments
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
+- `tests/view.rs`: Viewer helpers without a window (ADR 0024): placement matrices agree with `Pose::point`, the grid is centred,
 
 ## `crates/core` (civbb-core)
 
@@ -177,6 +179,7 @@ Internal deps: none
 - `docs/adr/0021-vulkan-bootstrap-and-render-graph.md`: 0021: Vulkan bootstrap, render graph shape, frames in flight and the shader toolchain
 - `docs/adr/0022-compute-skinning-and-sparse-blendshapes.md`: 0022: Compute skinning with fixed-point sparse blendshapes, buffers by device address
 - `docs/adr/0023-gpu-driven-forward-pass.md`: 0023: GPU-driven forward pass: shared buffers with vertex pulling, bindless textures, runs of indirect draws
+- `docs/adr/0024-desktop-viewer.md`: 0024: The desktop viewer loads verified packages, steps then draws each frame, and reports timing in its title
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

@@ -23,6 +23,7 @@ civbb-anim = { path = "crates/anim" }
 civbb-core = { path = "crates/core" }
 civbb-dynamics = { path = "crates/dynamics" }
 civbb-format = { path = "crates/format" }
+civbb-render = { path = "crates/render" }
 civbb-corpus = { path = "tools/corpus" }
 
 # Optimise dependencies in dev builds: crypto, decoding and later the renderer are unusably slow at opt-level 0.

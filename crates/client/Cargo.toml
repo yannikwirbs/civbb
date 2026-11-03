@@ -1,6 +1,6 @@
 [package]
 name = "civbb-client"
-description = "Client: wires the avatar systems into per-avatar islands and frames; a headless benchmark in Phase 0."
+description = "Client: wires the avatar systems into per-avatar islands and frames; a headless benchmark and a desktop viewer in Phase 0."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,8 +12,11 @@ civbb-core.workspace = true
 civbb-corpus.workspace = true
 civbb-dynamics.workspace = true
 civbb-format.workspace = true
+civbb-render.workspace = true
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.154"
+winit = "0.30"
 
 [lints]
 workspace = true
