@@ -106,6 +106,22 @@ Internal deps: civbb-format
 - `tests/cli.rs`: `civbb` end to end: keygen, build, validate and inspect on a corpus avatar, plus tamper and wrong-key rejection.
 - `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
 
+## `crates/render` (civbb-render)
+
+Renderer: Vulkan 1.3 instance, device, swapchain and a render graph of passes that declare their attachments.
+
+Internal deps: none
+
+- `examples/clear.rs`: Opens a window and clears it every frame, following resizes; the real window loop lives in the client (#27).
+- `src/context.rs`: The Vulkan instance with validation in debug builds, device selection and the logical device with its one queue.
+- `src/graph.rs`: Render graph skeleton: passes declare the images they draw to; the graph plans the layout transitions and
+- `src/lib.rs`: Renderer: a Vulkan 1.3 bootstrap and a render graph of passes that declare their attachments (design doc §6, ADR 0021).
+- `src/renderer.rs`: Renders frames to a window: two frames in flight, acquire, record a frame's graph, submit and present,
+- `src/swapchain.rs`: The window's swapchain: format and size choice, its images and views, and one "rendered" semaphore per image.
+- `tests/device.rs`: On a real device, headless: a two-pass graph clears an image and clears half of it again, the copy back reads
+- `tests/graph.rs`: Render graph planning (ADR 0021), no device needed: transitions before each pass and into each image's final use.
+- `tests/select.rs`: Device and surface format choice (ADR 0021), no device needed.
+
 ## `tools/corpus` (civbb-corpus)
 
 Deterministic generator of synthetic test avatars (lean control and deliberately bloated), CC0.
@@ -147,6 +163,7 @@ Internal deps: none
 - `docs/adr/0018-constraint-model.md`: 0018: Constraints follow Unity's semantics, sorted by dependency at load (format v6)
 - `docs/adr/0019-vrm-node-constraints.md`: 0019: VRM node constraints become rest-relative constraint kinds (format v7)
 - `docs/adr/0020-island-runtime.md`: 0020: The avatar island runtime: `core` runs jobs and counts, `client` wires the systems
+- `docs/adr/0021-vulkan-bootstrap-and-render-graph.md`: 0021: Vulkan bootstrap, render graph shape, frames in flight and the shader toolchain
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status
