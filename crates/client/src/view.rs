@@ -1,5 +1,5 @@
 //! Desktop viewer: N copies of an avatar in a grid with animator and dynamics running, drawn in a window with an
-//! orbit camera, CPU and GPU frame times in the title (design doc §21 Phase 0 deliverable 4, ADR 0024).
+//! orbit camera, CPU and GPU frame times in the title (design doc §21 Phase 0 deliverable 4, ADRs 0024 and 0025).
 
 use std::io::Cursor;
 use std::sync::Arc;
@@ -7,8 +7,9 @@ use std::time::Instant;
 
 use civbb_core::math::Pose;
 use civbb_format::Avatar;
-use civbb_format::material::{ColorSpace, ImageFormat};
+use civbb_format::material::{ColorSpace, ImageFormat, Material};
 use civbb_format::math::{Mat4, Vec3};
+use civbb_render::material::{MATERIAL_WORDS, pack};
 use civbb_render::skin::{Job, SkinnedMesh, Skinning};
 use civbb_render::{
     Access, Batches, Capacity, Draw, Forward, FrameStatus, MaterialId, MeshData, Pass, Renderer, Scene, View, Window,
@@ -200,7 +201,14 @@ struct Gpu {
     scene: Scene,
     meshes: Vec<MeshData>,
     instances: Vec<Vec<SkinnedMesh>>,
+    /// The avatar's materials, shared by every island.
     materials: Vec<MaterialId>,
+    /// Bindless index of each avatar texture.
+    bindless: Vec<u32>,
+    /// Per island, its own records for animated renderers, in [`Island::materials`] order (ADR 0025).
+    own: Vec<Vec<MaterialId>>,
+    /// Per island and mesh, the material map of an animated renderer: the shared one with its own records.
+    maps: Vec<Vec<Option<Vec<MaterialId>>>>,
     skinning: Skinning,
     forward: Forward,
 }
@@ -209,11 +217,14 @@ impl Gpu {
     fn new(
         renderer: &Renderer,
         avatar: &Avatar,
+        model: &Model,
         textures: &[Option<(u32, u32, Vec<u8>)>],
         copies: u32,
     ) -> civbb_render::Result<Self> {
         let ctx = renderer.context();
-        let capacity = Capacity::for_meshes(&avatar.meshes, copies, avatar.materials.len() as u32);
+        let per_island: usize = model.animated_materials().map(|(_, m)| m.len()).sum();
+        let materials = avatar.materials.len() + per_island * copies as usize;
+        let capacity = Capacity::for_meshes(&avatar.meshes, copies, materials as u32);
         let mut scene = Scene::new(ctx, capacity)?;
         let mut bindless = Vec::with_capacity(textures.len());
         for (t, decoded) in avatar.textures.iter().zip(textures) {
@@ -227,6 +238,23 @@ impl Gpu {
             .iter()
             .map(|m| scene.add_material(ctx, m, &bindless))
             .collect::<civbb_render::Result<Vec<_>>>()?;
+        let mut own = Vec::with_capacity(copies as usize);
+        let mut maps = Vec::with_capacity(copies as usize);
+        for _ in 0..copies {
+            let mut records = Vec::with_capacity(per_island);
+            let mut island_maps = vec![None; avatar.meshes.len()];
+            for (mesh, indices) in model.animated_materials() {
+                let mut map = materials.clone();
+                for &m in indices {
+                    let id = scene.add_material(ctx, &avatar.materials[m as usize], &bindless)?;
+                    map[m as usize] = id;
+                    records.push(id);
+                }
+                island_maps[mesh as usize] = Some(map);
+            }
+            own.push(records);
+            maps.push(island_maps);
+        }
         let meshes = avatar
             .meshes
             .iter()
@@ -250,6 +278,9 @@ impl Gpu {
             meshes,
             instances,
             materials,
+            bindless,
+            own,
+            maps,
         })
     }
 
@@ -279,6 +310,10 @@ struct Scratch {
     all_weights: Vec<Vec<Vec<f32>>>,
     draws: Vec<Draw>,
     batches: Batches,
+    /// Per island, its animated materials and the records last written for them.
+    materials: Vec<Vec<Material>>,
+    packed: Vec<Vec<[u32; MATERIAL_WORDS]>>,
+    updates: Vec<(u32, [u32; MATERIAL_WORDS])>,
 }
 
 /// Running totals for the title and the summary.
@@ -300,6 +335,7 @@ struct Viewer {
     window: Option<winit::window::Window>,
     avatar: Avatar,
     textures: Vec<Option<(u32, u32, Vec<u8>)>>,
+    model: Arc<Model>,
     islands: Vec<Island>,
     copies: u32,
     limit: Option<u32>,
@@ -343,6 +379,7 @@ impl Viewer {
             window: None,
             avatar: cfg.avatar,
             textures: cfg.textures,
+            model,
             islands,
             copies: cfg.copies,
             limit: cfg.frames,
@@ -406,11 +443,24 @@ impl Viewer {
         let s = &mut self.scratch;
         s.joints.resize_with(self.islands.len(), Vec::new);
         s.all_weights.resize_with(self.islands.len(), Vec::new);
+        s.materials.resize_with(self.islands.len(), Vec::new);
+        s.packed.resize_with(self.islands.len(), Vec::new);
         let eye = self.camera.eye();
         s.draws.clear();
+        s.updates.clear();
         for (i, island) in self.islands.iter().enumerate() {
             island.shape_weights(&mut s.weights);
             std::mem::swap(&mut s.all_weights[i], &mut s.weights);
+            // An island's records are rewritten only when they change; the first frame writes them all.
+            island.materials(&mut s.materials[i]);
+            s.packed[i].resize(s.materials[i].len(), [0; MATERIAL_WORDS]);
+            for ((m, last), id) in s.materials[i].iter().zip(&mut s.packed[i]).zip(&gpu.own[i]) {
+                let record = pack(m, &gpu.bindless);
+                if record != *last {
+                    *last = record;
+                    s.updates.push((id.index, record));
+                }
+            }
             let world = island.world();
             let joints = &mut s.joints[i];
             joints.resize(self.avatar.meshes.len(), None);
@@ -432,7 +482,8 @@ impl Viewer {
                     ),
                     _ => out.push(matrix(&world[mesh.node as usize])),
                 }
-                gpu.meshes[m].draws(&gpu.instances[i][m], &gpu.materials, distance, &mut s.draws);
+                let materials = gpu.maps[i][m].as_deref().unwrap_or(&gpu.materials);
+                gpu.meshes[m].draws(&gpu.instances[i][m], materials, distance, &mut s.draws);
             }
         }
         let jobs: Vec<Job> = s
@@ -454,7 +505,7 @@ impl Viewer {
         let extent = renderer.extent().unwrap_or_default();
         let aspect = extent.width.max(1) as f32 / extent.height.max(1) as f32;
         let view = View::look_at(eye, self.camera.target, 0.9, aspect, 0.05);
-        let batches = &s.batches;
+        let (batches, updates) = (&s.batches, &s.updates);
         let status = renderer.frame(|graph, target| {
             let skinned = graph.import_buffer(gpu.scene.skinned().handle, &[Access::VertexRead]);
             graph.add(
@@ -470,6 +521,7 @@ impl Viewer {
                 skinned,
                 &view,
                 batches,
+                updates,
                 [0.08, 0.09, 0.11, 1.0],
             );
         })?;
@@ -534,7 +586,7 @@ impl ApplicationHandler for Viewer {
             Ok(r) => r,
             Err(e) => return self.fail(event_loop, e),
         };
-        match Gpu::new(&renderer, &self.avatar, &self.textures, self.copies) {
+        match Gpu::new(&renderer, &self.avatar, &self.model, &self.textures, self.copies) {
             Ok(gpu) => self.gpu = Some(gpu),
             Err(e) => {
                 self.renderer = Some(renderer);

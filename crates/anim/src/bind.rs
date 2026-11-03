@@ -10,6 +10,7 @@ use civbb_format::mesh::MeshIndex;
 use civbb_core::math::quat_to_euler;
 
 use crate::clip::{BoundClip, BoundCurve, EulerCurves};
+use crate::material::{self, Field};
 use crate::muscle::{self, MUSCLES, Rig};
 
 /// Index into the slot buffer.
@@ -35,6 +36,8 @@ pub enum Target {
     Parameter(ParamIndex),
     /// Humanoid muscle, by index into [`MUSCLES`].
     Muscle(u8),
+    /// Component of a material field on every material of a renderer that has the field (ADR 0025).
+    Material(MeshIndex, Field, u8),
 }
 
 /// Every slot of an avatar: what it drives and its default (the Write Defaults value).
@@ -303,7 +306,12 @@ impl<'a> Binder<'a> {
                     .ok_or("no such blendshape")?
             }
             Property::RootMotion(_) => return Err("body pose curves not supported yet (#52)"),
-            Property::Material(_) => return Err("material curves not supported yet (#49)"),
+            Property::Material(name) => {
+                let (field, component) = material::parse(name).ok_or("unknown material property")?;
+                let &mesh = on_node.first().ok_or("no mesh at path")?;
+                renderer_default(self.avatar, mesh, field).ok_or("no material on the renderer has the property")?;
+                Target::Material(mesh, field, component)
+            }
             Property::Component { .. } => return Err("unsupported component property"),
             Property::Parameter(_) | Property::Muscle(_) => unreachable!("handled above"),
         };
@@ -326,6 +334,7 @@ impl<'a> Binder<'a> {
             Target::RendererEnabled(_) => 1.0,
             Target::Parameter(p) => a.animator.as_ref().expect("bound").parameters[p as usize].default,
             Target::Muscle(m) => self.rig.as_ref().expect("bound").rest[m as usize],
+            Target::Material(m, f, c) => renderer_default(a, m, f).expect("bound")[c as usize],
         };
         self.slots.insert(t, s);
         self.targets.push(t);
@@ -341,6 +350,15 @@ impl<'a> Binder<'a> {
         }
         first
     }
+}
+
+/// A renderer's value of a material field: the first of its submeshes' materials that has the field, as Unity reads
+/// the default from the renderer's first material (ADR 0025).
+fn renderer_default(avatar: &Avatar, mesh: MeshIndex, field: Field) -> Option<[f32; 4]> {
+    avatar.meshes[mesh as usize]
+        .submeshes
+        .iter()
+        .find_map(|s| material::get(&avatar.materials[s.material as usize], field))
 }
 
 enum Resolved {

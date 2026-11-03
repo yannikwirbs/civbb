@@ -1,5 +1,6 @@
 //! Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
-//! later, every system reports per island, and results do not depend on the number of workers.
+//! later, every system reports per island, results do not depend on the number of workers, and animated materials
+//! belong to their island (ADR 0025).
 
 use std::sync::Arc;
 
@@ -7,7 +8,8 @@ use civbb_client::{Island, Model, frame};
 use civbb_core::math::Pose;
 use civbb_core::{System, jobs};
 use civbb_format::Avatar;
-use civbb_format::animator::{ParamKind, Parameter};
+use civbb_format::animator::{Binding, ParamKind, Parameter, Property};
+use civbb_format::material::{Material, MaterialModel};
 
 const DT: f32 = 1.0 / 90.0;
 
@@ -95,4 +97,58 @@ fn results_do_not_depend_on_the_worker_count() {
             .collect::<Vec<_>>()
     };
     assert_eq!(run(1), run(4));
+}
+
+#[test]
+fn animated_materials_are_per_island() {
+    let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());
+    // A toggle that starts off: with Write Defaults off, a value an island once had would persist.
+    let params = &avatar.animator.as_ref().unwrap().parameters;
+    let name = params.iter().find(|p| p.default == 0.0).unwrap().name.clone();
+    // The toggle's on clip also lights up the body's emission.
+    let body = avatar.meshes[0].node as usize;
+    let path = civbb_anim::bind::node_paths(&avatar.hierarchy)[body].clone();
+    let on = avatar
+        .clips
+        .iter_mut()
+        .find(|c| c.name == format!("{name}_On"))
+        .unwrap();
+    let mut emission = on.curves[0].clone();
+    emission.binding = Binding {
+        path,
+        property: Property::Material("_EmissionColor.g".into()),
+    };
+    emission.keys[0].value = 0.5;
+    on.curves.push(emission);
+    let model = Arc::new(Model::new(&avatar));
+    let animated: Vec<_> = model.animated_materials().map(|(m, i)| (m, i.to_vec())).collect();
+    let used = avatar.meshes[0].submeshes[0].material;
+    assert_eq!(animated.len(), 1);
+    assert_eq!(animated[0].0, 0);
+    assert!(animated[0].1.contains(&used));
+
+    let mut islands: Vec<Island> = (0..2)
+        .map(|id| Island::new(Arc::clone(&model), id, id == 0, Pose::IDENTITY))
+        .collect();
+    let p = model.controller().unwrap().param(&name).unwrap() as usize;
+    for (i, island) in islands.iter_mut().enumerate() {
+        island.animator_mut().unwrap().params[p] = if i == 0 { 1.0 } else { 0.0 };
+    }
+    let mut out = Vec::new();
+    for _ in 0..3 {
+        frame::step(&mut islands, |_, _| true, DT);
+    }
+    let k = animated[0].1.iter().position(|&m| m == used).unwrap();
+    let emissive = |m: &Material| match &m.model {
+        MaterialModel::Toon(t) => t.emissive,
+        _ => unreachable!("the corpus uses toon materials"),
+    };
+    islands[0].materials(&mut out);
+    let lit = emissive(&out[k]);
+    assert!((lit[1] - civbb_anim::material::to_linear(0.5)).abs() < 1e-6, "{lit:?}");
+    assert_eq!([lit[0], lit[2]], [0.0, 0.0]);
+    // The other island keeps the material's own value, and the avatar's material is untouched.
+    islands[1].materials(&mut out);
+    assert_eq!(emissive(&out[k]), [0.0; 3]);
+    assert_eq!(emissive(&avatar.materials[used as usize]), [0.0; 3]);
 }

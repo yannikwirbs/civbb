@@ -5,7 +5,7 @@ use ash::vk;
 use civbb_format::math::{Mat4, Vec3};
 
 use crate::graph::{Access, BufferId, Graph, ImageDesc, ImageId, Load, Pass};
-use crate::material::{PipelineKey, Shader};
+use crate::material::{MATERIAL_WORDS, PipelineKey, Shader};
 use crate::memory::{bytes, update};
 use crate::scene::{MaterialId, MeshData, Scene};
 use crate::skin::SkinnedMesh;
@@ -298,13 +298,15 @@ impl Forward {
         }
     }
 
-    /// Adds the frame's two passes to `graph`: one writing the view, draw records and commands, then the forward
-    /// pass drawing `batches` into `target` (cleared to `clear`) with a transient depth buffer. `skinned` is
+    /// Adds the frame's two passes to `graph`: one writing the view, draw records, commands and the changed
+    /// `materials` (index from [`Scene::add_material`], record from [`crate::material::pack`]), then the forward pass
+    /// drawing `batches` into `target` (cleared to `clear`) with a transient depth buffer. `skinned` is
     /// [`Scene::skinned`] in the graph, written by an earlier skinning pass.
     ///
     /// # Panics
     ///
-    /// If `batches` holds more draws than the `max_draws` given to [`Forward::new`].
+    /// If `batches` holds more draws than the `max_draws` given to [`Forward::new`], or a material index was not
+    /// added to the scene.
     #[allow(clippy::too_many_arguments)]
     pub fn add<'a>(
         &'a self,
@@ -314,12 +316,21 @@ impl Forward {
         skinned: BufferId,
         view: &View,
         batches: &Batches,
+        materials: &[(u32, [u32; MATERIAL_WORDS])],
         clear: [f32; 4],
     ) {
         assert!(
             batches.len() <= self.max_draws as usize,
             "more draws than Forward::new allowed"
         );
+        let record = (MATERIAL_WORDS * 4) as u64;
+        let material_writes: Vec<(u64, Vec<u8>)> = materials
+            .iter()
+            .map(|(index, words)| {
+                assert!(*index < scene.used().materials, "material {index} is not in the scene");
+                (u64::from(*index) * record, bytes(words))
+            })
+            .collect();
         let view_words = view.words();
         let records = bytes(&batches.records);
         let commands = bytes(&batches.commands);
@@ -327,17 +338,23 @@ impl Forward {
         let view_buf = graph.import_buffer(self.view.handle, &[Access::VertexRead, Access::FragmentRead]);
         let records_buf = graph.import_buffer(self.records.handle, &[Access::VertexRead]);
         let commands_buf = graph.import_buffer(self.commands.handle, &[Access::IndirectRead]);
+        let materials_buf = graph.import_buffer(scene.materials().handle, &[Access::FragmentRead]);
         graph.add(
             Pass::new("draw upload")
                 .buffer(view_buf, Access::TransferWrite)
                 .buffer(records_buf, Access::TransferWrite)
                 .buffer(commands_buf, Access::TransferWrite)
+                .buffer(materials_buf, Access::TransferWrite)
                 .record(move |d, cmd| {
-                    // SAFETY: the graph records this outside a rendering scope; the buffers hold max_draws draws.
+                    // SAFETY: the graph records this outside a rendering scope; the buffers hold max_draws draws
+                    // and every material written was added to the scene.
                     unsafe {
                         update(d, cmd, &self.view, 0, &bytes(&view_words));
                         update(d, cmd, &self.records, 0, &records);
                         update(d, cmd, &self.commands, 0, &commands);
+                        for (offset, data) in &material_writes {
+                            update(d, cmd, scene.materials(), *offset, data);
+                        }
                     }
                 }),
         );
@@ -366,6 +383,7 @@ impl Forward {
                 .buffer(view_buf, Access::FragmentRead)
                 .buffer(records_buf, Access::VertexRead)
                 .buffer(commands_buf, Access::IndirectRead)
+                .buffer(materials_buf, Access::FragmentRead)
                 .record(move |d, cmd| {
                     let viewport = vk::Viewport {
                         x: 0.0,

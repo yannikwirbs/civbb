@@ -38,7 +38,9 @@ impl Controller {
         let paths = node_paths(&avatar.hierarchy);
         let node_of = |t: &Target| match *t {
             Target::Position(n, _) | Target::Rotation(n, _) | Target::Scale(n, _) | Target::Active(n) => Some(n),
-            Target::BlendShape(m, _) | Target::RendererEnabled(m) => Some(avatar.meshes[m as usize].node),
+            Target::BlendShape(m, _) | Target::RendererEnabled(m) | Target::Material(m, _, _) => {
+                Some(avatar.meshes[m as usize].node)
+            }
             Target::Parameter(_) | Target::Muscle(_) => None,
         };
         // Muscles follow the mask's body parts; other targets its transform paths, if it lists any.

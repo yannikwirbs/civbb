@@ -17,6 +17,7 @@ Internal deps: civbb-core, civbb-format
 - `src/curve.rs`: Evaluates a curve of Hermite keys with Unity `AnimationCurve` semantics (ADR 0007).
 - `src/lib.rs`: Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles and constraints (design
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
+- `src/material.rs`: Animated material properties: Unity shader property names mapped to native material fields, read and written in
 - `src/mix.rs`: Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
 - `src/muscle.rs`: Humanoid muscles: Unity's muscle table, and muscle values to human bones' local rotations (ADR 0014).
@@ -27,6 +28,7 @@ Internal deps: civbb-core, civbb-format
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
 - `tests/golden.rs`: Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
+- `tests/material.rs`: Material curves (ADR 0025): Unity property names to native fields, Unity's units (sRGB colours, smoothness, V-up
 - `tests/muscle.rs`: Humanoid muscles (ADR 0014): the table against Unity's, hand-derived muscle space, poses recorded from Unity's
 
 ## `crates/client` (civbb-client)
@@ -180,6 +182,7 @@ Internal deps: none
 - `docs/adr/0022-compute-skinning-and-sparse-blendshapes.md`: 0022: Compute skinning with fixed-point sparse blendshapes, buffers by device address
 - `docs/adr/0023-gpu-driven-forward-pass.md`: 0023: GPU-driven forward pass: shared buffers with vertex pulling, bindless textures, runs of indirect draws
 - `docs/adr/0024-desktop-viewer.md`: 0024: The desktop viewer loads verified packages, steps then draws each frame, and reports timing in its title
+- `docs/adr/0025-animated-material-properties.md`: 0025: Material curves bind per renderer to native fields; animated renderers get per-island material records
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

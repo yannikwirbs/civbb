@@ -8,6 +8,7 @@ pub mod constraint;
 pub mod controller;
 pub mod curve;
 pub mod machine;
+pub mod material;
 mod mix;
 pub mod motion;
 pub mod muscle;

@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use civbb_anim::behaviour::coerce;
-use civbb_anim::{Constraints, Controller, Instance, Target};
+use civbb_anim::material::{self, Field};
+use civbb_anim::{Constraints, Controller, Instance, Slot, Target};
 use civbb_core::math::{Pose, world_poses_into};
 use civbb_core::{Counters, System};
 use civbb_dynamics::contact::Participant;
@@ -11,7 +12,9 @@ use civbb_dynamics::{ContactRig, ContactState, State};
 use civbb_format::Avatar;
 use civbb_format::animator::{ParamIndex, ParamKind};
 use civbb_format::hierarchy::NodeIndex;
+use civbb_format::material::Material;
 use civbb_format::math::Transform;
+use civbb_format::mesh::MeshIndex;
 
 /// An avatar's systems compiled once, shared by every island showing that avatar.
 #[derive(Clone, Debug)]
@@ -27,6 +30,21 @@ pub struct Model {
     shapes: Vec<Vec<f32>>,
     /// Per contact receiver, the animator parameter its value goes to; `None` when the animator lacks it.
     receivers: Vec<Option<(ParamIndex, ParamKind)>>,
+    /// Renderers with animated material properties, by mesh index.
+    renderers: Vec<AnimatedRenderer>,
+}
+
+/// A renderer whose material properties the animator drives: each island shows its own copy of its materials
+/// (ADR 0025).
+#[derive(Clone, Debug)]
+struct AnimatedRenderer {
+    mesh: MeshIndex,
+    /// The avatar materials its submeshes use, each once, in submesh order.
+    materials: Vec<Material>,
+    /// Their avatar material indices.
+    indices: Vec<u32>,
+    /// The slot of each bound field component.
+    slots: Vec<(Field, u8, Slot)>,
 }
 
 impl Model {
@@ -43,6 +61,35 @@ impl Model {
                 Some((p, c.animator.parameters[p as usize].kind))
             })
             .collect();
+        let mut renderers: Vec<AnimatedRenderer> = Vec::new();
+        for (slot, t) in controller
+            .iter()
+            .flat_map(|c| c.bound.bindings.targets.iter().enumerate())
+        {
+            let Target::Material(mesh, field, component) = *t else {
+                continue;
+            };
+            let i = match renderers.iter().position(|r| r.mesh == mesh) {
+                Some(i) => i,
+                None => {
+                    let mut indices: Vec<u32> = Vec::new();
+                    for s in &avatar.meshes[mesh as usize].submeshes {
+                        if !indices.contains(&s.material) {
+                            indices.push(s.material);
+                        }
+                    }
+                    renderers.push(AnimatedRenderer {
+                        mesh,
+                        materials: indices.iter().map(|&m| avatar.materials[m as usize].clone()).collect(),
+                        indices,
+                        slots: Vec::new(),
+                    });
+                    renderers.len() - 1
+                }
+            };
+            renderers[i].slots.push((field, component, slot as Slot));
+        }
+        renderers.sort_by_key(|r| r.mesh);
         let nodes = &avatar.hierarchy.nodes;
         Self {
             controller,
@@ -58,7 +105,15 @@ impl Model {
                 .map(|m| m.blend_shapes.iter().map(|s| s.default_weight).collect())
                 .collect(),
             receivers,
+            renderers,
         }
+    }
+
+    /// Renderers whose material properties are animated, in mesh order, each with the avatar materials its
+    /// submeshes use: every island needs its own record of each (ADR 0025). [`Island::materials`] lists them in
+    /// this order.
+    pub fn animated_materials(&self) -> impl Iterator<Item = (MeshIndex, &[u32])> {
+        self.renderers.iter().map(|r| (r.mesh, r.indices.as_slice()))
     }
 
     /// The compiled animator, if the avatar has one.
@@ -138,6 +193,28 @@ impl Island {
             for (t, &v) in c.bound.bindings.targets.iter().zip(a.pose()) {
                 if let Target::BlendShape(m, s) = *t {
                     out[m as usize][s as usize] = v / 100.0;
+                }
+            }
+        }
+    }
+
+    /// Writes the materials of every animated renderer after the last step into `out`, flattened in
+    /// [`Model::animated_materials`] order: the avatar's material with the animator's values set on every material
+    /// of the renderer that has the field (ADR 0025). Reusing `out` across frames avoids reallocating.
+    pub fn materials(&self, out: &mut Vec<Material>) {
+        let m = &self.model;
+        let n: usize = m.renderers.iter().map(|r| r.materials.len()).sum();
+        if out.len() != n {
+            out.clear();
+            out.extend(m.renderers.iter().flat_map(|r| r.materials.iter().cloned()));
+        }
+        let Some(a) = &self.animator else { return };
+        let pose = a.pose();
+        let mut out = out.iter_mut();
+        for r in &m.renderers {
+            for mat in out.by_ref().take(r.materials.len()) {
+                for &(field, component, slot) in &r.slots {
+                    material::set(mat, field, component, pose[slot as usize]);
                 }
             }
         }

@@ -167,8 +167,8 @@ fn reports_what_does_not_bind() {
             "body pose curves not supported yet (#52)",
         ),
         (
-            curve("Body", Property::Material("_Color.r".into()), &[(0.0, 1.0)]),
-            "material curves not supported yet (#49)",
+            curve("Body", Property::Material("_Nope.r".into()), &[(0.0, 1.0)]),
+            "unknown material property",
         ),
     ];
     for (c, reason) in cases {

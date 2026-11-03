@@ -1,11 +1,12 @@
 //! The GPU-driven forward pass on a real device (ADR 0023): quads through skinning, shared buffers, bindless
-//! textures and indirect multi-draws, checked pixel by pixel; and the bloated corpus avatar drawn without
+//! textures, indirect multi-draws and a material rewritten in the frame (ADR 0025), checked pixel by pixel; and the bloated corpus avatar drawn without
 //! validation errors. Skips without a Vulkan device.
 
 use civbb_format::Avatar;
 use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr, TextureSlot, Toon, Unlit};
 use civbb_format::math::Mat4;
 use civbb_format::mesh::{Mesh, Submesh};
+use civbb_render::material::{MATERIAL_WORDS, pack};
 use civbb_render::skin::{Job, SkinnedMesh, Skinning};
 use civbb_render::{
     Access, Batches, Capacity, Context, Error, Forward, Graph, MaterialId, MemoryLocation, Pass, Scene, Transients,
@@ -83,8 +84,16 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
     })
 }
 
-/// Skins every mesh with identity joints and draws them into a `SIZE` square image; returns its RGBA8 pixels.
-fn render(ctx: &Context, scene: &mut Scene, meshes: &[Mesh], materials: &[MaterialId], view: &View) -> Vec<u8> {
+/// Skins every mesh with identity joints and draws them into a `SIZE` square image after rewriting `updates`;
+/// returns its RGBA8 pixels.
+fn render(
+    ctx: &Context,
+    scene: &mut Scene,
+    meshes: &[Mesh],
+    materials: &[MaterialId],
+    updates: &[(u32, [u32; MATERIAL_WORDS])],
+    view: &View,
+) -> Vec<u8> {
     let data: Vec<_> = meshes.iter().map(|m| scene.add_mesh(ctx, m).unwrap()).collect();
     let instances: Vec<_> = data.iter().map(|d| SkinnedMesh::new(ctx, scene, d).unwrap()).collect();
     let joints: Vec<Vec<Mat4>> = data.iter().map(|d| vec![IDENTITY; d.joint_count() as usize]).collect();
@@ -140,7 +149,16 @@ fn render(ctx: &Context, scene: &mut Scene, meshes: &[Mesh], materials: &[Materi
                 .buffer(skinned, Access::ComputeWrite)
                 .record(|d, cmd| skinning.record(d, cmd, &jobs)),
         );
-        forward.add(&mut graph, scene, image, skinned, view, &batches, [0.0, 0.0, 0.0, 1.0]);
+        forward.add(
+            &mut graph,
+            scene,
+            image,
+            skinned,
+            view,
+            &batches,
+            updates,
+            [0.0, 0.0, 0.0, 1.0],
+        );
         graph.record(ctx, &mut pool, cmd).unwrap();
         let region = vk::BufferImageCopy::default()
             .image_subresource(vk::ImageSubresourceLayers {
@@ -249,10 +267,17 @@ fn draws_quads_with_each_shader_depth_textures_and_blending() {
     let mut view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
     view.light_dir = [0.0, 0.0, 1.0];
     view.ambient = [0.0; 3];
-    let pixels = render(&ctx, &mut scene, &meshes, &materials, &view);
+    // The red material is rewritten to blue in the frame that draws it.
+    let blue = pack(&material(unlit([0.0, 0.0, 1.0, 1.0], None), opaque), &[]);
+    let pixels = render(&ctx, &mut scene, &meshes, &materials, &[(red.index, blue)], &view);
     // Screen left is world -X and screen top world +Y.
     assert_near(pixel(&pixels, 16, 48), [0, 255, 0], 0, "textured unlit, bottom left");
-    assert_near(pixel(&pixels, 40, 32), [255, 0, 0], 0, "unlit behind, middle right");
+    assert_near(
+        pixel(&pixels, 40, 32),
+        [0, 0, 255],
+        0,
+        "rewritten unlit behind, middle right",
+    );
     assert_near(pixel(&pixels, 56, 16), [0, 0, 255], 1, "toon in shade, top right");
     assert_near(pixel(&pixels, 56, 48), [242, 242, 242], 12, "lit PBR, bottom right");
     assert_near(
@@ -280,7 +305,7 @@ fn draws_the_bloated_avatar() {
         .map(|m| scene.add_material(&ctx, m, &[]).unwrap())
         .collect();
     let view = View::look_at([0.0, 1.0, 3.0], [0.0, 1.0, 0.0], 0.8, 1.0, 0.1);
-    let pixels = render(&ctx, &mut scene, &avatar.meshes, &materials, &view);
+    let pixels = render(&ctx, &mut scene, &avatar.meshes, &materials, &[], &view);
     let covered = pixels.chunks(4).filter(|p| p[..3] != [0, 0, 0]).count();
     assert!(covered > 100, "only {covered} pixels drawn");
     unsafe { scene.destroy(&ctx) };
