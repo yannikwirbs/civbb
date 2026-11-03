@@ -41,3 +41,9 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   they draw white; AliciaSolid (VRM) has textures.
 - Debug-build frame times mean nothing: the viewer took 45 ms CPU per frame in debug for what takes 1.5 ms in
   release (validation layer, unoptimised workspace crates).
+- Window captures: `SetForegroundWindow` can fail silently and `CopyFromScreen` then grabs whatever is on top (the
+  user's other apps). Capture once while the window is known to be in front, check the title bar in the image, and
+  delete any capture that shows something else without describing it.
+- Corpus toggles have Write Defaults off: a value a clip once wrote persists after switching state. Tests that
+  compare islands must start from a toggle that defaults off (`parameters` with `default == 0.0`).
+- The Bash tool rejects `sleep N; cmd` waits; watch CI with `gh run watch <id> --exit-status` in a background call.
