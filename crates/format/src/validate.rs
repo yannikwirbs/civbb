@@ -93,6 +93,8 @@ pub struct ValidationError {
 const MAX_ERRORS: usize = 100;
 /// Authors plus references in [`crate::meta::Meta`].
 const META_LISTS: usize = 256;
+/// Levels of detail below the full mesh.
+const MAX_LODS: usize = 8;
 
 /// Checks every cross reference, stream length, ordering and cap. `has_blob` reports whether a texture's blob exists.
 pub fn validate(a: &Avatar, caps: &Caps, has_blob: impl Fn(BlobId) -> bool) -> Result<(), Vec<ValidationError>> {
@@ -266,6 +268,43 @@ impl V {
                 self.ensure(end <= m.indices.len() as u64, sp, "index range out of bounds");
                 self.ensure(s.index_count % 3 == 0, sp, "index count not a multiple of 3");
                 self.index(s.material as usize, a.materials.len(), sp, "material");
+            }
+            self.ensure(m.lods.len() <= MAX_LODS, || p(".lods"), "too many levels");
+            let (mut above_v, mut above_i) = (n, m.indices.len());
+            for (li, l) in m.lods.iter().enumerate() {
+                let lp = || p(&format!(".lods[{li}]"));
+                let v = l.vertices as usize;
+                indices += l.indices.len();
+                self.ensure(v <= above_v, lp, "more vertices than the level above");
+                self.ensure(l.indices.len() < above_i, lp, "not fewer indices than the level above");
+                self.ensure(l.indices.len() % 3 == 0, lp, "not a triangle list");
+                self.ensure(
+                    l.indices.iter().all(|&i| (i as usize) < v),
+                    lp,
+                    "vertex index out of range",
+                );
+                self.ensure(
+                    l.submeshes.len() == m.submeshes.len()
+                        && l.submeshes
+                            .iter()
+                            .zip(&m.submeshes)
+                            .all(|(s, t)| s.material == t.material),
+                    lp,
+                    "submeshes differ from the mesh's",
+                );
+                self.ensure(
+                    l.submeshes.iter().all(|s| {
+                        s.index_count % 3 == 0 && s.first_index as u64 + s.index_count as u64 <= l.indices.len() as u64
+                    }),
+                    lp,
+                    "submesh index range out of bounds",
+                );
+                self.ensure(
+                    l.error.is_finite() && l.error >= 0.0,
+                    lp,
+                    "error not finite and non-negative",
+                );
+                (above_v, above_i) = (v.min(above_v), l.indices.len());
             }
             for (bi, b) in m.blend_shapes.iter().enumerate() {
                 let bp = || p(&format!(".blend_shapes[{bi}]"));
@@ -725,6 +764,50 @@ mod tests {
     #[test]
     fn sample_is_valid() {
         check(&sample_avatar()).unwrap();
+    }
+
+    #[test]
+    fn levels_are_checked() {
+        use crate::mesh::{Lod, Submesh};
+        let mut a = sample_avatar();
+        a.meshes[0].lods = vec![Lod {
+            vertices: 2,
+            indices: Vec::new(),
+            submeshes: vec![Submesh {
+                first_index: 0,
+                index_count: 0,
+                material: 0,
+            }],
+            error: 0.01,
+        }];
+        check(&a).unwrap();
+        // The level keeps two vertices, the shape's delta on vertex 2 goes, its name stays.
+        let l = a.meshes[0].level(1);
+        assert_eq!((l.positions.len(), l.indices.len(), l.lods.len()), (2, 0, 0));
+        assert_eq!(l.skin.as_ref().unwrap().vertex_weights.len(), 2);
+        assert!(l.blend_shapes[0].deltas.is_empty());
+        assert_eq!(a.meshes[0].level(5), l);
+        assert_eq!(a.meshes[0].level(0), a.meshes[0]);
+        type Mutation = fn(&mut Lod);
+        let cases: &[Mutation] = &[
+            |l| l.vertices = 4,
+            |l| l.indices = vec![0, 1, 2],
+            |l| l.indices = vec![0, 1],
+            |l| l.submeshes.clear(),
+            |l| l.submeshes[0].material = 1,
+            |l| l.submeshes[0].index_count = 3,
+            |l| l.error = f32::NAN,
+        ];
+        for mutate in cases {
+            let mut b = a.clone();
+            mutate(&mut b.meshes[0].lods[0]);
+            expect_error(&b, "meshes[0].lods[0]");
+        }
+        // A second level may not have more vertices or as many indices as the first.
+        let mut b = a.clone();
+        let again = b.meshes[0].lods[0].clone();
+        b.meshes[0].lods.push(again);
+        expect_error(&b, "meshes[0].lods[1]");
     }
 
     #[test]

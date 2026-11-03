@@ -8,7 +8,7 @@ use std::process::ExitCode;
 use civbb_format::package::Platform;
 use civbb_format::{Caps, Package, ReadLimits, SigningKey, validate};
 use civbb_pipeline::gltf_import::dir_resolver;
-use civbb_pipeline::{Imported, Limits, atlas, collapse, compress, import, merge, package, prune, stats, texture};
+use civbb_pipeline::{Imported, Limits, atlas, collapse, compress, import, lod, merge, package, prune, stats, texture};
 
 const USAGE: &str = "usage:
   civbb keygen <key-file>
@@ -95,6 +95,11 @@ fn run(args: &[String]) -> Result<(), Error> {
             );
             let merged = merge(&mut imported.avatar);
             println!("merged {} meshes, {} submeshes", merged.meshes, merged.submeshes);
+            let l = lod(&mut imported.avatar);
+            println!(
+                "lod chain on {} meshes: triangles {:?}, error {:?} of mesh extent",
+                l.meshes, l.triangles, l.error
+            );
             println!("collapsed {} toggle layers", collapse(&mut imported.avatar));
             let c = compress(&mut imported, platform)?;
             println!(

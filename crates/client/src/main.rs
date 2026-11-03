@@ -10,7 +10,7 @@ use civbb_format::{Caps, Package, ReadLimits, SigningKey, validate};
 
 const USAGE: &str = "usage:
   civbb-client bench [--avatars N] [--threads T[,T...]] [--frames F] [--warmup W] [--avatar lean|bloated]
-  civbb-client view [<package.civpkg> --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F]
+  civbb-client view [<package.civpkg> --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F] [--lod L]
 
 bench steps N avatars (default 100, bloated) for W + F frames (default 60 + 300) at each worker count (default 1,
 2, 4 ... up to the logical core count) and prints a JSON report to stdout. Build with --release for meaningful
@@ -19,7 +19,8 @@ numbers.
 view shows N copies (default 1) of a runtime package, verified against the key that signed it (`civbb build`
 makes one from glTF or VRM), or of a corpus avatar (default bloated), with animator and dynamics running. Drag to
 orbit, scroll to zoom; CPU and GPU frame times are in the title. With --frames it exits after F frames and prints
-a summary.";
+a summary. --lod draws every mesh at level L of its LOD chain (0 is full, default; past a mesh's last level, its
+last).";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -86,7 +87,7 @@ fn parse(args: &[String]) -> Option<Config> {
 }
 
 fn run_view(args: &[String]) -> ExitCode {
-    let (mut package, mut key, mut corpus, mut copies, mut frames) = (None, None, None, 1, None);
+    let (mut package, mut key, mut corpus, mut copies, mut frames, mut lod) = (None, None, None, 1, None, 0);
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let parsed = match arg.as_str() {
@@ -94,6 +95,7 @@ fn run_view(args: &[String]) -> ExitCode {
             "--avatar" => it.next().map(|v| corpus = Some(v.clone())),
             "--copies" => it.next().and_then(|v| v.parse().ok()).map(|n| copies = n),
             "--frames" => it.next().and_then(|v| v.parse().ok()).map(|n| frames = Some(n)),
+            "--lod" => it.next().and_then(|v| v.parse().ok()).map(|n| lod = n),
             s if !s.starts_with('-') && package.is_none() => {
                 package = Some(s.to_owned());
                 Some(())
@@ -117,13 +119,18 @@ fn run_view(args: &[String]) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let (avatar, textures) = match loaded {
+    let (mut avatar, textures) = match loaded {
         Ok(l) => l,
         Err(e) => {
             eprintln!("civbb-client: {e}");
             return ExitCode::FAILURE;
         }
     };
+    if lod > 0 {
+        avatar.meshes = avatar.meshes.iter().map(|m| m.level(lod)).collect();
+        let triangles: usize = avatar.meshes.iter().map(|m| m.indices.len() / 3).sum();
+        println!("LOD {lod}: {triangles} triangles");
+    }
     let cfg = view::Config {
         avatar,
         textures,

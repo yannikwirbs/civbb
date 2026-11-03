@@ -107,14 +107,17 @@ Internal deps: civbb-anim, civbb-format
 - `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`, `VRMC_node_constraint`) to native
 - `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
 - `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
+- `src/lod.rs`: Compiler stage 3 LOD chain: up to three simplified levels per mesh from meshoptimizer, weighing where skinning and
 - `src/main.rs`: `civbb`: build, validate and inspect avatar packages from the command line (design doc §9, creator tooling).
 - `src/merge.rs`: Compiler stage 3 mesh merging: meshes that are always visible together become one skinned mesh, and submeshes
 - `src/package.rs`: Turns imports into runtime packages and summarises avatars for `civbb inspect`.
 - `src/prune.rs`: Compiler stage 3 pruning: skin joints no vertex uses, nodes nothing references and blendshapes nothing drives,
 - `src/texture.rs`: Compiler stage 4 texture compression: images capped per platform and encoded to KTX2 with Basis Universal, UASTC
-- `tests/cli.rs`: `civbb` end to end: keygen, build (pruning, atlasing, merging, compression; ADRs 0026, 0027, 0029), validate and inspect on a corpus avatar, plus tamper and
+- `tests/cli.rs`: `civbb` end to end: keygen, build (pruning, atlasing, merging, LOD chain, compression; ADRs 0026, 0027, 0029, 0031), validate and inspect on a corpus avatar, plus tamper and
 - `tests/collapse.rs`: Toggle collapsing (ADR 0028): the corpus avatars' toggle layers become one direct blend tree layer, layers that
+- `tests/common/mod.rs`: Shared by the stage tests: validity, stepping islands through an avatar's states, and what an avatar shows.
 - `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
+- `tests/lod.rs`: LOD chain (ADR 0031): levels fall in triangles within their error caps, keep submesh borders and UV seams, keep
 - `tests/merge.rs`: Mesh merging (ADR 0027): meshes always visible together merge and same-material submeshes join, everything
 - `tests/prune.rs`: Pruning (ADR 0026): unused skin joints, unreferenced nodes and undriven blendshapes go; everything referenced,
 - `tests/texture.rs`: Texture atlasing and KTX2 compression (ADR 0029): every vertex samples the same texel through the atlas as
@@ -197,6 +200,7 @@ Internal deps: none
 - `docs/adr/0028-collapsing-toggle-layers.md`: 0028: Toggle layers collapse into one direct blend tree layer per group
 - `docs/adr/0029-texture-atlasing-and-ktx2.md`: 0029: Textures are atlased per material model and shipped as KTX2, encoded by basisu and transcoded in Rust
 - `docs/adr/0030-no-physbone-chain-merging.md`: 0030: PhysBone chains are not merged at compile time; our solver has no per-chain batch cost to save
+- `docs/adr/0031-skin-aware-lod-chain.md`: 0031: A skin-aware LOD chain from meshoptimizer: three prefix levels per mesh, built after merging (format v8)
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

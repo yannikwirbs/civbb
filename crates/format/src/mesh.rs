@@ -35,6 +35,63 @@ pub struct Mesh {
     pub blend_shapes: Vec<BlendShape>,
     /// Visibility in the owner's first-person view.
     pub first_person: FirstPerson,
+    /// Lower levels of detail, each coarser than the one before; empty if none (ADR 0031).
+    pub lods: Vec<Lod>,
+}
+
+/// A lower level of detail: simplified triangles over a prefix of the mesh's vertices, so skinning and shapes of
+/// that level stop at [`Lod::vertices`] (ADR 0031).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Lod {
+    /// Vertices this level uses: the mesh's first `vertices`, at most the previous level's.
+    pub vertices: u32,
+    /// Triangle list indices, all below `vertices`.
+    pub indices: Vec<u32>,
+    /// Index ranges into `indices`, one per submesh of the mesh with the same material.
+    pub submeshes: Vec<Submesh>,
+    /// Largest deviation from the full mesh in the mesh's units, as meshoptimizer measures it (position and
+    /// weighted attributes).
+    pub error: f32,
+}
+
+impl Mesh {
+    /// The mesh as level `n` draws it (0 is the full mesh, levels past the last give the last): vertex streams,
+    /// skin and shape deltas cut to the level's vertices, its triangles, and no further levels.
+    pub fn level(&self, n: usize) -> Mesh {
+        let Some(lod) = n.checked_sub(1).and_then(|i| self.lods.get(i).or(self.lods.last())) else {
+            return self.clone();
+        };
+        let v = lod.vertices as usize;
+        let cut = |s: &[[f32; 2]]| s[..s.len().min(v)].to_vec();
+        Mesh {
+            name: self.name.clone(),
+            node: self.node,
+            positions: self.positions[..v].to_vec(),
+            normals: self.normals[..v].to_vec(),
+            tangents: self.tangents[..self.tangents.len().min(v)].to_vec(),
+            uv0: cut(&self.uv0),
+            uv1: cut(&self.uv1),
+            skin: self.skin.as_ref().map(|s| Skin {
+                joints: s.joints.clone(),
+                inverse_bind: s.inverse_bind.clone(),
+                vertex_joints: s.vertex_joints[..v].to_vec(),
+                vertex_weights: s.vertex_weights[..v].to_vec(),
+            }),
+            indices: lod.indices.clone(),
+            submeshes: lod.submeshes.clone(),
+            blend_shapes: self
+                .blend_shapes
+                .iter()
+                .map(|b| BlendShape {
+                    name: b.name.clone(),
+                    default_weight: b.default_weight,
+                    deltas: b.deltas[..b.deltas.partition_point(|d| (d.vertex as usize) < v)].to_vec(),
+                })
+                .collect(),
+            first_person: self.first_person,
+            lods: Vec::new(),
+        }
+    }
 }
 
 /// First-person visibility of a mesh (VRM `firstPerson.meshAnnotations`).

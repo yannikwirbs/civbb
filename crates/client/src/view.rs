@@ -654,13 +654,14 @@ impl Viewer {
             let fps = n / w.0.elapsed().as_secs_f32();
             let gpu = renderer.gpu_ms().map_or("n/a".into(), |g| format!("{g:.2} ms"));
             let title = format!(
-                "civbb-client view: {} x {}, CPU {:.2} ms (avatar systems {:.2} ms), GPU {gpu}, {fps:.0} fps, {} draws, {} skinned meshes",
+                "civbb-client view: {} x {}, CPU {:.2} ms (avatar systems {:.2} ms), GPU {gpu}, {fps:.0} fps, {} draws, {} skinned meshes, {} triangles per copy",
                 self.copies,
                 self.avatar.name,
                 w.2 / n,
                 w.3 / n,
                 draws,
-                skinned
+                skinned,
+                self.avatar.meshes.iter().map(|m| m.indices.len() / 3).sum::<usize>()
             );
             if let Some(window) = &self.window {
                 window.set_title(&title);
