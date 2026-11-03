@@ -29,3 +29,15 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
 - GitHub runners have a Vulkan loader but no driver: instance creation fails with `ERROR_INCOMPATIBLE_DRIVER`, not a load error. Device tests must skip on that too (`Error::NoDevice`); reproduce locally with `VK_DRIVER_FILES=C:/nonexistent.json`.
 - The Vulkan SDK (`C:/VulkanSDK/<version>`) sets `VULKAN_SDK` machine-wide, but sessions started before the install don't see it: pass `VULKAN_SDK=C:/VulkanSDK/1.4.363.0` to `cargo xtask shaders`. `VK_KHRONOS_VALIDATION_VALIDATE_SYNC=true` turns on synchronization validation for a run.
 - Python run from a Bash heredoc turns Rust or Windows-path backslash escapes inside normal strings into real characters (a carriage return in a Rust literal, which clippy reports as `no_effect_replace`; `\1` in a path). Write Rust and docs with the Write/Edit tools; if Python must write them, use raw strings and check the output.
+- Slang for Vulkan: `SV_VulkanVertexID` and `SV_VulkanInstanceID` are `gl_VertexIndex` and `gl_InstanceIndex`
+  (including base vertex and `firstInstance`); the HLSL semantics may subtract the base. Check buffer struct
+  offsets with `spirv-dis` (in the SDK's `Bin`). `slangc` warns E41012 "profile implicitly upgraded" for
+  `Sampler2D` arrays; harmless.
+- To check what a window shows, capture only that window: PowerShell with `EnumWindows` by title prefix,
+  `GetWindowRect`, `Graphics.CopyFromScreen`, then Read the PNG. A full-screen capture shows the user's other
+  windows. `Process.MainWindowHandle` is 0 for processes started from Git Bash, so find the window by title.
+- Viewing pipeline content: `civbb keygen <scratchpad>/key`, `civbb build <src> --key <key> -o <scratchpad>/x.civpkg`,
+  then `civbb-client view <pkg> --key <key>`. Booth GLBs converted from FBX carry no textures (Yumeka: 0), so
+  they draw white; AliciaSolid (VRM) has textures.
+- Debug-build frame times mean nothing: the viewer took 45 ms CPU per frame in debug for what takes 1.5 ms in
+  release (validation layer, unoptimised workspace crates).
