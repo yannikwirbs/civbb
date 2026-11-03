@@ -196,6 +196,7 @@ Internal deps: none
 - `docs/adr/0027-merging-meshes-that-show-together.md`: 0027: The compiler merges meshes that show together and joins submeshes that share a material
 - `docs/adr/0028-collapsing-toggle-layers.md`: 0028: Toggle layers collapse into one direct blend tree layer per group
 - `docs/adr/0029-texture-atlasing-and-ktx2.md`: 0029: Textures are atlased per material model and shipped as KTX2, encoded by basisu and transcoded in Rust
+- `docs/adr/0030-no-physbone-chain-merging.md`: 0030: PhysBone chains are not merged at compile time; our solver has no per-chain batch cost to save
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

@@ -34,8 +34,11 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   offsets with `spirv-dis` (in the SDK's `Bin`). `slangc` warns E41012 "profile implicitly upgraded" for
   `Sampler2D` arrays; harmless.
 - To check what a window shows, capture only that window: PowerShell with `EnumWindows` by title prefix,
-  `GetWindowRect`, `Graphics.CopyFromScreen`, then Read the PNG. A full-screen capture shows the user's other
-  windows. `Process.MainWindowHandle` is 0 for processes started from Git Bash, so find the window by title.
+  `GetWindowRect`, then `PrintWindow(hwnd, hdc, 2)` (PW_RENDERFULLCONTENT) into a bitmap, then Read the PNG.
+  `PrintWindow` reads the window's own content, the Vulkan swapchain included, even when another window covers it;
+  `CopyFromScreen` copies whatever is on top. `Process.MainWindowHandle` is 0 for processes started from Git Bash,
+  so find the window by title. At 165 Hz `--frames 900` ends in 5 s: start the viewer and capture in one
+  PowerShell call (`Start-Process -PassThru`, sleep, capture, `Stop-Process`).
 - Viewing pipeline content: `civbb keygen <scratchpad>/key`, `civbb build <src> --key <key> -o <scratchpad>/x.civpkg`,
   then `civbb-client view <pkg> --key <key>`. Booth GLBs converted from FBX carry no textures (Yumeka: 0), so
   they draw white; AliciaSolid (VRM) has textures.
@@ -55,3 +58,15 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
 - Before/after binaries: `git worktree add --detach <scratchpad>/wt HEAD`, build there with
   `--target-dir <scratchpad>/wt-target`, then `git worktree remove --force` it. Piping `civbb build` into `head`
   makes it panic with "failed printing to stdout"; harmless.
+- Python's `open()` on Windows defaults to cp1252: read and write repo files with `encoding="utf-8"`, or
+  replacements containing `§` or other non-ASCII text silently fail to match. Git Bash's `iconv` reports every file
+  as invalid UTF-8; check with Python's strict `decode("utf-8")` instead.
+- `basisu_c_sys` (Basis Universal encoder) runs bindgen at build time: it found Visual Studio's libclang without
+  `LIBCLANG_PATH`. Its `default-features = false` build fails (transcoder code compiled out but still referenced):
+  keep the defaults and add `encoder`. Its own threading (`BU_COMP_FLAGS_THREADED`) makes UASTC RDO output differ
+  between runs; encode single-threaded and parallelise across textures.
+- Pure-Rust parsers still need hostile-input tests: `basisu` 0.1 allocates a KTX2 level's stated uncompressed
+  length unchecked (a 1 EB abort from three flipped bits). A test that truncates and bit-flips a small valid file
+  a few thousand times finds such things in seconds, on Windows, without cargo-fuzz.
+- Unity-exported UVs often sit a whole tile off 0..1 (AliciaSolid's V runs 1 to 2); with a repeating sampler
+  that is equal to 0..1, so check "each triangle in one unit tile", not "inside 0..1".

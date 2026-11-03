@@ -5,9 +5,11 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.8 Compiler optimisations** (M0.7 closed).
-- Next issue: #31 texture atlasing and KTX2, then #32, #33. #28 to #30 are done.
+- Next issue: #33 LOD chain with meshoptimizer, the last in M0.8. #28 to #32 are done (#32 by ADR 0030: no
+  chain merging, it measured slower in our solver).
 - Compiler stages in `civbb-pipeline`, run by `civbb build` between import and packaging, each proven
   behaviour-identical by tests that step islands before and after:
+  - Order in `civbb build`: `prune`, `atlas`, `merge`, `collapse`, `compress`.
   - `prune` (ADR 0026): zero-weight skin joints, unreferenced nodes (ancestors and chain descendants kept) and
     shapes nothing drives (clips, face binds, Unified Expressions and ARKit names, non-zero rest weight).
   - `merge` (ADR 0027): meshes under the same `Active`-animated nodes (same first-person mode and vertex streams)
@@ -15,10 +17,19 @@ Read at the start of every session; update at the end. Keep it short: the queue 
     with renderer or material curves, blended submeshes, shared nodes or colliding shape names stay apart. Draws per
     copy: Yumeka 23 to 7 (20 skinned meshes to 1), AliciaSolid 20 to 13, HAOLAN 15 to 9. Bloated only loses one
     mesh: every outfit and prop has its own toggle.
+  - `atlas` (ADR 0029): materials with the same model and UV slots share an atlas (8-texel gutters, 4-texel
+    aligned, shelf packed within the platform cap); whole-tile UV offsets are shifted back; animated materials,
+    UV1, `_ST` tiling, tile-crossing triangles and textures used elsewhere are left alone. Materials then equal
+    become one so `merge` joins their draws. AliciaSolid: textures 7 to 3, materials 12 to 10, draws 13 to 12.
+  - `compress` (ADR 0029): every texture to KTX2 with `basisu_c_sys` (C++ Basis Universal, bindgen needs
+    libclang), UASTC for normal maps, ETC1S otherwise, single-threaded per texture (reproducible), sides capped at
+    4096 desktop / 2048 Quest. AliciaSolid package blobs 5.6 MB to 2.8 MB, Seed-san 8.6 to 4.9 MB.
   - `collapse` (ADR 0028): plain bool toggle layers (two constant clips, zero-duration transitions) become one
     layer per group: a `Start` state, then a Write Defaults on direct tree of 1D trees weighted by `civbb/One`.
     Bloated 48 layers to 1, animator update 2.34 to 2.08 µs. Direct and 1D blend weights no longer allocate.
-- The viewer's title and `--frames` summary report draws and skinned meshes of the last frame.
+- The viewer's title and `--frames` summary report draws and skinned meshes of the last frame. KTX2 textures are
+  checked (header, level index) and transcoded to BC7 by the pure-Rust `basisu` crate; the renderer uploads BC7
+  levels and device selection requires BC textures. Fuzz target `ktx2_transcode`.
 - Animated materials (ADR 0025): `civbb_anim::material` maps Unity property names (`_Color`, `_EmissionColor`,
   `_MainTex_ST`, `_Glossiness`, MToon/lilToon/Poiyomi/UTS2 names) to native fields in Unity's units (sRGB colours,
   smoothness, V-up offsets); `Target::Material(mesh, field, component)` per renderer. `Model::animated_materials`
@@ -60,7 +71,7 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0028 are accepted. Renderer follow-ups: #58 toon outlines (M0.9, parity needs them), #59 GPU
+None. ADRs 0017 to 0030 are accepted. Renderer follow-ups: #58 toon outlines (M0.9, parity needs them), #59 GPU
 culling, #60 MSAA and multiview, #61 pipeline cache and freeing scene memory, #62 clustered lights and shadows
 (Phase 1). Dynamics constants and contact choices marked unverified wait
 for parity (M0.9). In M0.10: #52 (body pose), #53 (muscle frames for glTF/VRM), #54 (Unity-recorded animator
@@ -82,3 +93,5 @@ One line per session, newest last: date, what moved, what's next.
 - 2026-11-03 (3): #26 GPU-driven forward pass in `civbb-render` (shared buffers, bindless, uber-shaders, indirect runs, graph depth/transients/buffers; ADR 0023), #27 desktop viewer `civbb-client view` (ADR 0024). Opened #58 to #62. Next: #49.
 - 2026-11-03 (4): M0.7 closed: #49 material curves bound per renderer to native fields, per-island material records rewritten in the frame (ADR 0025). M0.8 started: #28 `civbb build` prunes unweighted joints, unreferenced nodes and undriven shapes (ADR 0026). Next: #29.
 - 2026-11-03 (5): #29 mesh merging (ADR 0027; Yumeka 23 to 7 draws, viewer reports draws), #30 toggle layers to one direct blend tree (ADR 0028; blend weights no longer allocate, collapse was 4x slower before). Next: #31.
+- 2026-11-03 (6): #31 texture atlasing and KTX2 (ADR 0029; AliciaSolid package 5.6 to 2.8 MB, one atlas, draws 13 to
+  12, viewer transcodes to BC7), #32 closed by ADR 0030 (merged chains measured slower). Next: #33.
