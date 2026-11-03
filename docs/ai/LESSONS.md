@@ -24,3 +24,5 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
 - To identify an unknown blend in recordings, fit the output as a linear combination of the inputs (least squares, all sign choices): a near-zero residual proves linearity and gives the effective weights (how Unity's sequential nlerp of constraint sources showed up).
 - `python -I` drops the script's directory from `sys.path`, so own scratch helper modules don't import; use it for scripts that read untrusted downloads, not for own analysis scripts.
 - Boundary tests in f32: `0.15 + 0.05` is not exactly `0.2`. Test "touching counts" with binary-exact values (0.25 + 0.25 at 0.5) and keep other cases clear of the boundary.
+- The workspace globs `crates/*`: an empty `crates/<name>/` without a `Cargo.toml` breaks every cargo command, `fmt` included. Create the manifest first.
+- Benchmarks: `cargo run` defaults to debug; numbers only mean something from `--release` (the report's `profile` field says which).
