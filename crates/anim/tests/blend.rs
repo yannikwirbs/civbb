@@ -25,6 +25,50 @@ fn one_d_is_linear_between_neighbours_and_clamped_outside() {
     close(&simple_1d(&th, 5.0), &[1.0, 0.0, 0.0]);
 }
 
+/// The 1D weights are picked without sorting; they match sorting the thresholds (stable, by `total_cmp`) and
+/// searching them, bit for bit, ties and values on thresholds included.
+#[test]
+fn one_d_matches_sorting_the_thresholds() {
+    fn sorted(th: &[f32], v: f32) -> Vec<f32> {
+        let mut w = vec![0.0; th.len()];
+        let mut order: Vec<usize> = (0..th.len()).collect();
+        order.sort_by(|&a, &b| th[a].total_cmp(&th[b]));
+        let (Some(&first), Some(&last)) = (order.first(), order.last()) else {
+            return w;
+        };
+        if v <= th[first] || v.is_nan() {
+            w[first] = 1.0;
+        } else if v >= th[last] {
+            w[last] = 1.0;
+        } else {
+            let k = order.partition_point(|&i| th[i] <= v);
+            let (a, b) = (order[k - 1], order[k]);
+            let t = (v - th[a]) / (th[b] - th[a]);
+            w[a] = 1.0 - t;
+            w[b] = t;
+        }
+        w
+    }
+    let mut rng = 0x9e37_79b9_7f4a_7c15_u64;
+    let mut next = move || {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        rng
+    };
+    for _ in 0..20_000 {
+        let n = (next() % 6) as usize;
+        // Few distinct values, so ties and hits are common.
+        let th: Vec<f32> = (0..n).map(|_| (next() % 5) as f32 * 0.5 - 1.0).collect();
+        let v = (next() % 13) as f32 * 0.25 - 1.75;
+        let (got, want) = (simple_1d(&th, v), sorted(&th, v));
+        assert!(
+            got.iter().map(|x| x.to_bits()).eq(want.iter().map(|x| x.to_bits())),
+            "{th:?} at {v}: {got:?} != {want:?}"
+        );
+    }
+}
+
 #[test]
 fn cartesian_gradient_bands() {
     let two = [[0.0, 0.0], [1.0, 0.0]];

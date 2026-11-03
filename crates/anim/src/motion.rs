@@ -4,7 +4,7 @@
 //! barycentric weights with the centre, freeform cartesian and directional by gradient bands (Johansen 2009,
 //! §6.3; polar with α = 2), direct from parameters.
 
-use civbb_format::animator::{BlendTree, BlendTreeKind, ClipIndex, Motion};
+use civbb_format::animator::{BlendTree, BlendTreeKind, ChildMotion, ClipIndex, Motion};
 
 use crate::clip::BoundClip;
 
@@ -44,14 +44,13 @@ fn weighted_length(
             *sum += w * if len > 0.0 { len } else { 1.0 } / scale;
             *weight += w;
         }
-        Motion::BlendTree(tree) => {
-            for (child, cw) in tree.children.iter().zip(weights(tree, params)) {
-                let s = scale * child.time_scale.abs();
-                if cw > 0.0 && s > 0.0 {
-                    weighted_length(&child.motion, clips, params, w * cw, s, sum, weight);
-                }
+        Motion::BlendTree(tree) => each_weight(tree, params, |i, cw| {
+            let child = &tree.children[i];
+            let s = scale * child.time_scale.abs();
+            if cw > 0.0 && s > 0.0 {
+                weighted_length(&child.motion, clips, params, w * cw, s, sum, weight);
             }
-        }
+        }),
     }
 }
 
@@ -77,20 +76,19 @@ fn collect(m: &Motion, clips: &[BoundClip], params: &[f32], normalized: f32, w: 
             time: clip_time(&clips[*c as usize], normalized),
             weight: w,
         }),
-        Motion::BlendTree(tree) => {
-            for (child, cw) in tree.children.iter().zip(weights(tree, params)) {
-                if cw > 0.0 {
-                    collect(
-                        &child.motion,
-                        clips,
-                        params,
-                        normalized + child.cycle_offset,
-                        w * cw,
-                        out,
-                    );
-                }
+        Motion::BlendTree(tree) => each_weight(tree, params, |i, cw| {
+            let child = &tree.children[i];
+            if cw > 0.0 {
+                collect(
+                    &child.motion,
+                    clips,
+                    params,
+                    normalized + child.cycle_offset,
+                    w * cw,
+                    out,
+                );
             }
-        }
+        }),
     }
 }
 
@@ -131,23 +129,78 @@ pub fn weights(tree: &BlendTree, params: &[f32]) -> Vec<f32> {
 /// Linear between the two thresholds around `v`, clamped to the end children. Thresholds need not be sorted.
 pub fn simple_1d(thresholds: &[f32], v: f32) -> Vec<f32> {
     let mut w = vec![0.0; thresholds.len()];
-    let mut order: Vec<usize> = (0..thresholds.len()).collect();
-    order.sort_by(|&a, &b| thresholds[a].total_cmp(&thresholds[b]));
-    let (Some(&first), Some(&last)) = (order.first(), order.last()) else {
-        return w;
-    };
-    if v <= thresholds[first] || v.is_nan() {
-        w[first] = 1.0;
-    } else if v >= thresholds[last] {
-        w[last] = 1.0;
-    } else {
-        let k = order.partition_point(|&i| thresholds[i] <= v);
-        let (a, b) = (order[k - 1], order[k]);
-        let t = (v - thresholds[a]) / (thresholds[b] - thresholds[a]);
-        w[a] = 1.0 - t;
-        w[b] = t;
+    for (i, x) in pick_1d(thresholds.len(), |i| thresholds[i], v).into_iter().flatten() {
+        w[i] = x;
     }
     w
+}
+
+/// The children [`simple_1d`] weighs, in child order, without allocating: in thresholds ordered by `total_cmp` with
+/// ties in child order, the ends when `v` is outside them, else the last at or below `v` and the first above it.
+fn pick_1d(n: usize, t: impl Fn(usize) -> f32, v: f32) -> [Option<(usize, f32)>; 2] {
+    let key = |i: usize| (t(i), i);
+    let less = |a: (f32, usize), b: (f32, usize)| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)).is_lt();
+    let (mut first, mut last) = (0, 0);
+    let (mut below, mut above): (Option<usize>, Option<usize>) = (None, None);
+    for i in 0..n {
+        if less(key(i), key(first)) {
+            first = i;
+        }
+        if !less(key(i), key(last)) {
+            last = i;
+        }
+        if t(i) <= v {
+            if below.is_none_or(|b| !less(key(i), key(b))) {
+                below = Some(i);
+            }
+        } else if above.is_none_or(|b| less(key(i), key(b))) {
+            above = Some(i);
+        }
+    }
+    if n == 0 {
+        return [None, None];
+    }
+    if v <= t(first) || v.is_nan() {
+        return [Some((first, 1.0)), None];
+    }
+    if v >= t(last) {
+        return [Some((last, 1.0)), None];
+    }
+    let (Some(a), Some(b)) = (below, above) else {
+        return [None, None];
+    };
+    let x = (v - t(a)) / (t(b) - t(a));
+    let (pa, pb) = ((a, 1.0 - x), (b, x));
+    if a < b {
+        [Some(pa), Some(pb)]
+    } else {
+        [Some(pb), Some(pa)]
+    }
+}
+
+/// Calls `f` with each child's index and weight, in child order; direct and 1D trees without allocating, and 1D
+/// trees only for their (at most two) weighted children.
+fn each_weight(tree: &BlendTree, params: &[f32], mut f: impl FnMut(usize, f32)) {
+    match tree.kind {
+        BlendTreeKind::Direct => {
+            let w = |c: &ChildMotion| c.direct_param.map_or(0.0, |p| params[p as usize]);
+            let sum: f32 = tree.children.iter().map(w).filter(|w| *w > 0.0).sum();
+            let normalize = tree.normalize && sum > 0.0;
+            for (i, c) in tree.children.iter().enumerate() {
+                f(i, if normalize { w(c) / sum } else { w(c) });
+            }
+        }
+        BlendTreeKind::Simple1D { param } => {
+            let t = |i: usize| tree.children[i].threshold;
+            for (i, w) in pick_1d(tree.children.len(), t, params[param as usize])
+                .into_iter()
+                .flatten()
+            {
+                f(i, w);
+            }
+        }
+        _ => weights(tree, params).into_iter().enumerate().for_each(|(i, w)| f(i, w)),
+    }
 }
 
 /// Barycentric weights of the two directions around `p` and the centre child (at the origin): inside their
