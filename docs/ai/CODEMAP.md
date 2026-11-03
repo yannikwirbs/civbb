@@ -33,11 +33,14 @@ Internal deps: civbb-core, civbb-format
 
 Client: wires the avatar systems into per-avatar islands and frames; a headless benchmark in Phase 0.
 
-Internal deps: civbb-anim, civbb-core, civbb-dynamics, civbb-format
+Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-format
 
+- `src/bench.rs`: Headless CPU benchmark: N avatar islands stepped for a number of frames at each worker count (design doc §21).
 - `src/frame.rs`: One simulation frame's avatar work: every island as its own parallel job, then the cross-avatar contact pass
 - `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
 - `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020).
+- `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`).
+- `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count; bad arguments
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 
 ## `crates/core` (civbb-core)

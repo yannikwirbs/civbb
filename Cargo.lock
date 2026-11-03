@@ -111,6 +111,8 @@ dependencies = [
  "civbb-corpus",
  "civbb-dynamics",
  "civbb-format",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -7,5 +7,10 @@ The client (design doc §5). Glue crate: wires `anim`, `dynamics` and `core` tog
   the animator (pose written to node transforms and activity), constraints, an IK stub, bone dynamics, then world
   placements and activity, each timed into `civbb_core::Counters`.
 - `frame`: `step` runs every island as its own rayon job, then the cross-avatar contact pass (step 6) once.
+- `bench` and `main.rs`: `civbb-client bench [--avatars N] [--threads T,T..] [--frames F] [--warmup W]
+  [--avatar lean|bloated]` steps N corpus avatars at each worker count and prints JSON: wall ms per frame (mean,
+  p50, p99), ms per avatar, speedup over the first run, and CPU ms per avatar by system. Avatars stand on a 1 m grid,
+  sway so their chains move, and flip one parameter every 30 frames. Run it with
+  `cargo run --release -p civbb-client -- bench`.
 
 Decisions are in ADR 0020.
