@@ -8,7 +8,7 @@ use std::process::ExitCode;
 use civbb_format::package::Platform;
 use civbb_format::{Caps, Package, ReadLimits, SigningKey, validate};
 use civbb_pipeline::gltf_import::dir_resolver;
-use civbb_pipeline::{Imported, Limits, import, package, stats};
+use civbb_pipeline::{Imported, Limits, import, package, prune, stats};
 
 const USAGE: &str = "usage:
   civbb keygen <key-file>
@@ -81,7 +81,12 @@ fn run(args: &[String]) -> Result<(), Error> {
         "keygen" => keygen(&a.input),
         "build" => {
             let key = read_key(a.key.as_deref().ok_or(Error::Usage)?)?;
-            let imported = import_file(&a.input)?;
+            let mut imported = import_file(&a.input)?;
+            let pruned = prune(&mut imported.avatar);
+            println!(
+                "pruned {} nodes, {} skin joints, {} blendshapes",
+                pruned.nodes, pruned.joints, pruned.shapes
+            );
             let platform = if a.quest { Platform::Quest } else { Platform::Desktop };
             let bytes = package(imported, platform).encode_signed(&key);
             let out = a.out.unwrap_or_else(|| a.input.with_extension("civpkg"));

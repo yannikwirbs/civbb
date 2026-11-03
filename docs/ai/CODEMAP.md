@@ -107,8 +107,10 @@ Internal deps: civbb-format
 - `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
 - `src/main.rs`: `civbb`: build, validate and inspect avatar packages from the command line (design doc §9, creator tooling).
 - `src/package.rs`: Turns imports into runtime packages and summarises avatars for `civbb inspect`.
-- `tests/cli.rs`: `civbb` end to end: keygen, build, validate and inspect on a corpus avatar, plus tamper and wrong-key rejection.
+- `src/prune.rs`: Compiler stage 3 pruning: skin joints no vertex uses, nodes nothing references and blendshapes nothing drives,
+- `tests/cli.rs`: `civbb` end to end: keygen, build (pruning, ADR 0026), validate and inspect on a corpus avatar, plus tamper and
 - `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
+- `tests/prune.rs`: Pruning (ADR 0026): unused skin joints, unreferenced nodes and undriven blendshapes go; everything referenced,
 
 ## `crates/render` (civbb-render)
 
@@ -183,6 +185,7 @@ Internal deps: none
 - `docs/adr/0023-gpu-driven-forward-pass.md`: 0023: GPU-driven forward pass: shared buffers with vertex pulling, bindless textures, runs of indirect draws
 - `docs/adr/0024-desktop-viewer.md`: 0024: The desktop viewer loads verified packages, steps then draws each frame, and reports timing in its title
 - `docs/adr/0025-animated-material-properties.md`: 0025: Material curves bind per renderer to native fields; animated renderers get per-island material records
+- `docs/adr/0026-pruning-joints-nodes-and-shapes.md`: 0026: The compiler prunes unweighted joints, unreferenced nodes and undriven blendshapes
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

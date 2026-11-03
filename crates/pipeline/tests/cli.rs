@@ -1,4 +1,5 @@
-//! `civbb` end to end: keygen, build, validate and inspect on a corpus avatar, plus tamper and wrong-key rejection.
+//! `civbb` end to end: keygen, build (pruning, ADR 0026), validate and inspect on a corpus avatar, plus tamper and
+//! wrong-key rejection.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -34,14 +35,32 @@ fn build_validate_inspect() {
         !civbb(&dir, &["keygen", "dev.key"]).status.success(),
         "keygen overwrote a key"
     );
-    stdout(&civbb(&dir, &["build", "lean.glb", "--key", "dev.key"]));
+    // The GLB carries no animator or face, so nothing drives the lean avatar's 15 visemes.
+    let built = stdout(&civbb(&dir, &["build", "lean.glb", "--key", "dev.key"]));
+    assert!(
+        built.starts_with("pruned 0 nodes, 0 skin joints, 15 blendshapes"),
+        "{built}"
+    );
     assert!(stdout(&civbb(&dir, &["validate", "lean.civpkg", "--key", "dev.key"])).starts_with("ok"));
 
     let from_source = stdout(&civbb(&dir, &["inspect", "lean.glb"]));
     let from_package = stdout(&civbb(&dir, &["inspect", "lean.civpkg", "--key", "dev.key"]));
     assert!(from_source.contains("name        lean"), "{from_source}");
     assert!(from_package.contains("compiler    civbb-pipeline"), "{from_package}");
-    assert!(from_package.ends_with(&from_source), "package and source disagree");
+    let without_shapes = |s: &str| {
+        s.lines().filter(|l| !l.starts_with("shapes")).collect::<Vec<_>>().join(
+            "
+",
+        )
+    };
+    assert!(
+        without_shapes(&from_package).ends_with(&without_shapes(&from_source)),
+        "package and source disagree"
+    );
+    assert!(
+        from_package.contains("shapes      0 blend shapes, 0 deltas"),
+        "{from_package}"
+    );
 
     stdout(&civbb(&dir, &["keygen", "other.key"]));
     assert!(
