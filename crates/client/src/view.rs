@@ -32,8 +32,8 @@ const MAX_TEXTURE_SIDE: u32 = 8192;
 pub struct Config {
     /// The avatar, validated.
     pub avatar: Avatar,
-    /// Its texture images, decoded to RGBA8 by [`decode_textures`]: width, height, texels.
-    pub textures: Vec<Option<(u32, u32, Vec<u8>)>>,
+    /// Its texture images, decoded by [`decode_textures`].
+    pub textures: Vec<Option<TextureImage>>,
     /// Copies in the grid.
     pub copies: u32,
     /// Exit after this many presented frames (for automated runs); `None` runs until the window closes.
@@ -59,22 +59,45 @@ pub struct Summary {
     pub skinned: usize,
 }
 
-/// Decodes the avatar's PNG and JPEG texture blobs with bounded sizes; `blob` returns a blob's bytes. Textures that
-/// are missing, KTX2 (not decoded yet), too large or broken are `None` and draw untextured.
+/// A decoded texture image.
+pub struct TextureImage {
+    /// Width in texels.
+    pub width: u32,
+    /// Height in texels.
+    pub height: u32,
+    /// Its texels.
+    pub texels: Texels,
+}
+
+/// Texels as the renderer uploads them.
+pub enum Texels {
+    /// RGBA8; mips are made on upload.
+    Rgba8(Vec<u8>),
+    /// BC7 blocks of every mip level, full size first (ADR 0029).
+    Bc7(Vec<Vec<u8>>),
+}
+
+/// Decodes the avatar's texture blobs with bounded sizes: PNG and JPEG to RGBA8, KTX2 transcoded to BC7; `blob`
+/// returns a blob's bytes. Textures that are missing, too large or broken are `None` and draw untextured.
 pub fn decode_textures<'b>(
     avatar: &Avatar,
     blob: impl Fn(civbb_format::BlobId) -> Option<&'b [u8]>,
-) -> Vec<Option<(u32, u32, Vec<u8>)>> {
+) -> Vec<Option<TextureImage>> {
     avatar
         .textures
         .iter()
         .map(|t| {
+            let bytes = blob(t.blob)?;
             let format = match t.format {
                 ImageFormat::Png => image::ImageFormat::Png,
                 ImageFormat::Jpeg => image::ImageFormat::Jpeg,
-                ImageFormat::Ktx2 => return None,
+                ImageFormat::Ktx2 => {
+                    return transcode_ktx2(bytes)
+                        .map_err(|e| eprintln!("civbb-client: texture {:?} left out: {e}", t.name))
+                        .ok();
+                }
             };
-            let mut reader = image::ImageReader::with_format(Cursor::new(blob(t.blob)?), format);
+            let mut reader = image::ImageReader::with_format(Cursor::new(bytes), format);
             let mut limits = image::Limits::default();
             limits.max_image_width = Some(MAX_TEXTURE_SIDE);
             limits.max_image_height = Some(MAX_TEXTURE_SIDE);
@@ -82,7 +105,11 @@ pub fn decode_textures<'b>(
             match reader.decode() {
                 Ok(image) => {
                     let rgba = image.into_rgba8();
-                    Some((rgba.width(), rgba.height(), rgba.into_raw()))
+                    Some(TextureImage {
+                        width: rgba.width(),
+                        height: rgba.height(),
+                        texels: Texels::Rgba8(rgba.into_raw()),
+                    })
                 }
                 Err(e) => {
                     eprintln!("civbb-client: texture {:?} left out: {e}", t.name);
@@ -91,6 +118,71 @@ pub fn decode_textures<'b>(
             }
         })
         .collect()
+}
+
+/// Transcodes a Basis Universal KTX2 texture to BC7, every mip level (ADR 0029). Untrusted input: the container
+/// is checked to be a single 2D image of bounded size with a full or partial mip chain before any level is
+/// transcoded, and each level's size against its blocks after.
+pub fn transcode_ktx2(bytes: &[u8]) -> Result<TextureImage, String> {
+    const MAGIC: &[u8] = b"\xabKTX 20\xbb\r\n\x1a\n";
+    if !bytes.starts_with(MAGIC) {
+        return Err("not KTX2".into());
+    }
+    // The level index first: `basisu` allocates a Zstandard level's stated uncompressed length unchecked.
+    let u32_at = |at: usize| {
+        bytes
+            .get(at..at + 4)
+            .map(|b| u32::from_le_bytes(b.try_into().expect("4 bytes")))
+    };
+    let u64_at = |at: usize| {
+        bytes
+            .get(at..at + 8)
+            .map(|b| u64::from_le_bytes(b.try_into().expect("8 bytes")))
+    };
+    let header = |at| u32_at(at).ok_or("truncated header");
+    let (width, height, level_count) = (header(20)?, header(24)?, header(40)?);
+    let side = 1..=MAX_TEXTURE_SIDE;
+    if !side.contains(&width) || !side.contains(&height) {
+        return Err(format!("size {width}x{height}"));
+    }
+    let most = 32 - width.max(height).leading_zeros();
+    if !(1..=most).contains(&level_count) {
+        return Err(format!("{level_count} levels"));
+    }
+    for level in 0..level_count {
+        let at = 80 + 24 * level as usize;
+        let (Some(offset), Some(length), Some(uncompressed)) = (u64_at(at), u64_at(at + 8), u64_at(at + 16)) else {
+            return Err("truncated level index".into());
+        };
+        let (w, h) = ((width >> level).max(1), (height >> level).max(1));
+        let blocks = u64::from(w.div_ceil(4) * h.div_ceil(4)) * 16;
+        if offset.checked_add(length).is_none_or(|end| end > bytes.len() as u64) || uncompressed > blocks {
+            return Err(format!("level {level} out of bounds"));
+        }
+    }
+    let t = basisu::Transcoder::new(bytes).map_err(|e| format!("{e:?}"))?;
+    if t.base_dimensions() != (width, height) {
+        return Err("inconsistent size".into());
+    }
+    if t.layer_count() > 1 || t.face_count() != 1 || t.is_video() || t.level_count() != level_count {
+        return Err("not a single 2D image with mips".into());
+    }
+    let mut levels = Vec::with_capacity(t.level_count() as usize);
+    for level in 0..t.level_count() {
+        let blocks = t
+            .transcode(level, basisu::TargetFormat::Bc7Rgba, basisu::DecodeFlags::NONE)
+            .map_err(|e| format!("level {level}: {e:?}"))?;
+        let (w, h) = ((width >> level).max(1), (height >> level).max(1));
+        if blocks.len() as u64 != u64::from(w.div_ceil(4) * h.div_ceil(4)) * 16 {
+            return Err(format!("level {level}: {} bytes", blocks.len()));
+        }
+        levels.push(blocks);
+    }
+    Ok(TextureImage {
+        width,
+        height,
+        texels: Texels::Bc7(levels),
+    })
 }
 
 /// Opens the window and runs until it closes or the frame limit is reached.
@@ -222,7 +314,7 @@ impl Gpu {
         renderer: &Renderer,
         avatar: &Avatar,
         model: &Model,
-        textures: &[Option<(u32, u32, Vec<u8>)>],
+        textures: &[Option<TextureImage>],
         copies: u32,
     ) -> civbb_render::Result<Self> {
         let ctx = renderer.context();
@@ -233,7 +325,13 @@ impl Gpu {
         let mut bindless = Vec::with_capacity(textures.len());
         for (t, decoded) in avatar.textures.iter().zip(textures) {
             bindless.push(match decoded {
-                Some((w, h, rgba)) => scene.add_texture(ctx, *w, *h, rgba, t.color_space == ColorSpace::Srgb)?,
+                Some(image) => {
+                    let srgb = t.color_space == ColorSpace::Srgb;
+                    match &image.texels {
+                        Texels::Rgba8(rgba) => scene.add_texture(ctx, image.width, image.height, rgba, srgb)?,
+                        Texels::Bc7(levels) => scene.add_bc7_texture(ctx, image.width, image.height, levels, srgb)?,
+                    }
+                }
                 None => civbb_render::material::NONE,
             });
         }
@@ -341,7 +439,7 @@ struct Viewer {
     renderer: Option<Renderer>,
     window: Option<winit::window::Window>,
     avatar: Avatar,
-    textures: Vec<Option<(u32, u32, Vec<u8>)>>,
+    textures: Vec<Option<TextureImage>>,
     model: Arc<Model>,
     islands: Vec<Island>,
     copies: u32,

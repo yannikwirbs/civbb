@@ -1,7 +1,7 @@
 # civbb-fuzz
 
 cargo-fuzz targets for the parsers of untrusted input (design doc §16): `package_decode`, `avatar_validate`,
-`gltf_import` (which also covers VRM). Kept out of the main workspace because it needs nightly and libFuzzer.
+`gltf_import` (which also covers VRM), `ktx2_transcode` (the client's KTX2 to BC7 transcoding). Kept out of the main workspace because it needs nightly and libFuzzer.
 
 CI (`.github/workflows/fuzz.yml`) runs each target for a minute on every push to `main` and for longer every night.
 Locally (Linux or macOS; Windows needs MSVC ASan):

@@ -18,6 +18,7 @@ it.
   with `civbb build`) or a corpus avatar in a grid, animator and dynamics running, skinned and drawn by
   `civbb-render`. Drag to orbit, scroll to zoom. The title shows CPU time per frame (without waiting for vsync and
   the GPU), the avatar systems' share and GPU time; `--frames` exits after F frames, prints those numbers and fails
-  on validation errors. PNG and JPEG textures are decoded with `image`; KTX2 comes with #31.
+  on validation errors. PNG and JPEG textures are decoded with `image`; KTX2 is checked, then transcoded to BC7 by the pure-Rust
+  `basisu` crate (ADR 0029).
 
 Decisions are in ADRs 0020 and 0024.

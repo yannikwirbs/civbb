@@ -102,6 +102,7 @@ Content compiler: imports glTF/VRM sources into the format model and builds runt
 Internal deps: civbb-anim, civbb-format
 
 - `src/accessor.rs`: Bounded glTF accessor reading: every offset, stride, count and sparse index is checked before use.
+- `src/atlas.rs`: Compiler stage 4 texture atlasing: textures of one material model share an atlas, so materials that differ only
 - `src/collapse.rs`: Compiler stage 5 toggle collapsing: layers that only switch between two constant clips on one bool collapse
 - `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`, `VRMC_node_constraint`) to native
 - `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
@@ -110,11 +111,13 @@ Internal deps: civbb-anim, civbb-format
 - `src/merge.rs`: Compiler stage 3 mesh merging: meshes that are always visible together become one skinned mesh, and submeshes
 - `src/package.rs`: Turns imports into runtime packages and summarises avatars for `civbb inspect`.
 - `src/prune.rs`: Compiler stage 3 pruning: skin joints no vertex uses, nodes nothing references and blendshapes nothing drives,
-- `tests/cli.rs`: `civbb` end to end: keygen, build (pruning and merging, ADRs 0026 and 0027), validate and inspect on a corpus avatar, plus tamper and
+- `src/texture.rs`: Compiler stage 4 texture compression: images capped per platform and encoded to KTX2 with Basis Universal, UASTC
+- `tests/cli.rs`: `civbb` end to end: keygen, build (pruning, atlasing, merging, compression; ADRs 0026, 0027, 0029), validate and inspect on a corpus avatar, plus tamper and
 - `tests/collapse.rs`: Toggle collapsing (ADR 0028): the corpus avatars' toggle layers become one direct blend tree layer, layers that
 - `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
 - `tests/merge.rs`: Mesh merging (ADR 0027): meshes always visible together merge and same-material submeshes join, everything
 - `tests/prune.rs`: Pruning (ADR 0026): unused skin joints, unreferenced nodes and undriven blendshapes go; everything referenced,
+- `tests/texture.rs`: Texture atlasing and KTX2 compression (ADR 0029): every vertex samples the same texel through the atlas as
 
 ## `crates/render` (civbb-render)
 
@@ -192,6 +195,7 @@ Internal deps: none
 - `docs/adr/0026-pruning-joints-nodes-and-shapes.md`: 0026: The compiler prunes unweighted joints, unreferenced nodes and undriven blendshapes
 - `docs/adr/0027-merging-meshes-that-show-together.md`: 0027: The compiler merges meshes that show together and joins submeshes that share a material
 - `docs/adr/0028-collapsing-toggle-layers.md`: 0028: Toggle layers collapse into one direct blend tree layer per group
+- `docs/adr/0029-texture-atlasing-and-ktx2.md`: 0029: Textures are atlased per material model and shipped as KTX2, encoded by basisu and transcoded in Rust
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

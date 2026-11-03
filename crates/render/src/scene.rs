@@ -225,6 +225,23 @@ impl Scene {
         self.textures.add(ctx, width, height, rgba, srgb)
     }
 
+    /// Uploads a BC7 texture with all its mips, full size first, and returns its bindless index (ADR 0029).
+    ///
+    /// # Panics
+    ///
+    /// If a level's size does not match its blocks, the level count is 0 or too many, a side is 0 or over 16384, or
+    /// the array is full.
+    pub fn add_bc7_texture(
+        &mut self,
+        ctx: &Context,
+        width: u32,
+        height: u32,
+        levels: &[Vec<u8>],
+        srgb: bool,
+    ) -> Result<u32> {
+        self.textures.add_bc7(ctx, width, height, levels, srgb)
+    }
+
     /// Uploads a material; `textures` maps its texture indices to bindless indices from [`Scene::add_texture`].
     pub fn add_material(&mut self, ctx: &Context, material: &Material, textures: &[u32]) -> Result<MaterialId> {
         let index = bump(&mut self.used.materials, self.capacity.materials, 1, "materials")?;

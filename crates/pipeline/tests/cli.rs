@@ -1,4 +1,4 @@
-//! `civbb` end to end: keygen, build (pruning and merging, ADRs 0026 and 0027), validate and inspect on a corpus avatar, plus tamper and
+//! `civbb` end to end: keygen, build (pruning, atlasing, merging, compression; ADRs 0026, 0027, 0029), validate and inspect on a corpus avatar, plus tamper and
 //! wrong-key rejection.
 
 use std::path::{Path, PathBuf};
@@ -36,10 +36,13 @@ fn build_validate_inspect() {
         "keygen overwrote a key"
     );
     // The GLB carries no animator or face, so nothing drives the lean avatar's 15 visemes or toggles its meshes:
-    // all three merge, and the body and prop share a material.
+    // all three merge, and the body and prop share a material. It has no textures to atlas or compress.
     let built = stdout(&civbb(&dir, &["build", "lean.glb", "--key", "dev.key"]));
     assert!(
-        built.starts_with("pruned 0 nodes, 0 skin joints, 15 blendshapes\nmerged 2 meshes, 1 submeshes"),
+        built.starts_with(
+            "pruned 0 nodes, 0 skin joints, 15 blendshapes\natlased 0 atlases, 0 fewer textures, 0 fewer materials\n\
+             merged 2 meshes, 1 submeshes\ncollapsed 0 toggle layers\ncompressed 0 textures"
+        ),
         "{built}"
     );
     assert!(stdout(&civbb(&dir, &["validate", "lean.civpkg", "--key", "dev.key"])).starts_with("ok"));

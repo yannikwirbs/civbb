@@ -153,7 +153,7 @@ fn run_view(args: &[String]) -> ExitCode {
 
 /// Reads, verifies and validates a package, and decodes its textures.
 #[allow(clippy::type_complexity)]
-fn load_package(path: &Path, key: &Path) -> Result<(civbb_format::Avatar, Vec<Option<(u32, u32, Vec<u8>)>>), String> {
+fn load_package(path: &Path, key: &Path) -> Result<(civbb_format::Avatar, Vec<Option<view::TextureImage>>), String> {
     let seed: [u8; 32] = std::fs::read(key)
         .map_err(|e| format!("{}: {e}", key.display()))?
         .try_into()

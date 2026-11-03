@@ -31,7 +31,7 @@ pub struct Candidate {
     /// The highest Vulkan version the device supports.
     pub api_version: u32,
     /// Whether it has the features the renderer needs (dynamic rendering, synchronization2, buffer device address,
-    /// descriptor indexing, multi-draw indirect; ADRs 0021 to 0023).
+    /// descriptor indexing, multi-draw indirect, BC textures; ADRs 0021 to 0023, 0029).
     pub features: bool,
     /// A queue family with graphics and compute (and present, when there is a surface), if any.
     pub queue_family: Option<u32>,
@@ -125,7 +125,8 @@ impl Context {
         let features = vk::PhysicalDeviceFeatures::default()
             .multi_draw_indirect(true)
             .draw_indirect_first_instance(true)
-            .sampler_anisotropy(true);
+            .sampler_anisotropy(true)
+            .texture_compression_bc(true);
         let mut features12 = vk::PhysicalDeviceVulkan12Features::default()
             .buffer_device_address(true)
             .descriptor_indexing(true)
@@ -318,6 +319,7 @@ fn select(
                 f.multi_draw_indirect,
                 f.draw_indirect_first_instance,
                 f.sampler_anisotropy,
+                f.texture_compression_bc,
                 f12.buffer_device_address,
                 f12.descriptor_indexing,
                 f12.runtime_descriptor_array,

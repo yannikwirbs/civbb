@@ -29,5 +29,10 @@ fn main() {
     let imported = import(&glb, &Limits::default(), |_| None).expect("lean imports");
     let signed = package(imported, Platform::Desktop).encode_signed(&SigningKey::from_bytes(&[7; 32]));
     write("package_decode", "lean.civpkg", &signed);
+    let image = image::RgbaImage::from_fn(16, 8, |x, y| image::Rgba([x as u8 * 16, y as u8 * 32, 128, 255]));
+    for (name, uastc) in [("etc1s.ktx2", false), ("uastc.ktx2", true)] {
+        let ktx2 = civbb_pipeline::texture::encode_ktx2(&image, true, uastc).expect("encodes");
+        write("ktx2_transcode", name, &ktx2);
+    }
     println!("seeds written to {}", dir.display());
 }

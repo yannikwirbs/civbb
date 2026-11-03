@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [package_decode, avatar_validate, gltf_import]
+        target: [package_decode, avatar_validate, gltf_import, ktx2_transcode]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly

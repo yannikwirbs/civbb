@@ -1,5 +1,5 @@
 //! Bindless textures: one descriptor array of sampled images that every draw indexes by number, filled as
-//! textures load, with mips generated on upload (design doc §6, ADR 0023).
+//! textures load: RGBA8 with mips generated on upload, or BC7 with its own mips (design doc §6, ADRs 0023, 0029).
 
 use ash::vk;
 
@@ -119,22 +119,75 @@ impl Textures {
     ///
     /// If `rgba` is not `width * height * 4` bytes, a side is 0 or over 16384, or the array is full.
     pub(crate) fn add(&mut self, ctx: &Context, width: u32, height: u32, rgba: &[u8], srgb: bool) -> Result<u32> {
-        assert!(
-            (1..=16384).contains(&width) && (1..=16384).contains(&height),
-            "texture size {width}x{height}"
-        );
         assert_eq!(
             rgba.len() as u64,
             u64::from(width) * u64::from(height) * 4,
             "RGBA8 texel count"
         );
-        assert!((self.images.len() as u32) < MAX_TEXTURES, "bindless texture array full");
         let levels = 32 - width.max(height).leading_zeros();
         let format = if srgb {
             vk::Format::R8G8B8A8_SRGB
         } else {
             vk::Format::R8G8B8A8_UNORM
         };
+        let image = self.create(ctx, width, height, levels, format, vk::ImageUsageFlags::TRANSFER_SRC)?;
+        let uploaded = upload_with_mips(ctx, &image, width, height, levels, rgba);
+        self.insert(ctx, image, uploaded)
+    }
+
+    /// Uploads a BC7 image with all its mips, `levels[0]` the full size (ADR 0029), and returns its index in the
+    /// array.
+    ///
+    /// # Panics
+    ///
+    /// If a level is not the size of its 4x4 blocks at 16 bytes each, there are no levels or more than the image
+    /// can have, a side is 0 or over 16384, or the array is full.
+    pub(crate) fn add_bc7(
+        &mut self,
+        ctx: &Context,
+        width: u32,
+        height: u32,
+        levels: &[Vec<u8>],
+        srgb: bool,
+    ) -> Result<u32> {
+        let count = levels.len() as u32;
+        assert!(
+            (1..=32 - width.max(height).leading_zeros()).contains(&count),
+            "{count} BC7 levels"
+        );
+        for (i, level) in levels.iter().enumerate() {
+            let (w, h) = ((width >> i).max(1), (height >> i).max(1));
+            assert_eq!(
+                level.len() as u64,
+                u64::from(w.div_ceil(4) * h.div_ceil(4)) * 16,
+                "BC7 level {i} size"
+            );
+        }
+        let format = if srgb {
+            vk::Format::BC7_SRGB_BLOCK
+        } else {
+            vk::Format::BC7_UNORM_BLOCK
+        };
+        let image = self.create(ctx, width, height, count, format, vk::ImageUsageFlags::empty())?;
+        let uploaded = upload_levels(ctx, &image, width, height, levels);
+        self.insert(ctx, image, uploaded)
+    }
+
+    /// Creates a sampled 2D image that transfers can write.
+    fn create(
+        &self,
+        ctx: &Context,
+        width: u32,
+        height: u32,
+        levels: u32,
+        format: vk::Format,
+        usage: vk::ImageUsageFlags,
+    ) -> Result<Image> {
+        assert!(
+            (1..=16384).contains(&width) && (1..=16384).contains(&height),
+            "texture size {width}x{height}"
+        );
+        assert!((self.images.len() as u32) < MAX_TEXTURES, "bindless texture array full");
         let info = vk::ImageCreateInfo::default()
             .image_type(vk::ImageType::TYPE_2D)
             .format(format)
@@ -146,11 +199,12 @@ impl Textures {
             .mip_levels(levels)
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
-            .usage(
-                vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
-            );
-        let image = ctx.create_image("texture", &info, vk::ImageAspectFlags::COLOR)?;
-        let uploaded = upload_with_mips(ctx, &image, width, height, levels, rgba);
+            .usage(vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST | usage);
+        ctx.create_image("texture", &info, vk::ImageAspectFlags::COLOR)
+    }
+
+    /// Puts an uploaded image into the array, or destroys it if `uploaded` failed.
+    fn insert(&mut self, ctx: &Context, image: Image, uploaded: Result<()>) -> Result<u32> {
         if let Err(e) = uploaded {
             // SAFETY: the upload waited for the GPU or never submitted.
             unsafe { ctx.destroy_image(image) };
@@ -283,6 +337,76 @@ fn upload_with_mips(ctx: &Context, image: &Image, width: u32, height: u32, level
                 done.push(barrier(0, last, source, read));
             }
             d.cmd_pipeline_barrier2(cmd, &dep(&done));
+        }
+    });
+    // SAFETY: `one_shot` waited for the copy, or never submitted it.
+    unsafe { ctx.destroy_buffer(staging) };
+    result
+}
+
+/// Copies every mip level from one staging buffer and leaves them ready for fragment shaders.
+fn upload_levels(ctx: &Context, image: &Image, width: u32, height: u32, levels: &[Vec<u8>]) -> Result<()> {
+    let total: usize = levels.iter().map(Vec::len).sum();
+    let mut staging = ctx.create_buffer(
+        "texture staging",
+        total as u64,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        MemoryLocation::CpuToGpu,
+    )?;
+    let mapped = staging.mapped_mut().expect("CpuToGpu memory is mapped");
+    let mut regions = Vec::with_capacity(levels.len());
+    let mut offset = 0;
+    for (i, level) in levels.iter().enumerate() {
+        mapped[offset..offset + level.len()].copy_from_slice(level);
+        regions.push(
+            vk::BufferImageCopy::default()
+                .buffer_offset(offset as u64)
+                .image_subresource(vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: i as u32,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .image_extent(vk::Extent3D {
+                    width: (width >> i).max(1),
+                    height: (height >> i).max(1),
+                    depth: 1,
+                }),
+        );
+        offset += level.len();
+    }
+    use vk::AccessFlags2 as A;
+    use vk::ImageLayout as L;
+    use vk::PipelineStageFlags2 as S;
+    let result = ctx.one_shot(|d, cmd| {
+        let barrier = |(src_stage, src_access, old), (dst_stage, dst_access, new)| {
+            vk::ImageMemoryBarrier2::default()
+                .src_stage_mask(src_stage)
+                .src_access_mask(src_access)
+                .dst_stage_mask(dst_stage)
+                .dst_access_mask(dst_access)
+                .old_layout(old)
+                .new_layout(new)
+                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .image(image.handle)
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: levels.len() as u32,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+        };
+        let written = (S::ALL_TRANSFER, A::TRANSFER_WRITE, L::TRANSFER_DST_OPTIMAL);
+        let read = (S::FRAGMENT_SHADER, A::SHADER_SAMPLED_READ, L::SHADER_READ_ONLY_OPTIMAL);
+        // SAFETY: the image and staging buffer are alive and sized for these commands.
+        unsafe {
+            let to_write = [barrier((S::NONE, A::NONE, L::UNDEFINED), written)];
+            d.cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().image_memory_barriers(&to_write));
+            d.cmd_copy_buffer_to_image(cmd, staging.handle, image.handle, L::TRANSFER_DST_OPTIMAL, &regions);
+            let to_read = [barrier(written, read)];
+            d.cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().image_memory_barriers(&to_read));
         }
     });
     // SAFETY: `one_shot` waited for the copy, or never submitted it.
