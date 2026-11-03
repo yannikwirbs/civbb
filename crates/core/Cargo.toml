@@ -1,0 +1,14 @@
+[package]
+name = "civbb-core"
+description = "Engine core: math, the job runner for per-avatar islands and per-system timing counters."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+civbb-format.workspace = true
+rayon = "1"
+
+[lints]
+workspace = true

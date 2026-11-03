@@ -2,7 +2,6 @@
 //! 0017).
 
 pub mod contact;
-pub mod math;
 pub mod rig;
 pub mod solver;
 

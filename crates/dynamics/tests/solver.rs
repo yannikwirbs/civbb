@@ -1,7 +1,7 @@
 //! Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness, limits,
 //! colliders, immobile, frame-rate independence, multi-child roots, grab, pose and the reported parameters.
 
-use civbb_dynamics::math::{Pose, length, normalize, sub};
+use civbb_core::math::{Pose, length, normalize, sub};
 use civbb_dynamics::rig::eval;
 use civbb_dynamics::{Rig, State};
 use civbb_format::Avatar;

@@ -1,0 +1,19 @@
+[package]
+name = "civbb-client"
+description = "Client: wires the avatar systems into per-avatar islands and frames; a headless benchmark in Phase 0."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+civbb-anim.workspace = true
+civbb-core.workspace = true
+civbb-dynamics.workspace = true
+civbb-format.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+civbb-corpus.workspace = true

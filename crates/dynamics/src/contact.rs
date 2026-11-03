@@ -7,7 +7,7 @@ use civbb_format::dynamics::{ContactVolume, ReceiverKind, Shape};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Vec3};
 
-use crate::math::{Pose, add, dot, length, mul, rotate, scale, sub};
+use civbb_core::math::{Pose, add, dot, length, mul, rotate, scale, sub};
 
 /// Largest radius after scaling, metres.
 pub const MAX_RADIUS: f32 = 3.0;

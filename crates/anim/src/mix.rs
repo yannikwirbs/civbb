@@ -4,10 +4,10 @@ use civbb_format::animator::{LayerBlending, State};
 use civbb_format::math::Quat;
 
 use crate::bind::Slot;
-use crate::clip::normalize;
 use crate::controller::Controller;
 use crate::machine::{From, LayerRun, Playing};
 use crate::motion::{self, Leaf};
+use civbb_core::math::{conj, mul, qnormalize};
 
 const IDENTITY: Quat = [0.0, 0.0, 0.0, 1.0];
 
@@ -130,7 +130,7 @@ impl Mixer {
                         d[k] + self.acc[s + k] + keep * (input[k] - d[k])
                     }
                 });
-                self.val[s..s + 4].copy_from_slice(&normalize(q));
+                self.val[s..s + 4].copy_from_slice(&qnormalize(q));
                 i += 4;
             } else {
                 self.val[s] = if additive {
@@ -209,12 +209,12 @@ impl Mixer {
             if rot {
                 let cur = quat(pose, su);
                 let q = if additive {
-                    let d = normalize(lerp(IDENTITY, quat(&self.val, su), weight));
+                    let d = qnormalize(lerp(IDENTITY, quat(&self.val, su), weight));
                     mul(cur, d)
                 } else {
                     lerp(cur, align(quat(&self.val, su), cur), weight)
                 };
-                pose[su..su + 4].copy_from_slice(&normalize(q));
+                pose[su..su + 4].copy_from_slice(&qnormalize(q));
             } else if additive {
                 pose[su] += weight * self.val[su];
             } else {
@@ -250,19 +250,4 @@ fn align(q: Quat, reference: Quat) -> Quat {
 
 fn lerp(a: Quat, b: Quat, t: f32) -> Quat {
     std::array::from_fn(|k| a[k] + t * (b[k] - a[k]))
-}
-
-pub(crate) fn conj(q: Quat) -> Quat {
-    [-q[0], -q[1], -q[2], q[3]]
-}
-
-pub(crate) fn mul(a: Quat, b: Quat) -> Quat {
-    let [ax, ay, az, aw] = a;
-    let [bx, by, bz, bw] = b;
-    [
-        aw * bx + ax * bw + ay * bz - az * by,
-        aw * by - ax * bz + ay * bw + az * bx,
-        aw * bz + ax * by - ay * bx + az * bw,
-        aw * bw - ax * bx - ay * by - az * bz,
-    ]
 }

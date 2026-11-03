@@ -7,7 +7,9 @@ use civbb_format::animator::{ClipIndex, Curve, Key, ParamIndex, ParamKind, Prope
 use civbb_format::hierarchy::{Hierarchy, NodeIndex};
 use civbb_format::mesh::MeshIndex;
 
-use crate::clip::{BoundClip, BoundCurve, EulerCurves, quat_to_euler};
+use civbb_core::math::quat_to_euler;
+
+use crate::clip::{BoundClip, BoundCurve, EulerCurves};
 use crate::muscle::{self, MUSCLES, Rig};
 
 /// Index into the slot buffer.

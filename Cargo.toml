@@ -19,6 +19,9 @@ unsafe_op_in_unsafe_fn = "deny"
 all = { level = "warn", priority = -1 }
 
 [workspace.dependencies]
+civbb-anim = { path = "crates/anim" }
+civbb-core = { path = "crates/core" }
+civbb-dynamics = { path = "crates/dynamics" }
 civbb-format = { path = "crates/format" }
 civbb-corpus = { path = "tools/corpus" }
 

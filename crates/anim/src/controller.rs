@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use civbb_format::Avatar;
 use civbb_format::animator::{Animator, Behaviour, BodyPart, ParamIndex, TrackingMode};
 use civbb_format::hierarchy::NodeIndex;
-use civbb_format::math::Quat;
+use civbb_format::math::{Quat, Transform};
 
 use crate::behaviour::{Builtin, Rng, Tracking, coerce, drive, part_index};
 use crate::bind::{Bound, Target, bind, node_paths};
@@ -186,6 +186,25 @@ impl Instance {
             }
         }
         if any { rig.rotations(&muscles) } else { Vec::new() }
+    }
+
+    /// Writes the pose's node targets into `locals` (every node's local transform) and `active` (every node's own
+    /// active flag; a value of 0.5 or more is active), then the [`Instance::human_pose`] rotations over them. Nodes
+    /// and components no slot targets keep what they hold.
+    pub fn write_nodes(&self, c: &Controller, locals: &mut [Transform], active: &mut [bool]) {
+        for (s, t) in c.bound.bindings.targets.iter().enumerate() {
+            let v = self.pose[s];
+            match *t {
+                Target::Position(n, k) => locals[n as usize].translation[k as usize] = v,
+                Target::Rotation(n, k) => locals[n as usize].rotation[k as usize] = v,
+                Target::Scale(n, k) => locals[n as usize].scale[k as usize] = v,
+                Target::Active(n) => active[n as usize] = v >= 0.5,
+                _ => {}
+            }
+        }
+        for (n, q) in self.human_pose(c) {
+            locals[n as usize].rotation = q;
+        }
     }
 
     /// Layer `i`'s state machine; `None` before the first update.

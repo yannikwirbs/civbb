@@ -19,4 +19,4 @@ A short map that stays current. Detailed reasoning lives in `design-doc.md` and 
 
 ## Phase 0 shape
 
-`pipeline` imports glTF/VRM, compiles to `format` types and writes runtime packages. `anim` and `dynamics` are pure step functions over per-avatar data (ADR 0003), run in parallel by `rayon`. `client` in Phase 0 is a desktop viewer with a headless benchmark mode.
+`pipeline` imports glTF/VRM, compiles to `format` types and writes runtime packages. `anim` and `dynamics` are pure step functions over per-avatar data (ADR 0003); `client` wires them into one island per avatar, run in parallel by `core::jobs` (rayon) with per-system counters (ADR 0020). `client` in Phase 0 is a desktop viewer with a headless benchmark mode.

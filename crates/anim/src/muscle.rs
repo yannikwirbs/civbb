@@ -3,8 +3,7 @@
 use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, NodeIndex};
 use civbb_format::math::Quat;
 
-use crate::clip::normalize;
-use crate::mix::{conj, mul};
+use civbb_core::math::{conj, mul, qnormalize};
 
 /// One Unity muscle.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -277,8 +276,8 @@ impl Rig {
 }
 
 /// Twist about X by `a[0]`, then swing about Y and Z, from half-angle tangents as Unity's muscle space does:
-/// `normalize(tx, ty + tx tz, tz - tx ty, 1)` is the swing `(0, ty, tz, 1)` times the twist `(tx, 0, 0, 1)`.
+/// `qnormalize(tx, ty + tx tz, tz - tx ty, 1)` is the swing `(0, ty, tz, 1)` times the twist `(tx, 0, 0, 1)`.
 fn zyroll(a: [f32; 3]) -> Quat {
     let [tx, ty, tz] = a.map(|d| (d.to_radians() * 0.5).tan());
-    normalize([tx, ty + tx * tz, tz - tx * ty, 1.0])
+    qnormalize([tx, ty + tx * tz, tz - tx * ty, 1.0])
 }

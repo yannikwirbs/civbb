@@ -8,8 +8,10 @@ use civbb_format::constraint::{Constraint, ConstraintKind, WorldUp};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform, Vec3};
 
-use crate::clip::{euler_to_quat, normalize, quat_to_euler};
-use crate::mix::{conj, mul};
+use civbb_core::math::{
+    add, conj, cross, dot, euler_to_quat, from_to, mul, nlerp, qnormalize, quat_to_euler, rotate, scale, slerp, sub,
+    unit,
+};
 
 /// An avatar's constraints in evaluation order: every constraint after those that move what it reads.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -315,45 +317,7 @@ fn frame(f: Vec3, u: Vec3) -> Option<Quat> {
         let s = (1.0 + m22 - m00 - m11).sqrt() * 2.0;
         [(m02 + m20) / s, (m12 + m21) / s, 0.25 * s, (m10 - m01) / s]
     };
-    Some(normalize(q))
-}
-
-/// The shortest rotation taking unit `a` to unit `b`.
-fn from_to(a: Vec3, b: Vec3) -> Quat {
-    let d = dot(a, b);
-    if d < -0.999_999 {
-        let side = if a[0].abs() < 0.9 {
-            [1.0, 0.0, 0.0]
-        } else {
-            [0.0, 1.0, 0.0]
-        };
-        let axis = unit(cross(a, side)).unwrap_or([0.0, 0.0, 1.0]);
-        return [axis[0], axis[1], axis[2], 0.0];
-    }
-    let c = cross(a, b);
-    normalize([c[0], c[1], c[2], 1.0 + d])
-}
-
-/// Spherical lerp on the shorter arc.
-fn slerp(a: Quat, b: Quat, t: f32) -> Quat {
-    let d: f32 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
-    let (b, d) = if d < 0.0 { (b.map(|x| -x), -d) } else { (b, d) };
-    if d > 0.9995 {
-        return nlerp(a, b, t);
-    }
-    let angle = d.acos();
-    let (wa, wb) = (((1.0 - t) * angle).sin(), (t * angle).sin());
-    normalize(std::array::from_fn(|k| a[k] * wa + b[k] * wb))
-}
-
-/// Normalised lerp on the shorter arc.
-fn nlerp(a: Quat, b: Quat, t: f32) -> Quat {
-    let b = if a.iter().zip(&b).map(|(x, y)| x * y).sum::<f32>() < 0.0 {
-        b.map(|x| -x)
-    } else {
-        b
-    };
-    normalize(std::array::from_fn(|k| a[k] + (b[k] - a[k]) * t))
+    Some(qnormalize(q))
 }
 
 /// `v` on constrained axes, `cur` on the others.
@@ -369,18 +333,6 @@ fn pick_rotation(axes: [bool; 3], q: Quat, cur: Quat) -> Quat {
     euler_to_quat(pick(axes, quat_to_euler(q), quat_to_euler(cur)))
 }
 
-fn add(a: Vec3, b: Vec3) -> Vec3 {
-    std::array::from_fn(|k| a[k] + b[k])
-}
-
-fn sub(a: Vec3, b: Vec3) -> Vec3 {
-    std::array::from_fn(|k| a[k] - b[k])
-}
-
-fn scale(a: Vec3, s: f32) -> Vec3 {
-    a.map(|x| x * s)
-}
-
 fn mul3(a: Vec3, b: Vec3) -> Vec3 {
     std::array::from_fn(|k| a[k] * b[k])
 }
@@ -392,27 +344,4 @@ fn div3(a: Vec3, b: Vec3, fallback: Vec3) -> Vec3 {
 
 fn lerp(a: Vec3, b: Vec3, t: f32) -> Vec3 {
     std::array::from_fn(|k| a[k] + (b[k] - a[k]) * t)
-}
-
-fn dot(a: Vec3, b: Vec3) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn cross(a: Vec3, b: Vec3) -> Vec3 {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
-
-fn unit(a: Vec3) -> Option<Vec3> {
-    let l = dot(a, a).sqrt();
-    (l > 1e-6 && l.is_finite()).then(|| scale(a, 1.0 / l))
-}
-
-fn rotate(q: Quat, v: Vec3) -> Vec3 {
-    let u = [q[0], q[1], q[2]];
-    let t = scale(cross(u, v), 2.0);
-    add(add(v, scale(t, q[3])), cross(u, t))
 }

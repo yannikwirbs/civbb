@@ -1,7 +1,7 @@
 //! Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order.
 
-use civbb_anim::clip::{euler_to_quat, quat_to_euler};
 use civbb_anim::{Target, bind};
+use civbb_core::math::{euler_to_quat, quat_to_euler};
 use civbb_format::Avatar;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, Node};

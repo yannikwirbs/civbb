@@ -5,7 +5,7 @@ use civbb_format::dynamics::{Chain, Collider, Graded, ImmobileType, Integration,
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Vec3};
 
-use crate::math::euler_to_quat;
+use civbb_core::math::euler_to_quat;
 
 /// Particles per chain at most, as PhysBones limit one component to 256 transforms; deeper nodes are not simulated.
 pub const MAX_PARTICLES: usize = 256;

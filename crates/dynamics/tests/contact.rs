@@ -1,8 +1,8 @@
 //! Contact conformance, hand-derived from ADR 0017: receiver types, tags, self and others, permits, local-only,
 //! capsules, scale and clamps, inactive nodes, OnEnter speed, and the grid against brute force.
 
+use civbb_core::math::{Pose, euler_to_quat};
 use civbb_dynamics::contact::{Participant, segment_distance, step};
-use civbb_dynamics::math::{Pose, euler_to_quat};
 use civbb_dynamics::{ContactRig, ContactState};
 use civbb_format::Avatar;
 use civbb_format::dynamics::*;

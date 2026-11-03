@@ -7,7 +7,7 @@ Each line is a file and the first line of its module doc. Read this instead of w
 
 Animation runtime: compile-time curve binding, clip sampling, Mecanim state machines, blend trees and constraints.
 
-Internal deps: civbb-format
+Internal deps: civbb-core, civbb-format
 
 - `src/behaviour.rs`: Legacy built-in parameters and state behaviours: parameter drivers, tracking, layer and locomotion control.
 - `src/bind.rs`: Compile-time binding: resolves curve paths to slots in one flat buffer with per-slot defaults (ADR 0007).
@@ -29,15 +29,36 @@ Internal deps: civbb-format
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
 - `tests/muscle.rs`: Humanoid muscles (ADR 0014): the table against Unity's, hand-derived muscle space, poses recorded from Unity's
 
+## `crates/client` (civbb-client)
+
+Client: wires the avatar systems into per-avatar islands and frames; a headless benchmark in Phase 0.
+
+Internal deps: civbb-anim, civbb-core, civbb-dynamics, civbb-format
+
+- `src/frame.rs`: One simulation frame's avatar work: every island as its own parallel job, then the cross-avatar contact pass
+- `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
+- `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020).
+- `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
+
+## `crates/core` (civbb-core)
+
+Engine core: math, the job runner for per-avatar islands and per-system timing counters.
+
+Internal deps: civbb-format
+
+- `src/counters.rs`: Per-system timing counters: lightweight, always-on time and run counts for each system of a frame (design doc §5).
+- `src/jobs.rs`: The job runner: one job per avatar island, run in parallel across islands with rayon (ADR 0003, ADR 0020).
+- `src/lib.rs`: Engine core: math, the job runner for per-avatar islands and per-system timing counters (design doc §5, ADR 0020).
+- `src/math.rs`: Vector and quaternion helpers on the format's array types, and world placements of a node hierarchy.
+
 ## `crates/dynamics` (civbb-dynamics)
 
 Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose, and contacts.
 
-Internal deps: civbb-format
+Internal deps: civbb-core, civbb-format
 
 - `src/contact.rs`: Contact senders and receivers: compiled volumes, a grid broadphase across avatars and receiver values (ADR 0017).
 - `src/lib.rs`: Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose, and contacts (design doc §7, ADRs 0015 to
-- `src/math.rs`: Vector and quaternion helpers for the solver; they move to `civbb-core` with #22.
 - `src/rig.rs`: Compiles an avatar's chains into one flat particle list, parents first, with per-particle parameters (ADR 0015).
 - `src/solver.rs`: Steps an avatar's chains against the animated pose (inertia, gravity, pull, stiffness, lengths, immobile, grab and
 - `tests/contact.rs`: Contact conformance, hand-derived from ADR 0017: receiver types, tags, self and others, permits, local-only,
@@ -122,6 +143,7 @@ Internal deps: none
 - `docs/adr/0017-contact-model-and-broadphase.md`: 0017: Contact model and a grid broadphase in `civbb-dynamics`
 - `docs/adr/0018-constraint-model.md`: 0018: Constraints follow Unity's semantics, sorted by dependency at load (format v6)
 - `docs/adr/0019-vrm-node-constraints.md`: 0019: VRM node constraints become rest-relative constraint kinds (format v7)
+- `docs/adr/0020-island-runtime.md`: 0020: The avatar island runtime: `core` runs jobs and counts, `client` wires the systems
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

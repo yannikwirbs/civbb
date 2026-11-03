@@ -1,7 +1,7 @@
 # civbb-anim
 
-The avatar animation runtime (design doc §7 "Animation"). Engine crate: depends only on `civbb-format` (and later
-`civbb-core`).
+The avatar animation runtime (design doc §7 "Animation"). Engine crate: depends only on `civbb-format` and
+`civbb-core` (whose `math` it uses).
 
 - `curve`: evaluates one curve of Hermite keys exactly as Unity's `AnimationCurve` does.
 - `bind`: compile-time binding. Every animated property of an avatar gets a slot in one flat `f32` buffer with its
@@ -17,7 +17,8 @@ The avatar animation runtime (design doc §7 "Animation"). Engine crate: depends
 - `constraint`: position, rotation, scale, parent, aim and look-at constraints, ordered by dependency at load and
   applied in one pass (ADR 0018, verified against Unity recordings).
 - `mix` and `controller`: a `Controller` (compiled, shared) and per-avatar `Instance`s that update parameters,
-  layers and the pose, with Write Defaults on, off and mixed (ADR 0010).
+  layers and the pose, with Write Defaults on, off and mixed (ADR 0010); `Instance::write_nodes` writes the pose
+  into node transforms and activity.
 
 Conformance: `tests/curve.rs` (key semantics), `tests/machine.rs` (state machine), `tests/blend.rs` (weights),
 `tests/behaviour.rs` (built-ins and behaviours), `tests/muscle.rs` and `tests/constraint.rs` (muscle space and

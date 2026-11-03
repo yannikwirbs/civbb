@@ -4,10 +4,10 @@
 use civbb_format::dynamics::{MultiChild, Shape};
 use civbb_format::math::{Transform, Vec3};
 
-use crate::math::{
+use crate::rig::{LimitKind, NO_PARENT, Rig};
+use civbb_core::math::{
     Pose, add, conj, cross, dot, from_to, length, mul, normalize, qnormalize, rotate, scale, sub, world_poses,
 };
-use crate::rig::{LimitKind, NO_PARENT, Rig};
 
 /// The step that per-step parameters (pull, spring) refer to, seconds.
 pub const REFERENCE_STEP: f32 = 1.0 / 60.0;
