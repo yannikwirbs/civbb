@@ -3,8 +3,8 @@
 
 use ash::vk;
 
-use crate::graph::{Graph, ImageId, Use};
-use crate::swapchain::Swapchain;
+use crate::graph::{Graph, ImageId, Transients, Use};
+use crate::swapchain::{Swapchain, choose_format};
 use crate::{Context, Result, Window};
 
 /// Frames the CPU may record ahead of the GPU.
@@ -26,9 +26,10 @@ struct Frame {
     done: vk::Fence,
 }
 
-/// A window's renderer: its context, swapchain and frames in flight.
+/// A window's renderer: its context, swapchain, frames in flight and the graph's transient images.
 pub struct Renderer {
     frames: Vec<Frame>,
+    transients: Transients,
     swapchain: Option<Swapchain>,
     extent: vk::Extent2D,
     stale: bool,
@@ -48,6 +49,7 @@ impl Renderer {
         let ctx = unsafe { Context::new(validation, Some(window))? };
         let mut r = Renderer {
             frames: Vec::new(),
+            transients: Transients::default(),
             swapchain: None,
             extent: vk::Extent2D { width, height },
             stale: true,
@@ -98,6 +100,14 @@ impl Renderer {
         self.stale = true;
     }
 
+    /// The format frames are drawn in: the surface format the swapchain uses (for creating pipelines).
+    pub fn color_format(&self) -> Result<vk::Format> {
+        let (loader, surface) = self.ctx.surface().expect("renderer contexts have a surface");
+        // SAFETY: plain query on handles from the context.
+        let formats = unsafe { loader.get_physical_device_surface_formats(self.ctx.physical(), surface)? };
+        Ok(choose_format(&formats).format)
+    }
+
     /// The swapchain's current size, once it exists.
     pub fn extent(&self) -> Option<vk::Extent2D> {
         self.swapchain.as_ref().map(|s| s.extent)
@@ -119,6 +129,8 @@ impl Renderer {
         // buffer and semaphore are no longer in use before they are reused.
         unsafe {
             device.wait_for_fences(&[frame.done], true, u64::MAX)?;
+            // The fence wait finished the frame before last, the oldest that could use a transient image.
+            self.transients.next_frame(&self.ctx);
             let index = match sc
                 .loader
                 .acquire_next_image(sc.handle, u64::MAX, frame.acquired, vk::Fence::null())
@@ -133,8 +145,6 @@ impl Renderer {
                 }
                 Err(e) => return Err(e.into()),
             };
-            // Only after a successful acquire, so the fence is signalled again by this frame's submit.
-            device.reset_fences(&[frame.done])?;
             device.reset_command_pool(frame.pool, vk::CommandPoolResetFlags::empty())?;
             device.begin_command_buffer(
                 frame.cmd,
@@ -149,7 +159,7 @@ impl Renderer {
                 Use::Present,
             );
             build(&mut graph, target);
-            graph.record(device, frame.cmd);
+            graph.record(&self.ctx, &mut self.transients, frame.cmd)?;
             device.end_command_buffer(frame.cmd)?;
 
             let waits = [vk::SemaphoreSubmitInfo::default()
@@ -163,6 +173,8 @@ impl Renderer {
                 .wait_semaphore_infos(&waits)
                 .command_buffer_infos(&cmds)
                 .signal_semaphore_infos(&signals);
+            // Only right before the submit that signals it again, so an earlier error can't leave it unsignalled.
+            device.reset_fences(&[frame.done])?;
             device.queue_submit2(self.ctx.queue(), &[submit], frame.done)?;
 
             let wait = [sc.rendered[index]];
@@ -212,6 +224,7 @@ impl Drop for Renderer {
             if let Some(mut sc) = self.swapchain.take() {
                 sc.destroy(device);
             }
+            self.transients.destroy(&self.ctx);
             for f in self.frames.drain(..) {
                 device.destroy_fence(f.done, None);
                 device.destroy_semaphore(f.acquired, None);

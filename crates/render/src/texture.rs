@@ -1,0 +1,291 @@
+//! Bindless textures: one descriptor array of sampled images that every draw indexes by number, filled as
+//! textures load, with mips generated on upload (design doc §6, ADR 0023).
+
+use ash::vk;
+
+use crate::memory::Image;
+use crate::{Context, MemoryLocation, Result};
+
+/// Size of the descriptor array: textures the scene can hold at once.
+pub const MAX_TEXTURES: u32 = 4096;
+
+/// The bindless texture array: its set layout, the one set, a shared sampler and the images in it.
+pub struct Textures {
+    layout: vk::DescriptorSetLayout,
+    pool: vk::DescriptorPool,
+    set: vk::DescriptorSet,
+    sampler: vk::Sampler,
+    images: Vec<Image>,
+}
+
+impl Textures {
+    /// Creates the empty array.
+    pub(crate) fn new(ctx: &Context) -> Result<Self> {
+        let d = ctx.device();
+        let mut t = Textures {
+            layout: vk::DescriptorSetLayout::null(),
+            pool: vk::DescriptorPool::null(),
+            set: vk::DescriptorSet::null(),
+            sampler: vk::Sampler::null(),
+            images: Vec::new(),
+        };
+        // SAFETY: valid create infos; on failure the caller drops the partly built value after `destroy`.
+        let built = unsafe {
+            (|| -> Result<()> {
+                let bindings = [vk::DescriptorSetLayoutBinding::default()
+                    .binding(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .descriptor_count(MAX_TEXTURES)
+                    .stage_flags(vk::ShaderStageFlags::FRAGMENT)];
+                let flags = [vk::DescriptorBindingFlags::PARTIALLY_BOUND
+                    | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND
+                    | vk::DescriptorBindingFlags::UPDATE_UNUSED_WHILE_PENDING];
+                let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfo::default().binding_flags(&flags);
+                t.layout = d.create_descriptor_set_layout(
+                    &vk::DescriptorSetLayoutCreateInfo::default()
+                        .flags(vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL)
+                        .bindings(&bindings)
+                        .push_next(&mut binding_flags),
+                    None,
+                )?;
+                let sizes = [vk::DescriptorPoolSize {
+                    ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    descriptor_count: MAX_TEXTURES,
+                }];
+                t.pool = d.create_descriptor_pool(
+                    &vk::DescriptorPoolCreateInfo::default()
+                        .flags(vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND)
+                        .max_sets(1)
+                        .pool_sizes(&sizes),
+                    None,
+                )?;
+                let layouts = [t.layout];
+                t.set = d.allocate_descriptor_sets(
+                    &vk::DescriptorSetAllocateInfo::default()
+                        .descriptor_pool(t.pool)
+                        .set_layouts(&layouts),
+                )?[0];
+                let limits = ctx.instance().get_physical_device_properties(ctx.physical()).limits;
+                t.sampler = d.create_sampler(
+                    &vk::SamplerCreateInfo::default()
+                        .mag_filter(vk::Filter::LINEAR)
+                        .min_filter(vk::Filter::LINEAR)
+                        .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
+                        .address_mode_u(vk::SamplerAddressMode::REPEAT)
+                        .address_mode_v(vk::SamplerAddressMode::REPEAT)
+                        .address_mode_w(vk::SamplerAddressMode::REPEAT)
+                        .anisotropy_enable(true)
+                        .max_anisotropy(limits.max_sampler_anisotropy.min(16.0))
+                        .max_lod(vk::LOD_CLAMP_NONE),
+                    None,
+                )?;
+                Ok(())
+            })()
+        };
+        match built {
+            Ok(()) => Ok(t),
+            Err(e) => {
+                // SAFETY: nothing was used on the GPU yet; null handles are ignored.
+                unsafe { t.destroy(ctx) };
+                Err(e)
+            }
+        }
+    }
+
+    /// The set layout, for pipeline layouts.
+    pub fn layout(&self) -> vk::DescriptorSetLayout {
+        self.layout
+    }
+
+    /// The descriptor set, bound once per pass.
+    pub fn set(&self) -> vk::DescriptorSet {
+        self.set
+    }
+
+    /// Number of textures loaded.
+    pub fn len(&self) -> usize {
+        self.images.len()
+    }
+
+    /// Whether no texture is loaded.
+    pub fn is_empty(&self) -> bool {
+        self.images.is_empty()
+    }
+
+    /// Uploads an RGBA8 image (`srgb` for colour, linear for data such as normals and masks), generates its mips
+    /// and returns its index in the array.
+    ///
+    /// # Panics
+    ///
+    /// If `rgba` is not `width * height * 4` bytes, a side is 0 or over 16384, or the array is full.
+    pub(crate) fn add(&mut self, ctx: &Context, width: u32, height: u32, rgba: &[u8], srgb: bool) -> Result<u32> {
+        assert!(
+            (1..=16384).contains(&width) && (1..=16384).contains(&height),
+            "texture size {width}x{height}"
+        );
+        assert_eq!(
+            rgba.len() as u64,
+            u64::from(width) * u64::from(height) * 4,
+            "RGBA8 texel count"
+        );
+        assert!((self.images.len() as u32) < MAX_TEXTURES, "bindless texture array full");
+        let levels = 32 - width.max(height).leading_zeros();
+        let format = if srgb {
+            vk::Format::R8G8B8A8_SRGB
+        } else {
+            vk::Format::R8G8B8A8_UNORM
+        };
+        let info = vk::ImageCreateInfo::default()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(format)
+            .extent(vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            })
+            .mip_levels(levels)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .usage(
+                vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::TRANSFER_DST,
+            );
+        let image = ctx.create_image("texture", &info, vk::ImageAspectFlags::COLOR)?;
+        let uploaded = upload_with_mips(ctx, &image, width, height, levels, rgba);
+        if let Err(e) = uploaded {
+            // SAFETY: the upload waited for the GPU or never submitted.
+            unsafe { ctx.destroy_image(image) };
+            return Err(e);
+        }
+        let index = self.images.len() as u32;
+        let infos = [vk::DescriptorImageInfo {
+            sampler: self.sampler,
+            image_view: image.view,
+            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+        }];
+        let write = vk::WriteDescriptorSet::default()
+            .dst_set(self.set)
+            .dst_binding(0)
+            .dst_array_element(index)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&infos);
+        // SAFETY: the element is unused by pending work (update-unused-while-pending) and the image is ready.
+        unsafe { ctx.device().update_descriptor_sets(&[write], &[]) };
+        self.images.push(image);
+        Ok(index)
+    }
+
+    /// Destroys the images and the array.
+    ///
+    /// # Safety
+    ///
+    /// The GPU no longer uses them.
+    pub(crate) unsafe fn destroy(&mut self, ctx: &Context) {
+        let d = ctx.device();
+        // SAFETY: per the contract; null handles are ignored.
+        unsafe {
+            for image in self.images.drain(..) {
+                ctx.destroy_image(image);
+            }
+            d.destroy_sampler(self.sampler, None);
+            d.destroy_descriptor_pool(self.pool, None);
+            d.destroy_descriptor_set_layout(self.layout, None);
+        }
+    }
+}
+
+/// Copies `rgba` into mip 0 through a staging buffer, blits each mip from the one above, and leaves every mip
+/// ready for fragment shaders.
+fn upload_with_mips(ctx: &Context, image: &Image, width: u32, height: u32, levels: u32, rgba: &[u8]) -> Result<()> {
+    let mut staging = ctx.create_buffer(
+        "texture staging",
+        rgba.len() as u64,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        MemoryLocation::CpuToGpu,
+    )?;
+    staging.mapped_mut().expect("CpuToGpu memory is mapped")[..rgba.len()].copy_from_slice(rgba);
+    use vk::AccessFlags2 as A;
+    use vk::ImageLayout as L;
+    use vk::PipelineStageFlags2 as S;
+    let result = ctx.one_shot(|d, cmd| {
+        let barrier = |level, count, (src_stage, src_access, old), (dst_stage, dst_access, new)| {
+            vk::ImageMemoryBarrier2::default()
+                .src_stage_mask(src_stage)
+                .src_access_mask(src_access)
+                .dst_stage_mask(dst_stage)
+                .dst_access_mask(dst_access)
+                .old_layout(old)
+                .new_layout(new)
+                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                .image(image.handle)
+                .subresource_range(vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: level,
+                    level_count: count,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+        };
+        let undefined = (S::NONE, A::NONE, L::UNDEFINED);
+        let written = (S::ALL_TRANSFER, A::TRANSFER_WRITE, L::TRANSFER_DST_OPTIMAL);
+        let source = (S::BLIT, A::TRANSFER_READ, L::TRANSFER_SRC_OPTIMAL);
+        let read = (S::FRAGMENT_SHADER, A::SHADER_SAMPLED_READ, L::SHADER_READ_ONLY_OPTIMAL);
+        let size = |level: u32| vk::Offset3D {
+            x: (width >> level).max(1) as i32,
+            y: (height >> level).max(1) as i32,
+            z: 1,
+        };
+        // SAFETY: the image and staging buffer are alive and sized for these commands.
+        unsafe {
+            fn dep<'a>(b: &'a [vk::ImageMemoryBarrier2<'a>]) -> vk::DependencyInfo<'a> {
+                vk::DependencyInfo::default().image_memory_barriers(b)
+            }
+            d.cmd_pipeline_barrier2(cmd, &dep(&[barrier(0, levels, undefined, written)]));
+            let region = vk::BufferImageCopy::default()
+                .image_subresource(vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .image_extent(vk::Extent3D {
+                    width,
+                    height,
+                    depth: 1,
+                });
+            d.cmd_copy_buffer_to_image(cmd, staging.handle, image.handle, L::TRANSFER_DST_OPTIMAL, &[region]);
+            for level in 1..levels {
+                d.cmd_pipeline_barrier2(cmd, &dep(&[barrier(level - 1, 1, written, source)]));
+                let layers = |mip_level| vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                };
+                let blit = vk::ImageBlit::default()
+                    .src_subresource(layers(level - 1))
+                    .src_offsets([vk::Offset3D::default(), size(level - 1)])
+                    .dst_subresource(layers(level))
+                    .dst_offsets([vk::Offset3D::default(), size(level)]);
+                d.cmd_blit_image(
+                    cmd,
+                    image.handle,
+                    L::TRANSFER_SRC_OPTIMAL,
+                    image.handle,
+                    L::TRANSFER_DST_OPTIMAL,
+                    &[blit],
+                    vk::Filter::LINEAR,
+                );
+            }
+            let last = levels - 1;
+            let mut done = vec![barrier(last, 1, written, read)];
+            if last > 0 {
+                done.push(barrier(0, last, source, read));
+            }
+            d.cmd_pipeline_barrier2(cmd, &dep(&done));
+        }
+    });
+    // SAFETY: `one_shot` waited for the copy, or never submitted it.
+    unsafe { ctx.destroy_buffer(staging) };
+    result
+}

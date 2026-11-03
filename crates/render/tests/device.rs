@@ -1,7 +1,7 @@
 //! On a real device, headless: a two-pass graph clears an image and clears half of it again, the copy back reads
 //! the expected pixels, and validation (on in debug builds) reports no errors. Skips without a Vulkan device.
 
-use civbb_render::{Context, Error, Graph, Load, Pass, Use, vk};
+use civbb_render::{Context, Error, Graph, Load, Pass, Transients, Use, vk};
 
 const SIZE: u32 = 64;
 const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
@@ -135,7 +135,7 @@ fn clears_and_reads_back() {
             };
             d.cmd_clear_attachments(cmd, &[clear], &[rect]);
         }));
-        graph.record(d, cmd);
+        graph.record(&ctx, &mut Transients::default(), cmd).unwrap();
 
         let region = vk::BufferImageCopy::default()
             .image_subresource(vk::ImageSubresourceLayers {

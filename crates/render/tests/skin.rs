@@ -4,7 +4,7 @@
 use civbb_format::math::Mat4;
 use civbb_format::mesh::Mesh;
 use civbb_render::skin::{Active, Job, SkinnedMesh, Skinning, active_shapes};
-use civbb_render::{Context, Error, MemoryLocation, vk};
+use civbb_render::{Capacity, Context, Error, MemoryLocation, Scene, vk};
 
 #[test]
 fn only_shapes_with_weight_and_deltas_are_active() {
@@ -138,13 +138,13 @@ fn reference(mesh: &Mesh, joints: &[Mat4], weights: &[f32]) -> Vec<[[f32; 4]; 3]
 }
 
 /// Skins every job in one recording and reads each output back.
-fn run(ctx: &Context, skinning: &Skinning, jobs: &[Job]) -> Vec<Vec<[[f32; 4]; 3]>> {
+fn run(ctx: &Context, scene: &Scene, skinning: &Skinning, jobs: &[Job]) -> Vec<Vec<[[f32; 4]; 3]>> {
     let readbacks: Vec<_> = jobs
         .iter()
         .map(|j| {
             ctx.create_buffer(
                 "readback",
-                j.mesh.output().size,
+                u64::from(j.mesh.vertex_count()) * 48,
                 vk::BufferUsageFlags::TRANSFER_DST,
                 MemoryLocation::GpuToCpu,
             )
@@ -161,11 +161,11 @@ fn run(ctx: &Context, skinning: &Skinning, jobs: &[Job]) -> Vec<Vec<[[f32; 4]; 3
         d.cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().memory_barriers(&[b]));
         for (j, r) in jobs.iter().zip(&readbacks) {
             let region = vk::BufferCopy {
-                src_offset: 0,
+                src_offset: u64::from(j.mesh.base()) * 48,
                 dst_offset: 0,
-                size: r.size,
+                size: u64::from(j.mesh.vertex_count()) * 48,
             };
-            d.cmd_copy_buffer(cmd, j.mesh.output().handle, r.handle, &[region]);
+            d.cmd_copy_buffer(cmd, scene.skinned().handle, r.handle, &[region]);
         }
         let b = vk::MemoryBarrier2::default()
             .src_stage_mask(vk::PipelineStageFlags2::COPY)
@@ -225,10 +225,14 @@ fn matches_the_dense_reference_on_the_bloated_avatar() {
     }
     assert!(avatar.meshes[0].blend_shapes.len() >= 1000);
     let skinning = Skinning::new(&ctx).unwrap();
+    let mut scene = Scene::new(&ctx, Capacity::for_meshes(&avatar.meshes, 1, 0)).unwrap();
     let meshes: Vec<_> = avatar
         .meshes
         .iter()
-        .map(|m| SkinnedMesh::new(&ctx, m).unwrap())
+        .map(|m| {
+            let data = scene.add_mesh(&ctx, m).unwrap();
+            SkinnedMesh::new(&ctx, &mut scene, &data).unwrap()
+        })
         .collect();
     let joints: Vec<Vec<Mat4>> = meshes
         .iter()
@@ -254,7 +258,7 @@ fn matches_the_dense_reference_on_the_bloated_avatar() {
             .zip(&weights)
             .map(|((mesh, joints), weights)| Job { mesh, joints, weights })
             .collect();
-        let outputs = run(&ctx, &skinning, &jobs);
+        let outputs = run(&ctx, &scene, &skinning, &jobs);
         for ((m, out), (j, w)) in avatar.meshes.iter().zip(&outputs).zip(joints.iter().zip(&weights)) {
             assert_close(&m.name, out, &reference(m, j, w));
         }
@@ -264,6 +268,7 @@ fn matches_the_dense_reference_on_the_bloated_avatar() {
             m.destroy(&ctx);
         }
         skinning.destroy(ctx.device());
+        scene.destroy(&ctx);
     }
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }

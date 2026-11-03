@@ -1,22 +1,31 @@
-//! Renderer: a Vulkan 1.3 bootstrap and a render graph of passes that declare their attachments (design doc §6, ADR 0021).
+//! Renderer: a Vulkan 1.3 bootstrap, a render graph, compute skinning and a GPU-driven forward pass (design doc §6,
+//! ADRs 0021 to 0023).
 //!
 //! [`Context`] owns the instance (with validation in debug builds), the chosen device and its queue. [`Renderer`]
 //! adds a window's swapchain, recreated on resize, and two frames in flight; each frame the caller adds passes to a
-//! [`Graph`], which plans the layout transitions between them and records them with dynamic rendering. The window
-//! loop that drives it lives in the client.
+//! [`Graph`], which plans the barriers between them and records them with dynamic rendering. A [`Scene`] holds
+//! every mesh, material and texture in shared buffers and one bindless array; [`skin::Skinning`] writes skinned
+//! vertices into it and [`Forward`] draws them with one indirect multi-draw per pipeline. The window loop that
+//! drives it lives in the client.
 
 mod context;
+pub mod forward;
 pub mod graph;
+pub mod material;
 mod memory;
 mod renderer;
+pub mod scene;
 pub mod skin;
 mod swapchain;
+pub mod texture;
 
 pub use ash::{self, vk};
 pub use context::{Candidate, Context, Window, pick_device};
-pub use graph::{Graph, ImageId, Load, Pass, Use};
-pub use memory::{Buffer, MemoryLocation};
+pub use forward::{Batches, Draw, Forward, View, batch};
+pub use graph::{Access, BufferId, Graph, ImageDesc, ImageId, Load, Pass, Transients, Use};
+pub use memory::{Buffer, Image, MemoryLocation};
 pub use renderer::{FRAMES_IN_FLIGHT, FrameStatus, Renderer};
+pub use scene::{Capacity, MaterialId, MeshData, Scene};
 pub use swapchain::choose_format;
 
 use std::fmt;

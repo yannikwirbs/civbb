@@ -30,7 +30,8 @@ pub struct Candidate {
     pub kind: vk::PhysicalDeviceType,
     /// The highest Vulkan version the device supports.
     pub api_version: u32,
-    /// Whether it has the features the renderer needs (dynamic rendering, synchronization2, buffer device address).
+    /// Whether it has the features the renderer needs (dynamic rendering, synchronization2, buffer device address,
+    /// descriptor indexing, multi-draw indirect; ADRs 0021 to 0023).
     pub features: bool,
     /// A queue family with graphics and compute (and present, when there is a surface), if any.
     pub queue_family: Option<u32>,
@@ -121,13 +122,26 @@ impl Context {
         } else {
             vec![]
         };
-        let mut features12 = vk::PhysicalDeviceVulkan12Features::default().buffer_device_address(true);
+        let features = vk::PhysicalDeviceFeatures::default()
+            .multi_draw_indirect(true)
+            .draw_indirect_first_instance(true)
+            .sampler_anisotropy(true);
+        let mut features12 = vk::PhysicalDeviceVulkan12Features::default()
+            .buffer_device_address(true)
+            .descriptor_indexing(true)
+            .runtime_descriptor_array(true)
+            .shader_sampled_image_array_non_uniform_indexing(true)
+            .descriptor_binding_partially_bound(true)
+            .descriptor_binding_sampled_image_update_after_bind(true)
+            .descriptor_binding_update_unused_while_pending(true);
         let mut features13 = vk::PhysicalDeviceVulkan13Features::default()
             .dynamic_rendering(true)
-            .synchronization2(true);
+            .synchronization2(true)
+            .shader_demote_to_helper_invocation(true);
         let info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queues)
             .enabled_extension_names(&extensions)
+            .enabled_features(&features)
             .push_next(&mut features13)
             .push_next(&mut features12);
         // SAFETY: `physical` came from this instance and supports everything requested (`select`).
@@ -299,9 +313,24 @@ fn select(
             if props.api_version >= vk::API_VERSION_1_3 {
                 instance.get_physical_device_features2(pd, &mut f2);
             }
-            let features = f13.dynamic_rendering == vk::TRUE
-                && f13.synchronization2 == vk::TRUE
-                && f12.buffer_device_address == vk::TRUE;
+            let f = f2.features;
+            let features = [
+                f.multi_draw_indirect,
+                f.draw_indirect_first_instance,
+                f.sampler_anisotropy,
+                f12.buffer_device_address,
+                f12.descriptor_indexing,
+                f12.runtime_descriptor_array,
+                f12.shader_sampled_image_array_non_uniform_indexing,
+                f12.descriptor_binding_partially_bound,
+                f12.descriptor_binding_sampled_image_update_after_bind,
+                f12.descriptor_binding_update_unused_while_pending,
+                f13.dynamic_rendering,
+                f13.synchronization2,
+                f13.shader_demote_to_helper_invocation,
+            ]
+            .iter()
+            .all(|&f| f == vk::TRUE);
             let families = instance.get_physical_device_queue_family_properties(pd);
             let mut queue_family = None;
             for (i, f) in families.iter().enumerate() {

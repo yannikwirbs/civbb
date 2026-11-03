@@ -108,21 +108,28 @@ Internal deps: civbb-format
 
 ## `crates/render` (civbb-render)
 
-Renderer: Vulkan 1.3 device and swapchain, a render graph, and compute skinning with sparse blendshapes.
+Renderer: Vulkan 1.3 device and swapchain, a render graph, compute skinning and a GPU-driven forward pass.
 
 Internal deps: civbb-format
 
 - `examples/clear.rs`: Opens a window and clears it every frame, following resizes; the real window loop lives in the client (#27).
+- `shaders/mesh.slang`: Forward uber-shaders: one vertex shader pulling skinned vertices, fragment shaders for PBR, Toon and Unlit
 - `shaders/skin.slang`: Compute skinning and sparse blendshapes (design doc §6, ADR 0022). Compiled by `cargo xtask shaders`.
 - `src/context.rs`: The Vulkan instance with validation in debug builds, device selection and the logical device with its one queue.
-- `src/graph.rs`: Render graph skeleton: passes declare the images they draw to; the graph plans the layout transitions and
-- `src/lib.rs`: Renderer: a Vulkan 1.3 bootstrap and a render graph of passes that declare their attachments (design doc §6, ADR 0021).
-- `src/memory.rs`: GPU buffers allocated with `gpu-allocator`, each with its device address, plus one-shot submits and uploads.
+- `src/forward.rs`: The forward pass: draws sorted into runs by pipeline, one indirect multi-draw per run, vertices pulled from the
+- `src/graph.rs`: Render graph: passes declare the images they draw to and the buffers they read and write; the graph plans the
+- `src/lib.rs`: Renderer: a Vulkan 1.3 bootstrap, a render graph, compute skinning and a GPU-driven forward pass (design doc §6,
+- `src/material.rs`: Materials as the uber-shaders read them: one fixed-size record per material in the material buffer, and the
+- `src/memory.rs`: GPU buffers (each with its device address) and images allocated with `gpu-allocator`, plus one-shot submits and
 - `src/renderer.rs`: Renders frames to a window: two frames in flight, acquire, record a frame's graph, submit and present,
+- `src/scene.rs`: The GPU-resident data draws reach: shared rest-vertex, attribute, blendshape, index and skinned-vertex buffers,
 - `src/skin.rs`: Compute skinning and sparse blendshapes: once per mesh per frame, applying only shapes with non-zero weight
 - `src/swapchain.rs`: The window's swapchain: format and size choice, its images and views, and one "rendered" semaphore per image.
+- `src/texture.rs`: Bindless textures: one descriptor array of sampled images that every draw indexes by number, filled as
 - `tests/device.rs`: On a real device, headless: a two-pass graph clears an image and clears half of it again, the copy back reads
-- `tests/graph.rs`: Render graph planning (ADR 0021), no device needed: transitions before each pass and into each image's final use.
+- `tests/draw.rs`: The GPU-driven forward pass on a real device (ADR 0023): quads through skinning, shared buffers, bindless
+- `tests/forward.rs`: The forward pass without a device (ADR 0023): pipeline keys, material records, draw batching into runs, and the
+- `tests/graph.rs`: Render graph planning (ADRs 0021, 0023), no device needed: image transitions before each pass and into each
 - `tests/select.rs`: Device and surface format choice (ADR 0021), no device needed.
 - `tests/skin.rs`: Compute skinning and sparse blendshapes (ADR 0022): the active shape list without a device, and on a device the
 
@@ -169,6 +176,7 @@ Internal deps: none
 - `docs/adr/0020-island-runtime.md`: 0020: The avatar island runtime: `core` runs jobs and counts, `client` wires the systems
 - `docs/adr/0021-vulkan-bootstrap-and-render-graph.md`: 0021: Vulkan bootstrap, render graph shape, frames in flight and the shader toolchain
 - `docs/adr/0022-compute-skinning-and-sparse-blendshapes.md`: 0022: Compute skinning with fixed-point sparse blendshapes, buffers by device address
+- `docs/adr/0023-gpu-driven-forward-pass.md`: 0023: GPU-driven forward pass: shared buffers with vertex pulling, bindless textures, runs of indirect draws
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status
