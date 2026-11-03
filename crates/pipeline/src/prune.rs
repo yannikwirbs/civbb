@@ -389,7 +389,7 @@ fn retain<T>(v: &mut Vec<T>, keep: &[bool]) {
 }
 
 /// Unity-style binding path of every node, as `civbb-anim` resolves clip paths: names below the root joined by `/`.
-fn node_paths(h: &Hierarchy) -> Vec<String> {
+pub(crate) fn node_paths(h: &Hierarchy) -> Vec<String> {
     let mut paths: Vec<String> = Vec::with_capacity(h.nodes.len());
     for n in &h.nodes {
         paths.push(match n.parent {

@@ -135,8 +135,8 @@ fn run_view(args: &[String]) -> ExitCode {
             if frames.is_some() {
                 let gpu = s.gpu_ms.map_or("n/a".into(), |g| format!("{g:.3} ms"));
                 println!(
-                    "{} frames: CPU {:.3} ms/frame (avatar systems {:.3} ms), GPU {gpu}, {} validation errors",
-                    s.frames, s.cpu_ms, s.systems_ms, s.validation_errors
+                    "{} frames: CPU {:.3} ms/frame (avatar systems {:.3} ms), GPU {gpu}, {} draws, {} skinned meshes, {} validation errors",
+                    s.frames, s.cpu_ms, s.systems_ms, s.draws, s.skinned, s.validation_errors
                 );
             }
             if s.validation_errors > 0 {

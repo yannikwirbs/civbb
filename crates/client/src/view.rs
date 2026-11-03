@@ -53,6 +53,10 @@ pub struct Summary {
     pub gpu_ms: Option<f32>,
     /// Validation errors reported (debug builds).
     pub validation_errors: u32,
+    /// Draws in the last frame, all copies.
+    pub draws: usize,
+    /// Meshes skinned in the last frame, all copies.
+    pub skinned: usize,
 }
 
 /// Decodes the avatar's PNG and JPEG texture blobs with bounded sizes; `blob` returns a blob's bytes. Textures that
@@ -324,6 +328,9 @@ struct Timing {
     systems: f32,
     gpu: f32,
     gpu_frames: u32,
+    /// Draws and skinned meshes in the last frame.
+    draws: usize,
+    skinned: usize,
     /// Since the title was last updated: start, frames, CPU, systems.
     window: Option<(Instant, u32, f32, f32)>,
 }
@@ -408,6 +415,8 @@ impl Viewer {
             systems_ms: t.systems / n,
             gpu_ms: (t.gpu_frames > 0).then(|| t.gpu / t.gpu_frames as f32),
             validation_errors: self.validation_errors,
+            draws: t.draws,
+            skinned: t.skinned,
         }
     }
 
@@ -502,6 +511,7 @@ impl Viewer {
             })
             .collect();
         batch(&mut s.draws, &mut s.batches);
+        let (draws, skinned) = (s.draws.len(), jobs.len());
         let extent = renderer.extent().unwrap_or_default();
         let aspect = extent.width.max(1) as f32 / extent.height.max(1) as f32;
         let view = View::look_at(eye, self.camera.target, 0.9, aspect, 0.05);
@@ -531,6 +541,7 @@ impl Viewer {
         // Waiting for vsync and the GPU is not CPU work.
         let cpu = start.elapsed().as_secs_f32() * 1000.0 - renderer.blocked_ms();
         let t = &mut self.timing;
+        (t.draws, t.skinned) = (draws, skinned);
         t.frames += 1;
         t.cpu += cpu;
         t.systems += systems;
@@ -545,11 +556,13 @@ impl Viewer {
             let fps = n / w.0.elapsed().as_secs_f32();
             let gpu = renderer.gpu_ms().map_or("n/a".into(), |g| format!("{g:.2} ms"));
             let title = format!(
-                "civbb-client view: {} x {}, CPU {:.2} ms (avatar systems {:.2} ms), GPU {gpu}, {fps:.0} fps",
+                "civbb-client view: {} x {}, CPU {:.2} ms (avatar systems {:.2} ms), GPU {gpu}, {fps:.0} fps, {} draws, {} skinned meshes",
                 self.copies,
                 self.avatar.name,
                 w.2 / n,
-                w.3 / n
+                w.3 / n,
+                draws,
+                skinned
             );
             if let Some(window) = &self.window {
                 window.set_title(&title);

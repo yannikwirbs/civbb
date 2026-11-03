@@ -1,4 +1,4 @@
-//! `civbb` end to end: keygen, build (pruning, ADR 0026), validate and inspect on a corpus avatar, plus tamper and
+//! `civbb` end to end: keygen, build (pruning and merging, ADRs 0026 and 0027), validate and inspect on a corpus avatar, plus tamper and
 //! wrong-key rejection.
 
 use std::path::{Path, PathBuf};
@@ -35,10 +35,11 @@ fn build_validate_inspect() {
         !civbb(&dir, &["keygen", "dev.key"]).status.success(),
         "keygen overwrote a key"
     );
-    // The GLB carries no animator or face, so nothing drives the lean avatar's 15 visemes.
+    // The GLB carries no animator or face, so nothing drives the lean avatar's 15 visemes or toggles its meshes:
+    // all three merge, and the body and prop share a material.
     let built = stdout(&civbb(&dir, &["build", "lean.glb", "--key", "dev.key"]));
     assert!(
-        built.starts_with("pruned 0 nodes, 0 skin joints, 15 blendshapes"),
+        built.starts_with("pruned 0 nodes, 0 skin joints, 15 blendshapes\nmerged 2 meshes, 1 submeshes"),
         "{built}"
     );
     assert!(stdout(&civbb(&dir, &["validate", "lean.civpkg", "--key", "dev.key"])).starts_with("ok"));
@@ -48,10 +49,13 @@ fn build_validate_inspect() {
     assert!(from_source.contains("name        lean"), "{from_source}");
     assert!(from_package.contains("compiler    civbb-pipeline"), "{from_package}");
     let without_shapes = |s: &str| {
-        s.lines().filter(|l| !l.starts_with("shapes")).collect::<Vec<_>>().join(
-            "
+        s.lines()
+            .filter(|l| !l.starts_with("shapes") && !l.starts_with("meshes"))
+            .collect::<Vec<_>>()
+            .join(
+                "
 ",
-        )
+            )
     };
     assert!(
         without_shapes(&from_package).ends_with(&without_shapes(&from_source)),
@@ -61,6 +65,7 @@ fn build_validate_inspect() {
         from_package.contains("shapes      0 blend shapes, 0 deltas"),
         "{from_package}"
     );
+    assert!(from_package.contains("meshes      1 meshes"), "{from_package}");
 
     stdout(&civbb(&dir, &["keygen", "other.key"]));
     assert!(

@@ -2,9 +2,11 @@
 
 mod accessor;
 pub mod gltf_import;
+pub mod merge;
 pub mod package;
 pub mod prune;
 
 pub use gltf_import::{ImportError, Imported, Limits, import};
+pub use merge::{Merged, merge};
 pub use package::{COMPILER, Stats, package, stats};
 pub use prune::{Pruned, prune};

@@ -18,6 +18,8 @@ thiserror = "2.0.21"
 workspace = true
 
 [dev-dependencies]
+civbb-client = { path = "../client" }
+civbb-core.workspace = true
 civbb-anim.workspace = true
 civbb-corpus.workspace = true
 

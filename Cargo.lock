@@ -349,6 +349,8 @@ version = "0.0.0"
 dependencies = [
  "base64",
  "civbb-anim",
+ "civbb-client",
+ "civbb-core",
  "civbb-corpus",
  "civbb-format",
  "getrandom 0.2.17",
