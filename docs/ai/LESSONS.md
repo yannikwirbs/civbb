@@ -66,7 +66,16 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   keep the defaults and add `encoder`. Its own threading (`BU_COMP_FLAGS_THREADED`) makes UASTC RDO output differ
   between runs; encode single-threaded and parallelise across textures.
 - Pure-Rust parsers still need hostile-input tests: `basisu` 0.1 allocates a KTX2 level's stated uncompressed
-  length unchecked (a 1 EB abort from three flipped bits). A test that truncates and bit-flips a small valid file
+  length unchecked (a 1 EB abort from three flipped bits). It also adds the header's `sgdByteOffset` unchecked (an
+  overflow panic the CI fuzzer found): check every header range (DFD, KVD, SGD, levels) before calling it. A test that truncates and bit-flips a small valid file
   a few thousand times finds such things in seconds, on Windows, without cargo-fuzz.
 - Unity-exported UVs often sit a whole tile off 0..1 (AliciaSolid's V runs 1 to 2); with a repeating sampler
   that is equal to 0..1, so check "each triangle in one unit tile", not "inside 0..1".
+- Python `str.replace` silently does nothing when the pattern is not there: a "no effect" experiment may never
+  have run. `assert old in s` before every replace, or use the Edit tool (it fails loudly).
+- meshoptimizer (`meshopt` crate): `LockBorder` keeps open edges, and seams stay closed on manifold surfaces, but
+  an edge three or more faces share can open (its faces go by collapsing their third vertex; locking the edge's
+  vertices does not help). Check simplified meshes with vertices welded by position and edge use counts, not raw
+  indices: wedges (split normals, UV seams) make every flat-shaded edge look open.
+- `gh run list --commit <sha>` right after `git push` can come back empty; list runs a few seconds later (or by
+  `--limit`) and watch each run ID.

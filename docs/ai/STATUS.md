@@ -4,12 +4,11 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Now
 
-- Phase 0 (prove the avatar compiler). Current milestone: **M0.8 Compiler optimisations** (M0.7 closed).
-- Next issue: #33 LOD chain with meshoptimizer, the last in M0.8. #28 to #32 are done (#32 by ADR 0030: no
-  chain merging, it measured slower in our solver).
+- Phase 0 (prove the avatar compiler). Current milestone: **M0.9 Reports and parity** (M0.8 closed).
+- Next issue: #34 per-avatar report, then #35 FLIP parity, #57 benchmark packages, #58 toon outlines.
 - Compiler stages in `civbb-pipeline`, run by `civbb build` between import and packaging, each proven
   behaviour-identical by tests that step islands before and after:
-  - Order in `civbb build`: `prune`, `atlas`, `merge`, `collapse`, `compress`.
+  - Order in `civbb build`: `prune`, `atlas`, `merge`, `lod`, `collapse`, `compress`.
   - `prune` (ADR 0026): zero-weight skin joints, unreferenced nodes (ancestors and chain descendants kept) and
     shapes nothing drives (clips, face binds, Unified Expressions and ARKit names, non-zero rest weight).
   - `merge` (ADR 0027): meshes under the same `Active`-animated nodes (same first-person mode and vertex streams)
@@ -21,6 +20,12 @@ Read at the start of every session; update at the end. Keep it short: the queue 
     aligned, shelf packed within the platform cap); whole-tile UV offsets are shifted back; animated materials,
     UV1, `_ST` tiling, tile-crossing triangles and textures used elsewhere are left alone. Materials then equal
     become one so `merge` joins their draws. AliciaSolid: textures 7 to 3, materials 12 to 10, draws 13 to 12.
+  - `lod` (ADR 0031, format v8): up to three levels per mesh from meshoptimizer (`meshopt` 0.7), aiming at 1/2,
+    1/4, 1/8 of the triangles with error caps 0.5/1.5/4 % of the mesh extent, kept only at <= 80 % of the level
+    above. A level is an index list over a vertex prefix (vertices reordered), so it skins and applies shapes to
+    fewer vertices; skin anchor and shape motion are simplification attributes, submesh borders locked
+    (`LockBorder`). Non-manifold edges (3+ faces) may open. AliciaSolid 31.8k, 16.4k, 9.2k, 7.8k triangles;
+    HAOLAN 146k to 21k. `Mesh::level(n)` gives a level as a mesh. Runtime switching is #63 (Phase 1).
   - `compress` (ADR 0029): every texture to KTX2 with `basisu_c_sys` (C++ Basis Universal, bindgen needs
     libclang), UASTC for normal maps, ETC1S otherwise, single-threaded per texture (reproducible), sides capped at
     4096 desktop / 2048 Quest. AliciaSolid package blobs 5.6 MB to 2.8 MB, Seed-san 8.6 to 4.9 MB.
@@ -44,7 +49,8 @@ Read at the start of every session; update at the end. Keep it short: the queue 
   PBR, Toon, Unlit x blend x culling; draws batched into runs, one indirect multi-draw per run, vertices pulled by
   address). Shaders are Slang in `crates/render/shaders/` (`skin`, `mesh`), compiled by `cargo xtask shaders`
   (Vulkan SDK 1.4.363.0 at `C:/VulkanSDK/1.4.363.0`) to committed SPIR-V; `ci` fails on a stale one.
-- Viewer (ADR 0024): `civbb-client view [<pkg> --key <key> | --avatar lean|bloated] [--copies N] [--frames F]`.
+- Viewer (ADR 0024): `civbb-client view [<pkg> --key <key> | --avatar lean|bloated] [--copies N] [--frames F]
+  [--lod L]`; the title shows triangles per copy.
   glTF/VRM go through `civbb build` first (client may not depend on pipeline). Release, reference PC: 100 bloated
   avatars 1.72 ms CPU per frame (systems 0.53 ms), 0.56 ms GPU; 4 Yumeka 1.5 ms CPU, 0.21 ms GPU. AliciaSolid
   renders textured and toon-shaded. Debug builds are ~30x slower on the CPU (validation).
@@ -57,7 +63,7 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). `civbb-dynamics`: XPBD PhysBone chains
   with grab/pose, colliders and limits (ADRs 0015, 0016), and contacts with the cross-avatar grid broadphase
-  (`contact::step`, ADR 0017). Format v7.
+  (`contact::step`, ADR 0017). Format v8 (LOD levels, ADR 0031).
 - Unity ground truth: `tools/unity-truth` runs in batch mode and records JSON into crate test dirs (ADR 0013,
   `tools/unity-truth/README.md`). Muscle space and constraints (44 cases, batch play mode) are verified against it;
   animator goldens are still hand-derived (#54).
@@ -71,7 +77,7 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0030 are accepted. Renderer follow-ups: #58 toon outlines (M0.9, parity needs them), #59 GPU
+None. ADRs 0017 to 0031 are accepted. LOD follow-up: #63 runtime level switching in renderer and governor. Renderer follow-ups: #58 toon outlines (M0.9, parity needs them), #59 GPU
 culling, #60 MSAA and multiview, #61 pipeline cache and freeing scene memory, #62 clustered lights and shadows
 (Phase 1). Dynamics constants and contact choices marked unverified wait
 for parity (M0.9). In M0.10: #52 (body pose), #53 (muscle frames for glTF/VRM), #54 (Unity-recorded animator
@@ -95,3 +101,6 @@ One line per session, newest last: date, what moved, what's next.
 - 2026-11-03 (5): #29 mesh merging (ADR 0027; Yumeka 23 to 7 draws, viewer reports draws), #30 toggle layers to one direct blend tree (ADR 0028; blend weights no longer allocate, collapse was 4x slower before). Next: #31.
 - 2026-11-03 (6): #31 texture atlasing and KTX2 (ADR 0029; AliciaSolid package 5.6 to 2.8 MB, one atlas, draws 13 to
   12, viewer transcodes to BC7), #32 closed by ADR 0030 (merged chains measured slower). Next: #33.
+- 2026-11-03 (7): M0.8 closed. #33 skin-aware LOD chain with meshoptimizer (ADR 0031, format v8): three prefix
+  levels per mesh, `civbb-client view --lod N`, AliciaSolid captured at each level. Opened #63. The fuzzer found a `basisu` overflow panic on KTX2 header ranges, fixed (#64).
+  Next: M0.9 from #34.
