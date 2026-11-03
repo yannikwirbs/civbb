@@ -108,19 +108,23 @@ Internal deps: civbb-format
 
 ## `crates/render` (civbb-render)
 
-Renderer: Vulkan 1.3 instance, device, swapchain and a render graph of passes that declare their attachments.
+Renderer: Vulkan 1.3 device and swapchain, a render graph, and compute skinning with sparse blendshapes.
 
-Internal deps: none
+Internal deps: civbb-format
 
 - `examples/clear.rs`: Opens a window and clears it every frame, following resizes; the real window loop lives in the client (#27).
+- `shaders/skin.slang`: Compute skinning and sparse blendshapes (design doc §6, ADR 0022). Compiled by `cargo xtask shaders`.
 - `src/context.rs`: The Vulkan instance with validation in debug builds, device selection and the logical device with its one queue.
 - `src/graph.rs`: Render graph skeleton: passes declare the images they draw to; the graph plans the layout transitions and
 - `src/lib.rs`: Renderer: a Vulkan 1.3 bootstrap and a render graph of passes that declare their attachments (design doc §6, ADR 0021).
+- `src/memory.rs`: GPU buffers allocated with `gpu-allocator`, each with its device address, plus one-shot submits and uploads.
 - `src/renderer.rs`: Renders frames to a window: two frames in flight, acquire, record a frame's graph, submit and present,
+- `src/skin.rs`: Compute skinning and sparse blendshapes: once per mesh per frame, applying only shapes with non-zero weight
 - `src/swapchain.rs`: The window's swapchain: format and size choice, its images and views, and one "rendered" semaphore per image.
 - `tests/device.rs`: On a real device, headless: a two-pass graph clears an image and clears half of it again, the copy back reads
 - `tests/graph.rs`: Render graph planning (ADR 0021), no device needed: transitions before each pass and into each image's final use.
 - `tests/select.rs`: Device and surface format choice (ADR 0021), no device needed.
+- `tests/skin.rs`: Compute skinning and sparse blendshapes (ADR 0022): the active shape list without a device, and on a device the
 
 ## `tools/corpus` (civbb-corpus)
 
@@ -137,7 +141,7 @@ Repo automation: CI gate, architecture rules, code map.
 
 Internal deps: none
 
-- `src/main.rs`: Repo automation: `cargo xtask ci | arch | codemap [--check]`.
+- `src/main.rs`: Repo automation: `cargo xtask ci | arch | codemap [--check] | shaders [--check]`.
 
 ## Docs
 
@@ -164,6 +168,7 @@ Internal deps: none
 - `docs/adr/0019-vrm-node-constraints.md`: 0019: VRM node constraints become rest-relative constraint kinds (format v7)
 - `docs/adr/0020-island-runtime.md`: 0020: The avatar island runtime: `core` runs jobs and counts, `client` wires the systems
 - `docs/adr/0021-vulkan-bootstrap-and-render-graph.md`: 0021: Vulkan bootstrap, render graph shape, frames in flight and the shader toolchain
+- `docs/adr/0022-compute-skinning-and-sparse-blendshapes.md`: 0022: Compute skinning with fixed-point sparse blendshapes, buffers by device address
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

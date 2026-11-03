@@ -7,12 +7,15 @@
 
 mod context;
 pub mod graph;
+mod memory;
 mod renderer;
+pub mod skin;
 mod swapchain;
 
 pub use ash::{self, vk};
 pub use context::{Candidate, Context, Window, pick_device};
 pub use graph::{Graph, ImageId, Load, Pass, Use};
+pub use memory::{Buffer, MemoryLocation};
 pub use renderer::{FRAMES_IN_FLIGHT, FrameStatus, Renderer};
 pub use swapchain::choose_format;
 
@@ -23,8 +26,10 @@ use std::fmt;
 pub enum Error {
     /// The Vulkan loader is missing or could not be loaded.
     Load(String),
-    /// No device supports Vulkan 1.3 with dynamic rendering, synchronization2 and a graphics queue (that can present).
+    /// No device supports Vulkan 1.3 with the needed features and a graphics queue (that can present).
     NoDevice,
+    /// GPU memory could not be allocated.
+    Memory(String),
     /// A Vulkan call failed.
     Vk(vk::Result),
 }
@@ -33,7 +38,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Load(e) => write!(f, "no Vulkan loader: {e}"),
-            Error::NoDevice => write!(f, "no Vulkan 1.3 device with dynamic rendering and synchronization2"),
+            Error::NoDevice => write!(f, "no Vulkan 1.3 device with the features the renderer needs"),
+            Error::Memory(e) => write!(f, "GPU memory: {e}"),
             Error::Vk(r) => write!(f, "Vulkan error: {r}"),
         }
     }

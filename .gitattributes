@@ -2,3 +2,4 @@
 *.png binary
 *.glb binary
 *.civpkg binary
+*.spv binary

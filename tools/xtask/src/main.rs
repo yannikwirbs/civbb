@@ -1,8 +1,10 @@
-//! Repo automation: `cargo xtask ci | arch | codemap [--check]`.
+//! Repo automation: `cargo xtask ci | arch | codemap [--check] | shaders [--check]`.
 //!
-//! - `ci`: the full local gate (fmt, clippy, tests, arch rules, fresh code map). Run before every commit.
+//! - `ci`: the full local gate (fmt, clippy, tests, arch rules, fresh code map and shaders). Run before every commit.
 //! - `arch`: enforces the crate dependency rules from design doc §21.
 //! - `codemap`: regenerates `docs/ai/CODEMAP.md`; `--check` fails if it is stale or a file lacks a module doc.
+//! - `shaders`: compiles `crates/*/shaders/*.slang` to committed SPIR-V with `slangc` (`$VULKAN_SDK/Bin` or PATH);
+//!   `--check` fails if a source changed since (ADR 0021), without needing the compiler.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -36,7 +38,8 @@ fn main() -> ExitCode {
         Some("ci") => ci(),
         Some("arch") => arch(),
         Some("codemap") => codemap(check),
-        _ => Err("usage: cargo xtask <ci|arch|codemap [--check]>".into()),
+        Some("shaders") => shaders(check),
+        _ => Err("usage: cargo xtask <ci|arch|codemap [--check]|shaders [--check]>".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -79,6 +82,7 @@ fn ci() -> Result<(), String> {
     run("cargo", &["test", "--workspace", "--quiet"])?;
     arch()?;
     codemap(true)?;
+    shaders(true)?;
     eprintln!("xtask: ci passed");
     Ok(())
 }
@@ -283,5 +287,83 @@ fn codemap(check: bool) -> Result<(), String> {
         fs::write(&target, md).map_err(|e| e.to_string())?;
         eprintln!("xtask: wrote {CODEMAP}");
     }
+    Ok(())
+}
+
+/// FNV-1a over the source with LF line ends: detects a changed shader source, nothing more.
+fn source_hash(path: &Path) -> Result<String, String> {
+    let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", rel(path)))?;
+    let hash = text
+        .replace("\r\n", "\n")
+        .bytes()
+        .fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+            (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+        });
+    Ok(format!("{hash:016x}\n"))
+}
+
+/// Each `crates/<name>/shaders/<shader>.slang` compiles to `shaders/spv/<shader>.spv`, with its source's hash in
+/// `shaders/spv/<shader>.hash`.
+fn shaders(check: bool) -> Result<(), String> {
+    let mut sources = Vec::new();
+    for krate in fs::read_dir(root().join("crates"))
+        .map_err(|e| e.to_string())?
+        .flatten()
+    {
+        for e in fs::read_dir(krate.path().join("shaders"))
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
+            if e.path().extension().is_some_and(|x| x == "slang") {
+                sources.push(e.path());
+            }
+        }
+    }
+    sources.sort();
+    let slangc = match std::env::var_os("VULKAN_SDK") {
+        Some(sdk) => Path::new(&sdk)
+            .join("Bin")
+            .join("slangc")
+            .to_string_lossy()
+            .into_owned(),
+        None => "slangc".into(),
+    };
+    let mut stale = Vec::new();
+    for src in sources {
+        let out = src.parent().expect("in shaders/").join("spv");
+        let stem = src.file_stem().expect("a file").to_string_lossy();
+        let (spv, hash_file) = (out.join(format!("{stem}.spv")), out.join(format!("{stem}.hash")));
+        let hash = source_hash(&src)?;
+        if check {
+            if !spv.exists() || fs::read_to_string(&hash_file).ok().as_deref() != Some(hash.as_str()) {
+                stale.push(rel(&src));
+            }
+            continue;
+        }
+        fs::create_dir_all(&out).map_err(|e| e.to_string())?;
+        let (src_rel, spv_rel) = (rel(&src), rel(&spv));
+        run(
+            &slangc,
+            &[
+                &src_rel,
+                "-target",
+                "spirv",
+                "-profile",
+                "spirv_1_6",
+                "-fvk-use-entrypoint-name",
+                "-o",
+                &spv_rel,
+            ],
+        )?;
+        fs::write(&hash_file, hash).map_err(|e| e.to_string())?;
+    }
+    if !stale.is_empty() {
+        return Err(format!(
+            "shaders changed since compiled; run `cargo xtask shaders`:\n  {}",
+            stale.join("\n  ")
+        ));
+    }
+    eprintln!("xtask: shaders fresh");
     Ok(())
 }

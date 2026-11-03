@@ -2,9 +2,12 @@
 
 use std::cmp::Reverse;
 use std::ffi::{CStr, c_char, c_void};
+use std::mem::ManuallyDrop;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use ash::{ext::debug_utils, khr, vk};
+use gpu_allocator::vulkan::{Allocator, AllocatorCreateDesc};
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
 use crate::{Error, Result};
@@ -27,7 +30,7 @@ pub struct Candidate {
     pub kind: vk::PhysicalDeviceType,
     /// The highest Vulkan version the device supports.
     pub api_version: u32,
-    /// Whether it has the Vulkan 1.3 features the renderer needs (dynamic rendering, synchronization2).
+    /// Whether it has the features the renderer needs (dynamic rendering, synchronization2, buffer device address).
     pub features: bool,
     /// A queue family with graphics and compute (and present, when there is a surface), if any.
     pub queue_family: Option<u32>,
@@ -79,6 +82,8 @@ impl Drop for Instance {
 
 /// The Vulkan instance, the chosen device and its one graphics and compute queue (ADR 0021).
 pub struct Context {
+    // Dropped before the device is destroyed.
+    pub(crate) allocator: ManuallyDrop<Mutex<Allocator>>,
     device: ash::Device,
     physical: vk::PhysicalDevice,
     queue_family: u32,
@@ -116,18 +121,37 @@ impl Context {
         } else {
             vec![]
         };
+        let mut features12 = vk::PhysicalDeviceVulkan12Features::default().buffer_device_address(true);
         let mut features13 = vk::PhysicalDeviceVulkan13Features::default()
             .dynamic_rendering(true)
             .synchronization2(true);
         let info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queues)
             .enabled_extension_names(&extensions)
-            .push_next(&mut features13);
+            .push_next(&mut features13)
+            .push_next(&mut features12);
         // SAFETY: `physical` came from this instance and supports everything requested (`select`).
         let device = unsafe { instance.instance.create_device(physical, &info, None)? };
         // SAFETY: the queue family was created with one queue.
         let queue = unsafe { device.get_device_queue(queue_family, 0) };
+        let allocator = Allocator::new(&AllocatorCreateDesc {
+            instance: instance.instance.clone(),
+            device: device.clone(),
+            physical_device: physical,
+            debug_settings: Default::default(),
+            buffer_device_address: true,
+            allocation_sizes: Default::default(),
+        });
+        let allocator = match allocator {
+            Ok(a) => a,
+            Err(e) => {
+                // SAFETY: nothing was created on the device yet.
+                unsafe { device.destroy_device(None) };
+                return Err(Error::Memory(e.to_string()));
+            }
+        };
         Ok(Context {
+            allocator: ManuallyDrop::new(Mutex::new(allocator)),
             device,
             physical,
             queue_family,
@@ -174,9 +198,11 @@ impl Context {
 
 impl Drop for Context {
     fn drop(&mut self) {
-        // SAFETY: owners of device objects (the renderer) are dropped before the context.
+        // SAFETY: owners of device objects (the renderer) are dropped before the context; the allocator is dropped
+        // once, here, before the device it allocates from.
         unsafe {
             let _ = self.device.device_wait_idle();
+            ManuallyDrop::drop(&mut self.allocator);
             self.device.destroy_device(None);
         }
     }
@@ -213,7 +239,11 @@ unsafe fn create_instance(entry: ash::Entry, validation: bool, window: Option<Wi
         .enabled_layer_names(&layer_names)
         .enabled_extension_names(&extensions);
     // SAFETY: the create info and the names it points to are alive for the call.
-    let instance = unsafe { entry.create_instance(&info, None)? };
+    let instance = unsafe { entry.create_instance(&info, None) }.map_err(|e| match e {
+        // A loader without any driver (CI runners).
+        vk::Result::ERROR_INCOMPATIBLE_DRIVER => Error::NoDevice,
+        e => e.into(),
+    })?;
     let mut instance = Instance {
         instance,
         debug: None,
@@ -261,12 +291,17 @@ fn select(
         let mut candidates = Vec::with_capacity(devices.len());
         for &pd in &devices {
             let props = instance.get_physical_device_properties(pd);
+            let mut f12 = vk::PhysicalDeviceVulkan12Features::default();
             let mut f13 = vk::PhysicalDeviceVulkan13Features::default();
-            let mut f2 = vk::PhysicalDeviceFeatures2::default().push_next(&mut f13);
+            let mut f2 = vk::PhysicalDeviceFeatures2::default()
+                .push_next(&mut f13)
+                .push_next(&mut f12);
             if props.api_version >= vk::API_VERSION_1_3 {
                 instance.get_physical_device_features2(pd, &mut f2);
             }
-            let features = f13.dynamic_rendering == vk::TRUE && f13.synchronization2 == vk::TRUE;
+            let features = f13.dynamic_rendering == vk::TRUE
+                && f13.synchronization2 == vk::TRUE
+                && f12.buffer_device_address == vk::TRUE;
             let families = instance.get_physical_device_queue_family_properties(pd);
             let mut queue_family = None;
             for (i, f) in families.iter().enumerate() {
