@@ -5,11 +5,20 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.8 Compiler optimisations** (M0.7 closed).
-- Next issue: #29 merge meshes sharing material and toggle group, then #30 to #33. #28 (pruning) is done.
-- Compiler stages in `civbb-pipeline`: `prune` (ADR 0026) runs in `civbb build` between import and packaging:
-  zero-weight skin joints, unreferenced nodes (ancestors and chain descendants kept) and shapes nothing drives
-  (clips, face binds, Unified Expressions and ARKit names, non-zero rest weight). Bloated loses 1185 of 1200 shapes,
-  Yumeka 5900 joint slots. A package without an animator loses every shape outside face setup.
+- Next issue: #31 texture atlasing and KTX2, then #32, #33. #28 to #30 are done.
+- Compiler stages in `civbb-pipeline`, run by `civbb build` between import and packaging, each proven
+  behaviour-identical by tests that step islands before and after:
+  - `prune` (ADR 0026): zero-weight skin joints, unreferenced nodes (ancestors and chain descendants kept) and
+    shapes nothing drives (clips, face binds, Unified Expressions and ARKit names, non-zero rest weight).
+  - `merge` (ADR 0027): meshes under the same `Active`-animated nodes (same first-person mode and vertex streams)
+    become one skinned mesh, rigid ones skinned to their node; same-material opaque/cutout submeshes join. Meshes
+    with renderer or material curves, blended submeshes, shared nodes or colliding shape names stay apart. Draws per
+    copy: Yumeka 23 to 7 (20 skinned meshes to 1), AliciaSolid 20 to 13, HAOLAN 15 to 9. Bloated only loses one
+    mesh: every outfit and prop has its own toggle.
+  - `collapse` (ADR 0028): plain bool toggle layers (two constant clips, zero-duration transitions) become one
+    layer per group: a `Start` state, then a Write Defaults on direct tree of 1D trees weighted by `civbb/One`.
+    Bloated 48 layers to 1, animator update 2.34 to 2.08 µs. Direct and 1D blend weights no longer allocate.
+- The viewer's title and `--frames` summary report draws and skinned meshes of the last frame.
 - Animated materials (ADR 0025): `civbb_anim::material` maps Unity property names (`_Color`, `_EmissionColor`,
   `_MainTex_ST`, `_Glossiness`, MToon/lilToon/Poiyomi/UTS2 names) to native fields in Unity's units (sRGB colours,
   smoothness, V-up offsets); `Target::Material(mesh, field, component)` per renderer. `Model::animated_materials`
@@ -51,7 +60,7 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0026 are accepted. Renderer follow-ups: #58 toon outlines (M0.9, parity needs them), #59 GPU
+None. ADRs 0017 to 0028 are accepted. Renderer follow-ups: #58 toon outlines (M0.9, parity needs them), #59 GPU
 culling, #60 MSAA and multiview, #61 pipeline cache and freeing scene memory, #62 clustered lights and shadows
 (Phase 1). Dynamics constants and contact choices marked unverified wait
 for parity (M0.9). In M0.10: #52 (body pose), #53 (muscle frames for glTF/VRM), #54 (Unity-recorded animator
@@ -72,3 +81,4 @@ One line per session, newest last: date, what moved, what's next.
 - 2026-11-03 (2): Vulkan SDK installed (winget). #24 new crate `civbb-render`: context, swapchain, frames in flight, render graph skeleton (ADR 0021); #25 compute skinning and sparse blendshapes, gpu-allocator, Slang toolchain with `cargo xtask shaders` (ADR 0022). Next: #26.
 - 2026-11-03 (3): #26 GPU-driven forward pass in `civbb-render` (shared buffers, bindless, uber-shaders, indirect runs, graph depth/transients/buffers; ADR 0023), #27 desktop viewer `civbb-client view` (ADR 0024). Opened #58 to #62. Next: #49.
 - 2026-11-03 (4): M0.7 closed: #49 material curves bound per renderer to native fields, per-island material records rewritten in the frame (ADR 0025). M0.8 started: #28 `civbb build` prunes unweighted joints, unreferenced nodes and undriven shapes (ADR 0026). Next: #29.
+- 2026-11-03 (5): #29 mesh merging (ADR 0027; Yumeka 23 to 7 draws, viewer reports draws), #30 toggle layers to one direct blend tree (ADR 0028; blend weights no longer allocate, collapse was 4x slower before). Next: #31.

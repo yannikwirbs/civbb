@@ -47,3 +47,11 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
 - Corpus toggles have Write Defaults off: a value a clip once wrote persists after switching state. Tests that
   compare islands must start from a toggle that defaults off (`parameters` with `default == 0.0`).
 - The Bash tool rejects `sleep N; cmd` waits; watch CI with `gh run watch <id> --exit-status` in a background call.
+- Measure a compile-time optimisation in our runtime before shipping it: collapsing toggle layers into a blend tree
+  (a big win in Unity) made our animator 4x slower until blend tree weights stopped allocating. Time it with a
+  throwaway release test (`Instance::update` in a loop) and delete the test afterwards.
+- Mutation-check equivalence tests, and make the mutated case reachable: a parameter driver that only fires on
+  frame 1 (when every layer starts in its default state anyway) could not show a driver-timing bug.
+- Before/after binaries: `git worktree add --detach <scratchpad>/wt HEAD`, build there with
+  `--target-dir <scratchpad>/wt-target`, then `git worktree remove --force` it. Piping `civbb build` into `head`
+  makes it panic with "failed printing to stdout"; harmless.
