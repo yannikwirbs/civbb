@@ -145,6 +145,20 @@ pub fn transcode_ktx2(bytes: &[u8]) -> Result<TextureImage, String> {
     if !side.contains(&width) || !side.contains(&height) {
         return Err(format!("size {width}x{height}"));
     }
+    // Data format descriptor, key/value data and supercompression global data inside the file: `basisu` adds the
+    // last one's offset unchecked.
+    for (offset, length) in [
+        (u32_at(48).map(u64::from), u32_at(52).map(u64::from)),
+        (u32_at(56).map(u64::from), u32_at(60).map(u64::from)),
+        (u64_at(64), u64_at(72)),
+    ] {
+        let (Some(offset), Some(length)) = (offset, length) else {
+            return Err("truncated header".into());
+        };
+        if offset.checked_add(length).is_none_or(|end| end > bytes.len() as u64) {
+            return Err("header range out of bounds".into());
+        }
+    }
     let most = 32 - width.max(height).leading_zeros();
     if !(1..=most).contains(&level_count) {
         return Err(format!("{level_count} levels"));

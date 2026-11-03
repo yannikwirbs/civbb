@@ -109,5 +109,13 @@ fn damaged_ktx2_is_an_error_not_a_panic() {
             }
             let _ = transcode_ktx2(&b);
         }
+        // Header byte ranges past the end (data format descriptor, key/values, supercompression global data):
+        // `basisu` 0.1 adds the global data's offset unchecked (found by the fuzzer).
+        for (at, width) in [(48, 4), (56, 4), (64, 8), (72, 8)] {
+            let mut b = bytes.to_vec();
+            b[at..at + width].fill(0xff);
+            b[at] = 0xfe;
+            assert!(transcode_ktx2(&b).is_err(), "range at {at}");
+        }
     }
 }
