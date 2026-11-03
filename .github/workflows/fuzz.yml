@@ -3,6 +3,12 @@ name: fuzz
 on:
   push:
     branches: [main]
+    paths:
+      - "crates/**"
+      - "fuzz/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/fuzz.yml"
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:

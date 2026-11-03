@@ -1,0 +1,17 @@
+# Markdown-only changes: crate READMEs (arch) and doc titles in the code map are all that can break.
+name: docs
+on:
+  push:
+    branches: [main]
+    paths: ["**.md"]
+  pull_request:
+    paths: ["**.md"]
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo xtask arch
+      - run: cargo xtask codemap --check
