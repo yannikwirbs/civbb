@@ -9,4 +9,5 @@ Continue CIVBB. Follow the session protocol in CLAUDE.md: read docs/ai/STATUS.md
 ## For the human, optional
 
 - More Booth avatars: drop the zips in `corpus/local/` and ask the session to convert them (`corpus/README.md`).
-- Local fuzzing is optional (CI runs it): `rustup toolchain install nightly`, `cargo install cargo-fuzz`, see `fuzz/README.md`.
+- Local fuzzing is optional (CI runs it). Nightly and cargo-fuzz are installed. On Windows, put the MSVC ASan
+  runtime on `PATH` first or the target exits `STATUS_DLL_NOT_FOUND`; see `fuzz/README.md`.

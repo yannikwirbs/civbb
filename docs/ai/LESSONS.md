@@ -79,3 +79,5 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   indices: wedges (split normals, UV seams) make every flat-shaded edge look open.
 - `gh run list --commit <sha>` right after `git push` can come back empty; list runs a few seconds later (or by
   `--limit`) and watch each run ID.
+- `cargo fuzz run` on Windows exits `0xc0000135` (STATUS_DLL_NOT_FOUND): put the MSVC ASan runtime on `PATH`
+  (`.../VC/Tools/MSVC/<ver>/bin/Hostx64/x64`, holds `clang_rt.asan_dynamic-x86_64.dll`). See `fuzz/README.md`.
