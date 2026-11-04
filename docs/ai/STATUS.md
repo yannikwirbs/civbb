@@ -5,7 +5,20 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.9 Reports and parity** (M0.8 closed).
-- Next issue: #35 FLIP parity, then #58 toon outlines, #65 KTX2 sizes, #66 constraint pass cost.
+- Next issues: #65 and #68 together (texture codec and quality: KTX2 size against FLIP parity), then #69 parity
+  framing, #66 constraint pass cost. Then M0.9 closes.
+- FLIP parity (ADR 0033): `civbb-client parity <reference> <test> --key <k> [--images <dir>]` renders both avatars
+  with the reference's rig (640x640, front/left/back/right framed from the bind-pose bounds) in every state
+  (`civbb_client::parity::states`: rest, then each parameter set in turn; the stage tests call it too), reads
+  pixels back (`Renderer::read_last`) and scores each view with FLIP (`flip-rs`, checked against NVIDIA's
+  `flip-evaluator`) over the avatar's pixels: mean, p99, traffic light (green mean <= 0.02 and p99 <= 0.2, red
+  mean > 0.1 or p99 > 0.5). `civbb build --report --measure` compares the compiled package with the import before
+  any stage and adds `parity` to the report plus `r.parity/*.png`. Untextured corpus/local files score exactly 0;
+  textured ones are yellow or red from `atlas` and ETC1S `compress` (#68; table on #35). lean and bloated are green
+  in every state (`crates/pipeline/tests/parity.rs`).
+- Toon outlines (ADR 0034): inverted hulls, a second indirect draw per outlined toon submesh (`Shader::Outline`,
+  front faces culled), width in metres times the width texture's G channel sampled in the vertex shader, unlit
+  outline colour. Material records are 84 words.
 - Per-avatar report (ADR 0032): `civbb build <src> --key <k> --report r.json [--measure]` writes `r.json` and `r.md`:
   stats after import and after each stage (`civbb_pipeline::compile` runs them), package size, and with
   `--measure` the output of `civbb-client measure` (run as a process from next to `civbb`; release only): `bench`
@@ -82,20 +95,18 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Blockers and needs-user
 
-- After the 2026-11-04 Actions outage, ci passed on cdbac2b and 938fd3f; fuzz on cdbac2b found a `basisu` KVD
-  underflow, fixed in #67. Check `gh run list` for the #67 commit first thing next session.
-
 - #37, #38 Unity tasks (M0.10, later). Sessions can run Unity themselves now; those two still need the human
   (Creator Companion projects, baselines).
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0032 are accepted. LOD follow-up: #63 runtime level switching in renderer and governor. Renderer follow-ups: #58 toon outlines (M0.9, parity needs them), #59 GPU
+None. ADRs 0017 to 0034 are accepted. LOD follow-up: #63 runtime level switching in renderer and governor. Renderer follow-ups: #59 GPU
 culling, #60 MSAA and multiview, #61 pipeline cache and freeing scene memory, #62 clustered lights and shadows
 (Phase 1). Dynamics constants and contact choices marked unverified wait
 for parity (M0.9). In M0.10: #52 (body pose), #53 (muscle frames for glTF/VRM), #54 (Unity-recorded animator
 goldens, now also material curve defaults, sRGB and `_ST` conventions per ADR 0025), #55 (box contacts, receiver value, body-part senders), #56 (animated constraint properties, VRChat
-constraint options). In M0.9: #65 (KTX2 can be larger on disk than PNG/JPEG), #66 (constraint pass cost).
+constraint options). In M0.9: #65 (KTX2 can be larger on disk than PNG/JPEG), #66 (constraint pass cost), #68 (ETC1S visibly lossy in
+parity), #69 (parity framing from bind-pose bounds).
 
 ## Session log
 
@@ -120,3 +131,7 @@ One line per session, newest last: date, what moved, what's next.
 - 2026-11-04: #34 per-avatar report (ADR 0032): stats per compiler stage, `civbb-client measure` (bench on one
   worker plus headless viewer frames), `civbb build --report --measure`, reports for all 31 local files; `view
   --frames` warm-up. #57 closed: `bench --package`, corpus constraints. Opened #65, #66. Fuzzer found #67 (KVD alignment), fixed. Next: #35.
+- 2026-11-04 (2): #35 FLIP parity (ADR 0033): `civbb-client parity`, `Renderer::read_last`, `flip-rs` (nv-flip's
+  tinyexr clashes with basisu's at link time), report `parity` key, all 32 corpus/local files scored (table on #35).
+  #58 toon outlines as inverted hulls (ADR 0034). Opened #68 (ETC1S loses visible detail), #69 (framing). Next: #65
+  with #68.

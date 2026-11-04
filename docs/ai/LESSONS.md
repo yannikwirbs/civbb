@@ -90,3 +90,12 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
 - `gh run view <id> --log-failed` prints nothing while any job of the run is still going; fetch a finished job's log
   with `gh api repos/yannikwirbs/civbb/actions/jobs/<job id>/logs` (job ids from `gh run view <id> --json jobs`).
 - Don't benchmark while compiling: run timing batches alone (background them and wait) or the numbers mean nothing.
+- C/C++ `-sys` crates may bundle the same third-party code with external linkage: `nv-flip-sys` and
+  `basisu_c_sys` both compile tinyexr, so any binary linking both fails with LNK2005. `cargo clippy` does not
+  link; build a test binary that pulls in both before settling on a native dependency.
+- Python heredocs through the Bash tool turn `\n` inside Rust string literals into real newlines too (valid Rust,
+  but it breaks string continuations and reads badly). Write Rust strings with escapes through Edit/Write only.
+- Reusing the viewer's draw for other cameras: check every hard-coded camera value (its field of view was fixed at
+  0.9 rad, which made the parity rig's framing look wrong).
+- Parity renders are a stage ablation tool: run `parity::run` on the import after each stage prefix (a throwaway
+  `#[ignore]` test in `crates/pipeline/tests`, release) to see which stage adds FLIP error.
