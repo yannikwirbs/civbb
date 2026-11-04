@@ -81,3 +81,12 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   `--limit`) and watch each run ID.
 - `cargo fuzz run` on Windows exits `0xc0000135` (STATUS_DLL_NOT_FOUND): put the MSVC ASan runtime on `PATH`
   (`.../VC/Tools/MSVC/<ver>/bin/Hostx64/x64`, holds `clang_rt.asan_dynamic-x86_64.dll`). See `fuzz/README.md`.
+- Goldens pin counts, not encoded sizes: the signed lean package was 125,221 bytes on Windows and 125,199 on the
+  Ubuntu runner with every count equal. `serde_json::Value` sorts keys (no `preserve_order`), so a golden written
+  through it is alphabetical; compare by value.
+- Viewer timings: the first frame creates the swapchain (170 ms), so short `--frames` means need a warm-up; and CPU
+  per frame reads ~10 % higher at vsync than flat out (the CPU idles and cools between paced frames; a 4.5 ms sleep
+  between headless frames reproduces it). Compare paced with paced, flat out with flat out.
+- `gh run view <id> --log-failed` prints nothing while any job of the run is still going; fetch a finished job's log
+  with `gh api repos/yannikwirbs/civbb/actions/jobs/<job id>/logs` (job ids from `gh run view <id> --json jobs`).
+- Don't benchmark while compiling: run timing batches alone (background them and wait) or the numbers mean nothing.

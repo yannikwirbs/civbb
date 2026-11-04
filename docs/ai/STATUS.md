@@ -5,7 +5,14 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.9 Reports and parity** (M0.8 closed).
-- Next issue: #34 per-avatar report, then #35 FLIP parity, #57 benchmark packages, #58 toon outlines.
+- Next issue: #35 FLIP parity, then #58 toon outlines, #65 KTX2 sizes, #66 constraint pass cost.
+- Per-avatar report (ADR 0032): `civbb build <src> --key <k> --report r.json [--measure]` writes `r.json` and `r.md`:
+  stats after import and after each stage (`civbb_pipeline::compile` runs them), package size, and with
+  `--measure` the output of `civbb-client measure` (run as a process from next to `civbb`; release only): `bench`
+  on one worker and the viewer's frames on an offscreen target (`Renderer::headless`), GPU null without a device.
+  Golden for lean counts: `crates/pipeline/tests/golden/report-lean.json` (`CIVBB_BLESS=1` rewrites it). All 31
+  files in corpus/local build with measured reports (summary on #34): e.g. Yumeka draws 23 to 7, 563 shapes to 0,
+  7.6 µs CPU and 17.9 µs GPU per avatar; HAOLAN textures 19.0 to 3.3 MB, 33.5 µs GPU.
 - Compiler stages in `civbb-pipeline`, run by `civbb build` between import and packaging, each proven
   behaviour-identical by tests that step islands before and after:
   - Order in `civbb build`: `prune`, `atlas`, `merge`, `lod`, `collapse`, `compress`.
@@ -50,16 +57,19 @@ Read at the start of every session; update at the end. Keep it short: the queue 
   address). Shaders are Slang in `crates/render/shaders/` (`skin`, `mesh`), compiled by `cargo xtask shaders`
   (Vulkan SDK 1.4.363.0 at `C:/VulkanSDK/1.4.363.0`) to committed SPIR-V; `ci` fails on a stale one.
 - Viewer (ADR 0024): `civbb-client view [<pkg> --key <key> | --avatar lean|bloated] [--copies N] [--frames F]
-  [--lod L]`; the title shows triangles per copy.
+  [--warmup W] [--lod L]`; the title shows triangles per copy; `--frames` summarises the F frames after a 60-frame
+  warm-up (ADR 0032).
   glTF/VRM go through `civbb build` first (client may not depend on pipeline). Release, reference PC: 100 bloated
   avatars 1.72 ms CPU per frame (systems 0.53 ms), 0.56 ms GPU; 4 Yumeka 1.5 ms CPU, 0.21 ms GPU. AliciaSolid
   renders textured and toon-shaded. Debug builds are ~30x slower on the CPU (validation).
 - `civbb-core`: shared math, `jobs::islands` (one rayon job per avatar), per-system `Counters`. `civbb-client`:
   `Model`/`Island` (animator, constraints, IK stub, dynamics, world poses) and `frame::step` with the contact pass
-  feeding next frame's parameters (ADR 0020); `civbb-client bench` prints JSON (#23).
+  feeding next frame's parameters (ADR 0020); `civbb-client bench [--package <pkg> --key <key>]` prints JSON (#23,
+  #57).
 - Benchmark on the reference PC (release): 100 bloated avatars 3.23 ms/frame on 1 thread, 0.43 ms on 16 (7.5x);
-  1000 avatars 32.6 ms to 3.7 ms (8.9x). Dynamics is ~83 % of island CPU. Corpus avatars have no constraints and
-  real converted avatars can't be benchmarked yet (#57, M0.9).
+  1000 avatars 32.6 ms to 3.7 ms (8.9x), measured before the corpus got constraints. Corpus constraints (#57): lean
+  2 twist helpers, bloated 67 (twists and tail bones); bloated one worker 30.0 to 42.9 µs per avatar, of which
+  constraints 12.1 µs and dynamics 25.7 µs; the constraint pass is slow (#66).
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). `civbb-dynamics`: XPBD PhysBone chains
   with grab/pose, colliders and limits (ADRs 0015, 0016), and contacts with the cross-avatar grid broadphase
@@ -77,12 +87,12 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0031 are accepted. LOD follow-up: #63 runtime level switching in renderer and governor. Renderer follow-ups: #58 toon outlines (M0.9, parity needs them), #59 GPU
+None. ADRs 0017 to 0032 are accepted. LOD follow-up: #63 runtime level switching in renderer and governor. Renderer follow-ups: #58 toon outlines (M0.9, parity needs them), #59 GPU
 culling, #60 MSAA and multiview, #61 pipeline cache and freeing scene memory, #62 clustered lights and shadows
 (Phase 1). Dynamics constants and contact choices marked unverified wait
 for parity (M0.9). In M0.10: #52 (body pose), #53 (muscle frames for glTF/VRM), #54 (Unity-recorded animator
 goldens, now also material curve defaults, sRGB and `_ST` conventions per ADR 0025), #55 (box contacts, receiver value, body-part senders), #56 (animated constraint properties, VRChat
-constraint options). In M0.9: #57 (benchmark packages and constraints).
+constraint options). In M0.9: #65 (KTX2 can be larger on disk than PNG/JPEG), #66 (constraint pass cost).
 
 ## Session log
 
@@ -104,3 +114,6 @@ One line per session, newest last: date, what moved, what's next.
 - 2026-11-03 (7): M0.8 closed. #33 skin-aware LOD chain with meshoptimizer (ADR 0031, format v8): three prefix
   levels per mesh, `civbb-client view --lod N`, AliciaSolid captured at each level. Opened #63. The fuzzer found a `basisu` overflow panic on KTX2 header ranges, fixed (#64).
   Next: M0.9 from #34.
+- 2026-11-04: #34 per-avatar report (ADR 0032): stats per compiler stage, `civbb-client measure` (bench on one
+  worker plus headless viewer frames), `civbb build --report --measure`, reports for all 31 local files; `view
+  --frames` warm-up. #57 closed: `bench --package`, corpus constraints. Opened #65, #66. Next: #35.
