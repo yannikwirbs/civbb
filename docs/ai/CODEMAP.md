@@ -213,6 +213,7 @@ Internal deps: none
 - `docs/adr/0033-flip-parity-against-the-source.md`: 0033: FLIP parity compares the compiled avatar with its own import in our renderer, per state and view
 - `docs/adr/0034-toon-outlines-as-inverted-hulls.md`: 0034: Toon outlines are inverted hulls drawn as a second indirect draw per outlined submesh
 - `docs/adr/0035-texture-codec-ladder-and-shared-mips.md`: 0035: Textures are UASTC or XUASTC within their source's size, with mips shared with the renderer and wrapping atlas gutters
+- `docs/adr/0036-parity-rig-frames-the-rest-pose.md`: 0036: The parity rig frames what the avatar shows at rest, in world space
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

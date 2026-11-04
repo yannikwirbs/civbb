@@ -7,6 +7,7 @@ use std::sync::Arc;
 use civbb_core::math::Pose;
 use civbb_format::Avatar;
 use civbb_format::cost::{Light, Parity, Rig, RigView, StateParity, Thresholds, ViewScore};
+use civbb_format::math::{Mat4, Vec3};
 use civbb_render::Renderer;
 
 use crate::frame;
@@ -74,10 +75,10 @@ pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &str, &[Island])
     }
 }
 
-/// The rig for an avatar: front, left, back and right, level with the centre of its bind-pose bounds, each as far
+/// The rig for an avatar: front, left, back and right, level with the centre of its [`rest_bounds`], each as far
 /// away as the bounds need to fill 90 % of the image (height or width across the view) from their near side.
 pub fn rig(avatar: &Avatar) -> Rig {
-    let (lo, hi) = view::bounds(avatar);
+    let (lo, hi) = rest_bounds(avatar);
     let centre: [f32; 3] = std::array::from_fn(|k| (lo[k] + hi[k]) / 2.0);
     let size: [f32; 3] = std::array::from_fn(|k| (hi[k] - lo[k]).max(0.01));
     let tan_y = (FOV_Y / 2.0).tan();
@@ -107,6 +108,69 @@ pub fn rig(avatar: &Avatar) -> Rig {
         background: [BACKGROUND[0], BACKGROUND[1], BACKGROUND[2]],
         views,
     }
+}
+
+/// The world-space bounds of what the avatar shows at rest: the vertices of meshes on active nodes after
+/// [`FRAMES_PER_STATE`] frames, skinned and with shape weights applied. All zero when nothing shows.
+pub fn rest_bounds(avatar: &Avatar) -> (Vec3, Vec3) {
+    let mut island = Island::new(Arc::new(Model::new(avatar)), 1, true, Pose::IDENTITY);
+    for _ in 0..FRAMES_PER_STATE {
+        frame::step(std::slice::from_mut(&mut island), |_, _| true, 1.0 / 60.0);
+    }
+    let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
+    for (mesh, vertices) in avatar.meshes.iter().zip(placed(avatar, &island)) {
+        if island.active()[mesh.node as usize] {
+            for p in vertices {
+                for k in 0..3 {
+                    lo[k] = lo[k].min(p[k]);
+                    hi[k] = hi[k].max(p[k]);
+                }
+            }
+        }
+    }
+    if lo[0] > hi[0] { ([0.0; 3], [0.0; 3]) } else { (lo, hi) }
+}
+
+/// Every mesh's vertices in world space after the island's shape weights and skinning, as the GPU places them.
+pub fn placed(avatar: &Avatar, island: &Island) -> Vec<Vec<Vec3>> {
+    let mut weights = Vec::new();
+    island.shape_weights(&mut weights);
+    let world = island.world();
+    let mut out = Vec::new();
+    for (mesh, weights) in avatar.meshes.iter().zip(&weights) {
+        let mut pos = mesh.positions.clone();
+        for (s, &w) in mesh.blend_shapes.iter().zip(weights) {
+            if w != 0.0 {
+                for d in &s.deltas {
+                    (0..3).for_each(|k| pos[d.vertex as usize][k] += w * d.position[k]);
+                }
+            }
+        }
+        let placed: Vec<Vec3> = match &mesh.skin {
+            Some(s) if !s.joints.is_empty() => pos
+                .iter()
+                .zip(&s.vertex_joints)
+                .zip(&s.vertex_weights)
+                .map(|((p, js), ws)| {
+                    let mut v = [0.0; 3];
+                    for (&j, &w) in js.iter().zip(ws).filter(|(_, w)| **w != 0.0) {
+                        let q = world[s.joints[j as usize] as usize].point(transform(&s.inverse_bind[j as usize], *p));
+                        (0..3).for_each(|k| v[k] += w * q[k]);
+                    }
+                    v
+                })
+                .collect(),
+            _ => pos.iter().map(|p| world[mesh.node as usize].point(*p)).collect(),
+        };
+        // Signed zeros compare equal but sort apart.
+        out.push(placed.iter().map(|p| p.map(|x| x + 0.0)).collect());
+    }
+    out
+}
+
+/// A column-major matrix applied to a point.
+fn transform(m: &Mat4, p: Vec3) -> Vec3 {
+    std::array::from_fn(|r| m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r])
 }
 
 /// Renders `test` and `reference` with the reference's [`rig`] in every [`states`] state and scores each view. With

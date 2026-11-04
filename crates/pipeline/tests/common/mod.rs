@@ -3,7 +3,7 @@
 use std::cmp::Ordering;
 
 use civbb_client::Island;
-use civbb_format::math::{Mat4, Vec3};
+pub use civbb_client::parity::placed;
 use civbb_format::{Avatar, Caps, validate};
 
 pub fn valid(a: &Avatar) {
@@ -74,46 +74,4 @@ pub fn look(avatar: &Avatar, island: &Island) -> Vec<(u32, [[f32; 3]; 3])> {
         })
     });
     out
-}
-
-/// Every mesh's vertices in world space after shape weights and skinning.
-pub fn placed(avatar: &Avatar, island: &Island) -> Vec<Vec<Vec3>> {
-    let mut weights = Vec::new();
-    island.shape_weights(&mut weights);
-    let world = island.world();
-    let mut out = Vec::new();
-    for (mesh, weights) in avatar.meshes.iter().zip(&weights) {
-        let mut pos = mesh.positions.clone();
-        for (s, &w) in mesh.blend_shapes.iter().zip(weights) {
-            if w != 0.0 {
-                for d in &s.deltas {
-                    (0..3).for_each(|k| pos[d.vertex as usize][k] += w * d.position[k]);
-                }
-            }
-        }
-        let placed: Vec<Vec3> = match &mesh.skin {
-            Some(s) if !s.joints.is_empty() => pos
-                .iter()
-                .zip(&s.vertex_joints)
-                .zip(&s.vertex_weights)
-                .map(|((p, js), ws)| {
-                    let mut v = [0.0; 3];
-                    for (&j, &w) in js.iter().zip(ws).filter(|(_, w)| **w != 0.0) {
-                        let q = world[s.joints[j as usize] as usize].point(transform(&s.inverse_bind[j as usize], *p));
-                        (0..3).for_each(|k| v[k] += w * q[k]);
-                    }
-                    v
-                })
-                .collect(),
-            _ => pos.iter().map(|p| world[mesh.node as usize].point(*p)).collect(),
-        };
-        // Signed zeros compare equal but sort apart.
-        out.push(placed.iter().map(|p| p.map(|x| x + 0.0)).collect());
-    }
-    out
-}
-
-/// A column-major matrix applied to a point.
-fn transform(m: &Mat4, p: Vec3) -> Vec3 {
-    std::array::from_fn(|r| m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r])
 }

@@ -139,3 +139,18 @@ fn the_rig_circles_the_bounds_centre() {
     // The avatar faces +Z, so its left is +X.
     assert!(front[2] > t[2] && back[2] < t[2] && left[0] > t[0] && right[0] < t[0]);
 }
+
+#[test]
+fn the_rig_frames_what_shows_at_rest_in_world_space() {
+    // Moving the root node moves the rest pose and its bounds; bind-pose mesh positions would not move (#69).
+    let avatar = civbb_corpus::generate(&civbb_corpus::lean());
+    let (lo, hi) = parity::rest_bounds(&avatar);
+    assert!(hi[1] - lo[1] > 1.0, "a standing avatar: {lo:?} {hi:?}");
+    let mut moved = avatar.clone();
+    let root = moved.hierarchy.nodes.iter().position(|n| n.parent.is_none()).unwrap();
+    moved.hierarchy.nodes[root].rest.translation[0] += 2.0;
+    let (mlo, mhi) = parity::rest_bounds(&moved);
+    assert!((mlo[0] - lo[0] - 2.0).abs() < 1e-4 && (mhi[0] - hi[0] - 2.0).abs() < 1e-4);
+    let shift = parity::rig(&moved).views[0].target[0] - parity::rig(&avatar).views[0].target[0];
+    assert!((shift - 2.0).abs() < 1e-4, "the rig follows: {shift}");
+}

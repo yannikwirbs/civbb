@@ -1,6 +1,6 @@
 # 0033: FLIP parity compares the compiled avatar with its own import in our renderer, per state and view
 
-Status: accepted
+Status: accepted; rig bounds superseded by 0036
 Date: 2026-11-04
 
 ## Context
