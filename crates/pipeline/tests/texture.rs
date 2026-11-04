@@ -14,8 +14,9 @@ use civbb_format::math::Transform;
 use civbb_format::mesh::{Mesh, Submesh};
 use civbb_format::package::Platform;
 use civbb_format::{Avatar, BlobId, Caps, validate};
+use civbb_pipeline::atlas::GUTTER;
 use civbb_pipeline::gltf_import::{Limits, dir_resolver, import};
-use civbb_pipeline::texture::{decode, max_side};
+use civbb_pipeline::texture::{LADDER, decode, encode_ktx2, max_side};
 use civbb_pipeline::{Imported, atlas, compress, package, prune};
 use image::RgbaImage;
 
@@ -321,7 +322,11 @@ fn atlas_rectangles_fit_the_cap() {
         .unwrap();
     let image = decode(&fits.blobs[&t.blob], t.format).unwrap();
     assert!(image.width() <= 128 && image.height() <= 128);
-    assert_eq!((image.width() % 4, image.height() % 4), (0, 0), "4-texel blocks");
+    assert_eq!(
+        (image.width() % GUTTER, image.height() % GUTTER),
+        (0, 0),
+        "aligned for mips 0 to 4"
+    );
 }
 
 /// RMS and largest per-channel error of a KTX2 blob's level 0 against `source`.
@@ -402,14 +407,15 @@ fn compress_encodes_ktx2_within_codec_error() {
     valid(&i);
     let c = compress(&mut i, Platform::Desktop).unwrap();
     valid(&i);
-    assert_eq!((c.textures, c.uastc, c.capped), (2, 1, 0));
+    assert_eq!((c.textures, c.uastc, c.capped), (2, 2, 0));
     assert_eq!(i.blobs.len(), 2, "sources dropped");
     for t in &i.avatar.textures {
         assert_eq!(t.format, ImageFormat::Ktx2);
     }
     let ktx2 = |n: usize| &i.blobs[&i.avatar.textures[n].blob];
     let source = |n: usize| basisu::Transcoder::new(ktx2(n)).unwrap().source_format();
-    assert_eq!(source(0), basisu::SourceFormat::Etc1s);
+    // UASTC, the ladder's first codec, is the smallest for both (the colour image does not fit its PNG).
+    assert_eq!(source(0), basisu::SourceFormat::UastcLdr);
     assert_eq!(source(1), basisu::SourceFormat::UastcLdr);
     assert_eq!(
         basisu::Transcoder::new(ktx2(0)).unwrap().level_count(),
@@ -417,9 +423,28 @@ fn compress_encodes_ktx2_within_codec_error() {
         "mips down to 1x1"
     );
     let (rms, max) = codec_error(ktx2(0), &colour);
-    assert!(rms < 8.0 && max < 48, "ETC1S: rms {rms}, max {max}");
+    assert!(rms < 2.0 && max <= 8, "UASTC colour: rms {rms}, max {max}");
     let (rms, max) = codec_error(ktx2(1), &normal);
     assert!(rms < 1.0 && max <= 4, "UASTC: rms {rms}, max {max}");
+}
+
+#[test]
+fn compress_takes_the_smallest_codec_when_none_fits_the_source() {
+    // A flat image is a few hundred bytes as PNG: no ladder codec fits, so the smallest is kept and counted.
+    let (mut i, _, _) = pbr_avatar();
+    let flat = RgbaImage::from_pixel(256, 256, image::Rgba([200, 120, 40, 255]));
+    let pf = png(&flat);
+    let id = BlobId::of(&pf);
+    i.blobs.insert(id, pf);
+    i.avatar.textures[0].blob = id;
+    let c = compress(&mut i, Platform::Desktop).unwrap();
+    assert_eq!(c.larger, 1);
+    let smallest = LADDER
+        .iter()
+        .map(|&codec| encode_ktx2(&flat, true, codec).unwrap().len())
+        .min()
+        .unwrap();
+    assert_eq!(i.blobs[&i.avatar.textures[0].blob].len(), smallest);
 }
 
 #[test]

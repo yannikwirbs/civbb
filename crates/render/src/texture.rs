@@ -1,5 +1,5 @@
 //! Bindless textures: one descriptor array of sampled images that every draw indexes by number, filled as
-//! textures load: RGBA8 with mips generated on upload, or BC7 with its own mips (design doc §6, ADRs 0023, 0029).
+//! textures load: RGBA8 with mips made on the CPU, or BC7 with its own mips (design doc §6, ADRs 0023, 0029, 0035).
 
 use ash::vk;
 
@@ -113,8 +113,8 @@ impl Textures {
         self.images.is_empty()
     }
 
-    /// Uploads an RGBA8 image (`srgb` for colour, linear for data such as normals and masks), generates its mips
-    /// and returns its index in the array.
+    /// Uploads an RGBA8 image (`srgb` for colour, linear for data such as normals and masks) with its mips from
+    /// [`civbb_core::mips::mips`], the same the compiler encodes (ADR 0035), and returns its index in the array.
     ///
     /// # Panics
     ///
@@ -125,14 +125,15 @@ impl Textures {
             u64::from(width) * u64::from(height) * 4,
             "RGBA8 texel count"
         );
-        let levels = 32 - width.max(height).leading_zeros();
         let format = if srgb {
             vk::Format::R8G8B8A8_SRGB
         } else {
             vk::Format::R8G8B8A8_UNORM
         };
-        let image = self.create(ctx, width, height, levels, format, vk::ImageUsageFlags::TRANSFER_SRC)?;
-        let uploaded = upload_with_mips(ctx, &image, width, height, levels, rgba);
+        let mut levels = vec![rgba.to_vec()];
+        levels.extend(civbb_core::mips::mips(rgba, width, height, srgb));
+        let image = self.create(ctx, width, height, levels.len() as u32, format)?;
+        let uploaded = upload_levels(ctx, &image, width, height, &levels);
         self.insert(ctx, image, uploaded)
     }
 
@@ -169,21 +170,13 @@ impl Textures {
         } else {
             vk::Format::BC7_UNORM_BLOCK
         };
-        let image = self.create(ctx, width, height, count, format, vk::ImageUsageFlags::empty())?;
+        let image = self.create(ctx, width, height, count, format)?;
         let uploaded = upload_levels(ctx, &image, width, height, levels);
         self.insert(ctx, image, uploaded)
     }
 
     /// Creates a sampled 2D image that transfers can write.
-    fn create(
-        &self,
-        ctx: &Context,
-        width: u32,
-        height: u32,
-        levels: u32,
-        format: vk::Format,
-        usage: vk::ImageUsageFlags,
-    ) -> Result<Image> {
+    fn create(&self, ctx: &Context, width: u32, height: u32, levels: u32, format: vk::Format) -> Result<Image> {
         assert!(
             (1..=16384).contains(&width) && (1..=16384).contains(&height),
             "texture size {width}x{height}"
@@ -200,7 +193,7 @@ impl Textures {
             .mip_levels(levels)
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
-            .usage(vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST | usage);
+            .usage(vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST);
         ctx.create_image("texture", &info, vk::ImageAspectFlags::COLOR)
     }
 
@@ -246,103 +239,6 @@ impl Textures {
             d.destroy_descriptor_set_layout(self.layout, None);
         }
     }
-}
-
-/// Copies `rgba` into mip 0 through a staging buffer, blits each mip from the one above, and leaves every mip
-/// ready for fragment shaders.
-fn upload_with_mips(ctx: &Context, image: &Image, width: u32, height: u32, levels: u32, rgba: &[u8]) -> Result<()> {
-    let mut staging = ctx.create_buffer(
-        "texture staging",
-        rgba.len() as u64,
-        vk::BufferUsageFlags::TRANSFER_SRC,
-        MemoryLocation::CpuToGpu,
-    )?;
-    staging.mapped_mut().expect("CpuToGpu memory is mapped")[..rgba.len()].copy_from_slice(rgba);
-    use vk::AccessFlags2 as A;
-    use vk::ImageLayout as L;
-    use vk::PipelineStageFlags2 as S;
-    let result = ctx.one_shot(|d, cmd| {
-        let barrier = |level, count, (src_stage, src_access, old), (dst_stage, dst_access, new)| {
-            vk::ImageMemoryBarrier2::default()
-                .src_stage_mask(src_stage)
-                .src_access_mask(src_access)
-                .dst_stage_mask(dst_stage)
-                .dst_access_mask(dst_access)
-                .old_layout(old)
-                .new_layout(new)
-                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-                .image(image.handle)
-                .subresource_range(vk::ImageSubresourceRange {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    base_mip_level: level,
-                    level_count: count,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                })
-        };
-        let undefined = (S::NONE, A::NONE, L::UNDEFINED);
-        let written = (S::ALL_TRANSFER, A::TRANSFER_WRITE, L::TRANSFER_DST_OPTIMAL);
-        let source = (S::BLIT, A::TRANSFER_READ, L::TRANSFER_SRC_OPTIMAL);
-        let read = (S::FRAGMENT_SHADER, A::SHADER_SAMPLED_READ, L::SHADER_READ_ONLY_OPTIMAL);
-        let size = |level: u32| vk::Offset3D {
-            x: (width >> level).max(1) as i32,
-            y: (height >> level).max(1) as i32,
-            z: 1,
-        };
-        // SAFETY: the image and staging buffer are alive and sized for these commands.
-        unsafe {
-            fn dep<'a>(b: &'a [vk::ImageMemoryBarrier2<'a>]) -> vk::DependencyInfo<'a> {
-                vk::DependencyInfo::default().image_memory_barriers(b)
-            }
-            d.cmd_pipeline_barrier2(cmd, &dep(&[barrier(0, levels, undefined, written)]));
-            let region = vk::BufferImageCopy::default()
-                .image_subresource(vk::ImageSubresourceLayers {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    mip_level: 0,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                })
-                .image_extent(vk::Extent3D {
-                    width,
-                    height,
-                    depth: 1,
-                });
-            d.cmd_copy_buffer_to_image(cmd, staging.handle, image.handle, L::TRANSFER_DST_OPTIMAL, &[region]);
-            for level in 1..levels {
-                d.cmd_pipeline_barrier2(cmd, &dep(&[barrier(level - 1, 1, written, source)]));
-                let layers = |mip_level| vk::ImageSubresourceLayers {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    mip_level,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                };
-                let blit = vk::ImageBlit::default()
-                    .src_subresource(layers(level - 1))
-                    .src_offsets([vk::Offset3D::default(), size(level - 1)])
-                    .dst_subresource(layers(level))
-                    .dst_offsets([vk::Offset3D::default(), size(level)]);
-                d.cmd_blit_image(
-                    cmd,
-                    image.handle,
-                    L::TRANSFER_SRC_OPTIMAL,
-                    image.handle,
-                    L::TRANSFER_DST_OPTIMAL,
-                    &[blit],
-                    vk::Filter::LINEAR,
-                );
-            }
-            let last = levels - 1;
-            let mut done = vec![barrier(last, 1, written, read)];
-            if last > 0 {
-                done.push(barrier(0, last, source, read));
-            }
-            d.cmd_pipeline_barrier2(cmd, &dep(&done));
-        }
-    });
-    // SAFETY: `one_shot` waited for the copy, or never submitted it.
-    unsafe { ctx.destroy_buffer(staging) };
-    result
 }
 
 /// Copies every mip level from one staging buffer and leaves them ready for fragment shaders.

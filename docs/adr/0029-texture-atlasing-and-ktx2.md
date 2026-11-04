@@ -1,6 +1,6 @@
 # 0029: Textures are atlased per material model and shipped as KTX2, encoded by basisu and transcoded in Rust
 
-Status: accepted
+Status: accepted; codecs (point 3), mips and gutters (point 7) superseded by 0035
 Date: 2026-11-03
 
 ## Context

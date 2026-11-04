@@ -1,5 +1,5 @@
 //! Compiler stage 4 texture compression: images capped per platform and encoded to KTX2 with Basis Universal, UASTC
-//! for normal maps and ETC1S for the rest (design doc §9, ADR 0029).
+//! or XUASTC within the source's size (design doc §9, ADRs 0029, 0035).
 
 use std::collections::BTreeMap;
 use std::io::Cursor;
@@ -7,15 +7,13 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use basisu_c_sys::BasisTextureFormat;
-use basisu_c_sys::common::{
-    BU_COMP_FLAGS_GEN_MIPS_WRAP, BU_COMP_FLAGS_KTX2_OUTPUT, BU_COMP_FLAGS_KTX2_UASTC_ZSTD, BU_COMP_FLAGS_SRGB,
-};
+use basisu_c_sys::common::{BU_COMP_FLAGS_KTX2_OUTPUT, BU_COMP_FLAGS_KTX2_UASTC_ZSTD, BU_COMP_FLAGS_SRGB};
 use basisu_c_sys::extra::{
     BasisuEncoder, BasisuEncoderParams, SourceImage, SourceImageFormat, basisu_encoder_init, types,
 };
-use civbb_format::material::{ColorSpace, ImageFormat, MaterialModel};
+use civbb_format::BlobId;
+use civbb_format::material::{ColorSpace, ImageFormat};
 use civbb_format::package::Platform;
-use civbb_format::{Avatar, BlobId};
 use image::RgbaImage;
 use image::imageops::FilterType;
 
@@ -37,8 +35,10 @@ pub fn max_side(platform: Platform) -> u32 {
 pub struct Compressed {
     /// Textures encoded to KTX2.
     pub textures: usize,
-    /// Of those, encoded as UASTC (normal maps).
+    /// Of those, encoded as UASTC; the rest are XUASTC.
     pub uastc: usize,
+    /// Of those, larger than their source image: no ladder codec fitted (JPEG sources).
+    pub larger: usize,
     /// Textures halved to fit the platform's cap.
     pub capped: usize,
     /// Texture blob bytes before.
@@ -62,74 +62,95 @@ pub fn decode(bytes: &[u8], format: ImageFormat) -> Result<RgbaImage, String> {
     Ok(reader.decode().map_err(|e| e.to_string())?.into_rgba8())
 }
 
-/// Encodes RGBA8 texels as KTX2 with mips: UASTC at full quality when `uastc`, else ETC1S. Single-threaded, so the
-/// same input gives the same bytes.
-pub fn encode_ktx2(image: &RgbaImage, srgb: bool, uastc: bool) -> Result<Vec<u8>, String> {
+/// How a texture is encoded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Codec {
+    /// UASTC LDR 4x4 without RDO, Zstandard-supercompressed: nearly lossless, transcodes to BC7 and ASTC directly.
+    Uastc,
+    /// XUASTC LDR 4x4 at a unified quality, 1 to 100 (below 100 the weight grid is DCT-coded).
+    Xuastc(i32),
+}
+
+/// The codecs tried for each texture, best first: the first whose KTX2 is no larger than the texture's source blob
+/// is kept, else the smallest of them (ADR 0035).
+pub const LADDER: [Codec; 3] = [Codec::Uastc, Codec::Xuastc(90), Codec::Xuastc(75)];
+
+/// Encoder threads at most: one 4096-texel encode needs about 3 GB.
+const MAX_WORKERS: usize = 4;
+
+/// Encodes RGBA8 texels as KTX2 with `codec`, with the mips the renderer makes for RGBA8 textures
+/// ([`civbb_core::mips::mips`]). Single-threaded, so the same input gives the same bytes.
+pub fn encode_ktx2(image: &RgbaImage, srgb: bool, codec: Codec) -> Result<Vec<u8>, String> {
     basisu_encoder_init();
     let mut encoder = BasisuEncoder::new();
-    encoder
-        .set_image(SourceImage {
-            data: image.as_raw(),
-            format: SourceImageFormat::Rgba8,
-            size: types::Extent3d {
-                width: image.width(),
-                height: image.height(),
-                depth_or_array_layers: 1,
-            },
-        })
-        .map_err(|e| e.to_string())?;
-    let mut flags = BU_COMP_FLAGS_KTX2_OUTPUT | BU_COMP_FLAGS_GEN_MIPS_WRAP;
+    let (width, height) = image.dimensions();
+    let mut levels = vec![image.as_raw().clone()];
+    levels.extend(civbb_core::mips::mips(image.as_raw(), width, height, srgb));
+    for (i, data) in levels.iter().enumerate() {
+        let size = types::Extent3d {
+            width: (width >> i).max(1),
+            height: (height >> i).max(1),
+            depth_or_array_layers: 1,
+        };
+        let format = SourceImageFormat::Rgba8;
+        encoder
+            .set_image_slice(i as u32, SourceImage { data, format, size })
+            .map_err(|e| e.to_string())?;
+    }
+    let mut flags = BU_COMP_FLAGS_KTX2_OUTPUT;
     if srgb {
         flags |= BU_COMP_FLAGS_SRGB;
     }
-    let (format, quality) = if uastc {
-        flags |= BU_COMP_FLAGS_KTX2_UASTC_ZSTD;
-        (BasisTextureFormat::UastcLdr4x4, 100)
-    } else {
-        (BasisTextureFormat::Etc1s, 75)
+    let (format, quality, effort) = match codec {
+        Codec::Uastc => {
+            flags |= BU_COMP_FLAGS_KTX2_UASTC_ZSTD;
+            (BasisTextureFormat::UastcLdr4x4, 100, 2)
+        }
+        Codec::Xuastc(q) => (BasisTextureFormat::XuastcLdr4x4, q, 2),
     };
     encoder
         .compress(BasisuEncoderParams {
             basis_tex_format: format,
             quality_level: quality,
-            effort_level: 2,
+            effort_level: effort,
             flags_and_quality: flags,
             low_level_uastc_rdo_or_dct_quality: 0.0,
         })
         .map_err(|e| e.to_string())
 }
 
-/// Indices of textures some material samples as a normal map.
-pub fn normal_maps(a: &Avatar) -> Vec<bool> {
-    let mut normal = vec![false; a.textures.len()];
-    for m in &a.materials {
-        let slot = match &m.model {
-            MaterialModel::Pbr(p) => p.normal_tex,
-            MaterialModel::Toon(t) => t.normal_tex,
-            MaterialModel::Unlit(_) => None,
-        };
-        if let Some(s) = slot {
-            normal[s.texture as usize] = true;
+/// Encodes `image` with each [`LADDER`] codec in turn until one is no larger than `budget` bytes; returns it, or the
+/// smallest when none fits, and the codec.
+fn encode_within(image: &RgbaImage, srgb: bool, budget: usize) -> Result<(Vec<u8>, Codec), String> {
+    let mut best: Option<(Vec<u8>, Codec)> = None;
+    for codec in LADDER {
+        let ktx2 = encode_ktx2(image, srgb, codec)?;
+        if ktx2.len() <= budget {
+            return Ok((ktx2, codec));
+        }
+        if best.as_ref().is_none_or(|(b, _)| ktx2.len() < b.len()) {
+            best = Some((ktx2, codec));
         }
     }
-    normal
+    Ok(best.expect("the ladder is not empty"))
 }
 
 /// Encodes every PNG and JPEG texture of a validated import to KTX2, halving those larger than the platform's cap,
-/// and drops the source blobs. Textures are encoded in parallel, one per thread at a time.
+/// each with the best [`LADDER`] codec no larger than its source blob, and drops the source blobs. Textures are
+/// encoded in parallel, one per thread at a time, on at most four threads.
 pub fn compress(imported: &mut Imported, platform: Platform) -> Result<Compressed, String> {
     let a = &mut imported.avatar;
-    let normal = normal_maps(a);
     let cap = max_side(platform);
     let todo: Vec<usize> = (0..a.textures.len())
         .filter(|&i| a.textures[i].format != ImageFormat::Ktx2)
         .collect();
     let next = AtomicUsize::new(0);
-    // Per texture: its KTX2 bytes and whether it was capped.
-    type Done = BTreeMap<usize, Result<(Vec<u8>, bool), String>>;
+    // Per texture: its KTX2 bytes, the codec and whether it was capped.
+    type Done = BTreeMap<usize, Result<(Vec<u8>, Codec, bool), String>>;
     let done: Mutex<Done> = Mutex::new(BTreeMap::new());
     let workers = std::thread::available_parallelism()
         .map_or(1, |n| n.get())
+        .min(MAX_WORKERS)
         .min(todo.len());
     let (textures, blobs) = (&a.textures, &imported.blobs);
     std::thread::scope(|s| {
@@ -145,8 +166,9 @@ pub fn compress(imported: &mut Imported, platform: Platform) -> Result<Compresse
                             let (w, h) = ((image.width() / 2).max(1), (image.height() / 2).max(1));
                             image = image::imageops::resize(&image, w, h, FilterType::Triangle);
                         }
-                        let ktx2 = encode_ktx2(&image, t.color_space == ColorSpace::Srgb, normal[i])?;
-                        Ok((ktx2, capped))
+                        let srgb = t.color_space == ColorSpace::Srgb;
+                        let (ktx2, codec) = encode_within(&image, srgb, bytes.len())?;
+                        Ok((ktx2, codec, capped))
                     })()
                     .map_err(|e: String| format!("texture {:?}: {e}", t.name));
                     done.lock().expect("no worker panicked").insert(i, result);
@@ -159,13 +181,15 @@ pub fn compress(imported: &mut Imported, platform: Platform) -> Result<Compresse
         ..Compressed::default()
     };
     for (i, result) in done.into_inner().expect("no worker panicked") {
-        let (ktx2, capped) = result?;
+        let (ktx2, codec, capped) = result?;
         let t = &mut a.textures[i];
+        let source = imported.blobs.get(&t.blob).map_or(0, Vec::len);
+        c.larger += usize::from(ktx2.len() > source);
         t.format = ImageFormat::Ktx2;
         t.blob = BlobId::of(&ktx2);
         imported.blobs.insert(t.blob, ktx2);
         c.textures += 1;
-        c.uastc += usize::from(normal[i]);
+        c.uastc += usize::from(codec == Codec::Uastc);
         c.capped += usize::from(capped);
     }
     let used: Vec<BlobId> = a.textures.iter().map(|t| t.blob).collect();

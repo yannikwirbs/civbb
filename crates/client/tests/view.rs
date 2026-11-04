@@ -78,7 +78,11 @@ fn shape_weights_are_defaults_without_an_animator_binding() {
 }
 
 /// 16x8 KTX2 textures written by `civbb_pipeline::texture::encode_ktx2` (the fuzz seeds).
-const KTX2: [&[u8]; 2] = [include_bytes!("data/etc1s.ktx2"), include_bytes!("data/uastc.ktx2")];
+const KTX2: [&[u8]; 3] = [
+    include_bytes!("data/etc1s.ktx2"),
+    include_bytes!("data/uastc.ktx2"),
+    include_bytes!("data/xuastc.ktx2"),
+];
 
 #[test]
 fn ktx2_transcodes_every_level_to_bc7() {
@@ -116,6 +120,12 @@ fn damaged_ktx2_is_an_error_not_a_panic() {
             b[at..at + width].fill(0xff);
             b[at] = 0xfe;
             assert!(transcode_ktx2(&b).is_err(), "range at {at}");
+        }
+        // Layer and face counts that overflow `basisu` 0.1's image count (XUASTC).
+        for at in [28, 32, 36] {
+            let mut b = bytes.to_vec();
+            b[at..at + 4].fill(0xff);
+            assert!(transcode_ktx2(&b).is_err(), "count at {at}");
         }
         // Key/value data whose end is not 4-byte aligned: `basisu` 0.1 underflows scanning it (fuzzer, #67).
         let mut b = bytes.to_vec();

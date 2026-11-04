@@ -11,6 +11,7 @@ ash = "0.38"
 ash-window = "0.13"
 raw-window-handle = "0.6"
 gpu-allocator = { version = "0.28", default-features = false, features = ["std", "vulkan"] }
+civbb-core.workspace = true
 civbb-format.workspace = true
 
 [dev-dependencies]

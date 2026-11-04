@@ -1,6 +1,6 @@
 [package]
 name = "civbb-core"
-description = "Engine core: math, the job runner for per-avatar islands and per-system timing counters."
+description = "Engine core: math, texture mips, the job runner for per-avatar islands and per-system timing counters."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -438,6 +438,7 @@ dependencies = [
  "base64",
  "basisu_c_sys",
  "civbb-anim",
+ "civbb-core",
  "civbb-format",
  "getrandom 0.2.17",
  "gltf",
@@ -454,6 +455,7 @@ version = "0.0.0"
 dependencies = [
  "ash",
  "ash-window",
+ "civbb-core",
  "civbb-format",
  "gpu-allocator",
  "raw-window-handle",

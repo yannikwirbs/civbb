@@ -90,8 +90,14 @@ pub fn compile(
     snapshot("collapse", &imported);
     let c = compress(&mut imported, platform)?;
     log(format!(
-        "compressed {} textures to KTX2 ({} UASTC, {} capped), {} to {} bytes",
-        c.textures, c.uastc, c.capped, c.bytes_before, c.bytes_after
+        "compressed {} textures to KTX2 ({} UASTC, {} XUASTC, {} capped, {} larger than their source), {} to {} bytes",
+        c.textures,
+        c.uastc,
+        c.textures - c.uastc,
+        c.capped,
+        c.larger,
+        c.bytes_before,
+        c.bytes_after
     ));
     snapshot("compress", &imported);
     let avatar = imported.avatar.name.clone();

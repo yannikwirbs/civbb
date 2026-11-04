@@ -16,8 +16,9 @@ use crate::Imported;
 use crate::prune::node_paths;
 use crate::texture::decode;
 
-/// Texels of edge-repeating gutter around each rectangle: clean down to mip 3.
-pub const GUTTER: u32 = 8;
+/// Texels of gutter around each rectangle, wrapping its content as the repeating sampler does; also the alignment
+/// of every rectangle and of the atlas sides, so mips 0 to 4 of a rectangle equal its texture's own (ADR 0035).
+pub const GUTTER: u32 = 16;
 
 const IDENTITY_ST: [f32; 4] = [1.0, 1.0, 0.0, 0.0];
 
@@ -442,21 +443,21 @@ fn icons(menu: &Menu, f: &mut impl FnMut(u32)) {
     }
 }
 
-fn ceil4(x: u32) -> u32 {
-    x.div_ceil(4) * 4
+fn ceil_gutter(x: u32) -> u32 {
+    x.div_ceil(GUTTER) * GUTTER
 }
 
-/// Shelf-packs rectangles of content `sizes` (tallest first), each with its gutter and on 4-texel boundaries, into
+/// Shelf-packs rectangles of content `sizes` (tallest first), each with its gutter and on [`GUTTER`] boundaries, into
 /// the smallest atlas whose sides are at most `max`: its size and each footprint's corner. `None` if they don't fit.
 fn pack(sizes: &[Size], max: u32) -> Option<Packing> {
     let foot: Vec<Size> = sizes
         .iter()
-        .map(|&(w, h)| (ceil4(w + 2 * GUTTER), ceil4(h + 2 * GUTTER)))
+        .map(|&(w, h)| (ceil_gutter(w + 2 * GUTTER), ceil_gutter(h + 2 * GUTTER)))
         .collect();
     let widest = foot.iter().map(|f| f.0).max()?;
     let area: u64 = foot.iter().map(|&(w, h)| u64::from(w) * u64::from(h)).sum();
-    let mut width = widest.max(ceil4((area as f64).sqrt().ceil() as u32));
-    let step = ceil4(width / 16).max(4);
+    let mut width = widest.max(ceil_gutter((area as f64).sqrt().ceil() as u32));
+    let step = ceil_gutter(width / 16);
     let mut best: Option<Packing> = None;
     while width <= max {
         let (mut x, mut y, mut shelf) = (0, 0, 0);
@@ -479,15 +480,14 @@ fn pack(sizes: &[Size], max: u32) -> Option<Packing> {
     best
 }
 
-/// Copies `src` into `atlas` with its content at `(x, y) + GUTTER`, repeating its edge texels across the rest of
-/// its footprint.
+/// Copies `src` into `atlas` with its content at `(x, y) + GUTTER`, wrapped around across the rest of its footprint.
 fn blit(atlas: &mut RgbaImage, src: &RgbaImage, x: u32, y: u32) {
     let (w, h) = src.dimensions();
-    let (fw, fh) = (ceil4(w + 2 * GUTTER), ceil4(h + 2 * GUTTER));
+    let (fw, fh) = (ceil_gutter(w + 2 * GUTTER), ceil_gutter(h + 2 * GUTTER));
     for dy in 0..fh {
-        let sy = dy.saturating_sub(GUTTER).min(h - 1);
+        let sy = (dy + h - GUTTER % h) % h;
         for dx in 0..fw {
-            let sx = dx.saturating_sub(GUTTER).min(w - 1);
+            let sx = (dx + w - GUTTER % w) % w;
             atlas.put_pixel(x + dx, y + dy, *src.get_pixel(sx, sy));
         }
     }
@@ -495,7 +495,7 @@ fn blit(atlas: &mut RgbaImage, src: &RgbaImage, x: u32, y: u32) {
 
 fn encode_png(image: &RgbaImage) -> Result<Vec<u8>, String> {
     let mut png = Vec::new();
-    PngEncoder::new_with_quality(&mut png, CompressionType::Fast, FilterType::Adaptive)
+    PngEncoder::new_with_quality(&mut png, CompressionType::Best, FilterType::Adaptive)
         .write_image(image.as_raw(), image.width(), image.height(), ExtendedColorType::Rgba8)
         .map_err(|e| e.to_string())?;
     Ok(png)

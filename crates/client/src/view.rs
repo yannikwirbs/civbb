@@ -166,6 +166,12 @@ pub fn transcode_ktx2(bytes: &[u8]) -> Result<TextureImage, String> {
     if [u32_at(56), u32_at(60)].iter().any(|v| v.is_none_or(|v| v % 4 != 0)) {
         return Err("key/value data not 4-byte aligned".into());
     }
+    // One 2D image: `basisu` multiplies the level, layer and face counts unchecked (XUASTC, found by the
+    // damaged-file test).
+    let (depth, layers, faces) = (header(28)?, header(32)?, header(36)?);
+    if depth != 0 || layers > 1 || faces != 1 {
+        return Err("not a single 2D image".into());
+    }
     let most = 32 - width.max(height).leading_zeros();
     if !(1..=most).contains(&level_count) {
         return Err(format!("{level_count} levels"));

@@ -52,7 +52,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 
 ## `crates/core` (civbb-core)
 
-Engine core: math, the job runner for per-avatar islands and per-system timing counters.
+Engine core: math, texture mips, the job runner for per-avatar islands and per-system timing counters.
 
 Internal deps: civbb-format
 
@@ -60,6 +60,8 @@ Internal deps: civbb-format
 - `src/jobs.rs`: The job runner: one job per avatar island, run in parallel across islands with rayon (ADR 0003, ADR 0020).
 - `src/lib.rs`: Engine core: math, the job runner for per-avatar islands and per-system timing counters (design doc §5, ADR 0020).
 - `src/math.rs`: Vector and quaternion helpers on the format's array types, and world placements of a node hierarchy.
+- `src/mips.rs`: Texture mip chains made on the CPU, the one definition the compiler encodes and the renderer uploads (ADR 0035).
+- `tests/mips.rs`: CPU mip chains (ADR 0035): 2x2 boxes for even sides, linear-light averages for sRGB colour, linear alpha,
 
 ## `crates/dynamics` (civbb-dynamics)
 
@@ -102,7 +104,7 @@ Internal deps: none
 
 Content compiler: imports glTF/VRM sources into the format model and builds runtime packages.
 
-Internal deps: civbb-anim, civbb-format
+Internal deps: civbb-anim, civbb-core, civbb-format
 
 - `src/accessor.rs`: Bounded glTF accessor reading: every offset, stride, count and sparse index is checked before use.
 - `src/atlas.rs`: Compiler stage 4 texture atlasing: textures of one material model share an atlas, so materials that differ only
@@ -132,7 +134,7 @@ Internal deps: civbb-anim, civbb-format
 
 Renderer: Vulkan 1.3 device and swapchain, a render graph, compute skinning and a GPU-driven forward pass.
 
-Internal deps: civbb-format
+Internal deps: civbb-core, civbb-format
 
 - `examples/clear.rs`: Opens a window and clears it every frame, following resizes; the real window loop lives in the client (#27).
 - `shaders/mesh.slang`: Forward uber-shaders: one vertex shader pulling skinned vertices, fragment shaders for PBR, Toon and Unlit
@@ -210,6 +212,7 @@ Internal deps: none
 - `docs/adr/0032-per-avatar-report.md`: 0032: The per-avatar report: counts per compiler stage from `civbb build`, times from `civbb-client measure`
 - `docs/adr/0033-flip-parity-against-the-source.md`: 0033: FLIP parity compares the compiled avatar with its own import in our renderer, per state and view
 - `docs/adr/0034-toon-outlines-as-inverted-hulls.md`: 0034: Toon outlines are inverted hulls drawn as a second indirect draw per outlined submesh
+- `docs/adr/0035-texture-codec-ladder-and-shared-mips.md`: 0035: Textures are UASTC or XUASTC within their source's size, with mips shared with the renderer and wrapping atlas gutters
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

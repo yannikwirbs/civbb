@@ -10,6 +10,7 @@ publish.workspace = true
 base64 = "0.23.1"
 basisu_c_sys = { version = "0.9.1", features = ["encoder", "extra"] }
 civbb-anim.workspace = true
+civbb-core.workspace = true
 civbb-format.workspace = true
 getrandom = "0.2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
@@ -25,7 +26,6 @@ workspace = true
 [dev-dependencies]
 basisu = "0.1.0"
 civbb-client = { path = "../client" }
-civbb-core.workspace = true
 civbb-corpus.workspace = true
 civbb-render = { path = "../render" }
 

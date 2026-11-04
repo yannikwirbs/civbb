@@ -3,5 +3,6 @@
 pub mod counters;
 pub mod jobs;
 pub mod math;
+pub mod mips;
 
 pub use counters::{Counters, System};
