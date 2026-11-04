@@ -1,5 +1,5 @@
-//! The forward pass without a device (ADR 0023): pipeline keys, material records, draw batching into runs, and the
-//! reverse-Z projection.
+//! The forward pass without a device (ADRs 0023, 0034): pipeline keys, material records, outline draws, draw batching
+//! into runs, and the reverse-Z projection.
 
 use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr, TextureSlot, Toon, Unlit};
 use civbb_render::material::{MATERIAL_WORDS, NONE, PipelineKey, Shader, pack};
@@ -36,6 +36,7 @@ fn every_key_has_its_own_index() {
     );
     // Cutoff is a shader branch, not a pipeline.
     assert!(!PipelineKey::of(&unlit(AlphaMode::Mask { cutoff: 0.5 }, false)).blend);
+    assert_eq!(PipelineKey::outline(&m), None, "only toon materials have outlines");
 }
 
 fn f(words: &[u32]) -> Vec<f32> {
@@ -118,9 +119,65 @@ fn material_records() {
     assert_eq!(slot(&r, 2).1, [10, 0]);
     assert_eq!(slot(&r, 5).1, [11, 0]);
 
+    assert_eq!(f(&r[72..76]), [0.0; 4], "no outline");
+    assert_eq!(PipelineKey::outline(&toon), None);
+
     let r = pack(&unlit(AlphaMode::Opaque, false), &[]);
     assert_eq!(f(&r[..4]), [0.5, 0.25, 1.0, 0.75]);
     assert!((0..6).all(|i| slot(&r, i).1[0] == NONE));
+    assert_eq!(r[80], NONE, "no outline width texture");
+}
+
+#[test]
+fn outlined_toon_materials_add_an_outline_draw() {
+    let mut m = unlit(AlphaMode::Blend, true);
+    m.model = MaterialModel::Toon(Toon {
+        base_color: [1.0; 4],
+        base_color_tex: None,
+        normal_tex: None,
+        normal_scale: 1.0,
+        shade_color: [0.0; 3],
+        shade_tex: None,
+        shade_shift: 0.0,
+        shade_toony: 0.9,
+        rim_color: [0.0; 3],
+        rim_power: 0.0,
+        matcap_tex: None,
+        matcap_strength: 0.0,
+        emissive: [0.0; 3],
+        emissive_tex: None,
+        outline_width: 0.002,
+        outline_color: [0.1, 0.2, 0.3],
+        outline_width_tex: Some(TextureSlot {
+            texture: 1,
+            uv_set: 1,
+            scale_offset: [2.0, 3.0, 0.25, 0.5],
+        }),
+    });
+    let r = pack(&m, &[10, 11]);
+    assert_eq!(f(&r[72..76]), [0.1, 0.2, 0.3, 0.002]);
+    assert_eq!((f(&r[76..80]), [r[80], r[81]]), (vec![2.0, 3.0, 0.25, 0.5], [11, 1]));
+    // Blended like its material, always front faces culled whatever the material's sides.
+    let outline = PipelineKey {
+        shader: Shader::Outline,
+        blend: true,
+        double_sided: false,
+    };
+    assert_eq!(PipelineKey::outline(&m), Some(outline));
+    let mut draws = Vec::new();
+    let mut d = draw(0, &m, 4, 1.0);
+    draws.push(d);
+    d.material.key = outline;
+    draws.push(d);
+    let mut out = Batches::default();
+    batch(&mut draws, &mut out);
+    let runs: Vec<(PipelineKey, u32)> = out.runs.iter().map(|r| (r.key, r.count)).collect();
+    assert_eq!(
+        runs,
+        [(PipelineKey::of(&m), 1), (outline, 1)],
+        "the outline after its mesh"
+    );
+    assert_eq!(&out.records[4..8], &out.records[..4], "same material and vertices");
 }
 
 fn draw(first_index: u32, material: &Material, index: u32, distance: f32) -> Draw {
@@ -133,6 +190,7 @@ fn draw(first_index: u32, material: &Material, index: u32, distance: f32) -> Dra
             index,
             key: PipelineKey::of(material),
             queue: material.render_queue,
+            outline: PipelineKey::outline(material),
         },
         distance,
     }

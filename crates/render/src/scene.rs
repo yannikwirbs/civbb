@@ -96,6 +96,8 @@ pub struct MaterialId {
     pub key: PipelineKey,
     /// Unity render queue, ordering blended draws.
     pub queue: i32,
+    /// The pipeline of its outline draw, if it has an outline (ADR 0034).
+    pub outline: Option<PipelineKey>,
 }
 
 /// Every mesh, material and texture the GPU draws from, in shared buffers.
@@ -255,6 +257,7 @@ impl Scene {
             index,
             key: PipelineKey::of(material),
             queue: material.render_queue,
+            outline: PipelineKey::outline(material),
         })
     }
 

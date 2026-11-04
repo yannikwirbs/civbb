@@ -417,7 +417,8 @@ impl Gpu {
             );
         }
         let submeshes: usize = meshes.iter().map(|m| m.submeshes().len()).sum();
-        let max_draws = (submeshes * copies as usize).max(1) as u32;
+        // Each submesh may add an outline draw (ADR 0034).
+        let max_draws = (2 * submeshes * copies as usize).max(1) as u32;
         Ok(Gpu {
             skinning: Skinning::new(ctx)?,
             forward: Forward::new(ctx, &scene, renderer.color_format()?, max_draws)?,

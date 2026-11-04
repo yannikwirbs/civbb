@@ -36,7 +36,8 @@ impl Textures {
                     .binding(0)
                     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .descriptor_count(MAX_TEXTURES)
-                    .stage_flags(vk::ShaderStageFlags::FRAGMENT)];
+                    // Outline widths are sampled per vertex (ADR 0034).
+                    .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)];
                 let flags = [vk::DescriptorBindingFlags::PARTIALLY_BOUND
                     | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND
                     | vk::DescriptorBindingFlags::UPDATE_UNUSED_WHILE_PENDING];

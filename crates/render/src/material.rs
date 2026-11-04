@@ -4,7 +4,7 @@
 use civbb_format::material::{AlphaMode, Material, MaterialModel, TextureSlot};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
-pub const MATERIAL_WORDS: usize = 72;
+pub const MATERIAL_WORDS: usize = 84;
 /// A texture slot without a texture.
 pub const NONE: u32 = u32::MAX;
 
@@ -17,6 +17,8 @@ pub enum Shader {
     Toon,
     /// Unlit colour or texture.
     Unlit,
+    /// A toon outline: the mesh's back faces pushed out along the normal, in the outline colour (ADR 0034).
+    Outline,
 }
 
 /// What separates one pipeline from another: the shader, alpha blending (blended draws don't write depth) and
@@ -33,7 +35,7 @@ pub struct PipelineKey {
 
 impl PipelineKey {
     /// Number of distinct keys, and so of pipelines.
-    pub const COUNT: usize = 12;
+    pub const COUNT: usize = 16;
 
     /// The key a material draws with.
     pub fn of(m: &Material) -> Self {
@@ -48,6 +50,18 @@ impl PipelineKey {
         }
     }
 
+    /// The key of a material's outline draw: toon materials with an outline width; blended like the material.
+    pub fn outline(m: &Material) -> Option<Self> {
+        match &m.model {
+            MaterialModel::Toon(t) if t.outline_width > 0.0 => Some(PipelineKey {
+                shader: Shader::Outline,
+                blend: m.alpha == AlphaMode::Blend,
+                double_sided: false,
+            }),
+            _ => None,
+        }
+    }
+
     /// The key's index, `0 .. COUNT`.
     pub fn index(self) -> usize {
         self.shader as usize * 4 + usize::from(self.blend) * 2 + usize::from(self.double_sided)
@@ -55,7 +69,7 @@ impl PipelineKey {
 
     /// Every key, in index order.
     pub fn all() -> impl Iterator<Item = PipelineKey> {
-        [Shader::Pbr, Shader::Toon, Shader::Unlit]
+        [Shader::Pbr, Shader::Toon, Shader::Unlit, Shader::Outline]
             .into_iter()
             .flat_map(|shader| {
                 [(false, false), (false, true), (true, false), (true, true)].map(|(blend, double_sided)| PipelineKey {
@@ -78,8 +92,10 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut params = [0.0, 1.0, 1.0, 0.0];
     // Shade shift, shade toony, rim power, matcap strength.
     let mut toon = [0.0; 4];
-    // Base, normal, metallic-roughness or shade, occlusion, emissive, matcap.
-    let mut slots: [Option<TextureSlot>; 6] = [None; 6];
+    // Base, normal, metallic-roughness or shade, occlusion, emissive, matcap, outline width.
+    let mut slots: [Option<TextureSlot>; 7] = [None; 7];
+    // Outline colour and width.
+    let mut outline = [0.0; 4];
     match &m.model {
         MaterialModel::Pbr(p) => {
             base_color = p.base_color;
@@ -92,6 +108,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 p.occlusion_tex,
                 p.emissive_tex,
                 None,
+                None,
             ];
         }
         MaterialModel::Toon(t) => {
@@ -101,6 +118,12 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
             rim = t.rim_color;
             params[2] = t.normal_scale;
             toon = [t.shade_shift, t.shade_toony, t.rim_power, t.matcap_strength];
+            outline = [
+                t.outline_color[0],
+                t.outline_color[1],
+                t.outline_color[2],
+                t.outline_width,
+            ];
             slots = [
                 t.base_color_tex,
                 t.normal_tex,
@@ -108,6 +131,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 None,
                 t.emissive_tex,
                 t.matcap_tex,
+                t.outline_width_tex,
             ];
         }
         MaterialModel::Unlit(u) => {
@@ -127,13 +151,18 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     vec4(xyz(rim));
     vec4(params);
     vec4(toon);
+    let mut slot_words = Vec::with_capacity(56);
     for slot in slots {
         let (st, tex) = match slot.and_then(|s| Some((s, *textures.get(s.texture as usize)?))) {
             Some((s, index)) => (s.scale_offset, [index, u32::from(s.uv_set), 0, 0]),
             None => ([1.0, 1.0, 0.0, 0.0], [NONE, 0, 0, 0]),
         };
-        words.extend(st.map(f32::to_bits));
-        words.extend(tex);
+        slot_words.extend(st.map(f32::to_bits));
+        slot_words.extend(tex);
     }
+    // After the six slots so their offsets stay: the outline, then its width slot.
+    words.extend(&slot_words[..48]);
+    words.extend(outline.map(f32::to_bits));
+    words.extend(&slot_words[48..]);
     words.try_into().expect("a material record is MATERIAL_WORDS long")
 }

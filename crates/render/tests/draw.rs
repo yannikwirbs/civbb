@@ -1,6 +1,7 @@
 //! The GPU-driven forward pass on a real device (ADR 0023): quads through skinning, shared buffers, bindless
-//! textures, indirect multi-draws and a material rewritten in the frame (ADR 0025), checked pixel by pixel; and the bloated corpus avatar drawn without
-//! validation errors. Skips without a Vulkan device.
+//! textures, indirect multi-draws and a material rewritten in the frame (ADR 0025), checked pixel by pixel; toon
+//! outlines around a cube (ADR 0034); and the bloated corpus avatar drawn without validation errors. Skips without a
+//! Vulkan device.
 
 use civbb_format::Avatar;
 use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr, TextureSlot, Toon, Unlit};
@@ -308,6 +309,85 @@ fn draws_the_bloated_avatar() {
     let pixels = render(&ctx, &mut scene, &avatar.meshes, &materials, &[], &view);
     let covered = pixels.chunks(4).filter(|p| p[..3] != [0, 0, 0]).count();
     assert!(covered > 100, "only {covered} pixels drawn");
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+/// A cube of half-size `h` at the origin with normals pointing out of its corners (smooth, so a pushed-out hull
+/// stays closed), drawn with material 0.
+fn cube(h: f32) -> Mesh {
+    let corners: Vec<[f32; 3]> = (0..8)
+        .map(|i| [i & 1, (i >> 1) & 1, (i >> 2) & 1].map(|b| if b == 1 { h } else { -h }))
+        .collect();
+    let normals = corners.iter().map(|c| c.map(|v| v.signum() / 3f32.sqrt())).collect();
+    // Two counter-clockwise triangles per face, seen from outside.
+    let faces = [
+        [0, 2, 3, 1],
+        [4, 5, 7, 6],
+        [0, 1, 5, 4],
+        [2, 6, 7, 3],
+        [0, 4, 6, 2],
+        [1, 3, 7, 5],
+    ];
+    let indices: Vec<u32> = faces
+        .iter()
+        .flat_map(|f| [f[0], f[1], f[2], f[0], f[2], f[3]])
+        .collect();
+    Mesh {
+        name: "cube".into(),
+        tangents: vec![[1.0, 0.0, 0.0, 1.0]; 8],
+        uv0: vec![[0.5, 0.5]; 8],
+        submeshes: vec![Submesh {
+            first_index: 0,
+            index_count: indices.len() as u32,
+            material: 0,
+        }],
+        positions: corners,
+        normals,
+        indices,
+        ..Mesh::default()
+    }
+}
+
+#[test]
+fn draws_toon_outlines_around_the_silhouette() {
+    let Some(ctx) = context() else { return };
+    let mut scene = Scene::new(
+        &ctx,
+        Capacity {
+            vertices: 8,
+            indices: 36,
+            deltas: 0,
+            skinned: 8,
+            materials: 1,
+        },
+    )
+    .unwrap();
+    // A white width texture: sampled in the vertex shader, it keeps the full width.
+    let white = scene.add_texture(&ctx, 1, 1, &[255; 4], false).unwrap();
+    let mut model = toon([1.0, 1.0, 0.0, 1.0], [1.0, 1.0, 0.0], 0.0);
+    if let MaterialModel::Toon(t) = &mut model {
+        t.outline_width = 0.3;
+        t.outline_color = [1.0, 0.0, 0.0];
+        t.outline_width_tex = Some(TextureSlot {
+            texture: 0,
+            uv_set: 0,
+            scale_offset: [1.0, 1.0, 0.0, 0.0],
+        });
+    }
+    let outlined = scene
+        .add_material(&ctx, &material(model, AlphaMode::Opaque), &[white])
+        .unwrap();
+    assert!(outlined.outline.is_some());
+    let mut view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+    view.light_dir = [0.0, 0.0, 1.0];
+    view.ambient = [0.0; 3];
+    let pixels = render(&ctx, &mut scene, &[cube(0.5)], &[outlined], &[], &view);
+    // The front face spans 32 +- 10.7 pixels; the hull's sides, pushed out by 0.3 / sqrt(3) per axis, reach 48.
+    assert_near(pixel(&pixels, 32, 32), [255, 255, 0], 1, "the cube's front face");
+    assert_near(pixel(&pixels, 46, 32), [255, 0, 0], 0, "outline right of the face");
+    assert_near(pixel(&pixels, 32, 18), [255, 0, 0], 0, "outline above the face");
+    assert_near(pixel(&pixels, 56, 32), [0, 0, 0], 0, "background past the outline");
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }

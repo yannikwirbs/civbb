@@ -150,7 +150,7 @@ Internal deps: civbb-format
 - `src/texture.rs`: Bindless textures: one descriptor array of sampled images that every draw indexes by number, filled as
 - `tests/device.rs`: On a real device, headless: a two-pass graph clears an image and clears half of it again, the copy back reads
 - `tests/draw.rs`: The GPU-driven forward pass on a real device (ADR 0023): quads through skinning, shared buffers, bindless
-- `tests/forward.rs`: The forward pass without a device (ADR 0023): pipeline keys, material records, draw batching into runs, and the
+- `tests/forward.rs`: The forward pass without a device (ADRs 0023, 0034): pipeline keys, material records, outline draws, draw batching
 - `tests/graph.rs`: Render graph planning (ADRs 0021, 0023), no device needed: image transitions before each pass and into each
 - `tests/select.rs`: Device and surface format choice (ADR 0021), no device needed.
 - `tests/skin.rs`: Compute skinning and sparse blendshapes (ADR 0022): the active shape list without a device, and on a device the
@@ -209,6 +209,7 @@ Internal deps: none
 - `docs/adr/0031-skin-aware-lod-chain.md`: 0031: A skin-aware LOD chain from meshoptimizer: three prefix levels per mesh, built after merging (format v8)
 - `docs/adr/0032-per-avatar-report.md`: 0032: The per-avatar report: counts per compiler stage from `civbb build`, times from `civbb-client measure`
 - `docs/adr/0033-flip-parity-against-the-source.md`: 0033: FLIP parity compares the compiled avatar with its own import in our renderer, per state and view
+- `docs/adr/0034-toon-outlines-as-inverted-hulls.md`: 0034: Toon outlines are inverted hulls drawn as a second indirect draw per outlined submesh
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

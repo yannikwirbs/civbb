@@ -40,6 +40,8 @@ struct Material
     float4 params;   // metallic, roughness, normal scale, alpha cutoff (0: no cutoff)
     float4 toon;     // shade shift, shade toony, rim power, matcap strength
     Slot slots[6];   // base, normal, metallic-roughness or shade, occlusion, emissive, matcap
+    float4 outline;  // toon outline colour in xyz, width in metres in w
+    Slot outline_width; // multiplies the width by its G channel
 };
 
 struct View
@@ -74,21 +76,48 @@ struct Varyings
     nointerpolation uint material : MATERIAL;
 };
 
-[shader("vertex")]
-Varyings vertex(uint index: SV_VulkanVertexID, uint instance: SV_VulkanInstanceID)
+// A skinned vertex of draw `d` at world position `p`.
+Varyings place(Draw d, Skinned s, float4 uv, float3 p)
 {
-    Draw d = pc.draws[instance];
-    Skinned s = pc.skinned[d.skinned + index];
     View v = *pc.view;
-    float3 p = s.position.xyz;
     Varyings o;
     o.position = v.view_proj[0] * p.x + v.view_proj[1] * p.y + v.view_proj[2] * p.z + v.view_proj[3];
     o.world = p;
     o.normal = s.normal.xyz;
     o.tangent = s.tangent;
-    o.uv = pc.attrs[d.attrs + index];
+    o.uv = uv;
     o.material = d.material;
     return o;
+}
+
+[shader("vertex")]
+Varyings vertex(uint index: SV_VulkanVertexID, uint instance: SV_VulkanInstanceID)
+{
+    Draw d = pc.draws[instance];
+    Skinned s = pc.skinned[d.skinned + index];
+    return place(d, s, pc.attrs[d.attrs + index], s.position.xyz);
+}
+
+// Toon outlines (ADR 0034): the vertex pushed out along its skinned normal by the outline width in metres, times
+// the width texture's G channel (MToon 1.0) sampled at the top mip.
+[shader("vertex")]
+Varyings outline_vertex(uint index: SV_VulkanVertexID, uint instance: SV_VulkanInstanceID)
+{
+    Draw d = pc.draws[instance];
+    Skinned s = pc.skinned[d.skinned + index];
+    Material m = pc.materials[d.material];
+    float4 uv = pc.attrs[d.attrs + index];
+    float width = m.outline.w;
+    Slot w = m.outline_width;
+    if (w.tex.x != NONE)
+    {
+        float2 c = (w.tex.y == 0 ? uv.xy : uv.zw) * w.st.xy + w.st.zw;
+        width *= textures[NonUniformResourceIndex(w.tex.x)].SampleLevel(c, 0).g;
+    }
+    float3 n = s.normal.xyz;
+    float l = length(n);
+    float3 p = s.position.xyz + (l > 0 ? n * (width / l) : 0);
+    return place(d, s, uv, p);
 }
 
 // The slot's texel, or white without a texture.
@@ -187,4 +216,12 @@ float4 unlit(Varyings i) : SV_Target
 {
     Material m = pc.materials[i.material];
     return base(m, i.uv);
+}
+
+// The outline colour, unlit, with the base colour's alpha and cutoff.
+[shader("fragment")]
+float4 outline(Varyings i) : SV_Target
+{
+    Material m = pc.materials[i.material];
+    return float4(m.outline.xyz, base(m, i.uv).a);
 }

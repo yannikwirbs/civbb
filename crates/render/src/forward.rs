@@ -146,19 +146,27 @@ pub struct Draw {
 }
 
 impl MeshData {
-    /// Adds a draw per submesh of `instance` (an instance of this mesh); `materials` maps the avatar's material
-    /// indices to the scene's. Submeshes whose material is out of range are skipped.
+    /// Adds a draw per submesh of `instance` (an instance of this mesh), and an outline draw after it if its
+    /// material has one; `materials` maps the avatar's material indices to the scene's. Submeshes whose material is
+    /// out of range are skipped.
     pub fn draws(&self, instance: &SkinnedMesh, materials: &[MaterialId], distance: f32, out: &mut Vec<Draw>) {
         for s in &self.submeshes {
             if let Some(&material) = materials.get(s.material as usize) {
-                out.push(Draw {
+                let draw = Draw {
                     first_index: self.index_base + s.first_index,
                     index_count: s.index_count,
                     skinned: instance.base(),
                     attrs: self.vertex_base,
                     material,
                     distance,
-                });
+                };
+                out.push(draw);
+                if let Some(key) = material.outline {
+                    out.push(Draw {
+                        material: MaterialId { key, ..material },
+                        ..draw
+                    });
+                }
             }
         }
     }
@@ -338,7 +346,7 @@ impl Forward {
         let view_buf = graph.import_buffer(self.view.handle, &[Access::VertexRead, Access::FragmentRead]);
         let records_buf = graph.import_buffer(self.records.handle, &[Access::VertexRead]);
         let commands_buf = graph.import_buffer(self.commands.handle, &[Access::IndirectRead]);
-        let materials_buf = graph.import_buffer(scene.materials().handle, &[Access::FragmentRead]);
+        let materials_buf = graph.import_buffer(scene.materials().handle, &[Access::VertexRead, Access::FragmentRead]);
         graph.add(
             Pass::new("draw upload")
                 .buffer(view_buf, Access::TransferWrite)
@@ -383,6 +391,7 @@ impl Forward {
                 .buffer(view_buf, Access::FragmentRead)
                 .buffer(records_buf, Access::VertexRead)
                 .buffer(commands_buf, Access::IndirectRead)
+                .buffer(materials_buf, Access::VertexRead)
                 .buffer(materials_buf, Access::FragmentRead)
                 .record(move |d, cmd| {
                     let viewport = vk::Viewport {
@@ -453,16 +462,17 @@ unsafe fn create_pipelines(
     let stages: Vec<[vk::PipelineShaderStageCreateInfo; 2]> = keys
         .iter()
         .map(|k| {
-            let fragment = match k.shader {
-                Shader::Pbr => c"pbr",
-                Shader::Toon => c"toon",
-                Shader::Unlit => c"unlit",
+            let (vertex, fragment) = match k.shader {
+                Shader::Pbr => (c"vertex", c"pbr"),
+                Shader::Toon => (c"vertex", c"toon"),
+                Shader::Unlit => (c"vertex", c"unlit"),
+                Shader::Outline => (c"outline_vertex", c"outline"),
             };
             [
                 vk::PipelineShaderStageCreateInfo::default()
                     .stage(vk::ShaderStageFlags::VERTEX)
                     .module(module)
-                    .name(c"vertex"),
+                    .name(vertex),
                 vk::PipelineShaderStageCreateInfo::default()
                     .stage(vk::ShaderStageFlags::FRAGMENT)
                     .module(module)
@@ -475,10 +485,11 @@ unsafe fn create_pipelines(
         .map(|k| {
             vk::PipelineRasterizationStateCreateInfo::default()
                 .polygon_mode(vk::PolygonMode::FILL)
-                .cull_mode(if k.double_sided {
-                    vk::CullModeFlags::NONE
-                } else {
-                    vk::CullModeFlags::BACK
+                // Outlines are inverted hulls: only the pushed-out back faces show, around the mesh.
+                .cull_mode(match (k.shader, k.double_sided) {
+                    (Shader::Outline, _) => vk::CullModeFlags::FRONT,
+                    (_, true) => vk::CullModeFlags::NONE,
+                    (_, false) => vk::CullModeFlags::BACK,
                 })
                 // glTF fronts are counter-clockwise; the projection's Y flip keeps them so on screen.
                 .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
