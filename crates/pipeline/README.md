@@ -16,6 +16,10 @@ The content compiler (design doc §9). Glue crate: nothing depends on it.
   or texels at every vertex UV, before and after. The encoders (`basisu_c_sys`, `meshopt`) are C++ built by `cc`;
   `basisu_c_sys` needs libclang for its bindings and only sees decoded RGBA.
 - `package.rs`: an import to a runtime package (texture blobs plus the avatar as root), and avatar stats.
+- `report.rs`: `compile` runs the stages in order and records the per-avatar report (ADR 0032): stats after each
+  stage and the package size as JSON and Markdown; `civbb build --report r.json [--measure]` writes it, `--measure`
+  adds times from `civbb-client measure` (a release build next to `civbb`). The lean avatar's counts are pinned by
+  `tests/golden/report-lean.json` (rewrite with `CIVBB_BLESS=1`).
 - `main.rs`: the `civbb` CLI: `keygen`, `build`, `validate`, `inspect` (`cargo run -p civbb-pipeline --bin civbb`).
 
 Local conformance runs: put Khronos samples in `corpus/local/khronos/` and VRMs in `corpus/local/vrm/` (both gitignored);

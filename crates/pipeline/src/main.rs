@@ -5,18 +5,21 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use civbb_format::cost::Measured;
 use civbb_format::package::Platform;
 use civbb_format::{Caps, Package, ReadLimits, SigningKey, validate};
 use civbb_pipeline::gltf_import::dir_resolver;
-use civbb_pipeline::{Imported, Limits, atlas, collapse, compress, import, lod, merge, package, prune, stats, texture};
+use civbb_pipeline::{Imported, Limits, compile, import, stats};
 
 const USAGE: &str = "usage:
   civbb keygen <key-file>
-  civbb build <source.gltf|.glb|.vrm> --key <key-file> [-o <out.civpkg>] [--quest]
+  civbb build <source.gltf|.glb|.vrm> --key <key-file> [-o <out.civpkg>] [--quest] [--report <r.json> [--measure]]
   civbb validate <package.civpkg> --key <key-file>
   civbb inspect <source or package.civpkg> [--key <key-file>]
 
-A key file holds a 32-byte Ed25519 seed. Packages are verified against the key that signed them.";
+A key file holds a 32-byte Ed25519 seed. Packages are verified against the key that signed them.
+--report writes the per-avatar report as JSON and, next to it, Markdown (`r.md`); --measure adds CPU and GPU
+times from `civbb-client measure`, which must sit next to `civbb` and be a release build.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -50,6 +53,8 @@ struct Args {
     key: Option<PathBuf>,
     out: Option<PathBuf>,
     quest: bool,
+    report: Option<PathBuf>,
+    measure: bool,
 }
 
 fn parse(rest: &[String]) -> Result<Args, Error> {
@@ -58,6 +63,8 @@ fn parse(rest: &[String]) -> Result<Args, Error> {
         key: None,
         out: None,
         quest: false,
+        report: None,
+        measure: false,
     };
     let mut input = None;
     let mut it = rest.iter();
@@ -66,11 +73,16 @@ fn parse(rest: &[String]) -> Result<Args, Error> {
             "--key" => a.key = Some(it.next().ok_or(Error::Usage)?.into()),
             "-o" => a.out = Some(it.next().ok_or(Error::Usage)?.into()),
             "--quest" => a.quest = true,
+            "--report" => a.report = Some(it.next().ok_or(Error::Usage)?.into()),
+            "--measure" => a.measure = true,
             s if s.starts_with('-') || input.is_some() => return Err(Error::Usage),
             s => input = Some(PathBuf::from(s)),
         }
     }
     a.input = input.ok_or(Error::Usage)?;
+    if a.measure && a.report.is_none() {
+        return Err(Error::Usage);
+    }
     Ok(a)
 }
 
@@ -80,36 +92,28 @@ fn run(args: &[String]) -> Result<(), Error> {
     match cmd.as_str() {
         "keygen" => keygen(&a.input),
         "build" => {
-            let key = read_key(a.key.as_deref().ok_or(Error::Usage)?)?;
-            let mut imported = import_file(&a.input)?;
-            let pruned = prune(&mut imported.avatar);
-            println!(
-                "pruned {} nodes, {} skin joints, {} blendshapes",
-                pruned.nodes, pruned.joints, pruned.shapes
-            );
+            let key_path = a.key.as_deref().ok_or(Error::Usage)?;
+            let key = read_key(key_path)?;
             let platform = if a.quest { Platform::Quest } else { Platform::Desktop };
-            let atlased = atlas(&mut imported, texture::max_side(platform))?;
-            println!(
-                "atlased {} atlases, {} fewer textures, {} fewer materials",
-                atlased.atlases, atlased.textures, atlased.materials
-            );
-            let merged = merge(&mut imported.avatar);
-            println!("merged {} meshes, {} submeshes", merged.meshes, merged.submeshes);
-            let l = lod(&mut imported.avatar);
-            println!(
-                "lod chain on {} meshes: triangles {:?}, error {:?} of mesh extent",
-                l.meshes, l.triangles, l.error
-            );
-            println!("collapsed {} toggle layers", collapse(&mut imported.avatar));
-            let c = compress(&mut imported, platform)?;
-            println!(
-                "compressed {} textures to KTX2 ({} UASTC, {} capped), {} to {} bytes",
-                c.textures, c.uastc, c.capped, c.bytes_before, c.bytes_after
-            );
-            let bytes = package(imported, platform).encode_signed(&key);
+            let (bytes, mut report) = compile(import_file(&a.input)?, platform, &key, |l| println!("{l}"))?;
             let out = a.out.unwrap_or_else(|| a.input.with_extension("civpkg"));
             fs::write(&out, &bytes).map_err(|e| format!("{}: {e}", out.display()))?;
             println!("wrote {} ({} bytes)", out.display(), bytes.len());
+            if let Some(path) = a.report {
+                if a.measure {
+                    report.timings = Some(measure(&out, key_path)?);
+                }
+                let json = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
+                fs::write(
+                    &path,
+                    json + "
+",
+                )
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+                let md = path.with_extension("md");
+                fs::write(&md, report.markdown()).map_err(|e| format!("{}: {e}", md.display()))?;
+                println!("wrote {} and {}", path.display(), md.display());
+            }
             Ok(())
         }
         "validate" => {
@@ -119,17 +123,21 @@ fn run(args: &[String]) -> Result<(), Error> {
             Ok(())
         }
         "inspect" => {
-            let avatar = if a.input.extension().is_some_and(|x| x == "civpkg") {
+            let (avatar, blobs) = if a.input.extension().is_some_and(|x| x == "civpkg") {
                 let key = read_key(a.key.as_deref().ok_or(Error::Usage)?)?;
                 let pkg = read_package(&a.input, &key)?;
                 println!("compiler    {}", pkg.header.compiler);
                 println!("platform    {:?}", pkg.header.platform);
-                pkg.avatar(&ReadLimits::default()).map_err(|e| e.to_string())?
+                (
+                    pkg.avatar(&ReadLimits::default()).map_err(|e| e.to_string())?,
+                    pkg.blobs,
+                )
             } else {
-                import_file(&a.input)?.avatar
+                let imported = import_file(&a.input)?;
+                (imported.avatar, imported.blobs)
             };
             println!("name        {}", avatar.name);
-            println!("{}", stats(&avatar));
+            println!("{}", stats(&avatar, &blobs));
             Ok(())
         }
         _ => Err(Error::Usage),
@@ -149,6 +157,24 @@ fn keygen(path: &Path) -> Result<(), Error> {
     let hex: String = public.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
     println!("wrote {}; public key {hex}", path.display());
     Ok(())
+}
+
+/// Runs `civbb-client measure` on the written package; the client binary sits next to this one (ADR 0032).
+fn measure(package: &Path, key: &Path) -> Result<Measured, Error> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let client = exe.with_file_name(format!("civbb-client{}", std::env::consts::EXE_SUFFIX));
+    let output = std::process::Command::new(&client)
+        .arg("measure")
+        .arg(package)
+        .arg("--key")
+        .arg(key)
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .map_err(|e| format!("{}: {e}", client.display()))?;
+    if !output.status.success() {
+        return Err(format!("{} measure failed ({})", client.display(), output.status).into());
+    }
+    serde_json::from_slice(&output.stdout).map_err(|e| format!("civbb-client measure output: {e}").into())
 }
 
 fn read_key(path: &Path) -> Result<SigningKey, Error> {

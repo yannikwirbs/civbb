@@ -24,7 +24,7 @@ pub use context::{Candidate, Context, Window, pick_device};
 pub use forward::{Batches, Draw, Forward, View, batch};
 pub use graph::{Access, BufferId, Graph, ImageDesc, ImageId, Load, Pass, Transients, Use};
 pub use memory::{Buffer, Image, MemoryLocation};
-pub use renderer::{FRAMES_IN_FLIGHT, FrameStatus, Renderer};
+pub use renderer::{FRAMES_IN_FLIGHT, FrameStatus, HEADLESS_FORMAT, Renderer};
 pub use scene::{Capacity, MaterialId, MeshData, Scene};
 pub use swapchain::choose_format;
 

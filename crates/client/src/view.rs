@@ -36,11 +36,14 @@ pub struct Config {
     pub textures: Vec<Option<TextureImage>>,
     /// Copies in the grid.
     pub copies: u32,
-    /// Exit after this many presented frames (for automated runs); `None` runs until the window closes.
+    /// Exit after this many presented frames past the warm-up (for automated runs); `None` runs until the window
+    /// closes.
     pub frames: Option<u32>,
+    /// Frames presented before timing starts: the first one creates the swapchain (~170 ms on the reference PC).
+    pub warmup: u32,
 }
 
-/// What a run measured.
+/// What a run measured, past the warm-up.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Summary {
     /// Frames presented.
@@ -209,6 +212,30 @@ pub fn run(cfg: Config) -> Result<Summary, String> {
         Some(e) => Err(e),
         None => Ok(viewer.summary()),
     }
+}
+
+/// Runs the viewer's frames without a window on a `width` by `height` offscreen target, back to back: the warm-up,
+/// then `cfg.frames` measured ones (ADR 0032). Returns the summary and the device's name; fails with
+/// [`civbb_render::Error::NoDevice`] or [`civbb_render::Error::Load`] where there is no device.
+pub fn run_headless(cfg: Config, width: u32, height: u32) -> civbb_render::Result<(Summary, String)> {
+    let frames = cfg.frames.unwrap_or(0);
+    let mut viewer = Viewer::new(cfg);
+    let result = Renderer::headless(cfg!(debug_assertions), width, height)
+        .and_then(|r| viewer.start(r))
+        .and_then(|()| {
+            while viewer.timing.frames < frames {
+                if !viewer.frame()? {
+                    break;
+                }
+            }
+            Ok(())
+        });
+    let device = viewer
+        .renderer
+        .as_ref()
+        .map_or_else(String::new, |r| r.context().device_name());
+    viewer.shutdown();
+    result.map(|()| (viewer.summary(), device))
 }
 
 /// An orbit camera: yaw and pitch around a target at a distance.
@@ -458,6 +485,8 @@ struct Viewer {
     islands: Vec<Island>,
     copies: u32,
     limit: Option<u32>,
+    /// Warm-up frames still to present.
+    warmup: u32,
     camera: Orbit,
     dragging: bool,
     cursor: Option<(f64, f64)>,
@@ -502,6 +531,7 @@ impl Viewer {
             islands,
             copies: cfg.copies,
             limit: cfg.frames,
+            warmup: cfg.warmup,
             camera,
             dragging: false,
             cursor: None,
@@ -530,6 +560,15 @@ impl Viewer {
             draws: t.draws,
             skinned: t.skinned,
         }
+    }
+
+    /// Uploads the avatar to `renderer`'s device and keeps both.
+    fn start(&mut self, renderer: Renderer) -> civbb_render::Result<()> {
+        let gpu = Gpu::new(&renderer, &self.avatar, &self.model, &self.textures, self.copies);
+        self.renderer = Some(renderer);
+        self.gpu = Some(gpu?);
+        self.textures = Vec::new();
+        Ok(())
     }
 
     /// Waits for the GPU and destroys what the renderer does not own.
@@ -654,6 +693,10 @@ impl Viewer {
         let cpu = start.elapsed().as_secs_f32() * 1000.0 - renderer.blocked_ms();
         let t = &mut self.timing;
         (t.draws, t.skinned) = (draws, skinned);
+        if self.warmup > 0 {
+            self.warmup -= 1;
+            return Ok(true);
+        }
         t.frames += 1;
         t.cpu += cpu;
         t.systems += systems;
@@ -712,15 +755,9 @@ impl ApplicationHandler for Viewer {
             Ok(r) => r,
             Err(e) => return self.fail(event_loop, e),
         };
-        match Gpu::new(&renderer, &self.avatar, &self.model, &self.textures, self.copies) {
-            Ok(gpu) => self.gpu = Some(gpu),
-            Err(e) => {
-                self.renderer = Some(renderer);
-                return self.fail(event_loop, e);
-            }
+        if let Err(e) = self.start(renderer) {
+            return self.fail(event_loop, e);
         }
-        self.textures = Vec::new();
-        self.renderer = Some(renderer);
         window.request_redraw();
         self.window = Some(window);
     }

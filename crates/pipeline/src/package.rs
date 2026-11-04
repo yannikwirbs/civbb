@@ -1,11 +1,13 @@
 //! Turns imports into runtime packages and summarises avatars for `civbb inspect`.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
 use civbb_format::material::MaterialModel;
 use civbb_format::package::{ContentKind, Header, Platform};
 use civbb_format::{Avatar, BlobId, FORMAT_VERSION, Package, cbor};
+
+use serde::Serialize;
 
 use crate::Imported;
 
@@ -28,22 +30,29 @@ pub fn package(imported: Imported, platform: Platform) -> Package {
     .with_avatar(&imported.avatar)
 }
 
-/// Counts that describe an avatar's size.
+/// Counts that describe an avatar's size (the report's keys, ADR 0032).
 #[allow(missing_docs)] // Each field counts what its name says.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Stats {
     pub nodes: usize,
     pub bones: usize,
     pub human_bones: usize,
     pub visemes: usize,
     pub meshes: usize,
+    pub skinned_meshes: usize,
+    /// Submeshes, one draw each when every mesh shows.
+    pub draws: usize,
     pub vertices: usize,
     pub triangles: usize,
+    /// Per LOD level, full detail first, over the deepest chain; a mesh with fewer levels counts its last.
+    pub lod: Vec<Level>,
     pub blend_shapes: usize,
     pub shape_deltas: usize,
     pub materials: usize,
     pub toon_materials: usize,
     pub textures: usize,
+    /// Encoded bytes of the distinct texture blobs.
+    pub texture_bytes: usize,
     pub clips: usize,
     pub curves: usize,
     pub keys: usize,
@@ -61,8 +70,16 @@ pub struct Stats {
     pub constraints: usize,
 }
 
-/// Counts everything in `a`. Bones are the distinct nodes any skin uses as a joint.
-pub fn stats(a: &Avatar) -> Stats {
+/// Vertices and triangles one LOD level draws.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct Level {
+    pub vertices: usize,
+    pub triangles: usize,
+}
+
+/// Counts everything in `a`, with texture bytes from `blobs`. Bones are the distinct nodes any skin uses as a joint.
+pub fn stats(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> Stats {
     let bones: HashSet<u32> = a
         .meshes
         .iter()
@@ -76,6 +93,8 @@ pub fn stats(a: &Avatar) -> Stats {
         human_bones: a.humanoid.as_ref().map_or(0, |h| h.bones.len()),
         visemes: a.face.as_ref().map_or(0, |f| f.visemes.len()),
         meshes: a.meshes.len(),
+        skinned_meshes: a.meshes.iter().filter(|m| m.skin.is_some()).count(),
+        draws: a.meshes.iter().map(|m| m.submeshes.len()).sum(),
         vertices: a.meshes.iter().map(|m| m.positions.len()).sum(),
         triangles: a.meshes.iter().map(|m| m.indices.len() / 3).sum(),
         blend_shapes: a.meshes.iter().map(|m| m.blend_shapes.len()).sum(),
@@ -92,6 +111,15 @@ pub fn stats(a: &Avatar) -> Stats {
             .filter(|m| matches!(m.model, MaterialModel::Toon(_)))
             .count(),
         textures: a.textures.len(),
+        texture_bytes: a
+            .textures
+            .iter()
+            .map(|t| t.blob)
+            .collect::<HashSet<_>>()
+            .iter()
+            .filter_map(|id| blobs.get(id))
+            .map(Vec::len)
+            .sum(),
         clips: a.clips.len(),
         curves: curves.clone().count(),
         keys: curves.map(|c| c.keys.len()).sum(),
@@ -101,6 +129,21 @@ pub fn stats(a: &Avatar) -> Stats {
         constraints: a.constraints.len(),
         ..Stats::default()
     };
+    let levels = a.meshes.iter().map(|m| m.lods.len()).max().unwrap_or(0) + 1;
+    s.lod = (0..levels)
+        .map(|n| {
+            a.meshes.iter().fold(Level::default(), |l, m| {
+                let (vertices, triangles) = match n.checked_sub(1).and_then(|i| m.lods.get(i).or(m.lods.last())) {
+                    Some(lod) => (lod.vertices as usize, lod.indices.len() / 3),
+                    None => (m.positions.len(), m.indices.len() / 3),
+                };
+                Level {
+                    vertices: l.vertices + vertices,
+                    triangles: l.triangles + triangles,
+                }
+            })
+        })
+        .collect();
     if let Some(anim) = &a.animator {
         let machines = anim.layers.iter().map(|l| &l.state_machine);
         s.parameters = anim.parameters.len();
@@ -130,8 +173,13 @@ impl fmt::Display for Stats {
         )?;
         writeln!(
             f,
-            "meshes      {} meshes, {} vertices, {} triangles",
-            self.meshes, self.vertices, self.triangles
+            "meshes      {} meshes ({} skinned), {} draws, {} vertices, {} triangles, LOD triangles {:?}",
+            self.meshes,
+            self.skinned_meshes,
+            self.draws,
+            self.vertices,
+            self.triangles,
+            self.lod.iter().map(|l| l.triangles).collect::<Vec<_>>()
         )?;
         writeln!(
             f,
@@ -140,8 +188,8 @@ impl fmt::Display for Stats {
         )?;
         writeln!(
             f,
-            "materials   {} materials ({} toon), {} textures",
-            self.materials, self.toon_materials, self.textures
+            "materials   {} materials ({} toon), {} textures, {} texture bytes",
+            self.materials, self.toon_materials, self.textures, self.texture_bytes
         )?;
         writeln!(
             f,

@@ -1,0 +1,301 @@
+{
+  "report": 1,
+  "avatar": "lean",
+  "compiler": "civbb-pipeline 0.0.0",
+  "format_version": 8,
+  "platform": "Desktop",
+  "stages": [
+    {
+      "stage": "source",
+      "nodes": 29,
+      "bones": 22,
+      "human_bones": 21,
+      "visemes": 15,
+      "meshes": 3,
+      "skinned_meshes": 3,
+      "draws": 3,
+      "vertices": 1376,
+      "triangles": 2192,
+      "lod": [
+        {
+          "vertices": 1376,
+          "triangles": 2192
+        }
+      ],
+      "blend_shapes": 15,
+      "shape_deltas": 195,
+      "materials": 2,
+      "toon_materials": 2,
+      "textures": 0,
+      "texture_bytes": 0,
+      "clips": 4,
+      "curves": 4,
+      "keys": 4,
+      "parameters": 2,
+      "layers": 2,
+      "states": 4,
+      "transitions": 4,
+      "animator_bytes": 1672,
+      "expression_params": 2,
+      "synced_bits": 2,
+      "chains": 0,
+      "colliders": 2,
+      "contacts": 3,
+      "constraints": 0
+    },
+    {
+      "stage": "prune",
+      "nodes": 29,
+      "bones": 22,
+      "human_bones": 21,
+      "visemes": 15,
+      "meshes": 3,
+      "skinned_meshes": 3,
+      "draws": 3,
+      "vertices": 1376,
+      "triangles": 2192,
+      "lod": [
+        {
+          "vertices": 1376,
+          "triangles": 2192
+        }
+      ],
+      "blend_shapes": 15,
+      "shape_deltas": 195,
+      "materials": 2,
+      "toon_materials": 2,
+      "textures": 0,
+      "texture_bytes": 0,
+      "clips": 4,
+      "curves": 4,
+      "keys": 4,
+      "parameters": 2,
+      "layers": 2,
+      "states": 4,
+      "transitions": 4,
+      "animator_bytes": 1672,
+      "expression_params": 2,
+      "synced_bits": 2,
+      "chains": 0,
+      "colliders": 2,
+      "contacts": 3,
+      "constraints": 0
+    },
+    {
+      "stage": "atlas",
+      "nodes": 29,
+      "bones": 22,
+      "human_bones": 21,
+      "visemes": 15,
+      "meshes": 3,
+      "skinned_meshes": 3,
+      "draws": 3,
+      "vertices": 1376,
+      "triangles": 2192,
+      "lod": [
+        {
+          "vertices": 1376,
+          "triangles": 2192
+        }
+      ],
+      "blend_shapes": 15,
+      "shape_deltas": 195,
+      "materials": 2,
+      "toon_materials": 2,
+      "textures": 0,
+      "texture_bytes": 0,
+      "clips": 4,
+      "curves": 4,
+      "keys": 4,
+      "parameters": 2,
+      "layers": 2,
+      "states": 4,
+      "transitions": 4,
+      "animator_bytes": 1672,
+      "expression_params": 2,
+      "synced_bits": 2,
+      "chains": 0,
+      "colliders": 2,
+      "contacts": 3,
+      "constraints": 0
+    },
+    {
+      "stage": "merge",
+      "nodes": 29,
+      "bones": 22,
+      "human_bones": 21,
+      "visemes": 15,
+      "meshes": 3,
+      "skinned_meshes": 3,
+      "draws": 3,
+      "vertices": 1376,
+      "triangles": 2192,
+      "lod": [
+        {
+          "vertices": 1376,
+          "triangles": 2192
+        }
+      ],
+      "blend_shapes": 15,
+      "shape_deltas": 195,
+      "materials": 2,
+      "toon_materials": 2,
+      "textures": 0,
+      "texture_bytes": 0,
+      "clips": 4,
+      "curves": 4,
+      "keys": 4,
+      "parameters": 2,
+      "layers": 2,
+      "states": 4,
+      "transitions": 4,
+      "animator_bytes": 1672,
+      "expression_params": 2,
+      "synced_bits": 2,
+      "chains": 0,
+      "colliders": 2,
+      "contacts": 3,
+      "constraints": 0
+    },
+    {
+      "stage": "lod",
+      "nodes": 29,
+      "bones": 22,
+      "human_bones": 21,
+      "visemes": 15,
+      "meshes": 3,
+      "skinned_meshes": 3,
+      "draws": 3,
+      "vertices": 1376,
+      "triangles": 2192,
+      "lod": [
+        {
+          "vertices": 1376,
+          "triangles": 2192
+        },
+        {
+          "vertices": 832,
+          "triangles": 1104
+        },
+        {
+          "vertices": 560,
+          "triangles": 560
+        }
+      ],
+      "blend_shapes": 15,
+      "shape_deltas": 195,
+      "materials": 2,
+      "toon_materials": 2,
+      "textures": 0,
+      "texture_bytes": 0,
+      "clips": 4,
+      "curves": 4,
+      "keys": 4,
+      "parameters": 2,
+      "layers": 2,
+      "states": 4,
+      "transitions": 4,
+      "animator_bytes": 1672,
+      "expression_params": 2,
+      "synced_bits": 2,
+      "chains": 0,
+      "colliders": 2,
+      "contacts": 3,
+      "constraints": 0
+    },
+    {
+      "stage": "collapse",
+      "nodes": 29,
+      "bones": 22,
+      "human_bones": 21,
+      "visemes": 15,
+      "meshes": 3,
+      "skinned_meshes": 3,
+      "draws": 3,
+      "vertices": 1376,
+      "triangles": 2192,
+      "lod": [
+        {
+          "vertices": 1376,
+          "triangles": 2192
+        },
+        {
+          "vertices": 832,
+          "triangles": 1104
+        },
+        {
+          "vertices": 560,
+          "triangles": 560
+        }
+      ],
+      "blend_shapes": 15,
+      "shape_deltas": 195,
+      "materials": 2,
+      "toon_materials": 2,
+      "textures": 0,
+      "texture_bytes": 0,
+      "clips": 4,
+      "curves": 4,
+      "keys": 4,
+      "parameters": 3,
+      "layers": 1,
+      "states": 3,
+      "transitions": 1,
+      "animator_bytes": 1731,
+      "expression_params": 2,
+      "synced_bits": 2,
+      "chains": 0,
+      "colliders": 2,
+      "contacts": 3,
+      "constraints": 0
+    },
+    {
+      "stage": "compress",
+      "nodes": 29,
+      "bones": 22,
+      "human_bones": 21,
+      "visemes": 15,
+      "meshes": 3,
+      "skinned_meshes": 3,
+      "draws": 3,
+      "vertices": 1376,
+      "triangles": 2192,
+      "lod": [
+        {
+          "vertices": 1376,
+          "triangles": 2192
+        },
+        {
+          "vertices": 832,
+          "triangles": 1104
+        },
+        {
+          "vertices": 560,
+          "triangles": 560
+        }
+      ],
+      "blend_shapes": 15,
+      "shape_deltas": 195,
+      "materials": 2,
+      "toon_materials": 2,
+      "textures": 0,
+      "texture_bytes": 0,
+      "clips": 4,
+      "curves": 4,
+      "keys": 4,
+      "parameters": 3,
+      "layers": 1,
+      "states": 3,
+      "transitions": 1,
+      "animator_bytes": 1731,
+      "expression_params": 2,
+      "synced_bits": 2,
+      "chains": 0,
+      "colliders": 2,
+      "contacts": 3,
+      "constraints": 0
+    }
+  ],
+  "package_bytes": 125221,
+  "timings": null
+}

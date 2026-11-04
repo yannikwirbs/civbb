@@ -20,7 +20,7 @@ const FLIP_EVERY: u32 = 30;
 /// What to run.
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// Corpus avatar every island shows: `lean` or `bloated`.
+    /// Name of the avatar every island shows, for the report.
     pub avatar: String,
     /// Number of avatars.
     pub avatars: u32,
@@ -35,7 +35,7 @@ pub struct Config {
 /// The benchmark's result, written as JSON.
 #[derive(Clone, Debug, Serialize)]
 pub struct Report {
-    /// Corpus avatar.
+    /// The avatar's name.
     pub avatar: String,
     /// Number of avatars.
     pub avatars: u32,
@@ -92,9 +92,9 @@ pub fn doubling(max: usize) -> Vec<usize> {
     v
 }
 
-/// Runs the benchmark; `None` if the avatar name is unknown or a worker pool cannot be built.
-pub fn run(cfg: &Config) -> Option<Report> {
-    let model = Arc::new(Model::new(&avatar(&cfg.avatar)?));
+/// Runs the benchmark with `avatar` on every island; `None` if a worker pool cannot be built.
+pub fn run(cfg: &Config, avatar: &Avatar) -> Option<Report> {
+    let model = Arc::new(Model::new(avatar));
     let mut runs: Vec<Run> = Vec::with_capacity(cfg.threads.len());
     for &threads in &cfg.threads {
         let pool = jobs::pool(threads).ok()?;

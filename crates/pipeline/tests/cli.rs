@@ -1,5 +1,5 @@
-//! `civbb` end to end: keygen, build (pruning, atlasing, merging, LOD chain, compression; ADRs 0026, 0027, 0029, 0031), validate and inspect on a corpus avatar, plus tamper and
-//! wrong-key rejection.
+//! `civbb` end to end: keygen, build (pruning, atlasing, merging, LOD chain, compression; ADRs 0026, 0027, 0029, 0031)
+//! with its report (ADR 0032), validate and inspect on a corpus avatar, plus tamper and wrong-key rejection.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -38,7 +38,10 @@ fn build_validate_inspect() {
     // The GLB carries no animator or face, so nothing drives the lean avatar's 15 visemes or toggles its meshes:
     // all three merge, and the body and prop share a material; the merged mesh gets a LOD chain. It has no
     // textures to atlas or compress.
-    let built = stdout(&civbb(&dir, &["build", "lean.glb", "--key", "dev.key"]));
+    let built = stdout(&civbb(
+        &dir,
+        &["build", "lean.glb", "--key", "dev.key", "--report", "lean.report.json"],
+    ));
     assert!(
         built.starts_with(
             "pruned 0 nodes, 0 skin joints, 15 blendshapes\natlased 0 atlases, 0 fewer textures, 0 fewer materials\n\
@@ -49,6 +52,30 @@ fn build_validate_inspect() {
     assert!(
         built.contains("\ncollapsed 0 toggle layers\ncompressed 0 textures"),
         "{built}"
+    );
+    assert!(
+        built.ends_with(
+            "wrote lean.report.json and lean.report.md
+"
+        ),
+        "{built}"
+    );
+    let report: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.join("lean.report.json")).unwrap()).unwrap();
+    assert_eq!(report["report"], 1);
+    assert_eq!(report["stages"].as_array().unwrap().len(), 7);
+    assert_eq!(
+        report["package_bytes"].as_u64(),
+        Some(std::fs::metadata(dir.join("lean.civpkg")).unwrap().len())
+    );
+    assert!(report["timings"].is_null());
+    let md = std::fs::read_to_string(dir.join("lean.report.md")).unwrap();
+    assert!(
+        md.starts_with(
+            "# Report: lean
+"
+        ),
+        "{md}"
     );
     assert!(stdout(&civbb(&dir, &["validate", "lean.civpkg", "--key", "dev.key"])).starts_with("ok"));
 
@@ -96,6 +123,13 @@ fn build_validate_inspect() {
         civbb(&dir, &["build", "lean.glb"]).status.code(),
         Some(2),
         "build without a key"
+    );
+    assert_eq!(
+        civbb(&dir, &["build", "lean.glb", "--key", "dev.key", "--measure"])
+            .status
+            .code(),
+        Some(2),
+        "measure without a report"
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }

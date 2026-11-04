@@ -185,6 +185,15 @@ impl Context {
         self.physical
     }
 
+    /// The physical device's name, as its driver reports it.
+    pub fn device_name(&self) -> String {
+        // SAFETY: plain query on a device from this instance.
+        let props = unsafe { self.instance.instance.get_physical_device_properties(self.physical) };
+        props
+            .device_name_as_c_str()
+            .map_or_else(|_| "unknown".into(), |n| n.to_string_lossy().into_owned())
+    }
+
     /// The logical device.
     pub fn device(&self) -> &ash::Device {
         &self.device
