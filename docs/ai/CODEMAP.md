@@ -43,7 +43,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020),
 - `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`), a desktop
 - `src/view.rs`: Desktop viewer: N copies of an avatar in a grid with animator and dynamics running, drawn in a window with an
-- `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count; bad arguments
+- `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 - `tests/measure.rs`: `civbb-client measure` (ADR 0032): debug builds refuse, release builds print CPU times and, with a device, GPU
 - `tests/view.rs`: Viewer helpers without a window (ADR 0024): placement matrices agree with `Pose::point`, the grid is centred,

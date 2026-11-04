@@ -1,7 +1,10 @@
-//! `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count; bad arguments
-//! print usage.
+//! `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
+//! avatar or a verified runtime package (#57); bad arguments print usage.
 
 use std::process::Command;
+
+use civbb_format::package::{ContentKind, Header, Platform};
+use civbb_format::{BlobId, FORMAT_VERSION, Package, SigningKey};
 
 fn client(args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_civbb-client"))
@@ -47,11 +50,65 @@ fn bench_reports_every_worker_count_as_json() {
 }
 
 #[test]
+fn bench_runs_a_verified_package() {
+    let dir = std::env::temp_dir().join(format!("civbb-bench-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let package = Package {
+        header: Header {
+            format_version: FORMAT_VERSION,
+            compiler: "test".into(),
+            kind: ContentKind::Avatar,
+            platform: Platform::Desktop,
+            root: BlobId([0; 32]),
+            cost: None,
+        },
+        blobs: Default::default(),
+    }
+    .with_avatar(&civbb_corpus::generate(&civbb_corpus::lean()));
+    std::fs::write(
+        dir.join("lean.civpkg"),
+        package.encode_signed(&SigningKey::from_bytes(&[5; 32])),
+    )
+    .unwrap();
+    std::fs::write(dir.join("key"), [5u8; 32]).unwrap();
+    std::fs::write(dir.join("other"), [6u8; 32]).unwrap();
+    let run = |key: &str| {
+        let pkg = dir.join("lean.civpkg");
+        let key = dir.join(key);
+        Command::new(env!("CARGO_BIN_EXE_civbb-client"))
+            .args([
+                "bench",
+                "--threads",
+                "1",
+                "--avatars",
+                "2",
+                "--frames",
+                "2",
+                "--warmup",
+                "0",
+            ])
+            .arg("--package")
+            .arg(&pkg)
+            .arg("--key")
+            .arg(&key)
+            .output()
+            .unwrap()
+    };
+    let out = run("key");
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["avatar"], "lean");
+    assert!(!run("other").status.success(), "a package signed by another key");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
 fn bad_arguments_print_usage() {
     for args in [
         &["bench", "--threads", "0"][..],
         &["bench", "--avatars"],
         &["bench", "--fast", "1"],
+        &["bench", "--package", "x.civpkg"],
         &["run"],
     ] {
         let out = client(args);

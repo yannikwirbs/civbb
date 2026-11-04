@@ -4,6 +4,7 @@ pub mod gltf;
 
 use civbb_format::Avatar;
 use civbb_format::animator::*;
+use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
 use civbb_format::dynamics::*;
 use civbb_format::expressions::*;
 use civbb_format::face::{Face, ShapeBind, Viseme};
@@ -33,6 +34,9 @@ pub struct Spec {
     pub sides: u32,
     /// Cylinder rings per limb segment.
     pub rings: u32,
+    /// Rotation constraints: twist helpers on the forearms and shins first, then tail bones following their
+    /// parent; at most as many as there are such bones.
+    pub constraints: u32,
 }
 
 /// A small, well-optimised control avatar: the compiler must never make it worse.
@@ -47,10 +51,11 @@ pub fn lean() -> Spec {
         shape_key_coverage: 0.02,
         sides: 8,
         rings: 4,
+        constraints: 2,
     }
 }
 
-/// The worst case on purpose: stacked outfits, dozens of toggles, a nine-tail rig and 1,200 shape keys.
+/// The worst case on purpose: stacked outfits, dozens of toggles, a nine-tail rig, 1,200 shape keys and 67 constraints.
 pub fn bloated() -> Spec {
     Spec {
         name: "bloated".into(),
@@ -62,6 +67,7 @@ pub fn bloated() -> Spec {
         shape_key_coverage: 0.05,
         sides: 24,
         rings: 16,
+        constraints: 67,
     }
 }
 
@@ -530,6 +536,41 @@ pub fn generate(spec: &Spec) -> Avatar {
         meshes.push(tails.finish(&b, "Tails", tails_node, material));
     }
 
+    // Constraints: half-weight twists copying the hand or foot rotation, then tail bones each copying a third of
+    // their parent's.
+    let mut pairs: Vec<(NodeIndex, NodeIndex, [bool; 3], f32)> = [
+        ("LowerArm.L", "Hand.L"),
+        ("LowerArm.R", "Hand.R"),
+        ("LowerLeg.L", "Foot.L"),
+        ("LowerLeg.R", "Foot.R"),
+    ]
+    .iter()
+    .map(|(target, source)| (b.find(target), b.find(source), [true, false, false], 0.5))
+    .collect();
+    for t in 0..spec.tails {
+        for k in 1..spec.tail_bones {
+            let (target, source) = (b.find(&format!("Tail_{t}_{k}")), b.find(&format!("Tail_{t}_{}", k - 1)));
+            pairs.push((target, source, [true; 3], 0.3));
+        }
+    }
+    let constraints = pairs
+        .into_iter()
+        .take(spec.constraints as usize)
+        .map(|(target, source, axes, weight)| Constraint {
+            kind: ConstraintKind::Rotation { offset: [0.0; 3] },
+            target,
+            sources: vec![ConstraintSource {
+                node: source,
+                weight: 1.0,
+                offset: Transform::IDENTITY,
+            }],
+            weight,
+            active: true,
+            axes,
+            rest: b.nodes[target as usize].rest,
+        })
+        .collect();
+
     // Shape keys: visemes first, then face-tracking style keys, each moving a contiguous run of body vertices.
     let body_mesh = &mut meshes[0];
     let vertex_count = body_mesh.positions.len() as u32;
@@ -718,7 +759,7 @@ pub fn generate(spec: &Spec) -> Avatar {
         }),
         dynamics,
         contacts,
-        constraints: vec![],
+        constraints,
     }
 }
 
@@ -740,8 +781,20 @@ mod tests {
         let a = generate(&bloated());
         assert!(a.meshes[0].blend_shapes.len() >= 1000);
         assert_eq!(a.dynamics.chains.len(), 9);
+        assert_eq!(a.constraints.len(), 67, "4 twists and every tail bone below a root");
         assert!(a.animator.as_ref().unwrap().layers.len() >= 40);
         assert!(a.meshes.len() >= 10);
+    }
+
+    #[test]
+    fn lean_has_forearm_twists() {
+        let a = generate(&lean());
+        let names: Vec<&str> = a
+            .constraints
+            .iter()
+            .map(|c| a.hierarchy.nodes[c.target as usize].name.as_str())
+            .collect();
+        assert_eq!(names, ["LowerArm.L", "LowerArm.R"]);
     }
 
     #[test]
