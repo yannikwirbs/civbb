@@ -45,7 +45,7 @@ fn unity_recordings_match() {
         };
         civbb_format::validate(&avatar, &Default::default(), |_| true).unwrap();
         let mut locals: Vec<Transform> = case.nodes.iter().map(|n| n.rest).collect();
-        Constraints::new(&avatar).evaluate(&mut locals);
+        Constraints::new(&avatar).evaluate(&mut locals, &mut Default::default());
         // Unity blends scale with an approximate `pow`, up to 1% above the exact geometric mean.
         let scale_eps = if case.name.starts_with("scale") { 0.01 } else { 1e-4 };
         for (i, (got, want)) in locals.iter().zip(&case.out).enumerate() {
@@ -114,7 +114,7 @@ fn avatar(constraints: Vec<Constraint>) -> Avatar {
 
 fn run(a: &Avatar) -> Vec<Vec3> {
     let mut locals: Vec<Transform> = a.hierarchy.nodes.iter().map(|n| n.rest).collect();
-    Constraints::new(a).evaluate(&mut locals);
+    Constraints::new(a).evaluate(&mut locals, &mut Default::default());
     locals.iter().map(|l| l.translation).collect()
 }
 
@@ -218,7 +218,7 @@ fn rest_pair(kind: ConstraintKind, source_rest: Quat, target_rest: Quat, weight:
 
 fn rest_run(a: &Avatar, mut locals: Vec<Transform>, source_rotation: Quat) -> Quat {
     locals[1].rotation = source_rotation;
-    Constraints::new(a).evaluate(&mut locals);
+    Constraints::new(a).evaluate(&mut locals, &mut Default::default());
     locals[2].rotation
 }
 

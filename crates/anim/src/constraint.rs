@@ -21,7 +21,15 @@ pub struct Constraints {
     rests: Vec<Quat>,
     /// The constraints, sorted.
     pub list: Vec<Constraint>,
+    /// The nodes constraints read and their ancestors, parents first: the only ones placed in world space.
+    placed: Vec<NodeIndex>,
+    /// Per constraint, the placed nodes below its target, parents first: re-placed after it moves the target.
+    below: Vec<Vec<NodeIndex>>,
 }
+
+/// World placements reused between [`Constraints::evaluate`] calls.
+#[derive(Clone, Debug, Default)]
+pub struct Scratch(Vec<Place>);
 
 impl Constraints {
     /// Sorts a validated avatar's constraints. A constraint runs after every constraint whose target is (or is an
@@ -76,40 +84,67 @@ impl Constraints {
                 }
             }
         }
+        let list: Vec<Constraint> = order.into_iter().map(|i| list[i].clone()).collect();
+        let mut needed = vec![false; parents.len()];
+        for (read, _) in list.iter().flat_map(reads) {
+            let mut n = Some(read);
+            while let Some(node) = n.filter(|&n| !needed[n as usize]) {
+                needed[node as usize] = true;
+                n = parents[node as usize];
+            }
+        }
+        let placed: Vec<NodeIndex> = (0..parents.len() as NodeIndex)
+            .filter(|&i| needed[i as usize])
+            .collect();
+        let below = list
+            .iter()
+            .map(|c| {
+                let mut inside = vec![false; parents.len()];
+                inside[c.target as usize] = true;
+                let mut out = Vec::new();
+                for &i in placed.iter().filter(|&&i| i > c.target) {
+                    if parents[i as usize].is_some_and(|p| inside[p as usize]) {
+                        inside[i as usize] = true;
+                        out.push(i);
+                    }
+                }
+                out
+            })
+            .collect();
         Self {
             parents,
             rests: avatar.hierarchy.nodes.iter().map(|n| n.rest.rotation).collect(),
-            list: order.into_iter().map(|i| list[i].clone()).collect(),
+            list,
+            placed,
+            below,
         }
     }
 
     /// Applies every constraint in order to `locals`, the animated local pose of every node.
-    pub fn evaluate(&self, locals: &mut [Transform]) {
+    pub fn evaluate(&self, locals: &mut [Transform], scratch: &mut Scratch) {
         if self.list.is_empty() {
             return;
         }
-        let mut world: Vec<Place> = Vec::with_capacity(locals.len());
-        for (i, l) in locals.iter().enumerate() {
+        let world = &mut scratch.0;
+        world.resize(locals.len(), Place::IDENTITY);
+        let place = |world: &mut Vec<Place>, locals: &[Transform], i: NodeIndex| {
+            let i = i as usize;
             let parent = self.parents[i].map_or(Place::IDENTITY, |p| world[p as usize]);
-            world.push(parent.then(l));
+            world[i] = parent.then(&locals[i]);
+        };
+        for &i in &self.placed {
+            place(world, locals, i);
         }
-        let mut moved = vec![false; locals.len()];
-        for c in &self.list {
+        for (c, below) in self.list.iter().zip(&self.below) {
             let t = c.target as usize;
             let parent = self.parents[t].map_or(Place::IDENTITY, |p| world[p as usize]);
-            let Some(new) = solve(c, &world, &parent, locals, &self.rests) else {
+            let Some(new) = solve(c, world, &parent, locals, &self.rests) else {
                 continue;
             };
             locals[t] = new;
-            // Re-place the target's subtree (children come after their parents).
-            moved.fill(false);
-            moved[t] = true;
             world[t] = parent.then(&new);
-            for i in t + 1..locals.len() {
-                if let Some(p) = self.parents[i].filter(|&p| moved[p as usize]) {
-                    moved[i] = true;
-                    world[i] = world[p as usize].then(&locals[i]);
-                }
+            for &i in below {
+                place(world, locals, i);
             }
         }
     }

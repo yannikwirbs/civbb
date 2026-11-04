@@ -139,6 +139,8 @@ pub struct Island {
     own_active: Vec<bool>,
     active: Vec<bool>,
     world: Vec<Pose>,
+    /// The constraint pass's world placements, kept between frames.
+    constraint_scratch: civbb_anim::constraint::Scratch,
 }
 
 impl Island {
@@ -156,6 +158,7 @@ impl Island {
             own_active: model.active.clone(),
             active: vec![false; n],
             world: Vec::with_capacity(n),
+            constraint_scratch: Default::default(),
             model,
         }
     }
@@ -239,6 +242,7 @@ impl Island {
             own_active,
             active,
             world,
+            constraint_scratch,
             ..
         } = self;
         let m = &**model;
@@ -255,7 +259,9 @@ impl Island {
                 a.write_nodes(c, locals, own_active);
             }
         });
-        counters.time(System::Constraints, || m.constraints.evaluate(locals));
+        counters.time(System::Constraints, || {
+            m.constraints.evaluate(locals, constraint_scratch)
+        });
         counters.time(System::Ik, || ik(locals));
         counters.time(System::Dynamics, || chains.step(&m.chains, *origin, locals, dt));
         counters.time(System::World, || {
