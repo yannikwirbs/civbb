@@ -117,5 +117,10 @@ fn damaged_ktx2_is_an_error_not_a_panic() {
             b[at] = 0xfe;
             assert!(transcode_ktx2(&b).is_err(), "range at {at}");
         }
+        // Key/value data whose end is not 4-byte aligned: `basisu` 0.1 underflows scanning it (fuzzer, #67).
+        let mut b = bytes.to_vec();
+        let length = u32::from_le_bytes(b[60..64].try_into().unwrap());
+        b[60..64].copy_from_slice(&(length - 1).to_le_bytes());
+        assert!(transcode_ktx2(&b).is_err(), "unaligned key/value length");
     }
 }

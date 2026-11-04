@@ -162,6 +162,10 @@ pub fn transcode_ktx2(bytes: &[u8]) -> Result<TextureImage, String> {
             return Err("header range out of bounds".into());
         }
     }
+    // Key/value entries are padded to 4 bytes; `basisu` steps its padded cursor past an unaligned end and underflows.
+    if [u32_at(56), u32_at(60)].iter().any(|v| v.is_none_or(|v| v % 4 != 0)) {
+        return Err("key/value data not 4-byte aligned".into());
+    }
     let most = 32 - width.max(height).leading_zeros();
     if !(1..=most).contains(&level_count) {
         return Err(format!("{level_count} levels"));

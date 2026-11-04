@@ -82,8 +82,8 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Blockers and needs-user
 
-- CI for cdbac2b, 938fd3f and later had not run when the session ended (GitHub Actions partial outage,
-  2026-11-04); `cargo xtask ci` passed locally. First thing next session: `gh run list`, fix anything red.
+- After the 2026-11-04 Actions outage, ci passed on cdbac2b and 938fd3f; fuzz on cdbac2b found a `basisu` KVD
+  underflow, fixed in #67. Check `gh run list` for the #67 commit first thing next session.
 
 - #37, #38 Unity tasks (M0.10, later). Sessions can run Unity themselves now; those two still need the human
   (Creator Companion projects, baselines).
@@ -119,4 +119,4 @@ One line per session, newest last: date, what moved, what's next.
   Next: M0.9 from #34.
 - 2026-11-04: #34 per-avatar report (ADR 0032): stats per compiler stage, `civbb-client measure` (bench on one
   worker plus headless viewer frames), `civbb build --report --measure`, reports for all 31 local files; `view
-  --frames` warm-up. #57 closed: `bench --package`, corpus constraints. Opened #65, #66. Next: #35.
+  --frames` warm-up. #57 closed: `bench --package`, corpus constraints. Opened #65, #66. Fuzzer found #67 (KVD alignment), fixed. Next: #35.

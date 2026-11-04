@@ -67,7 +67,7 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   between runs; encode single-threaded and parallelise across textures.
 - Pure-Rust parsers still need hostile-input tests: `basisu` 0.1 allocates a KTX2 level's stated uncompressed
   length unchecked (a 1 EB abort from three flipped bits). It also adds the header's `sgdByteOffset` unchecked (an
-  overflow panic the CI fuzzer found): check every header range (DFD, KVD, SGD, levels) before calling it. A test that truncates and bit-flips a small valid file
+  overflow panic the CI fuzzer found): check every header range (DFD, KVD, SGD, levels) before calling it, and that the KVD offset and length are 4-byte aligned (its padded cursor underflows otherwise, #67). A test that truncates and bit-flips a small valid file
   a few thousand times finds such things in seconds, on Windows, without cargo-fuzz.
 - Unity-exported UVs often sit a whole tile off 0..1 (AliciaSolid's V runs 1 to 2); with a repeating sampler
   that is equal to 0..1, so check "each triangle in one unit tile", not "inside 0..1".
