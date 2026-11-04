@@ -32,17 +32,17 @@ fn lean_counts_match_the_golden() {
     );
     assert!(report.timings.is_none());
 
-    let json = serde_json::to_string_pretty(&report).unwrap() + "\n";
+    // Counts only: the package size differs by a few bytes between Windows and Linux builds.
+    let mut got = serde_json::to_value(&report).unwrap();
+    got.as_object_mut().unwrap().remove("package_bytes");
+    let json = serde_json::to_string_pretty(&got).unwrap() + "\n";
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden/report-lean.json");
     if std::env::var_os("CIVBB_BLESS").is_some() {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, &json).unwrap();
     }
     let golden = std::fs::read_to_string(&path).expect("golden missing: run with CIVBB_BLESS=1");
-    let (got, want): (serde_json::Value, serde_json::Value) = (
-        serde_json::from_str(&json).unwrap(),
-        serde_json::from_str(&golden).unwrap(),
-    );
+    let want: serde_json::Value = serde_json::from_str(&golden).unwrap();
     assert!(got == want, "report differs from {}:\n{json}", path.display());
 }
 
