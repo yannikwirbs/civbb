@@ -42,10 +42,12 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
 - `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020),
 - `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`), a desktop
+- `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
 - `src/view.rs`: Desktop viewer: N copies of an avatar in a grid with animator and dynamics running, drawn in a window with an
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 - `tests/measure.rs`: `civbb-client measure` (ADR 0032): debug builds refuse, release builds print CPU times and, with a device, GPU
+- `tests/parity.rs`: FLIP parity scoring without a device (ADR 0033): FLIP of an image against itself is 0, a known perturbation
 - `tests/view.rs`: Viewer helpers without a window (ADR 0024): placement matrices agree with `Pose::point`, the grid is centred,
 
 ## `crates/core` (civbb-core)
@@ -121,6 +123,7 @@ Internal deps: civbb-anim, civbb-format
 - `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
 - `tests/lod.rs`: LOD chain (ADR 0031): levels fall in triangles within their error caps, keep submesh borders and UV seams, keep
 - `tests/merge.rs`: Mesh merging (ADR 0027): meshes always visible together merge and same-material submeshes join, everything
+- `tests/parity.rs`: FLIP parity on a device (ADR 0033): the lean and bloated corpus avatars after every compiler stage render like
 - `tests/prune.rs`: Pruning (ADR 0026): unused skin joints, unreferenced nodes and undriven blendshapes go; everything referenced,
 - `tests/report.rs`: The per-avatar report (ADR 0032): the lean corpus avatar's counts per stage against a golden JSON, the package
 - `tests/texture.rs`: Texture atlasing and KTX2 compression (ADR 0029): every vertex samples the same texel through the atlas as
@@ -205,6 +208,7 @@ Internal deps: none
 - `docs/adr/0030-no-physbone-chain-merging.md`: 0030: PhysBone chains are not merged at compile time; our solver has no per-chain batch cost to save
 - `docs/adr/0031-skin-aware-lod-chain.md`: 0031: A skin-aware LOD chain from meshoptimizer: three prefix levels per mesh, built after merging (format v8)
 - `docs/adr/0032-per-avatar-report.md`: 0032: The per-avatar report: counts per compiler stage from `civbb build`, times from `civbb-client measure`
+- `docs/adr/0033-flip-parity-against-the-source.md`: 0033: FLIP parity compares the compiled avatar with its own import in our renderer, per state and view
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

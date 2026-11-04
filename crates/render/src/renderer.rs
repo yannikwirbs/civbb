@@ -314,6 +314,55 @@ impl Renderer {
         Ok(FrameStatus::Presented)
     }
 
+    /// Headless only: copies the last frame's image back after it finished, as [`HEADLESS_FORMAT`] texels (BGRA8,
+    /// sRGB-encoded), rows tightly packed from the top. Call after at least one [`Renderer::frame`].
+    pub fn read_last(&self) -> Result<Vec<u8>> {
+        assert!(!self.offscreen.is_empty(), "read_last needs a headless renderer");
+        let last = &self.offscreen[(self.current + FRAMES_IN_FLIGHT - 1) % FRAMES_IN_FLIGHT];
+        let (width, height) = (self.extent.width, self.extent.height);
+        let buffer = self.ctx.create_buffer(
+            "read back",
+            u64::from(width) * u64::from(height) * 4,
+            vk::BufferUsageFlags::TRANSFER_DST,
+            crate::memory::MemoryLocation::GpuToCpu,
+        )?;
+        // Submitted after the frame on the same queue: the graph's final barrier orders its writes before the copy.
+        let copied = self.ctx.one_shot(|d, cmd| {
+            let region = vk::BufferImageCopy::default()
+                .image_subresource(vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                })
+                .image_extent(vk::Extent3D {
+                    width,
+                    height,
+                    depth: 1,
+                });
+            let host = vk::MemoryBarrier2::default()
+                .src_stage_mask(vk::PipelineStageFlags2::COPY)
+                .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                .dst_stage_mask(vk::PipelineStageFlags2::HOST)
+                .dst_access_mask(vk::AccessFlags2::HOST_READ);
+            // SAFETY: the image is in `TransferSrc` after every headless frame; the buffer holds all its texels.
+            unsafe {
+                d.cmd_copy_image_to_buffer(
+                    cmd,
+                    last.handle,
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    buffer.handle,
+                    &[region],
+                );
+                d.cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().memory_barriers(&[host]));
+            }
+        });
+        let texels = copied.map(|()| buffer.mapped().expect("GpuToCpu memory is mapped").to_vec());
+        // SAFETY: `one_shot` waited for the copy, or never submitted it.
+        unsafe { self.ctx.destroy_buffer(buffer) };
+        texels
+    }
+
     fn recreate(&mut self) -> Result<()> {
         let device = self.ctx.device();
         // SAFETY: after the wait no frame uses the old swapchain; it is retired by the new one, then destroyed.

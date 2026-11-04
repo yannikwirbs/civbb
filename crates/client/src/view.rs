@@ -325,7 +325,7 @@ fn mul(a: &Mat4, b: &Mat4) -> Mat4 {
 }
 
 /// The avatar's bind-pose bounds: lowest and highest corner over every mesh's vertices.
-fn bounds(avatar: &Avatar) -> (Vec3, Vec3) {
+pub(crate) fn bounds(avatar: &Avatar) -> (Vec3, Vec3) {
     let mut lo = [f32::MAX; 3];
     let mut hi = [f32::MIN; 3];
     for p in avatar.meshes.iter().flat_map(|m| &m.positions) {
@@ -338,7 +338,7 @@ fn bounds(avatar: &Avatar) -> (Vec3, Vec3) {
 }
 
 /// Everything on the GPU: the scene, one skinned instance per island and mesh, and the pipelines.
-struct Gpu {
+pub(crate) struct Gpu {
     scene: Scene,
     meshes: Vec<MeshData>,
     instances: Vec<Vec<SkinnedMesh>>,
@@ -355,7 +355,7 @@ struct Gpu {
 }
 
 impl Gpu {
-    fn new(
+    pub(crate) fn new(
         renderer: &Renderer,
         avatar: &Avatar,
         model: &Model,
@@ -434,7 +434,7 @@ impl Gpu {
     /// # Safety
     ///
     /// The GPU is idle.
-    unsafe fn destroy(self, renderer: &Renderer) {
+    pub(crate) unsafe fn destroy(self, renderer: &Renderer) {
         let ctx = renderer.context();
         // SAFETY: per the contract.
         unsafe {
@@ -450,7 +450,7 @@ impl Gpu {
 
 /// Per-frame scratch reused across frames.
 #[derive(Default)]
-struct Scratch {
+pub(crate) struct Scratch {
     /// Per island and mesh: skinning matrices and blendshape weights; `None` for a hidden mesh.
     joints: Vec<Vec<Option<Vec<Mat4>>>>,
     weights: Vec<Vec<f32>>,
@@ -604,95 +604,22 @@ impl Viewer {
         let (Some(renderer), Some(gpu)) = (&mut self.renderer, &self.gpu) else {
             return Ok(false);
         };
-        let s = &mut self.scratch;
-        s.joints.resize_with(self.islands.len(), Vec::new);
-        s.all_weights.resize_with(self.islands.len(), Vec::new);
-        s.materials.resize_with(self.islands.len(), Vec::new);
-        s.packed.resize_with(self.islands.len(), Vec::new);
         let eye = self.camera.eye();
-        s.draws.clear();
-        s.updates.clear();
-        for (i, island) in self.islands.iter().enumerate() {
-            island.shape_weights(&mut s.weights);
-            std::mem::swap(&mut s.all_weights[i], &mut s.weights);
-            // An island's records are rewritten only when they change; the first frame writes them all.
-            island.materials(&mut s.materials[i]);
-            s.packed[i].resize(s.materials[i].len(), [0; MATERIAL_WORDS]);
-            for ((m, last), id) in s.materials[i].iter().zip(&mut s.packed[i]).zip(&gpu.own[i]) {
-                let record = pack(m, &gpu.bindless);
-                if record != *last {
-                    *last = record;
-                    s.updates.push((id.index, record));
-                }
-            }
-            let world = island.world();
-            let joints = &mut s.joints[i];
-            joints.resize(self.avatar.meshes.len(), None);
-            let o = island.origin.pos;
-            let distance = ((o[0] - eye[0]).powi(2) + (o[1] - eye[1]).powi(2) + (o[2] - eye[2]).powi(2)).sqrt();
-            for (m, mesh) in self.avatar.meshes.iter().enumerate() {
-                if !island.active()[mesh.node as usize] {
-                    joints[m] = None;
-                    continue;
-                }
-                let out = joints[m].get_or_insert_with(Vec::new);
-                out.clear();
-                match &mesh.skin {
-                    Some(skin) if !skin.joints.is_empty() => out.extend(
-                        skin.joints
-                            .iter()
-                            .zip(&skin.inverse_bind)
-                            .map(|(&j, ib)| mul(&matrix(&world[j as usize]), ib)),
-                    ),
-                    _ => out.push(matrix(&world[mesh.node as usize])),
-                }
-                let materials = gpu.maps[i][m].as_deref().unwrap_or(&gpu.materials);
-                gpu.meshes[m].draws(&gpu.instances[i][m], materials, distance, &mut s.draws);
-            }
-        }
-        let jobs: Vec<Job> = s
-            .joints
-            .iter()
-            .zip(&s.all_weights)
-            .zip(&gpu.instances)
-            .flat_map(|((joints, weights), instances)| {
-                joints.iter().zip(weights).zip(instances).filter_map(|((j, w), mesh)| {
-                    Some(Job {
-                        mesh,
-                        joints: j.as_ref()?,
-                        weights: w,
-                    })
-                })
-            })
-            .collect();
-        batch(&mut s.draws, &mut s.batches);
-        let (draws, skinned) = (s.draws.len(), jobs.len());
-        let extent = renderer.extent().unwrap_or_default();
-        let aspect = extent.width.max(1) as f32 / extent.height.max(1) as f32;
-        let view = View::look_at(eye, self.camera.target, 0.9, aspect, 0.05);
-        let (batches, updates) = (&s.batches, &s.updates);
-        let status = renderer.frame(|graph, target| {
-            let skinned = graph.import_buffer(gpu.scene.skinned().handle, &[Access::VertexRead]);
-            graph.add(
-                Pass::new("skin")
-                    .buffer(skinned, Access::ComputeWrite)
-                    // SAFETY: the graph records this outside a rendering scope on the renderer's device.
-                    .record(|d, cmd| unsafe { gpu.skinning.record(d, cmd, &jobs) }),
-            );
-            gpu.forward.add(
-                graph,
-                &gpu.scene,
-                target,
-                skinned,
-                &view,
-                batches,
-                updates,
-                [0.08, 0.09, 0.11, 1.0],
-            );
-        })?;
-        if status == FrameStatus::Skipped {
+        let target = self.camera.target;
+        let Some((draws, skinned)) = draw(
+            renderer,
+            gpu,
+            &self.avatar,
+            &self.islands,
+            &mut self.scratch,
+            eye,
+            target,
+            FOV_Y,
+            BACKGROUND,
+        )?
+        else {
             return Ok(false);
-        }
+        };
         // Waiting for vsync and the GPU is not CPU work.
         let cpu = start.elapsed().as_secs_f32() * 1000.0 - renderer.blocked_ms();
         let t = &mut self.timing;
@@ -731,6 +658,105 @@ impl Viewer {
         }
         Ok(true)
     }
+}
+
+/// The viewer's vertical field of view in radians.
+const FOV_Y: f32 = 0.9;
+
+/// The viewer's background, linear.
+pub(crate) const BACKGROUND: [f32; 4] = [0.08, 0.09, 0.11, 1.0];
+
+/// Skins and draws `islands`, each with its own instances in `gpu`, seen from `eye` looking at `target` on
+/// `clear` with a vertical field of view of `fov_y` radians; returns the draws and skinned meshes, or `None` if the frame was skipped.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn draw(
+    renderer: &mut Renderer,
+    gpu: &Gpu,
+    avatar: &Avatar,
+    islands: &[Island],
+    s: &mut Scratch,
+    eye: Vec3,
+    target: Vec3,
+    fov_y: f32,
+    clear: [f32; 4],
+) -> civbb_render::Result<Option<(usize, usize)>> {
+    s.joints.resize_with(islands.len(), Vec::new);
+    s.all_weights.resize_with(islands.len(), Vec::new);
+    s.materials.resize_with(islands.len(), Vec::new);
+    s.packed.resize_with(islands.len(), Vec::new);
+    s.draws.clear();
+    s.updates.clear();
+    for (i, island) in islands.iter().enumerate() {
+        island.shape_weights(&mut s.weights);
+        std::mem::swap(&mut s.all_weights[i], &mut s.weights);
+        // An island's records are rewritten only when they change; the first frame writes them all.
+        island.materials(&mut s.materials[i]);
+        s.packed[i].resize(s.materials[i].len(), [0; MATERIAL_WORDS]);
+        for ((m, last), id) in s.materials[i].iter().zip(&mut s.packed[i]).zip(&gpu.own[i]) {
+            let record = pack(m, &gpu.bindless);
+            if record != *last {
+                *last = record;
+                s.updates.push((id.index, record));
+            }
+        }
+        let world = island.world();
+        let joints = &mut s.joints[i];
+        joints.resize(avatar.meshes.len(), None);
+        let o = island.origin.pos;
+        let distance = ((o[0] - eye[0]).powi(2) + (o[1] - eye[1]).powi(2) + (o[2] - eye[2]).powi(2)).sqrt();
+        for (m, mesh) in avatar.meshes.iter().enumerate() {
+            if !island.active()[mesh.node as usize] {
+                joints[m] = None;
+                continue;
+            }
+            let out = joints[m].get_or_insert_with(Vec::new);
+            out.clear();
+            match &mesh.skin {
+                Some(skin) if !skin.joints.is_empty() => out.extend(
+                    skin.joints
+                        .iter()
+                        .zip(&skin.inverse_bind)
+                        .map(|(&j, ib)| mul(&matrix(&world[j as usize]), ib)),
+                ),
+                _ => out.push(matrix(&world[mesh.node as usize])),
+            }
+            let materials = gpu.maps[i][m].as_deref().unwrap_or(&gpu.materials);
+            gpu.meshes[m].draws(&gpu.instances[i][m], materials, distance, &mut s.draws);
+        }
+    }
+    let jobs: Vec<Job> = s
+        .joints
+        .iter()
+        .zip(&s.all_weights)
+        .zip(&gpu.instances)
+        .flat_map(|((joints, weights), instances)| {
+            joints.iter().zip(weights).zip(instances).filter_map(|((j, w), mesh)| {
+                Some(Job {
+                    mesh,
+                    joints: j.as_ref()?,
+                    weights: w,
+                })
+            })
+        })
+        .collect();
+    batch(&mut s.draws, &mut s.batches);
+    let (draws, skinned) = (s.draws.len(), jobs.len());
+    let extent = renderer.extent().unwrap_or_default();
+    let aspect = extent.width.max(1) as f32 / extent.height.max(1) as f32;
+    let view = View::look_at(eye, target, fov_y, aspect, 0.05);
+    let (batches, updates) = (&s.batches, &s.updates);
+    let status = renderer.frame(|graph, target| {
+        let skinned = graph.import_buffer(gpu.scene.skinned().handle, &[Access::VertexRead]);
+        graph.add(
+            Pass::new("skin")
+                .buffer(skinned, Access::ComputeWrite)
+                // SAFETY: the graph records this outside a rendering scope on the renderer's device.
+                .record(|d, cmd| unsafe { gpu.skinning.record(d, cmd, &jobs) }),
+        );
+        gpu.forward
+            .add(graph, &gpu.scene, target, skinned, &view, batches, updates, clear);
+    })?;
+    Ok((status == FrameStatus::Presented).then_some((draws, skinned)))
 }
 
 impl ApplicationHandler for Viewer {

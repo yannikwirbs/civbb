@@ -1,10 +1,8 @@
 //! Shared by the stage tests: validity, stepping islands through an avatar's states, and what an avatar shows.
 
 use std::cmp::Ordering;
-use std::sync::Arc;
 
-use civbb_client::{Island, Model, frame};
-use civbb_core::math::Pose;
+use civbb_client::Island;
 use civbb_format::math::{Mat4, Vec3};
 use civbb_format::{Avatar, Caps, validate};
 
@@ -14,32 +12,26 @@ pub fn valid(a: &Avatar) {
     }
 }
 
-/// Steps one island per avatar through the same states: the rest pose, then each of the first avatar's parameters
-/// set away from its default in turn. Calls `check` with the state number and the islands after each.
+/// Steps one island per avatar through the same states as the parity renders (`civbb_client::parity::states`): the
+/// rest pose, then each of the first avatar's parameters set away from its default in turn. Calls `check` with the
+/// state number and the islands after each.
 pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &[Island])) {
-    let mut islands: Vec<Island> = avatars
-        .iter()
-        .map(|a| Island::new(Arc::new(Model::new(a)), 1, true, Pose::IDENTITY))
-        .collect();
-    let params: Vec<(String, f32)> = avatars[0]
-        .animator
-        .iter()
-        .flat_map(|x| &x.parameters)
-        .map(|p| (p.name.clone(), if p.default == 0.0 { 1.0 } else { 0.0 }))
-        .collect();
-    for state in 0..=params.len() {
-        for island in &mut islands {
-            if state > 0 {
-                let (p, v) = &params[state - 1];
-                let i = island.model().controller().unwrap().param(p).unwrap();
-                island.animator_mut().unwrap().params[i as usize] = *v;
-            }
-            for _ in 0..3 {
-                frame::step(std::slice::from_mut(island), |_, _| true, 1.0 / 60.0);
-            }
-        }
-        check(state, &islands);
+    // The parity stepper skips a parameter an avatar lacks; a stage must keep them all.
+    let names = |a: &Avatar| -> Vec<String> {
+        a.animator
+            .iter()
+            .flat_map(|x| &x.parameters)
+            .map(|p| p.name.clone())
+            .collect()
+    };
+    for a in avatars {
+        let have = names(a);
+        assert!(
+            names(avatars[0]).iter().all(|n| have.contains(n)),
+            "a parameter is gone"
+        );
     }
+    civbb_client::parity::states(avatars, |state, _, islands| check(state, islands));
 }
 
 /// Steps both avatars through the same states and compares what they show.

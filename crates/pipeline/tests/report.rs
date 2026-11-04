@@ -1,10 +1,10 @@
 //! The per-avatar report (ADR 0032): the lean corpus avatar's counts per stage against a golden JSON, the package
-//! size against the signed bytes, and the Markdown with and without timings. Set `CIVBB_BLESS=1` to rewrite the
-//! golden after an intended change.
+//! size against the signed bytes, and the Markdown with and without timings and parity. Set `CIVBB_BLESS=1` to
+//! rewrite the golden after an intended change.
 
 use std::path::Path;
 
-use civbb_format::cost::{CpuTimes, GpuTimes, Measured};
+use civbb_format::cost::{CpuTimes, GpuTimes, Light, Measured, Parity, Rig, RigView, StateParity, ViewScore};
 use civbb_format::package::Platform;
 use civbb_format::{Package, ReadLimits, SigningKey};
 use civbb_pipeline::{Imported, Report, compile};
@@ -77,4 +77,40 @@ fn markdown_has_a_column_per_stage_and_the_timings() {
     assert!(md.contains("| per avatar: dynamics | 0.0100 |"), "{md}");
     assert!(md.contains("## GPU (Test GPU)"), "{md}");
     assert!(md.contains("| **GPU per avatar** | **0.0045** |"), "{md}");
+    assert!(md.contains("## Parity\n\nNot rendered"), "{md}");
+
+    let view = |name: &str| RigView {
+        name: name.into(),
+        ..RigView::default()
+    };
+    let score = |mean, p99| ViewScore {
+        mean,
+        p99,
+        max: p99,
+        pixels: 1,
+    };
+    report.parity = Some(Parity {
+        reference: "source".into(),
+        rig: Rig {
+            width: 640,
+            height: 640,
+            views: vec![view("front"), view("back")],
+            ..Rig::default()
+        },
+        pixels_per_degree: 67.02,
+        states: vec![StateParity {
+            name: "Hat=1".into(),
+            light: Light::Yellow,
+            views: vec![score(0.0123, 0.25), score(0.0, 0.0)],
+        }],
+        light: Light::Yellow,
+        ..Parity::default()
+    });
+    let md = report.markdown();
+    assert!(md.contains("## Parity: yellow"), "{md}");
+    assert!(md.contains("| state | front | back | light |"), "{md}");
+    assert!(
+        md.contains("| Hat=1 | 0.0123 / 0.250 | 0.0000 / 0.000 | yellow |"),
+        "{md}"
+    );
 }

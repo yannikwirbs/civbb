@@ -2,6 +2,7 @@
   "avatar": "lean",
   "compiler": "civbb-pipeline 0.0.0",
   "format_version": 8,
+  "parity": null,
   "platform": "Desktop",
   "report": 1,
   "stages": [

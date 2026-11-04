@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use civbb_format::cost::Measured;
+use civbb_format::cost::{Light, Measured, Parity};
 use civbb_format::package::Platform;
 use civbb_format::{FORMAT_VERSION, SigningKey};
 use serde::Serialize;
@@ -32,6 +32,8 @@ pub struct Report {
     pub package_bytes: usize,
     /// Times measured by `civbb-client measure`; `None` unless measured.
     pub timings: Option<Measured>,
+    /// FLIP parity from `civbb-client parity` (ADR 0033); `None` unless measured or without a Vulkan device.
+    pub parity: Option<Parity>,
 }
 
 /// Counts after one stage.
@@ -103,6 +105,7 @@ pub fn compile(
         stages,
         package_bytes: bytes.len(),
         timings: None,
+        parity: None,
     };
     Ok((bytes, report))
 }
@@ -214,6 +217,53 @@ impl Report {
                 }
             }
         }
+        match &self.parity {
+            None => md.push_str("\n## Parity\n\nNot rendered (`civbb build --measure` with a Vulkan device).\n"),
+            Some(p) => {
+                let t = &p.thresholds;
+                let reference = match p.reference.as_str() {
+                    "source" => "the import before any compiler stage, same renderer",
+                    other => other,
+                };
+                let _ = writeln!(
+                    md,
+                    "\n## Parity: {}\n\nAgainst {reference}. NVIDIA FLIP per view at {}x{}, {:.0} pixels per degree, \
+                     over the avatar's pixels: mean / 99th percentile. Green: mean <= {} and p99 <= {}; red: mean > {} \
+                     or p99 > {}.\n",
+                    name(p.light),
+                    p.rig.width,
+                    p.rig.height,
+                    p.pixels_per_degree,
+                    t.green_mean,
+                    t.green_p99,
+                    t.red_mean,
+                    t.red_p99
+                );
+                md.push_str("| state |");
+                for v in &p.rig.views {
+                    let _ = write!(md, " {} |", v.name);
+                }
+                md.push_str(" light |\n| --- |");
+                md.push_str(&" ---: |".repeat(p.rig.views.len()));
+                md.push_str(" --- |\n");
+                for s in &p.states {
+                    let _ = write!(md, "| {} |", s.name);
+                    for v in &s.views {
+                        let _ = write!(md, " {:.4} / {:.3} |", v.mean, v.p99);
+                    }
+                    let _ = writeln!(md, " {} |", name(s.light));
+                }
+            }
+        }
         md
+    }
+}
+
+/// A light's name in the report.
+fn name(light: Light) -> &'static str {
+    match light {
+        Light::Green => "green",
+        Light::Yellow => "yellow",
+        Light::Red => "red",
     }
 }

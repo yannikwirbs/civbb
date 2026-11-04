@@ -373,6 +373,7 @@ dependencies = [
  "civbb-dynamics",
  "civbb-format",
  "civbb-render",
+ "flip-rs",
  "image",
  "serde",
  "serde_json",
@@ -427,6 +428,7 @@ dependencies = [
  "civbb-core",
  "civbb-corpus",
  "civbb-format",
+ "civbb-render",
  "getrandom 0.2.17",
  "gltf",
  "image",
@@ -785,6 +787,15 @@ dependencies = [
  "crc32fast",
  "miniz_oxide 0.9.1",
  "zlib-rs",
+]
+
+[[package]]
+name = "flip-rs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c9b6b63e1846015bbe3da269ecb374a427800ef66613d3e2241d7f51b211ce2"
+dependencies = [
+ "rayon",
 ]
 
 [[package]]

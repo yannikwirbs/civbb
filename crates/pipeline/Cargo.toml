@@ -27,6 +27,7 @@ basisu = "0.1.0"
 civbb-client = { path = "../client" }
 civbb-core.workspace = true
 civbb-corpus.workspace = true
+civbb-render = { path = "../render" }
 
 [[bin]]
 name = "civbb"

@@ -121,3 +121,92 @@ pub struct GpuTimes {
     /// Meshes skinned in the last frame, all copies.
     pub skinned_meshes: usize,
 }
+
+/// FLIP parity of a compiled avatar against reference images of the same states and views (ADR 0033).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Parity {
+    /// What the reference images show: `source`, our renderer on the imported avatar before any compiler stage.
+    pub reference: String,
+    /// The camera rig both sides are rendered with.
+    pub rig: Rig,
+    /// FLIP's pixels per degree of visual angle.
+    pub pixels_per_degree: f32,
+    /// The traffic light's bounds.
+    pub thresholds: Thresholds,
+    /// Rest, then each parameter set away from its default on top of the state before.
+    pub states: Vec<StateParity>,
+    /// The worst state's light.
+    pub light: Light,
+}
+
+/// Fixed cameras around an avatar, framed from its rest bounds.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Rig {
+    /// Image size in pixels.
+    pub width: u32,
+    /// Image size in pixels.
+    pub height: u32,
+    /// Vertical field of view in radians.
+    pub fov_y: f32,
+    /// Background colour, linear RGB.
+    pub background: [f32; 3],
+    /// The views, in the order of each state's scores.
+    pub views: Vec<RigView>,
+}
+
+/// One camera of the rig, avatar space (+Y up, the avatar faces +Z).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct RigView {
+    /// `front`, `left` and so on.
+    pub name: String,
+    /// Camera position.
+    pub eye: [f32; 3],
+    /// The point looked at.
+    pub target: [f32; 3],
+}
+
+/// Traffic-light bounds on a view's FLIP error over the avatar's pixels: green when both the mean and the 99th
+/// percentile are at most the green bounds, red when either is above the red bounds, yellow between.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Thresholds {
+    pub green_mean: f32,
+    pub green_p99: f32,
+    pub red_mean: f32,
+    pub red_p99: f32,
+}
+
+/// One state's scores.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct StateParity {
+    /// `rest`, or the parameter set in this state and its value (`Hat=1`).
+    pub name: String,
+    /// The worst view's light.
+    pub light: Light,
+    /// One score per rig view.
+    pub views: Vec<ViewScore>,
+}
+
+/// FLIP error of one view over the pixels the avatar covers in either image.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ViewScore {
+    /// Mean error, 0 (identical) to 1.
+    pub mean: f32,
+    /// 99th percentile.
+    pub p99: f32,
+    /// Largest error.
+    pub max: f32,
+    /// Pixels covered by the avatar in either image.
+    pub pixels: u32,
+}
+
+/// A parity traffic light (design doc §10): green publishes, yellow publishes with a note, red needs a fix.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[allow(missing_docs)]
+pub enum Light {
+    #[default]
+    Green,
+    Yellow,
+    Red,
+}

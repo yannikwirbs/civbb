@@ -5,11 +5,11 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use civbb_format::cost::Measured;
+use civbb_format::cost::{Measured, Parity};
 use civbb_format::package::Platform;
 use civbb_format::{Caps, Package, ReadLimits, SigningKey, validate};
 use civbb_pipeline::gltf_import::dir_resolver;
-use civbb_pipeline::{Imported, Limits, compile, import, stats};
+use civbb_pipeline::{Imported, Limits, compile, import, package, stats};
 
 const USAGE: &str = "usage:
   civbb keygen <key-file>
@@ -19,7 +19,9 @@ const USAGE: &str = "usage:
 
 A key file holds a 32-byte Ed25519 seed. Packages are verified against the key that signed them.
 --report writes the per-avatar report as JSON and, next to it, Markdown (`r.md`); --measure adds CPU and GPU
-times from `civbb-client measure`, which must sit next to `civbb` and be a release build.";
+times from `civbb-client measure`, which must sit next to `civbb` and be a release build, and FLIP parity of the
+compiled avatar against the import before any stage from `civbb-client parity`, with images of the rest state and
+of every state that is not green in `r.parity/`.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -95,13 +97,29 @@ fn run(args: &[String]) -> Result<(), Error> {
             let key_path = a.key.as_deref().ok_or(Error::Usage)?;
             let key = read_key(key_path)?;
             let platform = if a.quest { Platform::Quest } else { Platform::Desktop };
-            let (bytes, mut report) = compile(import_file(&a.input)?, platform, &key, |l| println!("{l}"))?;
+            let imported = import_file(&a.input)?;
+            // The parity reference: the import packaged without any compiler stage (ADR 0033).
+            let source = a.measure.then(|| {
+                let copy = Imported {
+                    avatar: imported.avatar.clone(),
+                    blobs: imported.blobs.clone(),
+                    warnings: Vec::new(),
+                };
+                package(copy, platform).encode_signed(&key)
+            });
+            let (bytes, mut report) = compile(imported, platform, &key, |l| println!("{l}"))?;
             let out = a.out.unwrap_or_else(|| a.input.with_extension("civpkg"));
             fs::write(&out, &bytes).map_err(|e| format!("{}: {e}", out.display()))?;
             println!("wrote {} ({} bytes)", out.display(), bytes.len());
             if let Some(path) = a.report {
-                if a.measure {
+                if let Some(source) = source {
                     report.timings = Some(measure(&out, key_path)?);
+                    let reference = out.with_extension("source.civpkg");
+                    fs::write(&reference, source).map_err(|e| format!("{}: {e}", reference.display()))?;
+                    let images = path.with_extension("parity");
+                    let parity = parity(&reference, &out, key_path, &images);
+                    let _ = fs::remove_file(&reference);
+                    report.parity = parity?;
                 }
                 let json = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
                 fs::write(
@@ -175,6 +193,28 @@ fn measure(package: &Path, key: &Path) -> Result<Measured, Error> {
         return Err(format!("{} measure failed ({})", client.display(), output.status).into());
     }
     serde_json::from_slice(&output.stdout).map_err(|e| format!("civbb-client measure output: {e}").into())
+}
+
+/// Runs `civbb-client parity` on the source and compiled packages, images into `images` (ADR 0033); `None` without
+/// a Vulkan device.
+fn parity(reference: &Path, test: &Path, key: &Path, images: &Path) -> Result<Option<Parity>, Error> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let client = exe.with_file_name(format!("civbb-client{}", std::env::consts::EXE_SUFFIX));
+    let output = std::process::Command::new(&client)
+        .arg("parity")
+        .arg(reference)
+        .arg(test)
+        .arg("--key")
+        .arg(key)
+        .arg("--images")
+        .arg(images)
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .map_err(|e| format!("{}: {e}", client.display()))?;
+    if !output.status.success() {
+        return Err(format!("{} parity failed ({})", client.display(), output.status).into());
+    }
+    serde_json::from_slice(&output.stdout).map_err(|e| format!("civbb-client parity output: {e}").into())
 }
 
 fn read_key(path: &Path) -> Result<SigningKey, Error> {

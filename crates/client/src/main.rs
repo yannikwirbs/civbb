@@ -1,11 +1,11 @@
 //! `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`), a desktop
-//! viewer (`view`) and both run on a package for its report (`measure`).
+//! viewer (`view`), both run on a package for its report (`measure`), and FLIP parity of two packages (`parity`).
 
 use std::path::Path;
 use std::process::ExitCode;
 
 use civbb_client::bench::{self, Config};
-use civbb_client::view;
+use civbb_client::{parity, view};
 use civbb_format::cost::{CpuTimes, GpuTimes, Measured};
 use civbb_format::{Caps, Package, ReadLimits, SigningKey, validate};
 
@@ -18,6 +18,7 @@ const USAGE: &str = "usage:
   civbb-client view [<package.civpkg> --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F] [--warmup W]
                     [--lod L]
   civbb-client measure <package.civpkg> --key <key-file> [--avatars N] [--frames F] [--warmup W]
+  civbb-client parity <reference.civpkg> <test.civpkg> --key <key-file> [--images <dir>]
 
 bench steps N avatars (default 100, bloated, or a verified runtime package) for W + F frames (default 60 + 300) at each worker count (default 1,
 2, 4 ... up to the logical core count) and prints a JSON report to stdout. Build with --release for meaningful
@@ -31,13 +32,19 @@ last).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
 300) and through the viewer's frames on an offscreen 1280x720 target (N copies, same frames) and prints the times
-as JSON for `civbb build --measure` (ADR 0032). GPU times are null without a Vulkan device. Release builds only.";
+as JSON for `civbb build --measure` (ADR 0032). GPU times are null without a Vulkan device. Release builds only.
+
+parity renders both packages' avatars with the reference's camera rig in every state (rest, then each parameter
+set in turn), compares each view with NVIDIA FLIP and prints the scores and traffic lights as JSON (ADR 0033).
+--images writes reference, test and error map side by side for the rest state and every state that is not green.
+Prints null without a Vulkan device.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("view") => return run_view(&args[1..]),
         Some("measure") => return run_measure(&args[1..]),
+        Some("parity") => return run_parity(&args[1..]),
         _ => {}
     }
     let Some((mut cfg, package)) = parse(&args) else {
@@ -238,6 +245,68 @@ fn run_measure(args: &[String]) -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Err(e) => {
+            eprintln!("civbb-client: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run_parity(args: &[String]) -> ExitCode {
+    let (mut packages, mut key, mut images) = (Vec::new(), None, None);
+    let mut it = args.iter();
+    while let Some(arg) = it.next() {
+        let parsed = match arg.as_str() {
+            "--key" => it.next().map(|v| key = Some(v.clone())),
+            "--images" => it.next().map(|v| images = Some(v.clone())),
+            s if !s.starts_with('-') && packages.len() < 2 => {
+                packages.push(s.to_owned());
+                Some(())
+            }
+            _ => None,
+        };
+        if parsed.is_none() {
+            eprintln!("{USAGE}");
+            return ExitCode::from(2);
+        }
+    }
+    let (Some(key), [reference, test]) = (key, packages.as_slice()) else {
+        eprintln!("{USAGE}");
+        return ExitCode::from(2);
+    };
+    let loaded = load_package(Path::new(reference), Path::new(&key))
+        .and_then(|r| Ok((r, load_package(Path::new(test), Path::new(&key))?)));
+    let ((ra, rt), (ta, tt)) = match loaded {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("civbb-client: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let reference = parity::Side {
+        avatar: &ra,
+        textures: &rt,
+    };
+    let test = parity::Side {
+        avatar: &ta,
+        textures: &tt,
+    };
+    let result = match parity::run(reference, test, images.as_deref().map(Path::new)) {
+        Ok(p) => Some(p),
+        Err(e @ (civbb_render::Error::Load(_) | civbb_render::Error::NoDevice)) => {
+            eprintln!("civbb-client: parity not rendered: {e}");
+            None
+        }
+        Err(e) => {
+            eprintln!("civbb-client: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match serde_json::to_string_pretty(&result) {
+        Ok(json) => {
+            println!("{json}");
+            ExitCode::SUCCESS
+        }
         Err(e) => {
             eprintln!("civbb-client: {e}");
             ExitCode::FAILURE
