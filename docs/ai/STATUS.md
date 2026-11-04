@@ -82,6 +82,9 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Blockers and needs-user
 
+- CI for cdbac2b, 938fd3f and later had not run when the session ended (GitHub Actions partial outage,
+  2026-11-04); `cargo xtask ci` passed locally. First thing next session: `gh run list`, fix anything red.
+
 - #37, #38 Unity tasks (M0.10, later). Sessions can run Unity themselves now; those two still need the human
   (Creator Companion projects, baselines).
 
