@@ -23,6 +23,65 @@ pub struct Constraint {
     pub axes: [bool; 3],
     /// Local at-rest values `weight` blends from (the parts the kind constrains).
     pub rest: Transform,
+    /// VRChat constraint options (ADR 0040); Unity constraints keep the defaults.
+    #[serde(default)]
+    pub options: ConstraintOptions,
+}
+
+/// VRChat constraint options Unity's constraints lack (ADR 0040).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ConstraintOptions {
+    /// Match the sources' local values instead of their world placements (*Solve In Local Space*).
+    pub local_space: bool,
+    /// Hold the target where it is in world space, ignoring the sources (*Freeze To World*), at start.
+    pub freeze: bool,
+}
+
+/// What a clip can animate on a constraint (ADR 0040).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ConstraintField {
+    /// [`Constraint::weight`].
+    Weight,
+    /// [`Constraint::active`].
+    Active,
+    /// The weight of source `n`.
+    SourceWeight(u8),
+    /// [`ConstraintOptions::freeze`].
+    Freeze,
+}
+
+/// The component type a clip addresses on a node, as Unity and VRChat name constraint components by type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ConstraintType {
+    /// Position constraint.
+    Position,
+    /// Rotation constraint.
+    Rotation,
+    /// Scale constraint.
+    Scale,
+    /// Parent constraint.
+    Parent,
+    /// Aim constraint.
+    Aim,
+    /// Look-at constraint.
+    LookAt,
+}
+
+impl ConstraintType {
+    /// The type a constraint kind is addressed by; `None` for the VRM rest-relative kinds, which no clip addresses.
+    pub fn of(kind: &ConstraintKind) -> Option<Self> {
+        Some(match kind {
+            ConstraintKind::Position { .. } => Self::Position,
+            ConstraintKind::Rotation { .. } => Self::Rotation,
+            ConstraintKind::Scale { .. } => Self::Scale,
+            ConstraintKind::Parent { .. } => Self::Parent,
+            ConstraintKind::Aim { .. } => Self::Aim,
+            ConstraintKind::LookAt { .. } => Self::LookAt,
+            ConstraintKind::RestRotation | ConstraintKind::RestRoll { .. } | ConstraintKind::RestAim { .. } => {
+                return None;
+            }
+        })
+    }
 }
 
 /// One constraint source.

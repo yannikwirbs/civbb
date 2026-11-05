@@ -134,6 +134,7 @@ impl Importer<'_> {
                 active: true,
                 axes: [true; 3],
                 rest: self.nodes[target as usize].rest,
+                options: Default::default(),
             });
         }
         out

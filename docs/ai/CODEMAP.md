@@ -22,7 +22,7 @@ Internal deps: civbb-core, civbb-format
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
 - `src/muscle.rs`: Humanoid muscles: Unity's muscle table, and muscle values to human bones' local rotations (ADR 0014).
 - `tests/behaviour.rs`: Built-in parameters and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
-- `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order.
+- `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order,
 - `tests/blend.rs`: Blend tree weights, hand-derived (ADR 0009): 1D, 2D simple directional, freeform cartesian and polar gradient
 - `tests/constraint.rs`: Constraints (ADR 0018): every case recorded from Unity's constraints (`tests/unity/constraints.json`), and
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
@@ -217,6 +217,7 @@ Internal deps: none
 - `docs/adr/0037-vrchat-components-reach-the-pipeline-through-the-exporter.md`: 0037: VRChat components reach the pipeline through the Unity exporter, never through a unitypackage reader
 - `docs/adr/0038-unity-exporter-in-repo-with-own-glb-writer.md`: 0038: The Unity exporter is a UPM package in this repo with its own GLB writer, run in batch mode
 - `docs/adr/0039-curves-stay-hermite-exporter-bakes-weighted-keys.md`: 0039: Curves stay Hermite; the exporter bakes weighted tangents, splits equal key times and mirrors curve values
+- `docs/adr/0040-animated-constraint-fields-and-vrchat-options.md`: 0040: Clips animate constraint weights, activity and freezing per island; VRChat's local-space and freeze options (format v9)
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

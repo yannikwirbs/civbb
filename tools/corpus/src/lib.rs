@@ -568,6 +568,7 @@ pub fn generate(spec: &Spec) -> Avatar {
             active: true,
             axes,
             rest: b.nodes[target as usize].rest,
+            options: Default::default(),
         })
         .collect();
 

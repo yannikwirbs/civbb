@@ -123,6 +123,7 @@ fn avatar() -> Avatar {
             active: true,
             axes: [true; 3],
             rest: Transform::IDENTITY,
+            options: Default::default(),
         }],
         ..Avatar::default()
     };

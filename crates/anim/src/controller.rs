@@ -9,6 +9,7 @@ use civbb_format::math::{Quat, Transform};
 
 use crate::behaviour::{Builtin, Rng, Tracking, coerce, drive, part_index};
 use crate::bind::{Bound, Target, bind, node_paths};
+use crate::constraint::{Constraints, Scratch};
 use crate::machine::{Ctx, LayerRun};
 use crate::mix::Mixer;
 use crate::muscle::{COUNT, MUSCLES};
@@ -41,6 +42,7 @@ impl Controller {
             Target::BlendShape(m, _) | Target::RendererEnabled(m) | Target::Material(m, _, _) => {
                 Some(avatar.meshes[m as usize].node)
             }
+            Target::Constraint(i, _) => Some(avatar.constraints[i as usize].target),
             Target::Parameter(_) | Target::Muscle(_) => None,
         };
         // Muscles follow the mask's body parts; other targets its transform paths, if it lists any.
@@ -206,6 +208,15 @@ impl Instance {
         }
         for (n, q) in self.human_pose(c) {
             locals[n as usize].rotation = q;
+        }
+    }
+
+    /// Writes the pose's constraint targets into the constraint pass's per-island values (ADR 0040).
+    pub fn write_constraints(&self, c: &Controller, constraints: &Constraints, scratch: &mut Scratch) {
+        for (s, t) in c.bound.bindings.targets.iter().enumerate() {
+            if let Target::Constraint(i, field) = *t {
+                constraints.set(scratch, i, field, self.pose[s]);
+            }
         }
     }
 

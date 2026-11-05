@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
 use civbb_format::animator::{ClipIndex, Curve, Key, ParamIndex, ParamKind, Property};
+use civbb_format::constraint::{ConstraintField, ConstraintType};
 use civbb_format::hierarchy::{Hierarchy, NodeIndex};
 use civbb_format::mesh::MeshIndex;
 
@@ -38,6 +39,8 @@ pub enum Target {
     Muscle(u8),
     /// Component of a material field on every material of a renderer that has the field (ADR 0025).
     Material(MeshIndex, Field, u8),
+    /// A field of a constraint, by index into [`Avatar::constraints`] (ADR 0040).
+    Constraint(u32, ConstraintField),
 }
 
 /// Every slot of an avatar: what it drives and its default (the Write Defaults value).
@@ -312,6 +315,17 @@ impl<'a> Binder<'a> {
                 renderer_default(self.avatar, mesh, field).ok_or("no material on the renderer has the property")?;
                 Target::Material(mesh, field, component)
             }
+            Property::Constraint { kind, field } => {
+                let (i, c) = (self.avatar.constraints.iter().enumerate())
+                    .find(|(_, c)| c.target == node && ConstraintType::of(&c.kind) == Some(*kind))
+                    .ok_or("no such constraint on the node")?;
+                if let ConstraintField::SourceWeight(s) = field
+                    && *s as usize >= c.sources.len()
+                {
+                    return Err("no such constraint source");
+                }
+                Target::Constraint(i as u32, *field)
+            }
             Property::Component { .. } => return Err("unsupported component property"),
             Property::Parameter(_) | Property::Muscle(_) => unreachable!("handled above"),
         };
@@ -335,6 +349,15 @@ impl<'a> Binder<'a> {
             Target::Parameter(p) => a.animator.as_ref().expect("bound").parameters[p as usize].default,
             Target::Muscle(m) => self.rig.as_ref().expect("bound").rest[m as usize],
             Target::Material(m, f, c) => renderer_default(a, m, f).expect("bound")[c as usize],
+            Target::Constraint(i, field) => {
+                let c = &a.constraints[i as usize];
+                match field {
+                    ConstraintField::Weight => c.weight,
+                    ConstraintField::Active => f32::from(u8::from(c.active)),
+                    ConstraintField::SourceWeight(s) => c.sources[s as usize].weight,
+                    ConstraintField::Freeze => f32::from(u8::from(c.options.freeze)),
+                }
+            }
         };
         self.slots.insert(t, s);
         self.targets.push(t);

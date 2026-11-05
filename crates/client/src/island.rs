@@ -257,6 +257,7 @@ impl Island {
                 }
                 a.update(c, dt);
                 a.write_nodes(c, locals, own_active);
+                a.write_constraints(c, &m.constraints, constraint_scratch);
             }
         });
         counters.time(System::Constraints, || {

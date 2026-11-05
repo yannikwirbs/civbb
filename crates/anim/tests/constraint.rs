@@ -1,9 +1,11 @@
 //! Constraints (ADR 0018): every case recorded from Unity's constraints (`tests/unity/constraints.json`), and
-//! hand-derived dependency order, ties, cycles, inactive constraints and subtree updates.
+//! hand-derived dependency order, ties, cycles, inactive constraints and subtree updates; animated values, Solve In
+//! Local Space and Freeze To World per island (ADR 0040).
 
 use civbb_anim::Constraints;
+use civbb_anim::constraint::Scratch;
 use civbb_format::Avatar;
-use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
+use civbb_format::constraint::{Constraint, ConstraintField, ConstraintKind, ConstraintSource};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Quat, Transform, Vec3};
 use serde::Deserialize;
@@ -92,6 +94,7 @@ fn position(target: u32, source: u32) -> Constraint {
         active: true,
         axes: [true; 3],
         rest: Transform::IDENTITY,
+        options: Default::default(),
     }
 }
 
@@ -266,4 +269,128 @@ fn rest_aim_turns_the_axis_at_the_source_by_the_shortest_rotation() {
     // The source sits at the parent's local (0, 0, 1), world (1, 0, 0).
     l[1].translation = [0.0, 0.0, 1.0];
     assert_rotation(rest_run(&a, l, [0.0, 0.0, 0.0, 1.0]), turn(X, 90.0));
+}
+
+/// Runs `a` frame by frame on one island's scratch, with `frame` changing the animated values or the pose first.
+fn frames(
+    a: &Avatar,
+    n: usize,
+    mut frame: impl FnMut(usize, &Constraints, &mut Scratch, &mut [Transform]),
+) -> Vec<Vec<Vec3>> {
+    let c = Constraints::new(a);
+    let mut scratch = Scratch::default();
+    let mut out = Vec::new();
+    for f in 0..n {
+        let mut locals: Vec<Transform> = a.hierarchy.nodes.iter().map(|n| n.rest).collect();
+        frame(f, &c, &mut scratch, &mut locals);
+        c.evaluate(&mut locals, &mut scratch);
+        out.push(locals.iter().map(|l| l.translation).collect());
+    }
+    out
+}
+
+#[test]
+fn animated_values_are_per_island_and_fall_back_to_the_stored_ones() {
+    // A follows B (0, 2, 0) or C (0, 0, 3); rest is the origin, so weight 0.5 lands halfway to the source.
+    let mut c = position(1, 2);
+    c.sources.push(ConstraintSource {
+        node: 3,
+        weight: 0.0,
+        offset: Transform::IDENTITY,
+    });
+    let a = avatar(vec![c]);
+    let cases: [(&[(ConstraintField, f32)], Vec3); 5] = [
+        (&[], [0.0, 2.0, 0.0]),
+        (&[(ConstraintField::Weight, 0.5)], [0.0, 1.0, 0.0]),
+        (&[(ConstraintField::Active, 0.0)], [1.0, 0.0, 0.0]),
+        (&[(ConstraintField::Active, 0.4)], [1.0, 0.0, 0.0]),
+        (
+            &[
+                (ConstraintField::SourceWeight(0), 0.0),
+                (ConstraintField::SourceWeight(1), 1.0),
+            ],
+            [0.0, 0.0, 3.0],
+        ),
+    ];
+    for (set, want) in cases {
+        let got = frames(&a, 1, |_, c, s, _| {
+            for &(field, v) in set {
+                c.set(s, 0, field, v);
+            }
+        });
+        assert_eq!(got[0][1], want, "{set:?}");
+    }
+    // A source index past the list is ignored.
+    let got = frames(&a, 1, |_, c, s, _| c.set(s, 0, ConstraintField::SourceWeight(9), 1.0));
+    assert_eq!(got[0][1], [0.0, 2.0, 0.0]);
+}
+
+#[test]
+fn set_addresses_constraints_in_avatar_order_after_sorting() {
+    // Listed reader first, so the sorted order is [1, 0]: avatar constraint 0 (on B) is list entry 1.
+    let a = avatar(vec![position(2, 1), position(1, 3)]);
+    assert_eq!(targets(&a), [1, 2]);
+    let got = frames(&a, 1, |_, c, s, _| c.set(s, 0, ConstraintField::Active, 0.0));
+    // B keeps its pose, A still follows C.
+    assert_eq!((got[0][1], got[0][2]), ([0.0, 0.0, 3.0], [0.0, 2.0, 0.0]));
+}
+
+#[test]
+fn solve_in_local_space_copies_the_sources_local_values() {
+    // D sits under C (0, 0, 3). In world space it reaches A's world (1, 0, 0), local (1, 0, -3)...
+    let world = run(&avatar(vec![position(4, 1)]))[4];
+    assert_eq!(world, [1.0, 0.0, -3.0]);
+    // ...in local space it takes A's local value as its own.
+    let mut c = position(4, 1);
+    c.options.local_space = true;
+    assert_eq!(run(&avatar(vec![c]))[4], [1.0, 0.0, 0.0]);
+}
+
+#[test]
+fn freeze_to_world_holds_the_world_placement_until_unfrozen() {
+    // D under C follows A. Frozen on frames 1 to 3; C moves from frame 2, A from frame 3 (only frozen D ignores
+    // that); unfrozen on frame 4.
+    let a = avatar(vec![position(4, 1)]);
+    let got = frames(&a, 5, |f, c, s, l| {
+        if f >= 2 {
+            l[3].translation = [5.0, 0.0, 3.0];
+        }
+        if f >= 3 {
+            l[1].translation = [7.0, 0.0, 0.0];
+        }
+        c.set(
+            s,
+            0,
+            ConstraintField::Freeze,
+            if (1..4).contains(&f) { 1.0 } else { 0.0 },
+        );
+    });
+    let d = |f: usize| got[f][4];
+    assert_eq!(d(0), [1.0, 0.0, -3.0]);
+    // Frozen at A's world (1, 0, 0) on the frame it freezes, and held there while C and A move.
+    assert_eq!(d(1), [1.0, 0.0, -3.0]);
+    assert_eq!(d(2), [-4.0, 0.0, -3.0]);
+    assert_eq!(d(3), [-4.0, 0.0, -3.0]);
+    // Unfrozen: follows A again, at (7, 0, 0) world.
+    assert_eq!(d(4), [2.0, 0.0, -3.0]);
+}
+
+#[test]
+fn an_inactive_constraint_drops_its_frozen_placement() {
+    let mut c = position(1, 2);
+    c.options.freeze = true;
+    let a = avatar(vec![c]);
+    // Frozen at B from the start; B moves from frame 1; the constraint is off on frame 2 and on again from frame 3.
+    let got = frames(&a, 4, |f, c, s, l| {
+        if f >= 1 {
+            l[2].translation = [0.0, 4.0, 0.0];
+        }
+        c.set(s, 0, ConstraintField::Active, if f == 2 { 0.0 } else { 1.0 });
+    });
+    let a_at = |f: usize| got[f][1];
+    assert_eq!(a_at(0), [0.0, 2.0, 0.0]);
+    assert_eq!(a_at(1), [0.0, 2.0, 0.0]);
+    assert_eq!(a_at(2), [1.0, 0.0, 0.0]);
+    // Frozen again where B is now, not where it froze first.
+    assert_eq!(a_at(3), [0.0, 4.0, 0.0]);
 }

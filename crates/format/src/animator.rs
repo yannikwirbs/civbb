@@ -418,6 +418,13 @@ pub enum Property {
     Material(String),
     /// Animator parameter driven by the clip (legacy FX technique).
     Parameter(String),
+    /// A field of the first constraint of this type whose target is the node at `path` (ADR 0040).
+    Constraint {
+        /// Component type.
+        kind: crate::constraint::ConstraintType,
+        /// Animated field.
+        field: crate::constraint::ConstraintField,
+    },
     /// Any other component property, kept so the compiler can report or map it later.
     Component {
         /// Source component type name.

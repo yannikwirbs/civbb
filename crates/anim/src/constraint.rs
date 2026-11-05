@@ -4,7 +4,7 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 
 use civbb_format::Avatar;
-use civbb_format::constraint::{Constraint, ConstraintKind, WorldUp};
+use civbb_format::constraint::{Constraint, ConstraintField, ConstraintKind, WorldUp};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform, Vec3};
 
@@ -25,11 +25,27 @@ pub struct Constraints {
     placed: Vec<NodeIndex>,
     /// Per constraint, the placed nodes below its target, parents first: re-placed after it moves the target.
     below: Vec<Vec<NodeIndex>>,
+    /// Per constraint in [`Avatar::constraints`] order, its place in `list`.
+    index: Vec<usize>,
 }
 
-/// World placements reused between [`Constraints::evaluate`] calls.
+/// One island's constraint state: world placements reused between [`Constraints::evaluate`] calls, the values clips
+/// animate and the world placements of frozen targets (ADR 0040).
 #[derive(Clone, Debug, Default)]
-pub struct Scratch(Vec<Place>);
+pub struct Scratch {
+    world: Vec<Place>,
+    live: Vec<Live>,
+    frozen: Vec<Option<Place>>,
+}
+
+/// What clips animate on one constraint.
+#[derive(Clone, Debug, PartialEq)]
+struct Live {
+    weight: f32,
+    active: bool,
+    freeze: bool,
+    sources: Vec<f32>,
+}
 
 impl Constraints {
     /// Sorts a validated avatar's constraints. A constraint runs after every constraint whose target is (or is an
@@ -84,6 +100,10 @@ impl Constraints {
                 }
             }
         }
+        let mut index = vec![0; list.len()];
+        for (k, &i) in order.iter().enumerate() {
+            index[i] = k;
+        }
         let list: Vec<Constraint> = order.into_iter().map(|i| list[i].clone()).collect();
         let mut needed = vec![false; parents.len()];
         for (read, _) in list.iter().flat_map(reads) {
@@ -117,6 +137,42 @@ impl Constraints {
             list,
             placed,
             below,
+            index,
+        }
+    }
+
+    /// Sets an animated field of constraint `i` ([`Avatar::constraints`] order) for one island (ADR 0040). Flags are
+    /// on at 0.5 or more.
+    pub fn set(&self, scratch: &mut Scratch, i: u32, field: ConstraintField, value: f32) {
+        self.ready(scratch);
+        let Some(&k) = self.index.get(i as usize) else {
+            return;
+        };
+        let l = &mut scratch.live[k];
+        match field {
+            ConstraintField::Weight => l.weight = value,
+            ConstraintField::Active => l.active = value >= 0.5,
+            ConstraintField::SourceWeight(s) => {
+                if let Some(w) = l.sources.get_mut(s as usize) {
+                    *w = value;
+                }
+            }
+            ConstraintField::Freeze => l.freeze = value >= 0.5,
+        }
+    }
+
+    /// Fills an island's animated values from the stored ones on first use.
+    fn ready(&self, scratch: &mut Scratch) {
+        if scratch.live.len() != self.list.len() {
+            scratch.live = (self.list.iter())
+                .map(|c| Live {
+                    weight: c.weight,
+                    active: c.active,
+                    freeze: c.options.freeze,
+                    sources: c.sources.iter().map(|s| s.weight).collect(),
+                })
+                .collect();
+            scratch.frozen = vec![None; self.list.len()];
         }
     }
 
@@ -125,7 +181,8 @@ impl Constraints {
         if self.list.is_empty() {
             return;
         }
-        let world = &mut scratch.0;
+        self.ready(scratch);
+        let Scratch { world, live, frozen } = scratch;
         world.resize(locals.len(), Place::IDENTITY);
         let place = |world: &mut Vec<Place>, locals: &[Transform], i: NodeIndex| {
             let i = i as usize;
@@ -135,10 +192,27 @@ impl Constraints {
         for &i in &self.placed {
             place(world, locals, i);
         }
-        for (c, below) in self.list.iter().zip(&self.below) {
+        for (k, (c, below)) in self.list.iter().zip(&self.below).enumerate() {
             let t = c.target as usize;
             let parent = self.parents[t].map_or(Place::IDENTITY, |p| world[p as usize]);
-            let Some(new) = solve(c, world, &parent, locals, &self.rests) else {
+            let l = &live[k];
+            let solved = if !l.active {
+                None
+            } else if c.options.local_space {
+                // The sources' local values, written as the target's local value.
+                let local = |n: NodeIndex| Place::of(&locals[n as usize]);
+                solve(c, l, &local, &Place::IDENTITY, locals, &self.rests)
+            } else {
+                solve(c, l, &|n| world[n as usize], &parent, locals, &self.rests)
+            };
+            let new = if l.active && l.freeze {
+                let held = *frozen[k].get_or_insert_with(|| parent.then(solved.as_ref().unwrap_or(&locals[t])));
+                Some(hold(c, &parent, &held, &locals[t]))
+            } else {
+                frozen[k] = None;
+                solved
+            };
+            let Some(new) = new else {
                 continue;
             };
             locals[t] = new;
@@ -179,6 +253,14 @@ impl Place {
         scale: [1.0; 3],
     };
 
+    fn of(t: &Transform) -> Self {
+        Self {
+            pos: t.translation,
+            rot: t.rotation,
+            scale: t.scale,
+        }
+    }
+
     fn then(&self, l: &Transform) -> Self {
         Self {
             pos: add(self.pos, rotate(self.rot, mul3(l.translation, self.scale))),
@@ -193,13 +275,21 @@ impl Place {
     }
 }
 
-/// The constrained local transform, or `None` to leave the node as animated.
-fn solve(c: &Constraint, world: &[Place], parent: &Place, locals: &[Transform], rests: &[Quat]) -> Option<Transform> {
-    if !c.active || c.sources.is_empty() {
+/// The constrained local transform with an island's animated values `l`, or `None` to leave the node as animated.
+/// `place` gives a node's placement in `parent`'s space (world, or local for *Solve In Local Space*).
+fn solve(
+    c: &Constraint,
+    l: &Live,
+    place: &dyn Fn(NodeIndex) -> Place,
+    parent: &Place,
+    locals: &[Transform],
+    rests: &[Quat],
+) -> Option<Transform> {
+    if c.sources.is_empty() {
         return None;
     }
     let cur = &locals[c.target as usize];
-    let total: f32 = c.sources.iter().map(|s| s.weight.max(0.0)).sum();
+    let total: f32 = l.sources.iter().map(|w| w.max(0.0)).sum();
     let mut out = *cur;
     if total <= 0.0 {
         // No source weight: the at-rest values.
@@ -214,9 +304,13 @@ fn solve(c: &Constraint, world: &[Place], parent: &Place, locals: &[Transform], 
         }
         return Some(out);
     }
-    let w = c.weight.clamp(0.0, 1.0);
-    let place = |n: NodeIndex| world[n as usize];
-    let weighted = || c.sources.iter().map(|s| (place(s.node), s.weight.max(0.0)));
+    let w = l.weight.clamp(0.0, 1.0);
+    let weighted = || {
+        c.sources
+            .iter()
+            .zip(&l.sources)
+            .map(|(s, sw)| (place(s.node), sw.max(0.0)))
+    };
     let average = |points: &mut dyn Iterator<Item = (Vec3, f32)>| {
         let sum = points.fold([0.0; 3], |acc, (p, sw)| add(acc, scale(p, sw)));
         scale(sum, 1.0 / total)
@@ -246,10 +340,10 @@ fn solve(c: &Constraint, world: &[Place], parent: &Place, locals: &[Transform], 
         }
         ConstraintKind::Parent { rotation_axes } => {
             let held = || {
-                c.sources.iter().map(|s| {
+                c.sources.iter().zip(&l.sources).map(|(s, sw)| {
                     let p = place(s.node);
                     let pos = add(p.pos, rotate(p.rot, s.offset.translation));
-                    (pos, mul(p.rot, s.offset.rotation), s.weight.max(0.0))
+                    (pos, mul(p.rot, s.offset.rotation), sw.max(0.0))
                 })
             };
             let p = average(&mut held().map(|(pos, _, sw)| (pos, sw)));
@@ -309,6 +403,32 @@ fn solve(c: &Constraint, world: &[Place], parent: &Place, locals: &[Transform], 
         }
     }
     Some(out)
+}
+
+/// The local transform that keeps a frozen target at `held` (a world placement) on the parts its constraint
+/// constrains; the others stay as animated (ADR 0040).
+fn hold(c: &Constraint, parent: &Place, held: &Place, cur: &Transform) -> Transform {
+    let translation = parent.local_point(held.pos, cur.translation);
+    let rotation = mul(conj(parent.rot), held.rot);
+    let mut out = *cur;
+    match c.kind {
+        ConstraintKind::Position { .. } => out.translation = pick(c.axes, translation, cur.translation),
+        ConstraintKind::Scale { .. } => {
+            out.scale = pick(c.axes, div3(held.scale, parent.scale, cur.scale), cur.scale);
+        }
+        ConstraintKind::Parent { rotation_axes } => {
+            out.translation = pick(c.axes, translation, cur.translation);
+            out.rotation = pick_rotation(rotation_axes, rotation, cur.rotation);
+        }
+        ConstraintKind::Rotation { .. } | ConstraintKind::Aim { .. } => {
+            out.rotation = pick_rotation(c.axes, rotation, cur.rotation);
+        }
+        ConstraintKind::LookAt { .. }
+        | ConstraintKind::RestRotation
+        | ConstraintKind::RestRoll { .. }
+        | ConstraintKind::RestAim { .. } => out.rotation = rotation,
+    }
+    out
 }
 
 /// Unity's source rotation blend: from the first source with weight, nlerp towards each later one by its share of

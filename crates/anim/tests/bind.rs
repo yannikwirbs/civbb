@@ -1,4 +1,5 @@
-//! Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order.
+//! Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order,
+//! constraint fields (ADR 0040).
 
 use civbb_anim::{Target, bind};
 use civbb_core::math::{euler_to_quat, quat_to_euler};
@@ -310,4 +311,70 @@ fn corpus_avatars_bind_completely() {
             c.sample(0.0, &mut out);
         }
     }
+}
+
+#[test]
+fn constraint_fields_bind_to_the_first_constraint_of_their_type_on_the_node() {
+    use civbb_format::constraint::{
+        Constraint, ConstraintField as F, ConstraintKind, ConstraintSource, ConstraintType,
+    };
+    let constraint = |kind, weight| Constraint {
+        kind,
+        target: 2,
+        sources: vec![ConstraintSource {
+            node: 3,
+            weight: 0.6,
+            offset: Transform::IDENTITY,
+        }],
+        weight,
+        active: true,
+        axes: [true; 3],
+        rest: Transform::IDENTITY,
+        options: Default::default(),
+    };
+    let field = |kind, field| Property::Constraint { kind, field };
+    let mut a = avatar(vec![clip(vec![
+        curve("Body/Arm", field(ConstraintType::Rotation, F::Weight), &[(0.0, 0.0)]),
+        curve("Body/Arm", field(ConstraintType::Rotation, F::Active), &[(0.0, 0.0)]),
+        curve(
+            "Body/Arm",
+            field(ConstraintType::Rotation, F::SourceWeight(0)),
+            &[(0.0, 0.0)],
+        ),
+        curve("Body/Arm", field(ConstraintType::Rotation, F::Freeze), &[(0.0, 1.0)]),
+        curve(
+            "Body/Arm",
+            field(ConstraintType::Rotation, F::SourceWeight(1)),
+            &[(0.0, 0.0)],
+        ),
+        curve("Body/Arm", field(ConstraintType::Aim, F::Weight), &[(0.0, 0.0)]),
+        curve("Hat", field(ConstraintType::Position, F::Weight), &[(0.0, 0.0)]),
+    ])]);
+    // A position constraint first, then two rotation constraints: the first rotation one (index 1) is bound.
+    a.constraints = vec![
+        constraint(ConstraintKind::Position { offset: [0.0; 3] }, 0.1),
+        constraint(ConstraintKind::Rotation { offset: [0.0; 3] }, 0.9),
+        constraint(ConstraintKind::Rotation { offset: [0.0; 3] }, 0.2),
+    ];
+    let b = bind(&a);
+    assert_eq!(
+        b.bindings.targets,
+        [
+            Target::Constraint(1, F::Weight),
+            Target::Constraint(1, F::Active),
+            Target::Constraint(1, F::SourceWeight(0)),
+            Target::Constraint(1, F::Freeze),
+        ]
+    );
+    // The stored values are the defaults.
+    close(&b.bindings.defaults, &[0.9, 1.0, 0.6, 0.0]);
+    let reasons: Vec<_> = b.unbound.iter().map(|u| (u.curve, u.reason)).collect();
+    assert_eq!(
+        reasons,
+        [
+            (4, "no such constraint source"),
+            (5, "no such constraint on the node"),
+            (6, "no such constraint on the node"),
+        ]
+    );
 }

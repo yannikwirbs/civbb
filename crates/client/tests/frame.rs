@@ -1,6 +1,6 @@
 //! Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 //! later, every system reports per island, results do not depend on the number of workers, and animated materials
-//! belong to their island (ADR 0025).
+//! (ADR 0025) and constraint fields (ADR 0040) belong to their island.
 
 use std::sync::Arc;
 
@@ -151,4 +151,50 @@ fn animated_materials_are_per_island() {
     islands[1].materials(&mut out);
     assert_eq!(emissive(&out[k]), [0.0; 3]);
     assert_eq!(emissive(&avatar.materials[used as usize]), [0.0; 3]);
+}
+
+#[test]
+fn a_toggle_can_switch_a_constraint_per_island() {
+    use civbb_format::constraint::{ConstraintField, ConstraintKind, ConstraintType};
+    let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());
+    // The first corpus constraint becomes a position constraint, so it visibly moves its target off the rest pose.
+    let c = &mut avatar.constraints[0];
+    c.kind = ConstraintKind::Position {
+        offset: [0.0, 0.1, 0.0],
+    };
+    c.axes = [true; 3];
+    let target = c.target as usize;
+    let path = civbb_anim::bind::node_paths(&avatar.hierarchy)[target].clone();
+    // A toggle that starts off; its on clip switches the constraint off.
+    let params = &avatar.animator.as_ref().unwrap().parameters;
+    let name = params.iter().find(|p| p.default == 0.0).unwrap().name.clone();
+    let on = avatar
+        .clips
+        .iter_mut()
+        .find(|c| c.name == format!("{name}_On"))
+        .unwrap();
+    let mut off = on.curves[0].clone();
+    off.binding = Binding {
+        path,
+        property: Property::Constraint {
+            kind: ConstraintType::Position,
+            field: ConstraintField::Active,
+        },
+    };
+    off.keys[0].value = 0.0;
+    on.curves.push(off);
+
+    let model = Arc::new(Model::new(&avatar));
+    let mut islands: Vec<Island> = (0..2)
+        .map(|id| Island::new(Arc::clone(&model), id, id == 0, Pose::IDENTITY))
+        .collect();
+    let p = model.controller().unwrap().param(&name).unwrap() as usize;
+    islands[0].animator_mut().unwrap().params[p] = 1.0;
+    for _ in 0..3 {
+        frame::step(&mut islands, |_, _| true, DT);
+    }
+    let rest = avatar.hierarchy.nodes[target].rest.translation;
+    // Island 0 switched the constraint off: the target keeps its rest place; island 1 still moves it.
+    assert_eq!(islands[0].locals()[target].translation, rest);
+    assert_ne!(islands[1].locals()[target].translation, rest);
 }
