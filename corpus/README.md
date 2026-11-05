@@ -20,4 +20,5 @@ cargo test -p civbb-pipeline local_glbs -- --nocapture
 ```
 
 `fbx_to_glb.py` relinks textures that the FBX references by the author's absolute paths. The conversion carries
-meshes, skins, shape keys and textures only; PhysBones, animators and menus live in the `.unitypackage` (#47).
+meshes, skins, shape keys and textures only; PhysBones, animators and menus live in the `.unitypackage` and
+reach the compiler through the Unity exporter (ADR 0037, #36).
