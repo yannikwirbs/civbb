@@ -122,3 +122,15 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
 - `local_avatars_atlas_and_shrink` is `#[ignore]`d (two minutes of codec-ladder encodes, and CI has no corpus/local):
   run it with `--ignored` after changing `atlas` or `texture`. Run `cargo fmt --all` before `cargo xtask ci`, and the
   gate once per commit, targeted `cargo test -p <crate> --test <name>` in between.
+- Unity batch runs exiting 198 with "No valid Unity Editor license found" mean the licence lapsed, not a project
+  problem: check `unity license status --format json` (`LICENSE_NOT_ACTIVE`) before debugging. Reactivating needs
+  `--accept-eula`, which is the owner's call. C# still compiles without a licence: Unity's bundled Roslyn
+  (`Editor/Data/DotNetSdkRoslyn/csc.dll` run by `Editor/Data/NetCoreRuntime/dotnet.exe`) against
+  `Editor/Data/Managed/UnityEngine/*.dll` and `NetStandard/ref/2.1.0/netstandard.dll`.
+- `python -I` ignores `PYTHONIOENCODING`: print non-ASCII paths (the Booth packages' Japanese folder names) with
+  `python -I -X utf8`. `xargs ... python -I -` takes stdin for the file list and leaves Python in the REPL; write
+  the script to a file instead.
+- Unity YAML assets may start with a UTF-8 BOM before `%YAML` (44 of HAOLAN Quest's); classify by
+  `removeprefix(BOM)`, or they look binary-serialised.
+- Before calling a test a check, make each case one the code under test could fail: a freeze test whose source
+  never moved while frozen passed with freezing switched off. Mutate the branch and see the test fail.

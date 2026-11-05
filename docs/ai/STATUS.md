@@ -5,9 +5,24 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.10 Unity exporter** (M0.9 closed).
-- Next: #47 (how VRChat components in `.unitypackage` files reach the pipeline: Unity plugin or a bounded Rust
-  reader of Unity YAML; ADR), which shapes #36 (the exporter, a separate repo). #37 and #38 need the human. The
-  non-exporter M0.10 issues (#50, #52 to #56) can go in any order.
+- **Unity is blocked**: batch runs exit 198, the Personal licence is no longer active (#72, needs the human).
+  Until then nothing that runs Unity can move: running the exporter (#36), recordings for #52, #53, #54.
+- Next without Unity: #55 (box contacts, receiver value, component node), #71 (Rust side of the `X_*`
+  extensions, starting with `X_avatar.humanoid`, which the exporter already writes), #73 (rebake offsets).
+- VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
+  `.unitypackage` or Unity YAML. Measured: in three of five Booth avatars the components sit on FBX-importer objects
+  (Yumeka 347 references to 119 importer fileIDs), up to 225 prefab overrides, 15 to 44 clips outside each package.
+- Exporter (ADR 0038): UPM package `tools/unity-exporter` in this repo (not a separate repo), excluded from the
+  workspace. `Civbb.Exporter.Batch.Import` refuses packages with `.cs`/`.dll`/`.asmdef` and imports the rest;
+  `Batch.Export` writes a prefab as GLB with its own writer (X mirror, one mesh per renderer, skins, last-frame
+  morph targets, `_MainTex`/`_Color` from saved properties, `X_avatar.humanoid`). Compile-checked against Unity's
+  assemblies (README has the command), **never run yet**; its `.meta` files come after the first run.
+- Curves (ADR 0039): the format stays Hermite; the exporter will bake weighted tangents, split equal key times and
+  mirror position x, Euler and quaternion y/z. No Booth clip uses either (28,693 keys).
+- Constraint fields (ADR 0040, format v9): `Property::Constraint { kind, field }` binds weight, active, source
+  weights and freeze of the first constraint of a type on a node; per-island values and frozen placements live in
+  `constraint::Scratch`; `Instance::write_constraints` after `write_nodes`. Solve In Local Space and Freeze To
+  World run; rebake is #73.
 - FLIP parity (ADR 0033): `civbb-client parity <reference> <test> --key <k> [--images <dir>]` renders both avatars
   with the reference's rig (640x640, front/left/back/right framed from the bind-pose bounds) in every state
   (`civbb_client::parity::states`: rest, then each parameter set in turn; the stage tests call it too), reads
@@ -92,7 +107,7 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). `civbb-dynamics`: XPBD PhysBone chains
   with grab/pose, colliders and limits (ADRs 0015, 0016), and contacts with the cross-avatar grid broadphase
-  (`contact::step`, ADR 0017). Format v8 (LOD levels, ADR 0031).
+  (`contact::step`, ADR 0017). Format v9 (constraint fields and options, ADR 0040).
 - Unity ground truth: `tools/unity-truth` runs in batch mode and records JSON into crate test dirs (ADR 0013,
   `tools/unity-truth/README.md`). Muscle space and constraints (44 cases, batch play mode) are verified against it;
   animator goldens are still hand-derived (#54).
@@ -101,18 +116,21 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Blockers and needs-user
 
-- #37, #38 Unity tasks (M0.10, later). Sessions can run Unity themselves now; those two still need the human
-  (Creator Companion projects, baselines).
+- #72 Reactivate the Unity Personal licence (`unity license activate --personal --accept-eula`, accepting the
+  terms is the owner's call). Blocks every Unity run.
+- #37, #38 Unity tasks (M0.10, later): Creator Companion projects with the VRChat SDK (the exporter reads
+  component fields through `SerializedObject`, which needs the SDK's scripts), baselines.
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0036 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
+None. ADRs 0017 to 0040 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
 bounds of 0033). LOD follow-up: #63 runtime level switching in renderer and governor. Renderer follow-ups: #59 GPU
 culling, #60 MSAA and multiview, #61 pipeline cache and freeing scene memory, #62 clustered lights and shadows
 (Phase 1). Dynamics constants and contact choices marked unverified wait
 for Unity references (M0.10). In M0.10: #52 (body pose), #53 (muscle frames for glTF/VRM), #54 (Unity-recorded animator
-goldens, now also material curve defaults, sRGB and `_ST` conventions per ADR 0025), #55 (box contacts, receiver value, body-part senders), #56 (animated constraint properties, VRChat
-constraint options).
+goldens, now also material curve defaults, sRGB and `_ST` conventions per ADR 0025), #55 (box contacts, receiver
+value, body-part senders), #71 (`X_*` extensions in the importer), #73 (rebake offsets). ADR 0040's capture frame
+and per-axis freeze are unverified.
 
 ## Session log
 
@@ -146,3 +164,7 @@ One line per session, newest last: date, what moved, what's next.
   wrapping 16-texel atlas gutters, encoder threads capped at 4; textured files green 13 of 16 (was 4). Found and
   fixed a `basisu` header-count overflow on XUASTC. #66 constraint pass 25 to 50 % faster. #69 rig frames the rest
   pose (ADR 0036). Next: M0.10 from #47.
+- 2026-11-05 (2): #47 closed by ADR 0037 (exporter, not a unitypackage reader; Booth packages measured). #36
+  started: `tools/unity-exporter` UPM package with batch import and a GLB writer (ADR 0038), compile-checked only:
+  the Unity licence lapsed (#72). #50 closed by ADR 0039 (curves stay Hermite). #56: animated constraint fields,
+  local space and freeze to world (ADR 0040, format v9). Opened #71, #72, #73. Next: #72 (human), then #55 or #71.
