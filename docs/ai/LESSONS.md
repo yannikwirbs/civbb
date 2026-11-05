@@ -99,3 +99,18 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   0.9 rad, which made the parity rig's framing look wrong).
 - Parity renders are a stage ablation tool: run `parity::run` on the import after each stage prefix (a throwaway
   `#[ignore]` test in `crates/pipeline/tests`, release) to see which stage adds FLIP error.
+- Basis Universal encodes need about 3 GB per 4096-texel texture (UASTC and XUASTC). One encode per core (16) committed
+  51 GB and swapped the reference PC: cap encoder threads at 4 (`texture::MAX_WORKERS`), in throwaway studies too,
+  and check a long run's memory (`Get-Process ... PagedMemorySize64`) in its first minutes.
+- A throwaway study that runs for minutes: check it uses more than one core (CPU seconds against wall time) and that
+  its filters still apply after edits; a variant list that stopped honouring `STUDY_VARIANTS` ran full encodes per
+  file and looked like a leak. Pipe long output through `grep --line-buffered` or progress stays invisible.
+- `basisu_c_sys` details: in 2D mode `set_image_slice(i)` for i > 0 supplies mip i (then leave out the GEN_MIPS
+  flags); unified UASTC quality below 100 turns RDO on, and a low-level RDO lambda needs `quality_level = -1`.
+  ETC1S's quality setting barely changes its error (its ceiling, not a knob). `basisu` 0.1 multiplies the KTX2
+  header's level, layer and face counts unchecked (XUASTC path): the client checks them first.
+- GPU blitted mips and offline mips of the same image differ visibly in FLIP (0.006 to 0.017 on textured avatars):
+  when two paths must render alike, give them one mip function (`civbb_core::mips`), not two filters that "should"
+  match. To isolate codec error from mip error, decode the codec's level 0 back to PNG and let both sides mip it.
+- Size budgets per texture: an atlas PNG written with fast compression is larger than the textures it replaces and
+  lets a bigger codec "fit"; compare like with like (best-compressed PNG).
