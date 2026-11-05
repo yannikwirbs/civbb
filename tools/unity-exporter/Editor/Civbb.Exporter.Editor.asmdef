@@ -1,0 +1,6 @@
+{
+  "name": "Civbb.Exporter.Editor",
+  "rootNamespace": "Civbb.Exporter",
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false
+}

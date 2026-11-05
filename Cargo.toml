@@ -2,7 +2,7 @@
 resolver = "3"
 members = ["crates/*", "tools/*"]
 # A Unity project, not a crate (ADR 0013).
-exclude = ["tools/unity-truth"]
+exclude = ["tools/unity-truth", "tools/unity-exporter"]
 
 [workspace.package]
 version = "0.0.0"

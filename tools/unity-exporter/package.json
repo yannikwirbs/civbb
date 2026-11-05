@@ -1,0 +1,8 @@
+{
+  "name": "civbb.unity-exporter",
+  "version": "0.1.0",
+  "displayName": "CIVBB Unity exporter",
+  "description": "Exports Unity avatar projects to CIVBB's source package: glTF plus X_* extensions (ADRs 0037, 0038).",
+  "unity": "2022.3",
+  "license": "MIT OR Apache-2.0"
+}

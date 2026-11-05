@@ -215,6 +215,7 @@ Internal deps: none
 - `docs/adr/0035-texture-codec-ladder-and-shared-mips.md`: 0035: Textures are UASTC or XUASTC within their source's size, with mips shared with the renderer and wrapping atlas gutters
 - `docs/adr/0036-parity-rig-frames-the-rest-pose.md`: 0036: The parity rig frames what the avatar shows at rest, in world space
 - `docs/adr/0037-vrchat-components-reach-the-pipeline-through-the-exporter.md`: 0037: VRChat components reach the pipeline through the Unity exporter, never through a unitypackage reader
+- `docs/adr/0038-unity-exporter-in-repo-with-own-glb-writer.md`: 0038: The Unity exporter is a UPM package in this repo with its own GLB writer, run in batch mode
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status
