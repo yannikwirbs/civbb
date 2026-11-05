@@ -216,6 +216,7 @@ Internal deps: none
 - `docs/adr/0036-parity-rig-frames-the-rest-pose.md`: 0036: The parity rig frames what the avatar shows at rest, in world space
 - `docs/adr/0037-vrchat-components-reach-the-pipeline-through-the-exporter.md`: 0037: VRChat components reach the pipeline through the Unity exporter, never through a unitypackage reader
 - `docs/adr/0038-unity-exporter-in-repo-with-own-glb-writer.md`: 0038: The Unity exporter is a UPM package in this repo with its own GLB writer, run in batch mode
+- `docs/adr/0039-curves-stay-hermite-exporter-bakes-weighted-keys.md`: 0039: Curves stay Hermite; the exporter bakes weighted tangents, splits equal key times and mirrors curve values
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status
