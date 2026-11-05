@@ -470,8 +470,12 @@ fn compress_caps_per_platform() {
 }
 
 /// Builds each local VRM avatar (gitignored `corpus/local/vrm/`) as `civbb build` does: atlased texels match
-/// exactly, colours at every vertex UV after KTX2 stay within ETC1S error of the source, and the package shrinks.
+/// exactly, colours at every vertex UV after KTX2 stay within codec error of the source, and the package shrinks.
+/// Ignored by default: it encodes every local VRM through the codec ladder (about two minutes, and CI has no
+/// corpus/local). Run `cargo test --release -p civbb-pipeline --test texture -- --ignored` after changing the atlas
+/// or texture stages.
 #[test]
+#[ignore = "encodes every local VRM (about 2 min): run with --ignored after changing atlas or texture"]
 fn local_avatars_atlas_and_shrink() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/local/vrm");
     let Ok(entries) = std::fs::read_dir(&dir) else {

@@ -114,3 +114,11 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   match. To isolate codec error from mip error, decode the codec's level 0 back to PNG and let both sides mip it.
 - Size budgets per texture: an atlas PNG written with fast compression is larger than the textures it replaces and
   lets a bigger codec "fit"; compare like with like (best-compressed PNG).
+- Long measurement runs (the 2026-11-05 session took 202 min, about 60 of them avoidable): before starting a corpus-wide
+  run, (1) run it on the smallest input first and on one real avatar, (2) after a minute check CPU seconds against
+  wall time and committed memory, (3) drop variants the one-avatar run already rules out (corpus-wide RDO variants
+  cost 13 min after AliciaSolid had shown XUASTC beats RDO), (4) run one variant when only images or one property
+  are needed, and (5) never end the turn just to wait: do the next independent issue meanwhile.
+- `local_avatars_atlas_and_shrink` is `#[ignore]`d (two minutes of codec-ladder encodes, and CI has no corpus/local):
+  run it with `--ignored` after changing `atlas` or `texture`. Run `cargo fmt --all` before `cargo xtask ci`, and the
+  gate once per commit, targeted `cargo test -p <crate> --test <name>` in between.
