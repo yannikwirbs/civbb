@@ -5,8 +5,9 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.10 Unity exporter** (M0.9 closed).
-- **Unity is blocked**: batch runs exit 198, the Personal licence is no longer active (#72, needs the human).
-  Until then nothing that runs Unity can move: running the exporter (#36), recordings for #52, #53, #54.
+- **Unity is unblocked** (#72 closed 2026-11-06): licence reactivated, batch runs exit 0. The Editor is now
+  6000.3.28f1 at `G:/Unity/editor/6000.3.28f1/`; `tools/unity-truth` still pins 6000.3.27f1 and gets upgraded on
+  its first open. Next: run the exporter (#36), then recordings for #52, #53, #54.
 - Next without Unity: #55 (box contacts, receiver value, component node), #71 (Rust side of the `X_*`
   extensions, starting with `X_avatar.humanoid`, which the exporter already writes), #73 (rebake offsets).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
@@ -116,8 +117,6 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Blockers and needs-user
 
-- #72 Reactivate the Unity Personal licence (`unity license activate --personal --accept-eula`, accepting the
-  terms is the owner's call). Blocks every Unity run.
 - #37, #38 Unity tasks (M0.10, later): Creator Companion projects with the VRChat SDK (the exporter reads
   component fields through `SerializedObject`, which needs the SDK's scripts), baselines.
 
@@ -168,3 +167,4 @@ One line per session, newest last: date, what moved, what's next.
   started: `tools/unity-exporter` UPM package with batch import and a GLB writer (ADR 0038), compile-checked only:
   the Unity licence lapsed (#72). #50 closed by ADR 0039 (curves stay Hermite). #56: animated constraint fields,
   local space and freeze to world (ADR 0040, format v9). Opened #71, #72, #73. Next: #72 (human), then #55 or #71.
+- 2026-11-06 (2): local `cargo fuzz` links on MSVC again (`flip-rs` behind `civbb-client`'s `parity` feature). Owner reactivated the Unity licence and updated the CLI (beta.17), Editor now 6000.3.28f1; #72 closed. Next: #36 (run the exporter).

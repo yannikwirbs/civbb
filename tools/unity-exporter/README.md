@@ -39,7 +39,7 @@ next to the Blender conversion in `corpus/local/glb/`.
 ## Compile check without a licence
 
 ```
-D=G:/Unity6/Editor/Data
+D=G:/Unity/editor/6000.3.28f1/Editor/Data
 "$D/NetCoreRuntime/dotnet.exe" "$D/DotNetSdkRoslyn/csc.dll" -nologo -noconfig -nostdlib -target:library \
   -langversion:9 -out:<scratch>/exporter.dll $(for f in $D/Managed/UnityEngine/*.dll; do echo -r:$f; done) \
   -r:$D/NetStandard/ref/2.1.0/netstandard.dll tools/unity-exporter/Editor/*.cs
