@@ -138,3 +138,15 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   `removeprefix(BOM)`, or they look binary-serialised.
 - Before calling a test a check, make each case one the code under test could fail: a freeze test whose source
   never moved while frozen passed with freezing switched off. Mutate the branch and see the test fail.
+- `AssetDatabase.ImportPackage` is asynchronous: a batch method that calls it and exits (or any `unity run`, which
+  adds `-quit`) imports nothing, though its own log line says it did. Exit from `importPackageCompleted`/`Failed`
+  and run the Editor binary without `-quit`; check `Assets/` afterwards, not the log.
+- VRChat avatars' root `Animator` has no controller: the playable-layer controllers hang off the avatar descriptor,
+  a missing script without the VRChat SDK. Find controllers with `AssetDatabase.FindAssets("t:AnimatorController")`.
+- `serde_json` writes non-finite floats as `null` and refuses `null` for an `f32`: Unity's step tangents (infinity)
+  need `Key`'s `null`-as-infinity reader (ADR 0041). Other format floats must be finite.
+- Blender's GLB morph targets are sparse accessors without a `bufferView`; scratch GLB readers must handle sparse.
+  The Unity export shares one attribute set across a mesh's primitives, so count vertices per accessor, not per
+  primitive. Install numpy with `python -m pip install --user numpy` for such scripts.
+- Scratch editor scripts for probing (`corpus/local/unity-export/Assets/Editor/Probe.cs`) are fine: the host project
+  is gitignored; they never go into `tools/unity-exporter`.

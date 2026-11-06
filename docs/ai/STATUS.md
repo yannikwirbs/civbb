@@ -5,18 +5,24 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.10 Unity exporter** (M0.9 closed).
-- **Unity is unblocked** (#72 closed 2026-11-06): licence reactivated, batch runs exit 0. Editor 6000.3.28f1;
-  `tools/unity-truth` upgraded to it, re-recorded goldens identical (only the version string differs). Next: run the exporter (#36), then recordings for #52, #53, #54.
-- Next without Unity: #55 (box contacts, receiver value, component node), #71 (Rust side of the `X_*`
-  extensions, starting with `X_avatar.humanoid`, which the exporter already writes), #73 (rebake offsets).
+- Unity works (Editor 6000.3.28f1). The exporter runs on all five Booth packages (#36): meshes match the Blender
+  conversions (comparison on #36), animators, clips and Unity constraints export into `X_animator`/`X_constraints`
+  and import (#71). Host project `corpus/local/unity-export` (gitignored, README). Next in #36 needs the VRChat SDK
+  (#37, owner steps on the issue): descriptor, expressions, PhysBones, contacts, VRChat constraints, behaviours.
+- Next without the SDK: `X_toon_material` (#36/#71), #55 (box contacts, receiver value, component node), #73
+  (rebake offsets), Unity recordings for #52, #53, #54 (animator goldens would also check exported clips).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
   `.unitypackage` or Unity YAML. Measured: in three of five Booth avatars the components sit on FBX-importer objects
   (Yumeka 347 references to 119 importer fileIDs), up to 225 prefab overrides, 15 to 44 clips outside each package.
 - Exporter (ADR 0038): UPM package `tools/unity-exporter` in this repo (not a separate repo), excluded from the
-  workspace. `Civbb.Exporter.Batch.Import` refuses packages with `.cs`/`.dll`/`.asmdef` and imports the rest;
-  `Batch.Export` writes a prefab as GLB with its own writer (X mirror, one mesh per renderer, skins, last-frame
-  morph targets, `_MainTex`/`_Color` from saved properties, `X_avatar.humanoid`). Compile-checked against Unity's
-  assemblies (README has the command), **never run yet**; its `.meta` files come after the first run.
+  workspace. `Civbb.Exporter.Batch.Import` refuses packages with `.cs`/`.dll`/`.asmdef` and imports the rest
+  (asynchronous: runs through the Editor binary without `-quit`); `Batch.Export` writes a prefab as GLB with its
+  own writer (X mirror, one mesh per renderer, skins, last-frame morph targets, `_MainTex`/`_Color` from saved
+  properties, `X_avatar.humanoid`, `X_animator` from `-civbbLayers Base=<controller>;FX=...`, `X_constraints`).
+  Without the SDK the root `Animator` has no controller, so sessions name the controllers by file name.
+- Source extensions (ADR 0041): `X_*` payloads are the format types' serde JSON with glTF node indices
+  (`gltf_import/source.rs`); `X_avatar` is `{humanoid: {bone: node}, viewpoint}`; `extras.active: false` marks
+  inactive nodes; a `null` key tangent is a step. `civbb_corpus::gltf::to_source_glb` writes them (round-trip test).
 - Curves (ADR 0039): the format stays Hermite; the exporter will bake weighted tangents, split equal key times and
   mirror position x, Euler and quaternion y/z. No Booth clip uses either (28,693 keys).
 - Constraint fields (ADR 0040, format v9): `Property::Constraint { kind, field }` binds weight, active, source
@@ -116,12 +122,12 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Blockers and needs-user
 
-- #37, #38 Unity tasks (M0.10, later): Creator Companion projects with the VRChat SDK (the exporter reads
-  component fields through `SerializedObject`, which needs the SDK's scripts), baselines.
+- #37 (now the exporter's blocker): a Unity 2022.3.22f1 host project with the VRChat Avatars SDK at
+  `corpus/local/unity-export-vrc` (steps on the issue; the SDK licence is the owner's call). #38 baselines later.
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0040 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
+None. ADRs 0017 to 0041 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
 bounds of 0033). LOD follow-up: #63 runtime level switching in renderer and governor. Renderer follow-ups: #59 GPU
 culling, #60 MSAA and multiview, #61 pipeline cache and freeing scene memory, #62 clustered lights and shadows
 (Phase 1). Dynamics constants and contact choices marked unverified wait
@@ -167,3 +173,4 @@ One line per session, newest last: date, what moved, what's next.
   the Unity licence lapsed (#72). #50 closed by ADR 0039 (curves stay Hermite). #56: animated constraint fields,
   local space and freeze to world (ADR 0040, format v9). Opened #71, #72, #73. Next: #72 (human), then #55 or #71.
 - 2026-11-06 (2): local `cargo fuzz` links on MSVC again (`flip-rs` behind `civbb-client`'s `parity` feature). Owner reactivated the Unity licence and updated the CLI (beta.17), Editor now 6000.3.28f1; #72 closed. Next: #36 (run the exporter).
+- 2026-11-06 (3): #36 exporter run on the five Booth packages: `ImportPackage` is async (fixed), 13 prefabs export and match the Blender GLBs (table on #36). ADR 0041 `X_*` = format JSON; #71 importer part 1 (avatar, animator, constraints, dynamics, contacts, expressions, active). Exporter writes animators, clips, Unity constraints; all five build. Next: #37 (owner: VRChat SDK host project), meanwhile `X_toon_material`, #55, #73.
