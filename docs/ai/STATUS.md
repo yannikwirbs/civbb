@@ -5,25 +5,34 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.10 Unity exporter** (M0.9 closed).
-- Unity works (Editor 6000.3.28f1). The exporter runs on all five Booth packages (#36): meshes match the Blender
-  conversions (comparison on #36), animators, clips and Unity constraints export into `X_animator`/`X_constraints`
-  and import (#71). Host project `corpus/local/unity-export` (gitignored, README). VRChat SDK host project
-  `corpus/local/unity-export-vrc` exists (#37 owner steps done 2026-11-06, Unity 2022.3.22f1, SDK 3.10.6); next in #36:
-  descriptor, expressions, PhysBones, contacts, VRChat constraints, behaviours.
-- Next without the SDK: `X_toon_material` (#36/#71), #55 (box contacts, receiver value, component node), #73
-  (rebake offsets), Unity recordings for #52, #53, #54 (animator goldens would also check exported clips).
+- Exporter (#36) runs in the VRChat SDK host project `corpus/local/unity-export-vrc` (Unity 2022.3.22f1, SDK
+  3.10.6; #37 closed) on all 11 local avatar packages (5 earlier Booth plus Cokoro, Little Blackbird, Ostgaroa,
+  inuinu, KohzieBoi, Megumi); 13 exports in `corpus/local/unity-glb/` all import and build (table on #36). VRChat
+  components are read by type and field name, no SDK reference (ADR 0042): descriptor playable layers (groups
+  Base, Additive, Gesture, Action, FX; Action starts at 0; SDK default layers and proxy clips referenced, not
+  copied), behaviours, viewpoint, visemes, blink, eye look, expressions, PhysBones and colliders, contacts, VRChat
+  constraints. `X_avatar` carries muscle frames and the face. Unity constraints export the target's local
+  transform as at-rest (`Object.Instantiate` resets it). `Batch.Import` survives the SDK's domain reload.
+- Materials (ADR 0043): `X_toon_material` is the material as Unity saved it plus the shader GUID; the importer
+  fingerprints GUID (lilToon variant table), name, markers, and maps lilToon, Poiyomi, UTS2, MToon, Standard,
+  VRChat Mobile and unlit to Toon/PBR/Unlit (`gltf_import/unity_material.rs`). Approximations until Unity reference
+  renders score them.
+- Verified against Unity (`tools/unity-truth/Assets/Editor/Exported.cs` records into `corpus/local/unity-truth`,
+  `crates/pipeline/tests/unity_export.rs` compares, local only): muscle, rotation, Euler, scale and blendshape
+  curves of HAOLAN, Tessakuchan, Cokoro, Little Blackbird and Yumeka clips exact; 10 Unity constraints within
+  0.0002 degrees; Yumeka's 4 VRChat constraints evaluated by the SDK's own editor runtime within 0.0001. The SDK
+  runtime is the ground truth for #75 (constraint options, contacts, PhysBones).
+- The muscle rig leaves the hips to the body pose (#52); real muscle frames had turned Yumeka over.
+- Next: #75 with #73 and #55 (record VRChat's runtime in the SDK project), #74 (LOD border edge on Cokoro), Unity
+  reference renders for parity (design doc §10), #52, #53, #54.
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
-  `.unitypackage` or Unity YAML. Measured: in three of five Booth avatars the components sit on FBX-importer objects
-  (Yumeka 347 references to 119 importer fileIDs), up to 225 prefab overrides, 15 to 44 clips outside each package.
+  `.unitypackage` or Unity YAML.
 - Exporter (ADR 0038): UPM package `tools/unity-exporter` in this repo (not a separate repo), excluded from the
-  workspace. `Civbb.Exporter.Batch.Import` refuses packages with `.cs`/`.dll`/`.asmdef` and imports the rest
-  (asynchronous: runs through the Editor binary without `-quit`); `Batch.Export` writes a prefab as GLB with its
-  own writer (X mirror, one mesh per renderer, skins, last-frame morph targets, `_MainTex`/`_Color` from saved
-  properties, `X_avatar.humanoid`, `X_animator` from `-civbbLayers Base=<controller>;FX=...`, `X_constraints`).
-  Without the SDK the root `Animator` has no controller, so sessions name the controllers by file name.
-- Source extensions (ADR 0041): `X_*` payloads are the format types' serde JSON with glTF node indices
-  (`gltf_import/source.rs`); `X_avatar` is `{humanoid: {bone: node}, viewpoint}`; `extras.active: false` marks
-  inactive nodes; a `null` key tangent is a step. `civbb_corpus::gltf::to_source_glb` writes them (round-trip test).
+  workspace; README has the batch commands for both host projects.
+- Source extensions (ADR 0041, 0042, 0043): `X_*` payloads are the format types' serde JSON with glTF node indices
+  (`gltf_import/source.rs`), except `X_avatar` (`{humanoid, viewpoint, muscle_frames, face}`) and per-material
+  `X_toon_material`; `extras.active: false` marks inactive nodes; a `null` key tangent is a step.
+  `civbb_corpus::gltf::to_source_glb` writes them (round-trip test).
 - Curves (ADR 0039): the format stays Hermite; the exporter will bake weighted tangents, split equal key times and
   mirror position x, Euler and quaternion y/z. No Booth clip uses either (28,693 keys).
 - Constraint fields (ADR 0040, format v9): `Property::Constraint { kind, field }` binds weight, active, source
@@ -118,22 +127,25 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 - Unity ground truth: `tools/unity-truth` runs in batch mode and records JSON into crate test dirs (ADR 0013,
   `tools/unity-truth/README.md`). Muscle space and constraints (44 cases, batch play mode) are verified against it;
   animator goldens are still hand-derived (#54).
-- Test avatars: `civbb-corpus` (`lean()`, `bloated()`, `generate`, `gltf::to_glb`), and locally `corpus/local/khronos/` (23 Khronos samples) `corpus/local/vrm/` (AliciaSolid 0.x, Seed-san and the twist sample 1.0) and `corpus/local/glb/` (Booth: HAOLAN, Taro, Tessakuchan, Yumeka, converted from FBX; see `corpus/README.md`). `civbb inspect <file>` prints what an avatar contains.
+- Test avatars: `civbb-corpus` (`lean()`, `bloated()`, `generate`, `gltf::to_glb`), and locally `corpus/local/khronos/` (23 Khronos samples) `corpus/local/vrm/` (AliciaSolid 0.x, Seed-san and the twist sample 1.0) and `corpus/local/glb/` (Booth FBX conversions: HAOLAN, Taro, Tessakuchan, Yumeka, Little Blackbird, Ostgaroa; Cokoro's in `hold/`, #74), `corpus/local/unity-glb/` (13 exporter outputs) and `corpus/local/unity-truth/` (Unity recordings); see `corpus/README.md`. `civbb inspect <file>` prints what an avatar contains.
 - Progress for the human: https://github.com/yannikwirbs/civbb/milestones
 
 ## Blockers and needs-user
 
 - #38 baselines later.
+- Local data: the three Cokoro Blender GLBs sit in `corpus/local/hold/` until #74 is fixed (the local LOD test fails
+  on them).
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0041 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
+None. ADRs 0017 to 0043 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
 bounds of 0033). LOD follow-up: #63 runtime level switching in renderer and governor. Renderer follow-ups: #59 GPU
 culling, #60 MSAA and multiview, #61 pipeline cache and freeing scene memory, #62 clustered lights and shadows
 (Phase 1). Dynamics constants and contact choices marked unverified wait
 for Unity references (M0.10). In M0.10: #52 (body pose), #53 (muscle frames for glTF/VRM), #54 (Unity-recorded animator
-goldens, now also material curve defaults, sRGB and `_ST` conventions per ADR 0025), #55 (box contacts, receiver
-value, body-part senders), #71 (`X_*` extensions in the importer), #73 (rebake offsets). ADR 0040's capture frame
+goldens, now also material curve defaults, sRGB and `_ST` conventions per ADR 0025), #55 (box contacts, face proximity,
+component node, body-part senders; SDK 3.10.6 has no receiver value field), #71 (`X_*` extensions in the importer), #73
+(rebake offsets), #74 (LOD border edge), #75 (VRChat runtime ground truth from the SDK project). ADR 0040's capture frame
 and per-axis freeze are unverified.
 
 ## Session log
@@ -174,3 +186,4 @@ One line per session, newest last: date, what moved, what's next.
   local space and freeze to world (ADR 0040, format v9). Opened #71, #72, #73. Next: #72 (human), then #55 or #71.
 - 2026-11-06 (2): local `cargo fuzz` links on MSVC again (`flip-rs` behind `civbb-client`'s `parity` feature). Owner reactivated the Unity licence and updated the CLI (beta.17), Editor now 6000.3.28f1; #72 closed. Next: #36 (run the exporter).
 - 2026-11-06 (3): #36 exporter run on the five Booth packages: `ImportPackage` is async (fixed), 13 prefabs export and match the Blender GLBs (table on #36). ADR 0041 `X_*` = format JSON; #71 importer part 1 (avatar, animator, constraints, dynamics, contacts, expressions, active). Exporter writes animators, clips, Unity constraints; all five build. Next: #37 (owner: VRChat SDK host project), meanwhile `X_toon_material`, #55, #73.
+- 2026-11-06 (4): #37 closed. New avatars extracted (zips verified, deleted) and converted. Exporter on the SDK project: VRChat components, muscle frames, face (ADR 0042), `X_toon_material` (ADR 0043); exported clips and constraints match Unity exactly (`unity_export` test); constraint at-rest from the transform; hips left to the body pose. Opened #74, #75. Next: #75 (#73, #55).

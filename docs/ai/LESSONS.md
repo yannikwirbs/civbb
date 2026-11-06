@@ -150,3 +150,22 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
   primitive. Install numpy with `python -m pip install --user numpy` for such scripts.
 - Scratch editor scripts for probing (`corpus/local/unity-export/Assets/Editor/Probe.cs`) are fine: the host project
   is gitignored; they never go into `tools/unity-exporter`.
+- In the VRChat SDK host project, `AssetDatabase.ImportPackage` is followed by a domain reload (the SDK changes
+  settings and recompiles), which drops static callbacks: the Editor then idles until its timeout. `Batch.Import`
+  polls for the package's assets and resumes from `SessionState` (ADR 0042).
+- Stopping a background job (TaskStop) can leave its children running (`timeout`, Unity); a second run then aborts
+  with "another Unity instance is running with this project open". Find leftovers with PowerShell
+  `Get-CimInstance Win32_Process` filtered by command line and stop them by PID; never stop every `Unity.exe` (the
+  owner may have an Editor open). Git Bash has no `setsid`.
+- Unity batch recordings of a prefab: animators with `CullUpdateTransforms` (most VRChat avatars) evaluate nothing
+  without a camera, so a sampled clip silently equals the rest pose. Set `cullingMode = AlwaysAnimate`.
+- `Object.Instantiate` resets Unity constraints' at-rest values (position, rotation, scale, parent, aim; not look-at)
+  to the target's local transform; `LoadPrefabContents` and `PrefabUtility.InstantiatePrefab` keep the serialized
+  ones. A runtime loads avatars by instantiating, so the exporter writes the local transform (ADR 0042).
+- Read VRChat enums from `SerializedProperty.enumNames[enumValueIndex]`: their underlying values are not
+  sequential (menu control types are 101 to 203).
+- A material whose shader is missing shows `Hidden/InternalErrorShader` but keeps its saved properties, and its
+  `.mat` file still names the shader GUID (`m_Shader: {fileID, guid}`); lilToon's variant GUIDs are in its
+  `.shader.meta` files on GitHub (ADR 0043). Saved properties include leftovers of earlier shaders: fingerprint by
+  GUID or name before marker properties.
+- Grepping Unity logs for `CIVBB` matches every path under the repo; grep `CIVBB (exported|failed|imported)`.
