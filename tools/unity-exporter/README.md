@@ -6,8 +6,8 @@ links no VRChat SDK code.
 
 - `Editor/Batch.cs`: batch entry points `Civbb.Exporter.Batch.Import` and `Civbb.Exporter.Batch.Export`.
 - `Editor/UnityPackage.cs`: lists a `.unitypackage`'s asset paths so the import step can refuse packages with code.
-- `Editor/Glb.cs`: the GLB writer: nodes, meshes, skins, morph targets, materials, textures, `X_avatar` (humanoid,
-  muscle frames, viewpoint, face).
+- `Editor/Glb.cs`: the GLB writer: nodes, meshes, skins, morph targets, materials with their saved properties as
+  `X_toon_material` (ADR 0043), textures, `X_avatar` (humanoid, muscle frames, viewpoint, face).
 - `Editor/AnimatorExport.cs`: animator controllers and clips as `X_animator` (ADR 0041; curves per ADR 0039).
 - `Editor/BehaviourExport.cs`: VRChat state behaviours as format behaviours (ADR 0042).
 - `Editor/ConstraintExport.cs`: Unity constraint components as `X_constraints`.

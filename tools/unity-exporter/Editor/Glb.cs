@@ -360,9 +360,79 @@ namespace Civbb.Exporter
                 }
                 pbr.Append('}');
                 var shader = mat.shader != null ? mat.shader.name : "";
-                materials.Add($"{{\"name\":{Str(mat.name)},\"pbrMetallicRoughness\":{pbr},\"extras\":{{\"unityShader\":{Str(shader)}}}}}");
+                materials.Add($"{{\"name\":{Str(mat.name)},\"pbrMetallicRoughness\":{pbr},\"extras\":{{\"unityShader\":{Str(shader)}}}," +
+                    $"\"extensions\":{{\"X_toon_material\":{SavedProperties(so, shader)}}}}}");
                 materialIndex[mat] = materials.Count - 1;
                 return materials.Count - 1;
+            }
+
+            /// The shader asset's GUID, also for shaders missing from the project (Unity then shows its error shader,
+            /// so the GUID comes from the material file's `m_Shader` reference); empty for built-in shaders and
+            /// materials inside model files.
+            static string ShaderGuid(Material mat)
+            {
+                if (mat.shader != null && mat.shader.name != "Hidden/InternalErrorShader" &&
+                    AssetDatabase.TryGetGUIDAndLocalFileIdentifier(mat.shader, out string guid, out long _) &&
+                    guid != "0000000000000000f000000000000000")
+                {
+                    return guid;
+                }
+                var path = AssetDatabase.GetAssetPath(mat);
+                if (!path.EndsWith(".mat", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+                {
+                    return "";
+                }
+                var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(path),
+                    @"m_Shader: \{fileID: -?\d+, guid: ([0-9a-f]{32})");
+                return m.Success ? m.Groups[1].Value : "";
+            }
+
+            /// `X_toon_material` (ADR 0043): the material as Unity saved it, for the importer's shader family
+            /// tables. Shaders missing from the project (most avatar shaders) keep their saved properties.
+            /// Colours as stored (sRGB-encoded), tiling as Unity's `[scale x, scale y, offset x, offset y]` with V up,
+            /// every referenced PNG or JPEG texture embedded.
+            string SavedProperties(SerializedObject so, string shader)
+            {
+                string Pairs(string array, Func<SerializedProperty, string> value)
+                {
+                    var p = so.FindProperty("m_SavedProperties." + array);
+                    var list = new List<string>();
+                    for (int i = 0; p != null && i < p.arraySize; i++)
+                    {
+                        var e = p.GetArrayElementAtIndex(i);
+                        list.Add($"{Str(e.FindPropertyRelative("first").stringValue)}:{value(e.FindPropertyRelative("second"))}");
+                    }
+                    return "{" + string.Join(",", list) + "}";
+                }
+                var floats = Pairs("m_Floats", v => Num(v.floatValue));
+                var ints = Pairs("m_Ints", v => v.intValue.ToString());
+                var colors = Pairs("m_Colors", v => Nums(v.colorValue.r, v.colorValue.g, v.colorValue.b, v.colorValue.a));
+                var textures = Pairs("m_TexEnvs", v =>
+                {
+                    int t = TextureFor(v.FindPropertyRelative("m_Texture").objectReferenceValue as Texture);
+                    var s = v.FindPropertyRelative("m_Scale").vector2Value;
+                    var o = v.FindPropertyRelative("m_Offset").vector2Value;
+                    return $"{{\"index\":{(t >= 0 ? t.ToString() : "null")},\"scale_offset\":{Nums(s.x, s.y, o.x, o.y)}}}";
+                });
+                // Keywords: Unity 2022+ splits valid and invalid ones; older versions keep one string.
+                var keywords = new List<string>();
+                foreach (var name in new[] { "m_ValidKeywords", "m_InvalidKeywords" })
+                {
+                    var p = so.FindProperty(name);
+                    for (int i = 0; p != null && i < p.arraySize; i++)
+                    {
+                        keywords.Add(p.GetArrayElementAtIndex(i).stringValue);
+                    }
+                }
+                var legacy = so.FindProperty("m_ShaderKeywords");
+                if (legacy != null && legacy.propertyType == SerializedPropertyType.String)
+                {
+                    keywords.AddRange(legacy.stringValue.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+                }
+                int queue = so.FindProperty("m_CustomRenderQueue")?.intValue ?? -1;
+                return $"{{\"shader\":{Str(shader)},\"shader_guid\":{Str(ShaderGuid((Material)so.targetObject))}," +
+                    $"\"render_queue\":{queue},\"keywords\":[{string.Join(",", keywords.Distinct().Select(Str))}]," +
+                    $"\"floats\":{floats},\"ints\":{ints},\"colors\":{colors},\"textures\":{textures}}}";
             }
 
             int TextureFor(Texture tex)
@@ -533,9 +603,10 @@ namespace Civbb.Exporter
                     bin.WriteByte(0);
                 }
                 var json = new StringBuilder("{\"asset\":{\"version\":\"2.0\",\"generator\":\"civbb-unity-exporter\"}");
-                if (extensions.Count > 0)
+                var used = extensions.Keys.Concat(materials.Count > 0 ? new[] { "X_toon_material" } : new string[0]).ToList();
+                if (used.Count > 0)
                 {
-                    json.Append(",\"extensionsUsed\":[").Append(string.Join(",", extensions.Keys.Select(Str))).Append(']');
+                    json.Append(",\"extensionsUsed\":[").Append(string.Join(",", used.Select(Str))).Append(']');
                 }
                 json.Append(",\"scene\":0,\"scenes\":[{\"nodes\":[0]}]");
                 Array(json, "nodes", nodes);

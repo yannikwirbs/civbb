@@ -24,6 +24,7 @@ use gltf::mesh::{Mode, Semantic};
 use crate::accessor::{arrays, floats, uints};
 
 mod source;
+mod unity_material;
 mod vrm;
 
 /// Limits for one import.
@@ -114,6 +115,7 @@ pub fn import(
         let material = im.material(&m);
         im.materials.push(material);
     }
+    im.unity_materials()?;
     im.meshes()?;
     let mut clips = im.animations()?;
     let vrm = im.vrm(&mut clips)?;

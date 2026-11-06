@@ -110,6 +110,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/atlas.rs`: Compiler stage 4 texture atlasing: textures of one material model share an atlas, so materials that differ only
 - `src/collapse.rs`: Compiler stage 5 toggle collapsing: layers that only switch between two constant clips on one bool collapse
 - `src/gltf_import/source.rs`: The source package's `X_*` extensions (ADR 0041): humanoid map, viewpoint and face, animator and clips,
+- `src/gltf_import/unity_material.rs`: Unity materials from the source package's `X_toon_material` (ADR 0043): the shader family fingerprinted by shader
 - `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`, `VRMC_node_constraint`) to native
 - `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
 - `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
@@ -131,6 +132,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `tests/report.rs`: The per-avatar report (ADR 0032): the lean corpus avatar's counts per stage against a golden JSON, the package
 - `tests/texture.rs`: Texture atlasing and KTX2 compression (ADR 0029): every vertex samples the same texel through the atlas as
 - `tests/unity_export.rs`: The Unity exporter's output against Unity itself (#36): clips sampled by civbb-anim on an exported GLB match
+- `tests/unity_material.rs`: Unity materials from `X_toon_material` (ADR 0043): shader families fingerprinted by GUID, name and markers, and
 
 ## `crates/render` (civbb-render)
 
@@ -222,6 +224,7 @@ Internal deps: none
 - `docs/adr/0040-animated-constraint-fields-and-vrchat-options.md`: 0040: Clips animate constraint weights, activity and freezing per island; VRChat's local-space and freeze options (format v9)
 - `docs/adr/0041-source-extensions-are-the-format-model-as-json.md`: 0041: The source package's X_* extensions carry the format model as JSON, with glTF node indices
 - `docs/adr/0042-vrchat-components-in-the-exporter.md`: 0042: The exporter reads VRChat components by field name; X_avatar gains muscle frames and the face
+- `docs/adr/0043-toon-materials-from-saved-unity-properties.md`: 0043: X_toon_material carries Unity's saved material; the importer fingerprints the shader and maps it
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status
