@@ -80,7 +80,8 @@ Environment gotchas and mistakes not to repeat. Add a line whenever something co
 - `gh run list --commit <sha>` right after `git push` can come back empty; list runs a few seconds later (or by
   `--limit`) and watch each run ID.
 - `cargo fuzz run` on Windows exits `0xc0000135` (STATUS_DLL_NOT_FOUND): put the MSVC ASan runtime on `PATH`
-  (`.../VC/Tools/MSVC/<ver>/bin/Hostx64/x64`, holds `clang_rt.asan_dynamic-x86_64.dll`). See `fuzz/README.md`.
+  (`.../VC/Tools/MSVC/<ver>/bin/Hostx64/x64`, holds `clang_rt.asan_dynamic-x86_64.dll`). See `fuzz/README.md`. On the dev machine it is on the user PATH since
+  2026-11-06 (`D:/zProgramm/Visual Studio/2026/...`); a shell started before that, or after a toolset update, lacks it.
 - `cargo fuzz build` on Windows fails with LNK2001 `main` when a dependency is also a `cdylib` (cargo-fuzz adds `/include:main`
   to every link; `--no-include-main-msvc` breaks the targets instead). Keep such crates out of the fuzz build: `flip-rs` sits
   behind `civbb-client`'s default `parity` feature, which `fuzz/Cargo.toml` turns off.
