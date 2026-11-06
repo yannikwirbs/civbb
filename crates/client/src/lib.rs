@@ -4,6 +4,7 @@
 pub mod bench;
 pub mod frame;
 pub mod island;
+#[cfg(feature = "parity")]
 pub mod parity;
 pub mod view;
 

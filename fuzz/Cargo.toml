@@ -10,7 +10,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-civbb-client = { path = "../crates/client" }
+civbb-client = { path = "../crates/client", default-features = false }
 civbb-corpus = { path = "../tools/corpus" }
 civbb-format = { path = "../crates/format" }
 civbb-pipeline = { path = "../crates/pipeline" }

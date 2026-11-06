@@ -14,11 +14,16 @@ civbb-corpus.workspace = true
 civbb-dynamics.workspace = true
 civbb-format.workspace = true
 civbb-render.workspace = true
-flip-rs = "0.1.2"
+flip-rs = { version = "0.1.2", optional = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.154"
 winit = "0.30"
+
+[features]
+default = ["parity"]
+# FLIP scoring (ADR 0033). Off in the fuzz build: flip-rs is also a cdylib, which cargo-fuzz cannot link on MSVC.
+parity = ["dep:flip-rs"]
 
 [lints]
 workspace = true
@@ -26,3 +31,4 @@ workspace = true
 [[bin]]
 name = "civbb-client"
 path = "src/main.rs"
+required-features = ["parity"]
