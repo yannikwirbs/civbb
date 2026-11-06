@@ -109,6 +109,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/accessor.rs`: Bounded glTF accessor reading: every offset, stride, count and sparse index is checked before use.
 - `src/atlas.rs`: Compiler stage 4 texture atlasing: textures of one material model share an atlas, so materials that differ only
 - `src/collapse.rs`: Compiler stage 5 toggle collapsing: layers that only switch between two constant clips on one bool collapse
+- `src/gltf_import/source.rs`: The source package's `X_*` extensions (ADR 0041): humanoid map and viewpoint, animator and clips, constraints,
 - `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`, `VRMC_node_constraint`) to native
 - `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
 - `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
@@ -218,6 +219,7 @@ Internal deps: none
 - `docs/adr/0038-unity-exporter-in-repo-with-own-glb-writer.md`: 0038: The Unity exporter is a UPM package in this repo with its own GLB writer, run in batch mode
 - `docs/adr/0039-curves-stay-hermite-exporter-bakes-weighted-keys.md`: 0039: Curves stay Hermite; the exporter bakes weighted tangents, splits equal key times and mirrors curve values
 - `docs/adr/0040-animated-constraint-fields-and-vrchat-options.md`: 0040: Clips animate constraint weights, activity and freezing per island; VRChat's local-space and freeze options (format v9)
+- `docs/adr/0041-source-extensions-are-the-format-model-as-json.md`: 0041: The source package's X_* extensions carry the format model as JSON, with glTF node indices
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status

@@ -193,7 +193,7 @@ impl Importer<'_> {
 
     /// World translation, rotation and scale of every node (scale and rotation composed per axis, which is exact
     /// without non-uniform scale under rotation).
-    fn world(&self) -> Vec<(Vec3, Quat, Vec3)> {
+    pub(super) fn world(&self) -> Vec<(Vec3, Quat, Vec3)> {
         let mut w: Vec<(Vec3, Quat, Vec3)> = Vec::with_capacity(self.nodes.len());
         for n in &self.nodes {
             let l = &n.rest;

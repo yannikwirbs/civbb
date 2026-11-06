@@ -24,6 +24,7 @@ fn main() {
     let lean = civbb_corpus::generate(&civbb_corpus::lean());
     let glb = civbb_corpus::gltf::to_glb(&lean);
     write("gltf_import", "lean.glb", &glb);
+    write("gltf_import", "lean-source.glb", &civbb_corpus::gltf::to_source_glb(&lean));
     write("gltf_import", "vrm1.gltf", VRM.as_bytes());
     write("avatar_validate", "lean.cbor", &cbor::to_vec(&lean));
     let imported = import(&glb, &Limits::default(), |_| None).expect("lean imports");

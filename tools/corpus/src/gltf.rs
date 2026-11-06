@@ -1,7 +1,8 @@
 //! Exports an avatar's node, mesh, skin and morph subset as GLB, the importer's test input.
 //!
 //! Morph targets use sparse accessors, so the bloated avatar's 1,200 shape keys stay small. Materials export
-//! their base colour only; textures, animations and everything outside glTF are left out.
+//! their base colour only; textures and animations are left out. [`to_source_glb`] adds the source package's
+//! `X_*` extensions (ADR 0041) for what glTF lacks.
 
 use civbb_format::Avatar;
 use civbb_format::material::MaterialModel;
@@ -76,6 +77,59 @@ impl Bin {
 
 /// The avatar as a GLB file. Each node may carry at most one mesh.
 pub fn to_glb(a: &Avatar) -> Vec<u8> {
+    let (doc, bin) = document(a);
+    glb(serde_json::to_vec(&doc).expect("json"), bin)
+}
+
+/// As [`to_glb`], plus `extras.active` on inactive nodes and the `X_*` extensions: humanoid map and viewpoint,
+/// animator and clips, constraints, dynamics, contacts and expressions. Node indices are glTF indices, which
+/// [`to_glb`] keeps equal to the avatar's.
+pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
+    let (mut doc, bin) = document(a);
+    for (i, n) in a.hierarchy.nodes.iter().enumerate() {
+        if !n.active {
+            doc["nodes"][i]["extras"] = json!({"active": false});
+        }
+    }
+    let mut ext = serde_json::Map::new();
+    if let Some(h) = &a.humanoid {
+        let bones: serde_json::Map<String, Value> = h
+            .bones
+            .iter()
+            .map(|(b, n)| {
+                (
+                    serde_json::to_value(b)
+                        .expect("bone")
+                        .as_str()
+                        .expect("name")
+                        .to_owned(),
+                    json!(n),
+                )
+            })
+            .collect();
+        ext.insert("X_avatar".into(), json!({"humanoid": bones, "viewpoint": h.viewpoint}));
+    }
+    if let Some(animator) = &a.animator {
+        ext.insert("X_animator".into(), json!({"animator": animator, "clips": a.clips}));
+    }
+    if !a.constraints.is_empty() {
+        ext.insert("X_constraints".into(), json!(a.constraints));
+    }
+    if !a.dynamics.chains.is_empty() || !a.dynamics.colliders.is_empty() {
+        ext.insert("X_dynamics".into(), json!(a.dynamics));
+    }
+    if !a.contacts.senders.is_empty() || !a.contacts.receivers.is_empty() {
+        ext.insert("X_contacts".into(), json!(a.contacts));
+    }
+    if let Some(e) = &a.expressions {
+        ext.insert("X_expressions".into(), json!(e));
+    }
+    doc["extensionsUsed"] = json!(ext.keys().collect::<Vec<_>>());
+    doc["extensions"] = Value::Object(ext);
+    glb(serde_json::to_vec(&doc).expect("json"), bin)
+}
+
+fn document(a: &Avatar) -> (Value, Vec<u8>) {
     let mut bin = Bin::default();
     let mut nodes: Vec<Value> = a
         .hierarchy
@@ -145,7 +199,7 @@ pub fn to_glb(a: &Avatar) -> Vec<u8> {
     if !skins.is_empty() {
         doc["skins"] = json!(skins);
     }
-    glb(serde_json::to_vec(&doc).expect("json"), bin.data)
+    (doc, bin.data)
 }
 
 fn mesh(bin: &mut Bin, m: &Mesh) -> Value {

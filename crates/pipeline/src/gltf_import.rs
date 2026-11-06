@@ -1,5 +1,5 @@
 //! glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
-//! plus VRM 0.x and 1.0 extensions when present.
+//! plus VRM 0.x and 1.0 extensions or the source package's `X_*` extensions (ADR 0041) when present.
 //!
 //! Input is untrusted. Every count is checked against [`Caps`] before allocating, the total input against
 //! [`Limits::bytes`], and the result passes [`civbb_format::validate`]. Coordinates and UVs keep glTF conventions.
@@ -23,6 +23,7 @@ use gltf::mesh::{Mode, Semantic};
 
 use crate::accessor::{arrays, floats, uints};
 
+mod source;
 mod vrm;
 
 /// Limits for one import.
@@ -46,7 +47,7 @@ impl Default for Limits {
 /// An imported avatar and the blobs its textures reference.
 #[derive(Debug)]
 pub struct Imported {
-    /// The avatar. Humanoid, face, dynamics, animator and expressions come only from VRM extensions.
+    /// The avatar. Humanoid, face, dynamics, animator and expressions come only from VRM or `X_*` extensions.
     pub avatar: Avatar,
     /// Encoded images by id.
     pub blobs: BTreeMap<BlobId, Vec<u8>>,
@@ -116,7 +117,11 @@ pub fn import(
     im.meshes()?;
     let mut clips = im.animations()?;
     let vrm = im.vrm(&mut clips)?;
-    let avatar = Avatar {
+    let source = im.source(clips.len())?;
+    if vrm.is_some() && source.is_some() {
+        return Err(ImportError("both VRM and X_* extensions present".into()));
+    }
+    let mut avatar = Avatar {
         name: vrm.as_ref().and_then(|v| v.name.clone()).unwrap_or(name),
         hierarchy: Hierarchy {
             nodes: std::mem::take(&mut im.nodes),
@@ -139,6 +144,15 @@ pub fn import(
             None => Avatar::default(),
         }
     };
+    if let Some(s) = source {
+        avatar.humanoid = s.humanoid;
+        avatar.animator = s.animator;
+        avatar.clips.extend(s.clips);
+        avatar.constraints = s.constraints;
+        avatar.dynamics = s.dynamics;
+        avatar.contacts = s.contacts;
+        avatar.expressions = s.expressions;
+    }
     civbb_format::validate(&avatar, &limits.caps, |id| im.blobs.contains_key(&id)).map_err(|errors| {
         let list: Vec<String> = errors.iter().map(ToString::to_string).collect();
         ImportError(format!("invalid result: {}", list.join("; ")))
@@ -339,6 +353,11 @@ impl Importer<'_> {
                     name = format!("{base} ({k})");
                 }
                 let (translation, rotation, scale) = node.transform().decomposed();
+                // `extras.active: false` marks an inactive node (ADR 0041).
+                let active = node.extras().as_ref().is_none_or(|raw| {
+                    serde_json::from_str::<serde_json::Value>(raw.get())
+                        .map_or(true, |v| v.get("active") != Some(&serde_json::Value::Bool(false)))
+                });
                 self.map[c] = Some(self.nodes.len() as NodeIndex);
                 self.nodes.push(Node {
                     name,
@@ -348,7 +367,7 @@ impl Importer<'_> {
                         rotation,
                         scale,
                     },
-                    active: true,
+                    active,
                 });
             }
         }

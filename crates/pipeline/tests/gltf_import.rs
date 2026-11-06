@@ -43,6 +43,63 @@ fn corpus_round_trips_through_glb() {
     }
 }
 
+/// The `X_*` extensions (ADR 0041) carry everything glTF lacks: the corpus avatars import equal to the original.
+#[test]
+fn corpus_round_trips_through_source_extensions() {
+    for spec in [civbb_corpus::lean(), civbb_corpus::bloated()] {
+        let original = civbb_corpus::generate(&spec);
+        assert!(
+            original.hierarchy.nodes.iter().any(|n| !n.active),
+            "{}: no inactive node",
+            spec.name
+        );
+        let glb = civbb_corpus::gltf::to_source_glb(&original);
+        let imported = import(&glb, &Limits::default(), no_files).unwrap_or_else(|e| panic!("{}: {e}", spec.name));
+        let a = imported.avatar;
+        assert_eq!(a.hierarchy.nodes, original.hierarchy.nodes, "{}", spec.name);
+        assert_eq!(a.meshes, original.meshes, "{}", spec.name);
+        let (h, o) = (a.humanoid.unwrap(), original.humanoid.clone().unwrap());
+        assert_eq!((h.bones, h.viewpoint), (o.bones, o.viewpoint), "{}", spec.name);
+        assert_eq!(a.animator, original.animator, "{}", spec.name);
+        assert_eq!(a.clips, original.clips, "{}", spec.name);
+        assert_eq!(a.constraints, original.constraints, "{}", spec.name);
+        assert_eq!(a.dynamics, original.dynamics, "{}", spec.name);
+        assert_eq!(a.contacts, original.contacts, "{}", spec.name);
+        assert_eq!(a.expressions, original.expressions, "{}", spec.name);
+        assert!(imported.warnings.is_empty(), "{:?}", imported.warnings);
+    }
+}
+
+/// `X_*` extensions are checked: malformed JSON, unknown bones, node indices outside the scene and clip
+/// indices past the clips fail the import with the extension's name.
+#[test]
+fn hostile_source_extensions_are_rejected() {
+    let reject = |expected: &str, ext: Value| {
+        let (mut doc, bin) = triangle_doc();
+        doc["extensions"] = ext;
+        let e = import(&gltf(doc, &bin), &Limits::default(), no_files).expect_err(expected);
+        assert!(e.to_string().contains(expected), "expected `{expected}`, got `{e}`");
+    };
+    reject("X_avatar", json!({"X_avatar": {"humanoid": {"Tail": 0}}}));
+    reject("X_avatar: node 7", json!({"X_avatar": {"humanoid": {"Hips": 7}}}));
+    reject("X_avatar", json!({"X_avatar": {"humanoid": {"Hips": -1}}}));
+    reject("X_avatar", json!({"X_avatar": {"humanoids": {}}}));
+    reject("X_constraints", json!({"X_constraints": {"not": "a list"}}));
+    let lean = civbb_corpus::generate(&civbb_corpus::lean());
+    let mut c = serde_json::to_value(&lean.constraints[0]).unwrap();
+    c["target"] = json!(u32::MAX);
+    reject("X_constraints: node 4294967295", json!({"X_constraints": [c]}));
+    let mut animator = serde_json::to_value(lean.animator.as_ref().unwrap()).unwrap();
+    reject("clip", json!({"X_animator": {"animator": animator, "clips": []}}));
+    animator["layers"] = json!("x");
+    reject("X_animator", json!({"X_animator": {"animator": animator}}));
+    reject("X_dynamics", json!({"X_dynamics": {"chains": 3}}));
+    reject("X_contacts", json!({"X_contacts": []}));
+    let mut doc = json!({"X_avatar": {"humanoid": {}}});
+    doc["VRM"] = json!({});
+    reject("both VRM and X_*", doc);
+}
+
 /// One triangle as a strip without indices or normals, two scene roots with the same name, an unlit material,
 /// a morph target and linear, step and cubic animation channels.
 #[test]
@@ -124,6 +181,95 @@ fn edge_cases_import() {
     assert!(w.keys[0].out_tangent.is_infinite());
     let ry = &clip.curves[4];
     assert_eq!((ry.binding.path.as_str(), ry.keys[0].out_tangent), ("Twin", 0.1));
+}
+
+/// `X_*` node indices are glTF indices and clip indices count the extension's own clips: with a synthetic root
+/// and one glTF animation both move.
+#[test]
+fn source_extensions_map_nodes_and_clips() {
+    use civbb_format::animator::{Animator, Clip, Layer, LayerBlending, LayerGroup, Motion, State, StateMachine};
+    use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
+    use civbb_format::hierarchy::HumanBone;
+    use civbb_format::math::Transform;
+    let (mut doc, bin) = triangle_doc();
+    doc["scenes"][0]["nodes"] = json!([0, 1]);
+    doc["nodes"] = json!([{"name": "A", "mesh": 0}, {"name": "B", "extras": {"active": false}}]);
+    doc["meshes"][0]["primitives"][0]["targets"] = json!([{"POSITION": 0}]);
+    doc["bufferViews"] = json!([{"buffer": 0, "byteLength": 36}, {"buffer": 0, "byteOffset": 36, "byteLength": 8}]);
+    let mut bin = bin;
+    bin.extend(f32s(&[0.0, 1.0]));
+    doc["accessors"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"bufferView": 1, "componentType": 5126, "count": 2, "type": "SCALAR"}));
+    doc["animations"] = json!([{"samplers": [{"input": 1, "output": 1}],
+        "channels": [{"sampler": 0, "target": {"node": 0, "path": "weights"}}]}]);
+    let state = State {
+        name: "S".into(),
+        motion: Some(Motion::Clip(0)),
+        speed: 1.0,
+        speed_param: None,
+        cycle_offset: 0.0,
+        cycle_offset_param: None,
+        time_param: None,
+        write_defaults: true,
+        transitions: Vec::new(),
+        behaviours: Vec::new(),
+    };
+    let animator = Animator {
+        parameters: Vec::new(),
+        groups: vec![LayerGroup {
+            name: "FX".into(),
+            weight: 1.0,
+        }],
+        layers: vec![Layer {
+            name: "L".into(),
+            group: 0,
+            weight: 1.0,
+            blending: LayerBlending::Override,
+            mask: None,
+            state_machine: StateMachine {
+                states: vec![state],
+                ..StateMachine::default()
+            },
+        }],
+    };
+    let clip = Clip {
+        name: "X".into(),
+        length: 0.0,
+        looping: false,
+        curves: Vec::new(),
+    };
+    let constraint = Constraint {
+        kind: ConstraintKind::Position { offset: [0.0; 3] },
+        target: 1,
+        sources: vec![ConstraintSource {
+            node: 0,
+            weight: 1.0,
+            offset: Transform::IDENTITY,
+        }],
+        weight: 1.0,
+        active: true,
+        axes: [true; 3],
+        rest: Transform::IDENTITY,
+        options: Default::default(),
+    };
+    doc["extensions"] = json!({
+        "X_avatar": {"humanoid": {"Hips": 1}},
+        "X_animator": {"animator": animator, "clips": [clip]},
+        "X_constraints": [constraint],
+    });
+    let a = import(&gltf(doc, &bin), &Limits::default(), no_files).unwrap().avatar;
+    let names: Vec<(&str, bool)> = a.hierarchy.nodes.iter().map(|n| (n.name.as_str(), n.active)).collect();
+    assert_eq!(names, [("Root", true), ("A", true), ("B", false)]);
+    let h = a.humanoid.unwrap();
+    assert_eq!(h.bones, [(HumanBone::Hips, 2)]);
+    assert_eq!(h.viewpoint, [0.0; 3], "no head: origin");
+    assert_eq!(a.clips.len(), 2);
+    assert_eq!(a.clips[1].name, "X");
+    let motion = &a.animator.unwrap().layers[0].state_machine.states[0].motion;
+    assert_eq!(motion, &Some(Motion::Clip(1)));
+    assert_eq!((a.constraints[0].target, a.constraints[0].sources[0].node), (2, 1));
 }
 
 fn triangle_doc() -> (Value, Vec<u8>) {

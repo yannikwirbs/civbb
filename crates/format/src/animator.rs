@@ -373,14 +373,21 @@ pub struct Curve {
     pub keys: Vec<Key>,
 }
 
-/// A Hermite key, as in Unity. Infinite tangents mean a constant (stepped) segment.
+/// A Hermite key, as in Unity. Infinite tangents mean a constant (stepped) segment. JSON has no infinity
+/// (`serde_json` writes `null`), so a `null` tangent reads as +infinity (ADR 0041).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Key {
     pub time: f32,
     pub value: f32,
+    #[serde(deserialize_with = "tangent")]
     pub in_tangent: f32,
+    #[serde(deserialize_with = "tangent")]
     pub out_tangent: f32,
+}
+
+fn tangent<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f32, D::Error> {
+    Ok(Option::<f32>::deserialize(d)?.unwrap_or(f32::INFINITY))
 }
 
 /// The target of a curve: a node path (Unity style, `/`-separated, relative to the root) and a property.
