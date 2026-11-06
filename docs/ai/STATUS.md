@@ -7,8 +7,9 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.10 Unity exporter** (M0.9 closed).
 - Unity works (Editor 6000.3.28f1). The exporter runs on all five Booth packages (#36): meshes match the Blender
   conversions (comparison on #36), animators, clips and Unity constraints export into `X_animator`/`X_constraints`
-  and import (#71). Host project `corpus/local/unity-export` (gitignored, README). Next in #36 needs the VRChat SDK
-  (#37, owner steps on the issue): descriptor, expressions, PhysBones, contacts, VRChat constraints, behaviours.
+  and import (#71). Host project `corpus/local/unity-export` (gitignored, README). VRChat SDK host project
+  `corpus/local/unity-export-vrc` exists (#37 owner steps done 2026-11-06, Unity 2022.3.22f1, SDK 3.10.6); next in #36:
+  descriptor, expressions, PhysBones, contacts, VRChat constraints, behaviours.
 - Next without the SDK: `X_toon_material` (#36/#71), #55 (box contacts, receiver value, component node), #73
   (rebake offsets), Unity recordings for #52, #53, #54 (animator goldens would also check exported clips).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
@@ -122,8 +123,7 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 
 ## Blockers and needs-user
 
-- #37 (now the exporter's blocker): a Unity 2022.3.22f1 host project with the VRChat Avatars SDK at
-  `corpus/local/unity-export-vrc` (steps on the issue; the SDK licence is the owner's call). #38 baselines later.
+- #38 baselines later.
 
 ## Decisions in flight
 
