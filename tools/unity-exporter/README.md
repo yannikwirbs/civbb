@@ -8,8 +8,8 @@ links no VRChat SDK code.
 - `Editor/UnityPackage.cs`: lists a `.unitypackage`'s asset paths so the import step can refuse packages with code.
 - `Editor/Glb.cs`: the GLB writer: nodes, meshes, skins, morph targets, materials, textures, `X_avatar.humanoid`.
 
-Status: written and compile-checked against Unity 6000.3.27f1's assemblies; not yet run (the Unity licence lapsed,
-#72). The `.meta` files a git install needs are added after the first run.
+Status: runs on Unity 6000.3.28f1. All 13 humanoid prefabs of the five Booth packages export; meshes, triangles,
+shapes, joints and bind poses match the Blender conversions in `corpus/local/glb/` (comparison on #36).
 
 ## Install
 
@@ -25,10 +25,12 @@ Host project, gitignored, created once (`unity editors path <version>` gives the
 ```
 
 then add `"civbb.unity-exporter": "file:../../../../tools/unity-exporter"` to its `Packages/manifest.json`.
-Import a package, list the humanoid prefabs, export one:
+Import a package, list the humanoid prefabs, export one. `AssetDatabase.ImportPackage` is asynchronous and `unity
+run` always adds `-quit`, so the import runs through the Editor binary without `-quit` and exits from its completion
+callback:
 
 ```
-unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Import -civbbPackage <abs path>.unitypackage
+"$(unity editors path 6000.3.28f1)/Editor/Unity.exe" -batchmode -nographics -projectPath D:/Documents/Repos/CIVBB/corpus/local/unity-export -logFile <log> -executeMethod Civbb.Exporter.Batch.Import -civbbPackage <abs path>.unitypackage
 unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export
 unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export -civbbAvatar Assets/<prefab> -civbbOut <abs path>.glb
 ```

@@ -11,18 +11,28 @@ namespace Civbb.Exporter
     public static class Batch
     {
         /// `-civbbPackage <file>`: refuses packages with code, imports the rest and makes imported models readable.
+        /// `ImportPackage` runs asynchronously, so the editor exits from its completion callbacks.
         public static void Import()
         {
-            Run(() =>
+            string path = null;
+            try
             {
-                var path = Arg("-civbbPackage") ?? throw new ArgumentException("missing -civbbPackage");
+                path = Arg("-civbbPackage") ?? throw new ArgumentException("missing -civbbPackage");
                 var code = UnityPackage.CodeEntries(path);
                 if (code.Count > 0)
                 {
                     throw new InvalidOperationException(
                         $"refused, the package carries code: {string.Join(", ", code.Take(5))}");
                 }
-                AssetDatabase.ImportPackage(path, false);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"CIVBB failed: {e}");
+                EditorApplication.Exit(1);
+                return;
+            }
+            AssetDatabase.importPackageCompleted += _ => Run(() =>
+            {
                 AssetDatabase.Refresh();
                 foreach (var guid in AssetDatabase.FindAssets("t:Model"))
                 {
@@ -35,6 +45,9 @@ namespace Civbb.Exporter
                 }
                 Debug.Log($"CIVBB imported {path}");
             });
+            AssetDatabase.importPackageFailed += (_, error) => Run(() => throw new InvalidOperationException(error));
+            AssetDatabase.importPackageCancelled += _ => Run(() => throw new InvalidOperationException("cancelled"));
+            AssetDatabase.ImportPackage(path, false);
         }
 
         /// `-civbbAvatar <prefab asset path> -civbbOut <file.glb>` writes the prefab; without `-civbbAvatar` it lists
