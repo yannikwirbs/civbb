@@ -175,9 +175,11 @@ impl Rig {
         if h.muscle_frames.is_empty() {
             return None;
         }
+        // The hips have no muscles; they follow the body pose (RootT/RootQ, #52), so their frame never places them.
         let mut frames: Vec<(NodeIndex, &MuscleFrame)> = h
             .muscle_frames
             .iter()
+            .filter(|f| f.bone != HumanBone::Hips)
             .map(|f| (h.node(f.bone).expect("validated"), f))
             .collect();
         // Parents have lower node indices than their children.

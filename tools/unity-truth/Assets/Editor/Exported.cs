@@ -24,7 +24,8 @@ public static class Exported
     static List<IConstraint> constraints;
     static List<Transform> inputs;
     static System.Random random;
-    static int pose, frames;
+    static int pose, frames, vrcConstraints;
+    const string VrcConstraint = "VRC.SDK3.Dynamics.Constraint.Components.";
     const int Poses = 8;
 
     /// `-executeMethod Exported.Record -civbbAvatar <prefab> -civbbClips "a;b" -civbbOut <abs json>`.
@@ -39,9 +40,10 @@ public static class Exported
             var clipNames = Arg("-civbbClips").Split(';');
             avatar = (GameObject)Object.Instantiate(prefab);
             avatar.name = prefab.name;
-            // Keep Unity's own components only: VRChat runtime components (PhysBones, VRChat constraints) would move
-            // bones in play mode.
-            foreach (var c in avatar.GetComponentsInChildren<Component>(true).Where(c => c is MonoBehaviour).ToList())
+            // Keep Unity's own components and VRChat constraints (the SDK runs them in play mode, when it is in the
+            // project); other VRChat runtime components (PhysBones) would move bones.
+            foreach (var c in avatar.GetComponentsInChildren<Component>(true)
+                         .Where(c => c is MonoBehaviour && !c.GetType().FullName.StartsWith(VrcConstraint)).ToList())
                 Object.DestroyImmediate(c);
             nodes = new List<Transform>();
             Collect(avatar.transform);
@@ -93,6 +95,19 @@ public static class Exported
                 if (target.parent != null)
                     inputs.Add(target.parent);
             }
+            // VRChat constraints, read by field name (no SDK reference): their sources and the target's parent.
+            foreach (var c in avatar.GetComponentsInChildren<Component>(true).Where(c => c != null && c.GetType().FullName.StartsWith(VrcConstraint)))
+            {
+                var so = new SerializedObject(c);
+                int n = so.FindProperty("Sources.totalLength").intValue;
+                for (int i = 0; i < Math.Min(n, 16); i++)
+                    if (so.FindProperty($"Sources.source{i}.SourceTransform").objectReferenceValue is Transform t)
+                        inputs.Add(t);
+                var target = so.FindProperty("TargetTransform").objectReferenceValue as Transform ?? c.transform;
+                if (target.parent != null)
+                    inputs.Add(target.parent);
+                vrcConstraints++;
+            }
             inputs = inputs.Distinct().ToList();
             random = new System.Random(5);
             EditorSettings.enterPlayModeOptionsEnabled = true;
@@ -122,11 +137,11 @@ public static class Exported
             }
             if (frames % 3 == 0)
             {
-                if (pose == Poses || constraints.Count == 0)
+                if (pose == Poses || constraints.Count + vrcConstraints == 0)
                 {
                     json.Append("\n  ]\n}\n");
                     File.WriteAllText(outPath, json.ToString());
-                    Debug.Log($"CIVBB exported truth recorded to {outPath}: {constraints.Count} constraints");
+                    Debug.Log($"CIVBB exported truth recorded to {outPath}: {constraints.Count} Unity and {vrcConstraints} VRChat constraints");
                     EditorApplication.update -= Tick;
                     EditorApplication.Exit(0);
                     return;

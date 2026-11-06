@@ -349,6 +349,20 @@ fn pre_and_post_carry_muscle_space_into_the_nodes() {
     same(pose_of(&rig(&a), &[("Left Arm Down-Up", 1.0)])[&2], expected);
 }
 
+/// The hips follow the body pose (#52), not muscles: their frame, however turned, places nothing. A real avatar's
+/// hips frame (Yumeka's, exported from Unity) turned the whole body over before this.
+#[test]
+fn the_hips_frame_places_nothing() {
+    let mut a = arm(0.5, I, Vec::new());
+    let f = &mut a.humanoid.as_mut().unwrap().muscle_frames[0];
+    assert_eq!(f.bone, HumanBone::Hips);
+    f.pre = about(0, 90.0);
+    let r = rig(&a);
+    assert!(!r.has(HumanBone::Hips));
+    assert!(!pose_of(&r, &[]).contains_key(&1), "hips node 1 placed");
+    same(pose_of(&r, &[("Left Arm Down-Up", 1.0)])[&2], about(2, 100.0));
+}
+
 #[test]
 fn swing_combines_y_and_z_by_half_angle_tangents() {
     let mut a = arm(0.5, I, Vec::new());
@@ -509,7 +523,7 @@ fn masks_gate_muscles_by_body_part_and_the_pose_follows_the_muscles() {
     let p: HashMap<NodeIndex, Quat> = i.human_pose(&c).into_iter().collect();
     same(p[&2], about(2, 100.0));
     same(p[&4], about(2, 80.0));
-    same(p[&1], I);
+    assert!(!p.contains_key(&1), "the hips follow the body pose (#52)");
 
     // A mask with the left arm and an empty transform list still writes the arm's muscles.
     a.animator.as_mut().unwrap().layers[1].mask = Some(left_arm);
