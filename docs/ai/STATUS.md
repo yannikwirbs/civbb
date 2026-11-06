@@ -5,9 +5,8 @@ Read at the start of every session; update at the end. Keep it short: the queue 
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.10 Unity exporter** (M0.9 closed).
-- **Unity is unblocked** (#72 closed 2026-11-06): licence reactivated, batch runs exit 0. The Editor is now
-  6000.3.28f1 at `G:/Unity/editor/6000.3.28f1/`; `tools/unity-truth` still pins 6000.3.27f1 and gets upgraded on
-  its first open. Next: run the exporter (#36), then recordings for #52, #53, #54.
+- **Unity is unblocked** (#72 closed 2026-11-06): licence reactivated, batch runs exit 0. Editor 6000.3.28f1;
+  `tools/unity-truth` upgraded to it, re-recorded goldens identical (only the version string differs). Next: run the exporter (#36), then recordings for #52, #53, #54.
 - Next without Unity: #55 (box contacts, receiver value, component node), #71 (Rust side of the `X_*`
   extensions, starting with `X_avatar.humanoid`, which the exporter already writes), #73 (rebake offsets).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses

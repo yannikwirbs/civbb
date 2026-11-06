@@ -19,7 +19,7 @@ CIVBB is a social VR platform on a custom Rust + Vulkan engine. The product spec
 - A decision the design doc doesn't make, or a deviation from it: write an ADR in `docs/adr/` (copy `0000-template.md`). ADRs are not edited after acceptance; supersede them.
 - Found work outside the current issue: open an issue with labels and milestone, don't do it now.
 - Something the human must do (install, hardware test, licence call): open an issue labelled `needs-user` and list it in STATUS.md.
-- Sessions may run Unity themselves (batch mode via the Unity CLI or `Unity.exe -batchmode`) on projects inside this repo. Never drive an Editor the human has open on another project.
+- Sessions may run Unity themselves (batch mode via `unity run`, or the Editor binary from `unity editors path` for play-mode methods; LESSONS) on projects inside this repo. Never drive an Editor the human has open on another project.
 
 ## End of every session (always, even when stopping early)
 
@@ -41,4 +41,4 @@ CIVBB is a social VR platform on a custom Rust + Vulkan engine. The product spec
 
 ## Environment
 
-Windows 11, PowerShell and Git Bash. i5-12600K (6P+4E), RTX 5070 Ti, 32 GB RAM. This matches the design doc's reference PC. Rust stable MSVC via rustup. Unity 6000.3.28f1 at `G:/Unity/editor/6000.3.28f1/Editor/Unity.exe` (Personal licence active); Unity CLI at `C:/Users/xxsay/AppData/Local/Unity/bin/unity.exe`. No VRChat SDK or Creator Companion.
+Windows 11, PowerShell and Git Bash. i5-12600K (6P+4E), RTX 5070 Ti, 32 GB RAM. This matches the design doc's reference PC. Rust stable MSVC via rustup. Unity 6000.3.28f1 (Personal licence active); never hardcode an Editor path, ask `unity editors` / `unity editors path <version>`. Unity CLI at `C:/Users/xxsay/AppData/Local/Unity/bin/unity.exe`. No VRChat SDK or Creator Companion.

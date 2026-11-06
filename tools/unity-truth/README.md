@@ -9,10 +9,12 @@ A minimal Unity project that records Unity's behaviour as JSON test data (ADR 00
   so run it **without** `-quit` (it exits by itself) and give `-civbbOut` as an absolute path (Unity resolves
   relative ones against the project).
 
-Run with the editor pinned in `ProjectSettings/ProjectVersion.txt` (path in CLAUDE.md, Environment):
+`unity run` picks the editor pinned in `ProjectSettings/ProjectVersion.txt`. It always adds `-quit`, so
+`Constraints.Record` needs the Editor binary itself:
 
 ```
-Unity.exe -batchmode -nographics -quit -projectPath tools/unity-truth -executeMethod Muscles.Record -logFile <log> -civbbOut crates/anim/tests/unity
+unity run tools/unity-truth --no-tail --log-file <log> -- -executeMethod Muscles.Record -civbbOut <abs path>/crates/anim/tests/unity
+"$(unity editors path 6000.3.28f1)/Editor/Unity.exe" -batchmode -nographics -projectPath tools/unity-truth   -executeMethod Constraints.Record -logFile <log> -civbbOut <abs path>/crates/anim/tests/unity
 ```
 
 The first run imports the project (under a minute). The log ends with `CIVBB muscles recorded to ...`; Unity

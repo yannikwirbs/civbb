@@ -18,19 +18,19 @@ In a creator project's `Packages/manifest.json`:
 
 ## Local runs on the Booth corpus (sessions)
 
-Host project, gitignored, created once (paths from CLAUDE.md, Environment):
+Host project, gitignored, created once (`unity editors path <version>` gives the Editor folder):
 
 ```
-Unity.exe -batchmode -nographics -quit -createProject D:/Documents/Repos/CIVBB/corpus/local/unity-export -logFile <log>
+"$(unity editors path 6000.3.28f1)/Editor/Unity.exe" -batchmode -nographics -quit -createProject D:/Documents/Repos/CIVBB/corpus/local/unity-export -logFile <log>
 ```
 
 then add `"civbb.unity-exporter": "file:../../../../tools/unity-exporter"` to its `Packages/manifest.json`.
 Import a package, list the humanoid prefabs, export one:
 
 ```
-Unity.exe -batchmode -nographics -projectPath corpus/local/unity-export -executeMethod Civbb.Exporter.Batch.Import -logFile <log> -civbbPackage <abs path>.unitypackage
-Unity.exe -batchmode -nographics -projectPath corpus/local/unity-export -executeMethod Civbb.Exporter.Batch.Export -logFile <log>
-Unity.exe -batchmode -nographics -projectPath corpus/local/unity-export -executeMethod Civbb.Exporter.Batch.Export -logFile <log> -civbbAvatar Assets/<prefab> -civbbOut <abs path>.glb
+unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Import -civbbPackage <abs path>.unitypackage
+unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export
+unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export -civbbAvatar Assets/<prefab> -civbbOut <abs path>.glb
 ```
 
 Each exits by itself (0, or 1 with `CIVBB failed:` in the log). Check the result with `civbb inspect <glb>`
@@ -39,7 +39,7 @@ next to the Blender conversion in `corpus/local/glb/`.
 ## Compile check without a licence
 
 ```
-D=G:/Unity/editor/6000.3.28f1/Editor/Data
+D="$(unity editors path 6000.3.28f1)/Editor/Data"
 "$D/NetCoreRuntime/dotnet.exe" "$D/DotNetSdkRoslyn/csc.dll" -nologo -noconfig -nostdlib -target:library \
   -langversion:9 -out:<scratch>/exporter.dll $(for f in $D/Managed/UnityEngine/*.dll; do echo -r:$f; done) \
   -r:$D/NetStandard/ref/2.1.0/netstandard.dll tools/unity-exporter/Editor/*.cs
