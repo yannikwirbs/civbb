@@ -14,23 +14,32 @@ namespace Civbb.Exporter
 {
     static class AnimatorExport
     {
-        /// The extension JSON (null without layers) and a report fragment.
+        /// Assets of the VRChat SDK (its default controllers and proxy clips) are referenced, never copied (ADR 0042).
+        public static bool SdkAsset(UnityEngine.Object o) =>
+            o != null && AssetDatabase.GetAssetPath(o).StartsWith("Packages/com.vrchat.", StringComparison.Ordinal);
+
+        /// The extension JSON (null without layers) and a report fragment. A null path leaves its group empty.
         public static (string json, string report) Write(Transform root, IList<(string group, string path)> layers)
         {
-            if (layers.Count == 0)
+            if (layers.All(l => l.path == null))
             {
                 return (null, "no animator");
             }
-            var w = new Writer();
-            var controllers = layers.Select(l => AssetDatabase.LoadAssetAtPath<AnimatorController>(l.path)
+            var controllers = layers.Select(l => l.path == null ? null
+                : AssetDatabase.LoadAssetAtPath<AnimatorController>(l.path)
                 ?? throw new ArgumentException($"no animator controller at {l.path}")).ToList();
+            var w = new Writer(layers.Select(l => l.group).ToList(), controllers);
             // Parameters first: a clip in one controller may drive another's parameter.
-            controllers.ForEach(w.Parameters);
+            controllers.Where(c => c != null).ToList().ForEach(w.Parameters);
             for (int g = 0; g < controllers.Count; g++)
             {
-                w.Layers(controllers[g], g);
+                if (controllers[g] != null)
+                {
+                    w.Layers(controllers[g], g);
+                }
             }
-            var groups = layers.Select(l => $"{{\"name\":{Str(l.group)},\"weight\":1}}");
+            // VRChat's Action layer starts at weight 0; Playable Layer Control behaviours raise it.
+            var groups = layers.Select(l => $"{{\"name\":{Str(l.group)},\"weight\":{(l.group == "Action" ? 0 : 1)}}}");
             var json = $"{{\"animator\":{{\"parameters\":[{string.Join(",", w.parameters)}]," +
                 $"\"groups\":[{string.Join(",", groups)}],\"layers\":[{string.Join(",", w.layers)}]}}," +
                 $"\"clips\":[{string.Join(",", w.clips)}]}}";
@@ -45,11 +54,27 @@ namespace Civbb.Exporter
             readonly Dictionary<AnimationClip, int> clipIndex = new Dictionary<AnimationClip, int>();
             readonly HashSet<string> muscles = Muscles();
             int states, subMachines, machineTransitions, droppedTransitions, syncedLayers, typeClashes, emptyMotions,
-                curves, objectCurves, componentCurves, bakedSegments, jumps, emptyLayers;
+                curves, objectCurves, componentCurves, bakedSegments, jumps, emptyLayers, sdkClips, behaviours;
             int emptyClip = -1;
+            readonly List<string> groupNames;
+            /// Index of each group's first layer in the flattened layer list.
+            readonly List<int> firstLayer = new List<int>();
+            readonly BehaviourExport behaviourWriter = new BehaviourExport();
+
+            public Writer(List<string> groups, List<AnimatorController> controllers)
+            {
+                groupNames = groups;
+                int n = 0;
+                foreach (var c in controllers)
+                {
+                    firstLayer.Add(n);
+                    n += c != null ? c.layers.Length : 0;
+                }
+            }
 
             public string Report() =>
-                $"animator {layers.Count} layers, {parameters.Count} parameters, {states} states, {clips.Count} clips, " +
+                $"animator {layers.Count} layers, {parameters.Count} parameters, {states} states, {clips.Count} clips " +
+                $"({sdkClips} SDK clips referenced), {behaviours} behaviours ({behaviourWriter.Report()}), " +
                 $"{curves} curves ({componentCurves} other component, {objectCurves} object curves skipped, " +
                 $"{bakedSegments} weighted segments baked, {jumps} jumps split), {subMachines} sub-state machines, " +
                 $"{machineTransitions} state machine transitions skipped, {droppedTransitions} transitions dropped, " +
@@ -135,7 +160,7 @@ namespace Civbb.Exporter
                         $"\"cycle_offset_param\":{Param(s.cycleOffsetParameterActive, s.cycleOffsetParameter)}," +
                         $"\"time_param\":{Param(s.timeParameterActive, s.timeParameter)}," +
                         $"\"write_defaults\":{Bool(s.writeDefaultValues)}," +
-                        $"\"transitions\":[{Transitions(s.transitions, index)}],\"behaviours\":[]}}");
+                        $"\"transitions\":[{Transitions(s.transitions, index)}],\"behaviours\":[{StateBehaviours(s)}]}}");
                 }
                 foreach (var m in machines)
                 {
@@ -166,6 +191,26 @@ namespace Civbb.Exporter
                 {
                     Gather(sub.stateMachine, states, machines);
                 }
+            }
+
+            string StateBehaviours(AnimatorState s)
+            {
+                var list = new List<string>();
+                foreach (var b in s.behaviours)
+                {
+                    var json = behaviourWriter.Write(b, name => paramIndex.TryGetValue(name ?? "", out var p) ? p.index : -1,
+                        group => groupNames.IndexOf(group), (group, layer) =>
+                        {
+                            int g = groupNames.IndexOf(group);
+                            return g >= 0 && g < firstLayer.Count ? firstLayer[g] + layer : -1;
+                        });
+                    if (json != null)
+                    {
+                        list.Add(json);
+                    }
+                }
+                behaviours += list.Count;
+                return string.Join(",", list);
             }
 
             string Param(bool active, string name) =>
@@ -290,6 +335,14 @@ namespace Civbb.Exporter
                 if (clipIndex.TryGetValue(clip, out int found))
                 {
                     return found;
+                }
+                if (SdkAsset(clip))
+                {
+                    // A VRChat proxy clip: kept by name, its keys stay in the SDK (ADR 0042).
+                    sdkClips++;
+                    clipIndex[clip] = clips.Count;
+                    clips.Add($"{{\"name\":{Str(clip.name)},\"length\":0,\"looping\":false,\"curves\":[]}}");
+                    return clips.Count - 1;
                 }
                 var list = new List<string>();
                 foreach (var b in AnimationUtility.GetCurveBindings(clip))

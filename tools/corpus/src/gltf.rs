@@ -5,6 +5,7 @@
 //! `X_*` extensions (ADR 0041) for what glTF lacks.
 
 use civbb_format::Avatar;
+use civbb_format::face::{EyeDriver, ShapeBind};
 use civbb_format::material::MaterialModel;
 use civbb_format::mesh::Mesh;
 use serde_json::{Value, json};
@@ -107,7 +108,23 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
                 )
             })
             .collect();
-        ext.insert("X_avatar".into(), json!({"humanoid": bones, "viewpoint": h.viewpoint}));
+        let mut x = json!({"humanoid": bones, "viewpoint": h.viewpoint, "muscle_frames": h.muscle_frames});
+        if let Some(face) = &a.face {
+            // Binds name the glTF node carrying the mesh (ADR 0042); node indices equal the avatar's.
+            let mut face = face.clone();
+            let binds = face.visemes.iter_mut().flat_map(|(_, b)| b.iter_mut());
+            let eye_binds: Vec<&mut ShapeBind> = match face.eyes.as_mut().map(|e| &mut e.driver) {
+                Some(EyeDriver::Shapes { up, down, left, right }) => {
+                    [up, down, left, right].into_iter().flatten().collect()
+                }
+                _ => Vec::new(),
+            };
+            for b in binds.chain(face.blink.iter_mut()).chain(eye_binds) {
+                b.mesh = a.meshes[b.mesh as usize].node;
+            }
+            x["face"] = json!(face);
+        }
+        ext.insert("X_avatar".into(), x);
     }
     if let Some(animator) = &a.animator {
         ext.insert("X_animator".into(), json!({"animator": animator, "clips": a.clips}));

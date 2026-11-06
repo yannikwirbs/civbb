@@ -152,6 +152,7 @@ pub fn import(
         avatar.dynamics = s.dynamics;
         avatar.contacts = s.contacts;
         avatar.expressions = s.expressions;
+        avatar.face = s.face;
     }
     civbb_format::validate(&avatar, &limits.caps, |id| im.blobs.contains_key(&id)).map_err(|errors| {
         let list: Vec<String> = errors.iter().map(ToString::to_string).collect();

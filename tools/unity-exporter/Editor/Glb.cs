@@ -20,17 +20,31 @@ namespace Civbb.Exporter
         {
             var w = new Writer();
             w.Run(root.transform);
+            // VRChat components (ADR 0042); `layers` from the command line overrides the descriptor's.
+            var vrc = new VrcExport(root.transform, w.NodeIndex);
+            if (layers.Count == 0)
+            {
+                layers = vrc.Layers();
+            }
+            w.Viewpoint = vrc.Viewpoint();
+            w.Face = vrc.Face();
+            w.Humanoid(root.transform);
             var animator = AnimatorExport.Write(root.transform, layers);
-            if (animator.json != null)
+            void Put(string name, string json)
             {
-                w.extensions["X_animator"] = animator.json;
+                if (json != null)
+                {
+                    w.extensions[name] = json;
+                }
             }
-            var constraints = ConstraintExport.Write(root.transform, w.NodeIndex);
-            if (constraints.json != null)
-            {
-                w.extensions["X_constraints"] = constraints.json;
-            }
-            return (w.Finish(), $"{w.Report()}; {animator.report}; {constraints.report}");
+            Put("X_animator", animator.json);
+            var constraints = ConstraintExport.Write(root.transform, w.NodeIndex, vrc.Constraints());
+            Put("X_constraints", constraints.json);
+            Put("X_dynamics", vrc.Dynamics());
+            Put("X_contacts", vrc.Contacts());
+            Put("X_expressions", vrc.Expressions());
+            vrc.CountOthers();
+            return (w.Finish(), $"{w.Report()}; {animator.report}; {constraints.report}; {vrc.Report()}");
         }
 
         sealed class Writer
@@ -77,7 +91,6 @@ namespace Civbb.Exporter
                     }
                     nodes.Add(Node(t, t == root, mesh, skin));
                 }
-                Humanoid(root);
             }
 
             static void Collect(Transform t, List<Transform> order)
@@ -378,13 +391,29 @@ namespace Civbb.Exporter
                 return textures.Count - 1;
             }
 
-            void Humanoid(Transform root)
+            /// Writes `X_avatar`: humanoid map, muscle frames, and the descriptor's viewpoint and face if set.
+            public void Humanoid(Transform root)
             {
                 var animator = root.GetComponent<Animator>();
-                if (animator == null || animator.avatar == null || !animator.avatar.isHuman)
+                var entries = new List<string>();
+                var frames = new List<string>();
+                if (animator != null && animator.avatar != null && animator.avatar.isHuman)
+                {
+                    HumanBones(animator.avatar, entries, frames);
+                }
+                humanBones = entries.Count;
+                if (entries.Count == 0 && Viewpoint == null && Face == null)
                 {
                     return;
                 }
+                var viewpoint = Viewpoint != null ? $",\"viewpoint\":{Vec(Viewpoint.Value)}" : "";
+                var face = Face != null ? $",\"face\":{Face}" : "";
+                extensions["X_avatar"] = $"{{\"humanoid\":{{{string.Join(",", entries)}}}," +
+                    $"\"muscle_frames\":[{string.Join(",", frames)}]{viewpoint}{face}}}";
+            }
+
+            void HumanBones(Avatar avatar, List<string> entries, List<string> frames)
+            {
                 var names = new Dictionary<string, string>();
                 for (int i = 0; i < HumanTrait.BoneName.Length; i++)
                 {
@@ -403,17 +432,57 @@ namespace Civbb.Exporter
                         byName[t.name] = t;
                     }
                 }
-                var entries = new List<string>();
-                foreach (var h in animator.avatar.humanDescription.human)
+                var desc = avatar.humanDescription;
+                foreach (var h in desc.human)
                 {
                     if (names.TryGetValue(h.humanName, out var bone) && byName.TryGetValue(h.boneName, out var t))
                     {
                         entries.Add($"{Str(bone)}:{nodeIndex[t]}");
+                        frames.Add(MuscleFrame(avatar, desc, (HumanBodyBones)Enum.Parse(typeof(HumanBodyBones), bone), h.limit));
                     }
                 }
-                humanBones = entries.Count;
-                extensions["X_avatar"] = $"{{\"humanoid\":{{{string.Join(",", entries)}}}}}";
             }
+
+            const System.Reflection.BindingFlags Internal =
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+
+            /// A bone's muscle frame (ADR 0014) from the Avatar's internal accessors, as unity-truth records them,
+            /// in glTF space: rotations mirrored, Y and Z limit signs negated (ADR 0042).
+            static string MuscleFrame(Avatar avatar, HumanDescription desc, HumanBodyBones bone, HumanLimit limit)
+            {
+                var args = new object[] { (int)bone };
+                var pre = (Quaternion)typeof(Avatar).GetMethod("GetPreRotation", Internal).Invoke(avatar, args);
+                var post = (Quaternion)typeof(Avatar).GetMethod("GetPostRotation", Internal).Invoke(avatar, args);
+                var sign = (Vector3)typeof(Avatar).GetMethod("GetLimitSign", Internal).Invoke(avatar, args);
+                var min = new float[3];
+                var max = new float[3];
+                for (int d = 0; d < 3; d++)
+                {
+                    int muscle = HumanTrait.MuscleFromBone((int)bone, d);
+                    if (muscle < 0)
+                    {
+                        continue;
+                    }
+                    min[d] = limit.useDefaultValues ? HumanTrait.GetMuscleDefaultMin(muscle) : limit.min[d];
+                    max[d] = limit.useDefaultValues ? HumanTrait.GetMuscleDefaultMax(muscle) : limit.max[d];
+                }
+                float twist = bone switch
+                {
+                    HumanBodyBones.LeftUpperArm or HumanBodyBones.RightUpperArm => desc.upperArmTwist,
+                    HumanBodyBones.LeftLowerArm or HumanBodyBones.RightLowerArm => desc.lowerArmTwist,
+                    HumanBodyBones.LeftUpperLeg or HumanBodyBones.RightUpperLeg => desc.upperLegTwist,
+                    HumanBodyBones.LeftLowerLeg or HumanBodyBones.RightLowerLeg => desc.lowerLegTwist,
+                    _ => 1,
+                };
+                return $"{{\"bone\":{Str(bone.ToString())},\"pre\":{Quat(pre)},\"post\":{Quat(post)}," +
+                    $"\"sign\":{Nums(sign.x, -sign.y, -sign.z)},\"min\":{Nums(min)},\"max\":{Nums(max)},\"twist\":{Num(twist)}}}";
+            }
+
+            /// Avatar-space eye position from the VRChat descriptor, or null for the importer's default.
+            public Vector3? Viewpoint;
+
+            /// `X_avatar.face` JSON from the VRChat descriptor, or null.
+            public string Face;
 
             /// The glTF node of a transform in the prefab, or -1.
             public int NodeIndex(Transform t) => t != null && nodeIndex.TryGetValue(t, out int i) ? i : -1;

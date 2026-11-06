@@ -1,5 +1,6 @@
 // Unity's constraint components as X_constraints (ADR 0041): format `Constraint` JSON in glTF space, as the
-// unity-truth recorder writes them (ADR 0018), with the X mirror of ADR 0038.
+// unity-truth recorder writes them (ADR 0018), with the X mirror of ADR 0038. At-rest values are the target's local
+// transform, except for look-at: instantiating an object at runtime resets them to it (ADR 0042).
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,8 +12,9 @@ namespace Civbb.Exporter
 {
     static class ConstraintExport
     {
-        /// The extension JSON (null without constraints) and a report fragment.
-        public static (string json, string report) Write(Transform root, Func<Transform, int> node)
+        /// The extension JSON (null without constraints) and a report fragment; `extra` (VRChat constraints, ADR
+        /// 0042) go after Unity's.
+        public static (string json, string report) Write(Transform root, Func<Transform, int> node, IList<string> extra)
         {
             var list = new List<string>();
             int missingSources = 0, skipped = 0;
@@ -44,7 +46,8 @@ namespace Civbb.Exporter
                         $"\"weight\":{Num(c.weight)},\"active\":{Bool(c.constraintActive)},\"axes\":{axes},\"rest\":{rest}}}");
                 }
             }
-            var report = $"{list.Count} constraints ({skipped} skipped, {missingSources} sources outside the prefab)";
+            var report = $"{list.Count} Unity constraints ({skipped} skipped, {missingSources} sources outside the prefab)";
+            list.AddRange(extra);
             return (list.Count > 0 ? "[" + string.Join(",", list) + "]" : null, report);
         }
 
@@ -56,28 +59,29 @@ namespace Civbb.Exporter
             out Func<int, string> offsets)
         {
             offsets = null;
+            var local = ((Component)c).transform;
             switch (c)
             {
                 case PositionConstraint p:
                     axes = Axes(p.translationAxis);
-                    rest = Rest(p.translationAtRest, Vector3.zero, Vector3.one);
+                    rest = Transform(local.localPosition, Quaternion.identity, Vector3.one);
                     return $"{{\"Position\":{{\"offset\":{Vec(p.translationOffset)}}}}}";
                 case RotationConstraint r:
                     axes = Axes(r.rotationAxis);
-                    rest = Rest(Vector3.zero, r.rotationAtRest, Vector3.one);
+                    rest = Transform(Vector3.zero, local.localRotation, Vector3.one);
                     return $"{{\"Rotation\":{{\"offset\":{Euler(r.rotationOffset)}}}}}";
                 case ScaleConstraint s:
                     axes = Axes(s.scalingAxis);
-                    rest = Rest(Vector3.zero, Vector3.zero, s.scaleAtRest);
+                    rest = Transform(Vector3.zero, Quaternion.identity, local.localScale);
                     return $"{{\"Scale\":{{\"offset\":{Nums(s.scaleOffset.x, s.scaleOffset.y, s.scaleOffset.z)}}}}}";
                 case ParentConstraint p:
                     axes = Axes(p.translationAxis);
-                    rest = Rest(p.translationAtRest, p.rotationAtRest, Vector3.one);
+                    rest = Transform(local.localPosition, local.localRotation, Vector3.one);
                     offsets = i => Transform(p.GetTranslationOffset(i), Quaternion.Euler(p.GetRotationOffset(i)), Vector3.one);
                     return $"{{\"Parent\":{{\"rotation_axes\":{Axes(p.rotationAxis)}}}}}";
                 case AimConstraint a:
                     axes = Axes(a.rotationAxis);
-                    rest = Rest(Vector3.zero, a.rotationAtRest, Vector3.one);
+                    rest = Transform(Vector3.zero, local.localRotation, Vector3.one);
                     int up = node(a.worldUpObject);
                     string w;
                     switch (a.worldUpType)

@@ -47,7 +47,18 @@ fn corpus_round_trips_through_glb() {
 #[test]
 fn corpus_round_trips_through_source_extensions() {
     for spec in [civbb_corpus::lean(), civbb_corpus::bloated()] {
-        let original = civbb_corpus::generate(&spec);
+        let mut original = civbb_corpus::generate(&spec);
+        // The generator makes no muscle frames; one with distinct values checks the field travels.
+        let h = original.humanoid.as_mut().unwrap();
+        h.muscle_frames.push(civbb_format::hierarchy::MuscleFrame {
+            bone: h.bones[0].0,
+            pre: [0.0, 0.6, 0.0, 0.8],
+            post: [0.6, 0.0, 0.0, 0.8],
+            sign: [1.0, -1.0, 1.0],
+            min: [-40.0, -30.0, -20.0],
+            max: [40.0, 30.0, 20.0],
+            twist: 1.0,
+        });
         assert!(
             original.hierarchy.nodes.iter().any(|n| !n.active),
             "{}: no inactive node",
@@ -59,7 +70,9 @@ fn corpus_round_trips_through_source_extensions() {
         assert_eq!(a.hierarchy.nodes, original.hierarchy.nodes, "{}", spec.name);
         assert_eq!(a.meshes, original.meshes, "{}", spec.name);
         let (h, o) = (a.humanoid.unwrap(), original.humanoid.clone().unwrap());
-        assert_eq!((h.bones, h.viewpoint), (o.bones, o.viewpoint), "{}", spec.name);
+        assert_eq!(h, o, "{}", spec.name);
+        assert!(original.face.is_some(), "{}: no face", spec.name);
+        assert_eq!(a.face, original.face, "{}", spec.name);
         assert_eq!(a.animator, original.animator, "{}", spec.name);
         assert_eq!(a.clips, original.clips, "{}", spec.name);
         assert_eq!(a.constraints, original.constraints, "{}", spec.name);
@@ -84,6 +97,20 @@ fn hostile_source_extensions_are_rejected() {
     reject("X_avatar: node 7", json!({"X_avatar": {"humanoid": {"Hips": 7}}}));
     reject("X_avatar", json!({"X_avatar": {"humanoid": {"Hips": -1}}}));
     reject("X_avatar", json!({"X_avatar": {"humanoids": {}}}));
+    let bind = |mesh: u32| json!({"visemes": [], "blink": [{"mesh": mesh, "shape": 0, "weight": 1.0}], "eyes": null});
+    reject("face.binds[0]", json!({"X_avatar": {"face": bind(0)}})); // the mesh has no shape 0
+    reject("X_avatar: node 9", json!({"X_avatar": {"face": bind(9)}}));
+    let (mut doc, bin) = triangle_doc();
+    doc["nodes"] = json!([{"mesh": 0, "children": [1]}, {}]);
+    doc["extensions"] = json!({"X_avatar": {"face": bind(1)}});
+    let e = import(&gltf(doc, &bin), &Limits::default(), no_files).expect_err("no mesh");
+    assert!(e.to_string().contains("X_avatar: node 1 has no mesh"), "{e}");
+    let eyes = json!({"visemes": [], "blink": [], "eyes": {"driver": {"Bones": {"left": 9, "right": null}},
+        "horizontal_inner": {"input_max": 1.0, "output_scale": 1.0},
+        "horizontal_outer": {"input_max": 1.0, "output_scale": 1.0},
+        "vertical_down": {"input_max": 1.0, "output_scale": 1.0},
+        "vertical_up": {"input_max": 1.0, "output_scale": 1.0}}});
+    reject("X_avatar: node 9", json!({"X_avatar": {"face": eyes}}));
     reject("X_constraints", json!({"X_constraints": {"not": "a list"}}));
     let lean = civbb_corpus::generate(&civbb_corpus::lean());
     let mut c = serde_json::to_value(&lean.constraints[0]).unwrap();

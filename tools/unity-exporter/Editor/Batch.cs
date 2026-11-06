@@ -10,11 +10,16 @@ namespace Civbb.Exporter
 {
     public static class Batch
     {
+        const string PendingKey = "civbb.import.package";
+        const double ImportTimeout = 600;
+
         /// `-civbbPackage <file>`: refuses packages with code, imports the rest and makes imported models readable.
-        /// `ImportPackage` runs asynchronously, so the editor exits from its completion callbacks.
+        /// `ImportPackage` runs asynchronously and may be followed by a domain reload (the VRChat SDK recompiles after
+        /// changing settings), which drops static callbacks. So the editor polls until every asset path the package
+        /// lists exists and nothing compiles or imports, and the pending import survives reloads in `SessionState`.
         public static void Import()
         {
-            string path = null;
+            string path;
             try
             {
                 path = Arg("-civbbPackage") ?? throw new ArgumentException("missing -civbbPackage");
@@ -31,23 +36,65 @@ namespace Civbb.Exporter
                 EditorApplication.Exit(1);
                 return;
             }
-            AssetDatabase.importPackageCompleted += _ => Run(() =>
-            {
-                AssetDatabase.Refresh();
-                foreach (var guid in AssetDatabase.FindAssets("t:Model"))
-                {
-                    var importer = AssetImporter.GetAtPath(AssetDatabase.GUIDToAssetPath(guid)) as ModelImporter;
-                    if (importer != null && !importer.isReadable)
-                    {
-                        importer.isReadable = true;
-                        importer.SaveAndReimport();
-                    }
-                }
-                Debug.Log($"CIVBB imported {path}");
-            });
+            SessionState.SetString(PendingKey, path);
             AssetDatabase.importPackageFailed += (_, error) => Run(() => throw new InvalidOperationException(error));
             AssetDatabase.importPackageCancelled += _ => Run(() => throw new InvalidOperationException("cancelled"));
             AssetDatabase.ImportPackage(path, false);
+            Watch();
+        }
+
+        [InitializeOnLoadMethod]
+        static void Resume()
+        {
+            if (!string.IsNullOrEmpty(SessionState.GetString(PendingKey, "")))
+            {
+                Watch();
+            }
+        }
+
+        static void Watch()
+        {
+            var path = SessionState.GetString(PendingKey, "");
+            var expected = UnityPackage.Entries(path);
+            // An asset whose GUID the project already has keeps its existing path.
+            bool Present((string guid, string path) e) => File.Exists(e.path) || Directory.Exists(e.path) ||
+                !string.IsNullOrEmpty(AssetDatabase.GUIDToAssetPath(e.guid));
+            double start = EditorApplication.timeSinceStartup;
+            EditorApplication.CallbackFunction poll = null;
+            poll = () =>
+            {
+                if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                {
+                    return;
+                }
+                bool done = expected.All(Present);
+                if (!done && EditorApplication.timeSinceStartup - start < ImportTimeout)
+                {
+                    return;
+                }
+                EditorApplication.update -= poll;
+                SessionState.EraseString(PendingKey);
+                Run(() =>
+                {
+                    if (!done)
+                    {
+                        var missing = expected.Where(e => !Present(e)).Take(5).Select(e => e.path);
+                        throw new InvalidOperationException($"import timed out, missing {string.Join(", ", missing)}");
+                    }
+                    AssetDatabase.Refresh();
+                    foreach (var guid in AssetDatabase.FindAssets("t:Model"))
+                    {
+                        var importer = AssetImporter.GetAtPath(AssetDatabase.GUIDToAssetPath(guid)) as ModelImporter;
+                        if (importer != null && !importer.isReadable)
+                        {
+                            importer.isReadable = true;
+                            importer.SaveAndReimport();
+                        }
+                    }
+                    Debug.Log($"CIVBB imported {path} ({expected.Count} assets)");
+                });
+            };
+            EditorApplication.update += poll;
         }
 
         /// `-civbbAvatar <prefab asset path> -civbbOut <file.glb>` writes the prefab; without `-civbbAvatar` it lists

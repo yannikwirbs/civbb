@@ -1,5 +1,5 @@
-//! The source package's `X_*` extensions (ADR 0041): humanoid map and viewpoint, animator and clips, constraints,
-//! dynamics, contacts and expressions, read as the format model's JSON with glTF node indices.
+//! The source package's `X_*` extensions (ADR 0041): humanoid map, viewpoint and face, animator and clips,
+//! constraints, dynamics, contacts and expressions, read as the format model's JSON with glTF node indices.
 //!
 //! A malformed extension or a node index outside the scene fails the import; `validate` then checks the rest.
 
@@ -7,7 +7,8 @@ use civbb_format::animator::{Animator, Clip, Motion};
 use civbb_format::constraint::{Constraint, ConstraintKind, WorldUp};
 use civbb_format::dynamics::{Contacts, Dynamics};
 use civbb_format::expressions::Expressions;
-use civbb_format::hierarchy::{HumanBone, Humanoid, NodeIndex};
+use civbb_format::face::{EyeDriver, Face, ShapeBind};
+use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, NodeIndex};
 use civbb_format::math::Vec3;
 use serde::Deserialize;
 use serde_json::Value;
@@ -24,6 +25,7 @@ pub(super) struct Source {
     pub dynamics: Dynamics,
     pub contacts: Contacts,
     pub expressions: Option<Expressions>,
+    pub face: Option<Face>,
 }
 
 #[derive(Deserialize)]
@@ -33,6 +35,13 @@ struct XAvatar {
     humanoid: serde_json::Map<String, Value>,
     #[serde(default)]
     viewpoint: Option<Vec3>,
+    /// Format `MuscleFrame`s in glTF space (ADR 0042).
+    #[serde(default)]
+    muscle_frames: Vec<MuscleFrame>,
+    /// The format `Face` with each bind's `mesh` the glTF node carrying the mesh and eye bones as glTF nodes
+    /// (ADR 0042).
+    #[serde(default)]
+    face: Option<Face>,
 }
 
 #[derive(Deserialize)]
@@ -66,7 +75,12 @@ impl Importer<'_> {
         }
         let mut s = Source::default();
         if let Some(v) = doc.extension_value("X_avatar") {
-            s.humanoid = Some(self.x_avatar(parse("X_avatar", v)?)?);
+            let mut x: XAvatar = parse("X_avatar", v)?;
+            if let Some(mut face) = x.face.take() {
+                self.face_meshes(&mut face)?;
+                s.face = Some(face);
+            }
+            s.humanoid = Some(self.x_avatar(x)?);
         }
         if let Some(v) = doc.extension_value("X_animator") {
             let x: XAnimator = parse("X_animator", v)?;
@@ -136,6 +150,7 @@ impl Importer<'_> {
             h.bones.push((bone, self.x_node("X_avatar", i)?));
         }
         h.bones.sort_unstable_by_key(|&(b, _)| b);
+        h.muscle_frames = x.muscle_frames;
         h.viewpoint = match (x.viewpoint, h.node(HumanBone::Head)) {
             (Some(v), _) => v,
             (None, Some(head)) => {
@@ -149,6 +164,35 @@ impl Importer<'_> {
             }
         };
         Ok(h)
+    }
+
+    /// Maps a face's glTF node indices: binds' mesh nodes to format meshes, eye bones to hierarchy nodes.
+    fn face_meshes(&self, face: &mut Face) -> Result<(), String> {
+        let ext = "X_avatar";
+        let mesh = |n: u32| -> Result<u32, String> {
+            let at = self.x_node(ext, n)?;
+            self.node_meshes
+                .get(&at)
+                .map(|&m| m as u32)
+                .ok_or_else(|| format!("{ext}: node {n} has no mesh"))
+        };
+        let mut eye_binds: Vec<&mut ShapeBind> = Vec::new();
+        match face.eyes.as_mut().map(|e| &mut e.driver) {
+            Some(EyeDriver::Bones { left, right }) => {
+                for n in [left, right].into_iter().flatten() {
+                    *n = self.x_node(ext, *n)?;
+                }
+            }
+            Some(EyeDriver::Shapes { up, down, left, right }) => {
+                eye_binds.extend([up, down, left, right].into_iter().flatten());
+            }
+            None => {}
+        }
+        let binds = face.visemes.iter_mut().flat_map(|(_, b)| b.iter_mut());
+        for b in binds.chain(face.blink.iter_mut()).chain(eye_binds) {
+            b.mesh = mesh(b.mesh)?;
+        }
+        Ok(())
     }
 
     fn constraint_nodes(&self, c: &mut Constraint) -> Result<(), String> {

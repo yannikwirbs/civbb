@@ -6,15 +6,19 @@ links no VRChat SDK code.
 
 - `Editor/Batch.cs`: batch entry points `Civbb.Exporter.Batch.Import` and `Civbb.Exporter.Batch.Export`.
 - `Editor/UnityPackage.cs`: lists a `.unitypackage`'s asset paths so the import step can refuse packages with code.
-- `Editor/Glb.cs`: the GLB writer: nodes, meshes, skins, morph targets, materials, textures, `X_avatar.humanoid`.
+- `Editor/Glb.cs`: the GLB writer: nodes, meshes, skins, morph targets, materials, textures, `X_avatar` (humanoid,
+  muscle frames, viewpoint, face).
 - `Editor/AnimatorExport.cs`: animator controllers and clips as `X_animator` (ADR 0041; curves per ADR 0039).
+- `Editor/BehaviourExport.cs`: VRChat state behaviours as format behaviours (ADR 0042).
 - `Editor/ConstraintExport.cs`: Unity constraint components as `X_constraints`.
+- `Editor/VrcExport.cs`: VRChat components (ADR 0042): descriptor (playable layers, viewpoint, visemes, blink, eye
+  look, expressions), PhysBones and colliders, contacts, VRChat constraints. Read by field name; no SDK reference.
 - `Editor/Json.cs`: JSON text helpers and the X mirror for vectors, rotations and Euler angles.
 
-Status: runs on Unity 6000.3.28f1. All 13 humanoid prefabs of the five Booth packages export; meshes, triangles,
-shapes, joints and bind poses match the Blender conversions in `corpus/local/glb/` (comparison on #36). Animators
-and Unity constraints export and import; VRChat components (descriptor, PhysBones, contacts, VRChat constraints,
-state behaviours) need the VRChat SDK in the host project (#37).
+Status: runs on Unity 6000.3.28f1 without the VRChat SDK and on 2022.3.22f1 with it (SDK 3.10.6). All humanoid
+prefabs of the 11 local avatar packages export; meshes, triangles, shapes, joints and bind poses match the Blender
+conversions in `corpus/local/glb/` (comparison on #36). With the SDK, VRChat components export too (ADR 0042); each
+export logs what it skipped.
 
 ## Install
 
@@ -23,7 +27,10 @@ In a creator project's `Packages/manifest.json`:
 
 ## Local runs on the Booth corpus (sessions)
 
-Host project, gitignored, created once (`unity editors path <version>` gives the Editor folder):
+Two gitignored host projects: `corpus/local/unity-export-vrc` (Unity 2022.3.22f1 with the VRChat SDK, created by
+the owner with the Creator Companion; use this one) and `corpus/local/unity-export` (Unity 6, no SDK). Both list the
+exporter as `"civbb.unity-exporter": "file:../../../../tools/unity-exporter"` in `Packages/manifest.json`. The SDK-less
+one was created with:
 
 ```
 "$(unity editors path 6000.3.28f1)/Editor/Unity.exe" -batchmode -nographics -quit -createProject D:/Documents/Repos/CIVBB/corpus/local/unity-export -logFile <log>
@@ -31,17 +38,18 @@ Host project, gitignored, created once (`unity editors path <version>` gives the
 
 then add `"civbb.unity-exporter": "file:../../../../tools/unity-exporter"` to its `Packages/manifest.json`.
 Import a package, list the humanoid prefabs, export one. `AssetDatabase.ImportPackage` is asynchronous and `unity
-run` always adds `-quit`, so the import runs through the Editor binary without `-quit` and exits from its completion
-callback:
+run` always adds `-quit`, so the import runs through the Editor binary without `-quit` and exits once every asset of
+the package exists (ADR 0042; it survives the domain reload the SDK triggers):
 
 ```
-"$(unity editors path 6000.3.28f1)/Editor/Unity.exe" -batchmode -nographics -projectPath D:/Documents/Repos/CIVBB/corpus/local/unity-export -logFile <log> -executeMethod Civbb.Exporter.Batch.Import -civbbPackage <abs path>.unitypackage
-unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export
-unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export -civbbAvatar Assets/<prefab> -civbbOut <abs path>.glb [-civbbLayers "Base=Assets/<controller>;Gesture=...;FX=..."]
+"$(unity editors path 2022.3.22f1)/Editor/Unity.exe" -batchmode -nographics -projectPath D:/Documents/Repos/CIVBB/corpus/local/unity-export-vrc -logFile <log> -executeMethod Civbb.Exporter.Batch.Import -civbbPackage <abs path>.unitypackage
+unity run corpus/local/unity-export-vrc --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export
+unity run corpus/local/unity-export-vrc --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export -civbbAvatar Assets/<prefab> -civbbOut <abs path>.glb [-civbbLayers "Base=Assets/<controller>;Gesture=...;FX=..."]
 ```
 
-`-civbbLayers` names the controllers that fill the animator's layer groups, in order. Until the exporter reads the
-VRChat avatar descriptor (#37), sessions pick them by file name.
+Without `-civbbLayers`, the descriptor's playable layers fill the groups `Base`, `Additive`, `Gesture`, `Action`,
+`FX` (ADR 0042). `-civbbLayers` overrides that with controllers named by asset path, in order (projects without the
+SDK).
 
 Each exits by itself (0, or 1 with `CIVBB failed:` in the log). Check the result with `civbb inspect <glb>`
 next to the Blender conversion in `corpus/local/glb/`.

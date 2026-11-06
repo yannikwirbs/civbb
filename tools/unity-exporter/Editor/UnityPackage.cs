@@ -30,9 +30,12 @@ namespace Civbb.Exporter
         }
 
         /// Every asset path the package declares (the first line of each `<guid>/pathname` entry).
-        public static List<string> AssetPaths(string path)
+        public static List<string> AssetPaths(string path) => Entries(path).ConvertAll(e => e.path);
+
+        /// Every asset the package declares as (guid, asset path).
+        public static List<(string guid, string path)> Entries(string path)
         {
-            var paths = new List<string>();
+            var paths = new List<(string, string)>();
             using var gz = new GZipStream(File.OpenRead(path), CompressionMode.Decompress);
             var header = new byte[512];
             while (ReadFull(gz, header, 512))
@@ -53,7 +56,8 @@ namespace Civbb.Exporter
                         throw new InvalidDataException("truncated package");
                     }
                     var text = Encoding.UTF8.GetString(body, 0, (int)size);
-                    paths.Add(text.Split('\n')[0].Trim());
+                    var guid = name.StartsWith("./") ? name.Substring(2) : name;
+                    paths.Add((guid.Split('/')[0], text.Split('\n')[0].Trim()));
                 }
                 else
                 {
