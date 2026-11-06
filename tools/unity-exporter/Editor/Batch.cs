@@ -72,10 +72,16 @@ namespace Civbb.Exporter
                     return;
                 }
                 var output = Arg("-civbbOut") ?? throw new ArgumentException("missing -civbbOut");
+                // `Base=<controller>;FX=<controller>` fills the animator's layer groups in order (ADR 0041) until
+                // the avatar descriptor is read (#37).
+                var layers = (Arg("-civbbLayers") ?? "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(l => l.Split(new[] { '=' }, 2))
+                    .Select(p => p.Length == 2 ? (p[0].Trim(), p[1].Trim()) : throw new ArgumentException($"bad -civbbLayers entry {p[0]}"))
+                    .ToList();
                 var root = PrefabUtility.LoadPrefabContents(avatar);
                 try
                 {
-                    var (glb, report) = Glb.Write(root);
+                    var (glb, report) = Glb.Write(root, layers);
                     File.WriteAllBytes(output, glb);
                     Debug.Log($"CIVBB exported {avatar} to {output}: {report}");
                 }

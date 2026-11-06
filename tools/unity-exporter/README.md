@@ -7,9 +7,14 @@ links no VRChat SDK code.
 - `Editor/Batch.cs`: batch entry points `Civbb.Exporter.Batch.Import` and `Civbb.Exporter.Batch.Export`.
 - `Editor/UnityPackage.cs`: lists a `.unitypackage`'s asset paths so the import step can refuse packages with code.
 - `Editor/Glb.cs`: the GLB writer: nodes, meshes, skins, morph targets, materials, textures, `X_avatar.humanoid`.
+- `Editor/AnimatorExport.cs`: animator controllers and clips as `X_animator` (ADR 0041; curves per ADR 0039).
+- `Editor/ConstraintExport.cs`: Unity constraint components as `X_constraints`.
+- `Editor/Json.cs`: JSON text helpers and the X mirror for vectors, rotations and Euler angles.
 
 Status: runs on Unity 6000.3.28f1. All 13 humanoid prefabs of the five Booth packages export; meshes, triangles,
-shapes, joints and bind poses match the Blender conversions in `corpus/local/glb/` (comparison on #36).
+shapes, joints and bind poses match the Blender conversions in `corpus/local/glb/` (comparison on #36). Animators
+and Unity constraints export and import; VRChat components (descriptor, PhysBones, contacts, VRChat constraints,
+state behaviours) need the VRChat SDK in the host project (#37).
 
 ## Install
 
@@ -32,8 +37,11 @@ callback:
 ```
 "$(unity editors path 6000.3.28f1)/Editor/Unity.exe" -batchmode -nographics -projectPath D:/Documents/Repos/CIVBB/corpus/local/unity-export -logFile <log> -executeMethod Civbb.Exporter.Batch.Import -civbbPackage <abs path>.unitypackage
 unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export
-unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export -civbbAvatar Assets/<prefab> -civbbOut <abs path>.glb
+unity run corpus/local/unity-export --no-tail --log-file <log> -- -executeMethod Civbb.Exporter.Batch.Export -civbbAvatar Assets/<prefab> -civbbOut <abs path>.glb [-civbbLayers "Base=Assets/<controller>;Gesture=...;FX=..."]
 ```
+
+`-civbbLayers` names the controllers that fill the animator's layer groups, in order. Until the exporter reads the
+VRChat avatar descriptor (#37), sessions pick them by file name.
 
 Each exits by itself (0, or 1 with `CIVBB failed:` in the log). Check the result with `civbb inspect <glb>`
 next to the Blender conversion in `corpus/local/glb/`.

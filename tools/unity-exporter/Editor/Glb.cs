@@ -1,24 +1,36 @@
 // Writes a prefab's hierarchy as GLB (ADR 0038): nodes, one mesh per renderer with a primitive per submesh, skins,
-// morph targets, materials with their main texture, and the humanoid map as X_avatar.
+// morph targets, materials with their main texture, the humanoid map as X_avatar, and with ADR 0041 the animator
+// (X_animator) and Unity constraints (X_constraints).
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
+using static Civbb.Exporter.Json;
 
 namespace Civbb.Exporter
 {
     public static class Glb
     {
-        /// The GLB bytes and a one-line summary of what went in.
-        public static (byte[] glb, string report) Write(GameObject root)
+        /// The GLB bytes and a one-line summary of what went in. `layers` names the controllers that fill the
+        /// animator's layer groups, in order (`Base=<asset path>`); empty writes no animator.
+        public static (byte[] glb, string report) Write(GameObject root, IList<(string group, string path)> layers)
         {
             var w = new Writer();
             w.Run(root.transform);
-            return (w.Finish(), w.Report());
+            var animator = AnimatorExport.Write(root.transform, layers);
+            if (animator.json != null)
+            {
+                w.extensions["X_animator"] = animator.json;
+            }
+            var constraints = ConstraintExport.Write(root.transform, w.NodeIndex);
+            if (constraints.json != null)
+            {
+                w.extensions["X_constraints"] = constraints.json;
+            }
+            return (w.Finish(), $"{w.Report()}; {animator.report}; {constraints.report}");
         }
 
         sealed class Writer
@@ -33,7 +45,7 @@ namespace Civbb.Exporter
             readonly Dictionary<Transform, int> nodeIndex = new Dictionary<Transform, int>();
             readonly Dictionary<Material, int> materialIndex = new Dictionary<Material, int>();
             readonly Dictionary<string, int> textureIndex = new Dictionary<string, int>();
-            string humanoid;
+            public readonly SortedDictionary<string, string> extensions = new SortedDictionary<string, string>();
             int primitives, vertices, triangles, shapes, multiFrameShapes, skippedTextures, skippedSubmeshes,
                 extraMaterials, missingBones, humanBones;
 
@@ -400,8 +412,11 @@ namespace Civbb.Exporter
                     }
                 }
                 humanBones = entries.Count;
-                humanoid = $"{{\"humanoid\":{{{string.Join(",", entries)}}}}}";
+                extensions["X_avatar"] = $"{{\"humanoid\":{{{string.Join(",", entries)}}}}}";
             }
+
+            /// The glTF node of a transform in the prefab, or -1.
+            public int NodeIndex(Transform t) => t != null && nodeIndex.TryGetValue(t, out int i) ? i : -1;
 
             string Vec3(Vector3[] a, bool bounds)
             {
@@ -449,9 +464,9 @@ namespace Civbb.Exporter
                     bin.WriteByte(0);
                 }
                 var json = new StringBuilder("{\"asset\":{\"version\":\"2.0\",\"generator\":\"civbb-unity-exporter\"}");
-                if (humanoid != null)
+                if (extensions.Count > 0)
                 {
-                    json.Append(",\"extensionsUsed\":[\"X_avatar\"]");
+                    json.Append(",\"extensionsUsed\":[").Append(string.Join(",", extensions.Keys.Select(Str))).Append(']');
                 }
                 json.Append(",\"scene\":0,\"scenes\":[{\"nodes\":[0]}]");
                 Array(json, "nodes", nodes);
@@ -466,9 +481,10 @@ namespace Civbb.Exporter
                 {
                     json.Append(",\"buffers\":[{\"byteLength\":").Append(bin.Length).Append("}]");
                 }
-                if (humanoid != null)
+                if (extensions.Count > 0)
                 {
-                    json.Append(",\"extensions\":{\"X_avatar\":").Append(humanoid).Append('}');
+                    json.Append(",\"extensions\":{")
+                        .Append(string.Join(",", extensions.Select(e => $"{Str(e.Key)}:{e.Value}"))).Append('}');
                 }
                 json.Append('}');
                 var jsonBytes = Encoding.UTF8.GetBytes(json.ToString());
@@ -518,37 +534,6 @@ namespace Civbb.Exporter
                 var b = new byte[f.Length * 4];
                 Buffer.BlockCopy(f, 0, b, 0, b.Length);
                 return b;
-            }
-
-            static string Num(float f)
-            {
-                return float.IsFinite(f) ? f.ToString("R", CultureInfo.InvariantCulture) : "0";
-            }
-
-            static string Nums(params float[] f)
-            {
-                return "[" + string.Join(",", f.Select(Num)) + "]";
-            }
-
-            static string Str(string s)
-            {
-                var sb = new StringBuilder("\"");
-                foreach (var c in s ?? "")
-                {
-                    if (c == '"' || c == '\\')
-                    {
-                        sb.Append('\\').Append(c);
-                    }
-                    else if (c < 0x20)
-                    {
-                        sb.Append("\\u").Append(((int)c).ToString("x4"));
-                    }
-                    else
-                    {
-                        sb.Append(c);
-                    }
-                }
-                return sb.Append('"').ToString();
             }
         }
     }
