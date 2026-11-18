@@ -13,12 +13,22 @@ CIVBB is a social VR platform on a custom Rust + Vulkan engine. The product spec
 
 - Take the lowest-numbered open issue in the current milestone unless STATUS.md says otherwise. Comment on the issue when you start if the work spans sessions.
 - Trunk-based: small commits straight to `main`, message `area: what (#N)`; use `Closes #N` in the commit that finishes an issue.
-- Gate before every commit: `cargo xtask ci` (fmt, clippy `-D warnings`, tests, arch rules, code map freshness). Never commit red.
+- Gate before every commit: `cargo fmt --all && cargo xtask ci` (fmt, clippy `-D warnings`, tests, arch rules, code map freshness). Never commit red.
 - New file: start it with a `//!` line saying its one job (the code map uses it). New crate: `description` in Cargo.toml, a `README.md`, and a layer in `tools/xtask/src/main.rs`.
 - A decision the design doc doesn't make, or a deviation from it: write an ADR in `docs/adr/` (copy `0000-template.md`). ADRs are not edited after acceptance; supersede them.
 - Found work outside the current issue: open an issue with labels and milestone, don't do it now.
 - Something the human must do (install, hardware test, licence call): open an issue labelled `needs-user` and list it in STATUS.md.
-- Sessions may run Unity themselves (batch mode via `unity run`, or the Editor binary from `unity editors path` for play-mode methods; `LESSONS-unity.md`) on projects inside this repo. Never drive an Editor the human has open on another project.
+- Sessions may run Unity themselves (`tools/unity-batch.sh`, below; `LESSONS-unity.md`) on projects inside this repo. Never drive an Editor the human has open on another project.
+
+## How to iterate
+
+Use these helpers, not raw cargo or Unity command lines: each prints one line on success and only the relevant errors on failure.
+
+- Build: `cargo build --workspace` (dev profile: workspace crates at opt-level 1, dependencies at 2). `--release` only for timings.
+- Quick test: `cargo xtask test` (crates changed since `HEAD` and their dependents). One test file: `cargo test -p <crate> --test <file> --quiet`.
+- Full test, before every commit: `cargo fmt --all && cargo xtask ci` (~20 s warm).
+- Unity: `tools/unity-batch.sh <project> <Class.Method> [args]` (the method must exit itself; `Muscles.Record` still needs `unity run`). Grep the log it names only when you need more.
+- Edit with the Edit tool, not Python heredocs (escape bugs, LESSONS.md); read big files by range (`grep -n`, then Read with an offset).
 
 ## End of every session (always, even when stopping early)
 

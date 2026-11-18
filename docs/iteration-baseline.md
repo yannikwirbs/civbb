@@ -89,4 +89,25 @@ per test binary plus cargo's `Checking` lines.
 
 ## Changes
 
-Filled in as each change is kept or reverted.
+Kept, each in its own commit with the numbers in the message. Times are warm unless marked clean.
+
+| change | before | after |
+| --- | --- | --- |
+| Workspace crates at opt-level 1 in dev builds (`Cargo.toml`) | full tests 82.1 s; gate 88.0 s; incremental format 18.4 s, pipeline 6.5 s; clean 119 s | full tests 13.9 s; gate 22.6 s; incremental format 13.1 s, pipeline 4.9 s; clean 119 s |
+| Session state split by read frequency (ADR 0044) | 70,190 B (~17,500 tokens) read at session start | 15,938 B (~4,000 tokens); 24,795 B (~6,200) with the current area's STATE section and topic lessons |
+| `cargo xtask ci` prints one line, failures filtered | passing gate 7,121 B; one failing test 1,828 B | 93 B; 493 B |
+| `cargo xtask test`: changed crates and dependents only | `cargo test --workspace --quiet` after a pipeline change 17.7 s, 6,235 B | 11.2 s, 72 B (anim or format change: same time ±1 s, 97 to 162 B) |
+| `tools/unity-batch.sh` | per Unity run: 344 B command, ~4,000 B log grep | 79 B command, 143 B summary |
+| CLAUDE.md "How to iterate", PATH prefix step dropped (`cargo` is on PATH) | ~90 `export PATH=...` prefixes per 10 sessions | none required |
+
+Measured and reverted:
+
+| change | before | after |
+| --- | --- | --- |
+| `debug = "line-tables-only"` in dev builds | incremental format 13.1 s, pipeline 4.9 s; clean 119 s | 13.6 s, 5.3 s; clean 154 s |
+| `rust-lld` instead of MSVC `link.exe` | incremental format 13.1 s, pipeline 4.9 s | 16.3 s, 6.0 s |
+
+Not pursued: merging each crate's integration tests into one binary. After a format change the 44 test targets
+take 149 of 186 CPU seconds, but they link in parallel; the wall-time path is the pipeline library (7.0 s) and then
+one test binary (at most 6.7 s), which merging would not shorten. The slowest test is now
+`parity::bloated_compiled_matches_its_import_in_every_state` at 6.5 s (GPU with validation in debug builds).
