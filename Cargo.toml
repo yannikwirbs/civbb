@@ -26,6 +26,11 @@ civbb-format = { path = "crates/format" }
 civbb-render = { path = "crates/render" }
 civbb-corpus = { path = "tools/corpus" }
 
+# Workspace crates at opt-level 1 in dev builds: the stage tests step and skin avatars on the CPU (full test run 82 s
+# at opt-level 0, 19 s at 1), and incremental builds get faster too. Debug assertions and overflow checks stay on.
+[profile.dev]
+opt-level = 1
+
 # Optimise dependencies in dev builds: crypto, decoding and later the renderer are unusably slow at opt-level 0.
 [profile.dev.package."*"]
 opt-level = 2
