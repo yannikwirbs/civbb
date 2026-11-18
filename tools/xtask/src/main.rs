@@ -1,6 +1,7 @@
-//! Repo automation: `cargo xtask ci | arch | codemap [--check] | shaders [--check]`.
+//! Repo automation: `cargo xtask ci | test | arch | codemap [--check] | shaders [--check]`.
 //!
 //! - `ci`: the full local gate (fmt, clippy, tests, arch rules, fresh code map and shaders). Run before every commit.
+//! - `test`: tests only the crates changed since `HEAD` and the crates that depend on them; the quick check.
 //! - `arch`: enforces the crate dependency rules from design doc §21.
 //! - `codemap`: regenerates `docs/ai/CODEMAP.md`; `--check` fails if it is stale or a file lacks a module doc.
 //! - `shaders`: compiles `crates/*/shaders/*.slang` to committed SPIR-V with `slangc` (`$VULKAN_SDK/Bin` or PATH);
@@ -36,14 +37,15 @@ fn main() -> ExitCode {
     let check = args.iter().any(|a| a == "--check");
     let result = match args.first().map(String::as_str) {
         Some("ci") => ci(),
+        Some("test") => test(),
         Some("arch") => arch(),
         Some("codemap") => codemap(check),
         Some("shaders") => shaders(check),
-        _ => Err("usage: cargo xtask <ci|arch|codemap [--check]|shaders [--check]>".into()),
+        _ => Err("usage: cargo xtask <ci|test|arch|codemap [--check]|shaders [--check]>".into()),
     };
     match result {
         Ok(()) => {
-            if args.first().is_some_and(|a| a != "ci") {
+            if args.first().is_some_and(|a| a != "ci" && a != "test") {
                 eprintln!("xtask: {} ok", args.join(" "));
             }
             ExitCode::SUCCESS
@@ -139,6 +141,59 @@ fn test_totals(text: &str) -> String {
     format!("{passed} passed, {ignored} ignored")
 }
 
+/// Tests the crates changed since `HEAD` (tracked or untracked files) and every crate whose tests depend on them.
+fn test() -> Result<(), String> {
+    let start = std::time::Instant::now();
+    let status = quiet("git", &["status", "--porcelain", "--untracked-files=all"])?;
+    // Porcelain lines are `XY path` or `XY old -> new`; the path that exists now is last.
+    let changed: Vec<&str> = status
+        .lines()
+        .filter_map(|l| l.get(3..))
+        .map(|p| p.rsplit(" -> ").next().unwrap_or(p).trim_matches('"'))
+        .collect();
+    let pkgs = packages()?;
+    let everything = changed
+        .iter()
+        .any(|p| matches!(*p, "Cargo.toml" | "Cargo.lock") || p.starts_with(".cargo/"));
+    let mut hit: Vec<&str> = pkgs
+        .iter()
+        .filter(|p| {
+            let dir = rel(&p.dir) + "/";
+            everything || changed.iter().any(|c| c.starts_with(&dir))
+        })
+        .map(|p| p.name.as_str())
+        .collect();
+    loop {
+        let more: Vec<&str> = pkgs
+            .iter()
+            .filter(|p| !hit.contains(&p.name.as_str()))
+            .filter(|p| p.test_deps.iter().any(|d| hit.contains(&d.as_str())))
+            .map(|p| p.name.as_str())
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        hit.extend(more);
+    }
+    if hit.is_empty() {
+        eprintln!("xtask: test: no crate changed since HEAD");
+        return Ok(());
+    }
+    hit.sort_unstable();
+    let mut args = vec!["test", "--quiet"];
+    for name in &hit {
+        args.extend(["-p", name]);
+    }
+    let out = quiet("cargo", &args)?;
+    eprintln!(
+        "xtask: test passed ({}: {}) in {:.0} s",
+        hit.join(" "),
+        test_totals(&out),
+        start.elapsed().as_secs_f32()
+    );
+    Ok(())
+}
+
 fn ci() -> Result<(), String> {
     let start = std::time::Instant::now();
     quiet("cargo", &["fmt", "--all", "--", "--check"])?;
@@ -163,6 +218,8 @@ struct Package {
     description: Option<String>,
     dir: PathBuf,
     internal_deps: Vec<String>,
+    /// Internal dependencies of any kind, dev-dependencies included: whose changes this crate's tests see.
+    test_deps: Vec<String>,
 }
 
 fn packages() -> Result<Vec<Package>, String> {
@@ -178,21 +235,24 @@ fn packages() -> Result<Vec<Package>, String> {
     let mut pkgs = Vec::new();
     for p in meta["packages"].as_array().into_iter().flatten() {
         let manifest = PathBuf::from(p["manifest_path"].as_str().unwrap_or_default());
-        let internal_deps = p["dependencies"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            // Dev-dependencies may cross layers (tests), normal and build deps may not.
-            .filter(|d| d["kind"].as_str() != Some("dev"))
-            .filter_map(|d| d["name"].as_str())
-            .filter(|n| n.starts_with("civbb-"))
-            .map(str::to_owned)
-            .collect();
+        let deps = |dev: bool| {
+            p["dependencies"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|d| dev || d["kind"].as_str() != Some("dev"))
+                .filter_map(|d| d["name"].as_str())
+                .filter(|n| n.starts_with("civbb-"))
+                .map(str::to_owned)
+                .collect()
+        };
         pkgs.push(Package {
             name: p["name"].as_str().unwrap_or_default().to_owned(),
             description: p["description"].as_str().map(str::to_owned),
             dir: manifest.parent().map(Path::to_path_buf).unwrap_or_default(),
-            internal_deps,
+            // Dev-dependencies may cross layers (tests), normal and build deps may not.
+            internal_deps: deps(false),
+            test_deps: deps(true),
         });
     }
     pkgs.sort_by(|a, b| a.dir.cmp(&b.dir));

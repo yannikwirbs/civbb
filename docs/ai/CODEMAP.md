@@ -176,7 +176,7 @@ Repo automation: CI gate, architecture rules, code map.
 
 Internal deps: none
 
-- `src/main.rs`: Repo automation: `cargo xtask ci | arch | codemap [--check] | shaders [--check]`.
+- `src/main.rs`: Repo automation: `cargo xtask ci | test | arch | codemap [--check] | shaders [--check]`.
 
 ## Docs
 
