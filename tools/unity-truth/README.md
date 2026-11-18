@@ -14,6 +14,11 @@ A minimal Unity project that records Unity's behaviour as JSON test data (ADR 00
   `corpus/local/unity-glb/<name>.glb`; `crates/pipeline/tests/unity_export.rs` compares them. Run like
   `Constraints.Record` (play mode, no `-quit`): `-executeMethod Exported.Record -civbbAvatar Assets/<prefab>
   -civbbClips "<clip>;<clip>" -civbbOut <abs path>.json`.
+- `Assets/Editor/VrcConstraints.cs`: the VRChat SDK's constraint runtime (#75, ADR 0046): generated cases with
+  Solve In Local Space, Freeze To World and Rebake Offsets When Unfrozen, ten frames each. It needs the SDK, so
+  copy it into `corpus/local/unity-export-vrc/Assets/Editor` and run it there; it reaches the SDK only by reflection
+  and the cases hold no third-party data, so the output is committed:
+  `tools/unity-batch.sh corpus/local/unity-export-vrc VrcConstraints.Record -civbbOut <abs path>/crates/anim/tests/unity/vrc_constraints.json`.
 
 `unity run` picks the editor pinned in `ProjectSettings/ProjectVersion.txt`. It always adds `-quit`, so
 `Constraints.Record` needs the Editor binary itself:

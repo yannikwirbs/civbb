@@ -410,13 +410,7 @@ namespace Civbb.Exporter
                     Skip($"VRC{kind}Constraint");
                 }
             }
-            int rebake = 0;
-            foreach (var c in root.GetComponentsInChildren<Component>(true).Where(c => c != null && c.GetType().FullName.StartsWith(DynamicsNs + "Constraint.")))
-            {
-                var p = new SerializedObject(c).FindProperty("RebakeOffsetsWhenUnfrozen");
-                rebake += p != null && p.boolValue ? 1 : 0;
-            }
-            notes.Add($"{list.Count} VRChat constraints ({rebake} rebake offsets when unfrozen, #73)");
+            notes.Add($"{list.Count} VRChat constraints");
             return list;
         }
 
@@ -477,7 +471,7 @@ namespace Civbb.Exporter
             return $"{{\"kind\":{json},\"target\":{target},\"sources\":[{string.Join(",", parts)}]," +
                 $"\"weight\":{Num(P(so, "GlobalWeight").floatValue)},\"active\":{Bool(P(so, "IsActive").boolValue)},\"axes\":{axes}," +
                 $"\"rest\":{rest},\"options\":{{\"local_space\":{Bool(P(so, "SolveInLocalSpace").boolValue)}," +
-                $"\"freeze\":{Bool(P(so, "FreezeToWorld").boolValue)}}}}}";
+                $"\"freeze\":{Bool(P(so, "FreezeToWorld").boolValue)},\"rebake\":{Bool(P(so, "RebakeOffsetsWhenUnfrozen").boolValue)}}}}}";
         }
 
         /// Counts VRChat components this exporter does not carry (head chops, audio, station, ...).

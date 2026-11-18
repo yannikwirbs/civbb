@@ -1,6 +1,6 @@
 //! Constraints (ADR 0018): every case recorded from Unity's constraints (`tests/unity/constraints.json`), and
 //! hand-derived dependency order, ties, cycles, inactive constraints and subtree updates; animated values, Solve In
-//! Local Space and Freeze To World per island (ADR 0040).
+//! Local Space and Freeze To World per island (ADR 0040, 0046; `tests/vrc_constraint.rs` has the SDK recordings).
 
 use civbb_anim::Constraints;
 use civbb_anim::constraint::Scratch;
@@ -367,30 +367,30 @@ fn freeze_to_world_holds_the_world_placement_until_unfrozen() {
     });
     let d = |f: usize| got[f][4];
     assert_eq!(d(0), [1.0, 0.0, -3.0]);
-    // Frozen at A's world (1, 0, 0) on the frame it freezes, and held there while C and A move.
-    assert_eq!(d(1), [1.0, 0.0, -3.0]);
-    assert_eq!(d(2), [-4.0, 0.0, -3.0]);
-    assert_eq!(d(3), [-4.0, 0.0, -3.0]);
+    // On the frame it freezes D stays as animated, at world (0, 1, 3) (ADR 0046), and is held there while C and A
+    // move.
+    assert_eq!(d(1), [0.0, 1.0, 0.0]);
+    assert_eq!(d(2), [-5.0, 1.0, 0.0]);
+    assert_eq!(d(3), [-5.0, 1.0, 0.0]);
     // Unfrozen: follows A again, at (7, 0, 0) world.
     assert_eq!(d(4), [2.0, 0.0, -3.0]);
 }
 
 #[test]
-fn an_inactive_constraint_drops_its_frozen_placement() {
+fn an_inactive_constraint_keeps_its_frozen_placement() {
     let mut c = position(1, 2);
     c.options.freeze = true;
     let a = avatar(vec![c]);
-    // Frozen at B from the start; B moves from frame 1; the constraint is off on frame 2 and on again from frame 3.
+    // A, animated to (1 + f, 0, 0), is frozen from the start; the constraint is off on frame 2 and on again from
+    // frame 3 (ADR 0046).
     let got = frames(&a, 4, |f, c, s, l| {
-        if f >= 1 {
-            l[2].translation = [0.0, 4.0, 0.0];
-        }
+        l[1].translation = [1.0 + f as f32, 0.0, 0.0];
         c.set(s, 0, ConstraintField::Active, if f == 2 { 0.0 } else { 1.0 });
     });
     let a_at = |f: usize| got[f][1];
-    assert_eq!(a_at(0), [0.0, 2.0, 0.0]);
-    assert_eq!(a_at(1), [0.0, 2.0, 0.0]);
-    assert_eq!(a_at(2), [1.0, 0.0, 0.0]);
-    // Frozen again where B is now, not where it froze first.
-    assert_eq!(a_at(3), [0.0, 4.0, 0.0]);
+    assert_eq!(a_at(0), [1.0, 0.0, 0.0]);
+    assert_eq!(a_at(1), [1.0, 0.0, 0.0]);
+    assert_eq!(a_at(2), [3.0, 0.0, 0.0]);
+    // Held where it froze first, not frozen again where it is animated now.
+    assert_eq!(a_at(3), [1.0, 0.0, 0.0]);
 }

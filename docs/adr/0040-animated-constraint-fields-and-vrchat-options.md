@@ -1,6 +1,6 @@
 # 0040: Clips animate constraint weights, activity and freezing per island; VRChat's local-space and freeze options (format v9)
 
-Status: accepted
+Status: accepted; capture frame and rebaking (points 5 and 6) superseded by 0046
 Date: 2026-11-05
 
 ## Context

@@ -30,6 +30,7 @@ Internal deps: civbb-core, civbb-format
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
 - `tests/material.rs`: Material curves (ADR 0025): Unity property names to native fields, Unity's units (sRGB colours, smoothness, V-up
 - `tests/muscle.rs`: Humanoid muscles (ADR 0014): the table against Unity's, hand-derived muscle space, poses recorded from Unity's
+- `tests/vrc_constraint.rs`: VRChat constraint options (ADR 0040, #73): every case recorded from the VRChat SDK's own constraint runtime
 
 ## `crates/client` (civbb-client)
 
@@ -227,6 +228,7 @@ Internal deps: none
 - `docs/adr/0043-toon-materials-from-saved-unity-properties.md`: 0043: X_toon_material carries Unity's saved material; the importer fingerprints the shader and maps it
 - `docs/adr/0044-session-state-split-by-read-frequency.md`: 0044: Session state is split by how often it is read
 - `docs/adr/0045-pinned-rust-toolchain.md`: 0045: One pinned Rust toolchain for this machine and CI
+- `docs/adr/0046-vrchat-constraint-options-from-the-sdk-runtime.md`: 0046: VRChat constraint options follow the SDK's own runtime: freeze capture, rebaking, scale offsets (format v10)
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

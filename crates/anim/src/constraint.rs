@@ -38,13 +38,39 @@ pub struct Scratch {
     frozen: Vec<Option<Place>>,
 }
 
-/// What clips animate on one constraint.
+/// What clips animate on one constraint, and its offsets once rebaked (ADR 0046).
 #[derive(Clone, Debug, PartialEq)]
 struct Live {
     weight: f32,
     active: bool,
     freeze: bool,
     sources: Vec<f32>,
+    offsets: Offsets,
+}
+
+/// A constraint's offsets: its kind's offset (position, Euler degrees or scale factor; zero for the others) and its
+/// sources' parent offsets.
+#[derive(Clone, Debug, PartialEq)]
+struct Offsets {
+    kind: Vec3,
+    sources: Vec<Transform>,
+}
+
+impl Offsets {
+    fn of(c: &Constraint) -> Self {
+        let kind = match c.kind {
+            ConstraintKind::Position { offset }
+            | ConstraintKind::Rotation { offset }
+            | ConstraintKind::Scale { offset }
+            | ConstraintKind::Aim { offset, .. }
+            | ConstraintKind::LookAt { offset, .. } => offset,
+            _ => [0.0; 3],
+        };
+        Self {
+            kind,
+            sources: c.sources.iter().map(|s| s.offset).collect(),
+        }
+    }
 }
 
 impl Constraints {
@@ -170,6 +196,7 @@ impl Constraints {
                     active: c.active,
                     freeze: c.options.freeze,
                     sources: c.sources.iter().map(|s| s.weight).collect(),
+                    offsets: Offsets::of(c),
                 })
                 .collect();
             scratch.frozen = vec![None; self.list.len()];
@@ -195,21 +222,35 @@ impl Constraints {
         for (k, (c, below)) in self.list.iter().zip(&self.below).enumerate() {
             let t = c.target as usize;
             let parent = self.parents[t].map_or(Place::IDENTITY, |p| world[p as usize]);
-            let l = &live[k];
-            let solved = if !l.active {
-                None
-            } else if c.options.local_space {
-                // The sources' local values, written as the target's local value.
-                let local = |n: NodeIndex| Place::of(&locals[n as usize]);
-                solve(c, l, &local, &Place::IDENTITY, locals, &self.rests)
+            let local = |n: NodeIndex| Place::of(&locals[n as usize]);
+            let in_world = |n: NodeIndex| world[n as usize];
+            // The sources' local values, written as the target's local value, for Solve In Local Space.
+            let (read, space): (&dyn Fn(NodeIndex) -> Place, Place) = if c.options.local_space {
+                (&local, Place::IDENTITY)
             } else {
-                solve(c, l, &|n| world[n as usize], &parent, locals, &self.rests)
+                (&in_world, parent)
+            };
+            let l = &mut live[k];
+            // Unfreezing: the placement is dropped and, with rebaking, the offsets that keep the target where it is
+            // now replace the old ones on this island.
+            if !l.freeze
+                && frozen[k].take().is_some()
+                && l.active
+                && c.options.rebake
+                && let Some(offsets) = bake(c, l, read, &space, &locals[t])
+            {
+                l.offsets = offsets;
+            }
+            let l = &live[k];
+            let solved = if l.active {
+                solve(c, l, read, &space, locals, &self.rests)
+            } else {
+                None
             };
             let new = if l.active && l.freeze {
-                let held = *frozen[k].get_or_insert_with(|| parent.then(solved.as_ref().unwrap_or(&locals[t])));
+                let held = *frozen[k].get_or_insert_with(|| parent.then(&locals[t]));
                 Some(hold(c, &parent, &held, &locals[t]))
             } else {
-                frozen[k] = None;
                 solved
             };
             let Some(new) = new else {
@@ -311,39 +352,36 @@ fn solve(
             .zip(&l.sources)
             .map(|(s, sw)| (place(s.node), sw.max(0.0)))
     };
-    let average = |points: &mut dyn Iterator<Item = (Vec3, f32)>| {
-        let sum = points.fold([0.0; 3], |acc, (p, sw)| add(acc, scale(p, sw)));
-        scale(sum, 1.0 / total)
-    };
+    let average = |points: &mut dyn Iterator<Item = (Vec3, f32)>| mean(points, total);
     let local_rotation = |q: Quat, offset: Vec3| mul(mul(conj(parent.rot), q), euler_to_quat(offset));
     // The rotation a constraint gives, weighted from rest, with unconstrained axes left as animated.
     let rotated = |q: Quat, axes: [bool; 3]| pick_rotation(axes, nlerp(c.rest.rotation, q, w), cur.rotation);
     let me = parent.then(cur).pos;
+    let offset = l.offsets.kind;
 
     match c.kind {
-        ConstraintKind::Position { offset } => {
+        ConstraintKind::Position { .. } => {
             let p = average(&mut weighted().map(|(s, sw)| (s.pos, sw)));
             let local = add(parent.local_point(p, cur.translation), offset);
             out.translation = pick(c.axes, lerp(c.rest.translation, local, w), cur.translation);
         }
-        ConstraintKind::Rotation { offset } => {
+        ConstraintKind::Rotation { .. } => {
             let q = blend(&mut weighted().map(|(s, sw)| (s.rot, sw)), total);
             out.rotation = rotated(local_rotation(q, offset), c.axes);
         }
-        ConstraintKind::Scale { offset } => {
-            let log = weighted().fold([0.0; 3], |acc, (s, sw)| {
-                add(acc, scale(s.scale.map(|x| x.max(f32::MIN_POSITIVE).ln()), sw))
-            });
-            let world_scale = scale(log, 1.0 / total).map(f32::exp);
-            let local = mul3(div3(world_scale, parent.scale, cur.scale), offset);
+        ConstraintKind::Scale { .. } => {
+            let local = mul3(
+                div3(mean_scale(&mut weighted(), total), parent.scale, cur.scale),
+                scaled(l, offset),
+            );
             out.scale = pick(c.axes, lerp(c.rest.scale, local, w), cur.scale);
         }
         ConstraintKind::Parent { rotation_axes } => {
             let held = || {
-                c.sources.iter().zip(&l.sources).map(|(s, sw)| {
+                (c.sources.iter().zip(&l.sources).zip(&l.offsets.sources)).map(|((s, sw), o)| {
                     let p = place(s.node);
-                    let pos = add(p.pos, rotate(p.rot, s.offset.translation));
-                    (pos, mul(p.rot, s.offset.rotation), sw.max(0.0))
+                    let pos = add(p.pos, rotate(p.rot, o.translation));
+                    (pos, mul(p.rot, o.rotation), sw.max(0.0))
                 })
             };
             let p = average(&mut held().map(|(pos, _, sw)| (pos, sw)));
@@ -352,33 +390,15 @@ fn solve(
             out.translation = pick(c.axes, lerp(c.rest.translation, local, w), cur.translation);
             out.rotation = rotated(local_rotation(q, [0.0; 3]), rotation_axes);
         }
-        ConstraintKind::Aim {
-            offset,
-            aim_axis,
-            up_axis,
-            world_up,
-        } => {
+        ConstraintKind::Aim { .. } | ConstraintKind::LookAt { .. } => {
             let goal = average(&mut weighted().map(|(s, sw)| (s.pos, sw)));
-            let up = match world_up {
-                WorldUp::SceneUp => Some([0.0, 1.0, 0.0]),
-                WorldUp::Vector(v) => Some(v),
-                WorldUp::ObjectUp(n) => Some(sub(place(n).pos, me)),
-                WorldUp::ObjectRotationUp(n, v) => Some(rotate(place(n).rot, v)),
-                WorldUp::None => None,
+            let q = aimed(&c.kind, place, me, goal)?;
+            let axes = if matches!(c.kind, ConstraintKind::Aim { .. }) {
+                c.axes
+            } else {
+                [true; 3]
             };
-            let q = aim(aim_axis, up_axis, sub(goal, me), up)?;
-            out.rotation = rotated(local_rotation(q, offset), c.axes);
-        }
-        ConstraintKind::LookAt {
-            offset,
-            roll,
-            world_up_node,
-        } => {
-            let goal = average(&mut weighted().map(|(s, sw)| (s.pos, sw)));
-            let up = world_up_node.map_or([0.0, 1.0, 0.0], |n| sub(place(n).pos, me));
-            let q = aim([0.0, 0.0, 1.0], [0.0, 1.0, 0.0], sub(goal, me), Some(up))?;
-            let q = mul(q, euler_to_quat([0.0, 0.0, -roll]));
-            out.rotation = rotated(local_rotation(q, offset), [true; 3]);
+            out.rotation = rotated(local_rotation(q, offset), axes);
         }
         ConstraintKind::RestRotation | ConstraintKind::RestRoll { .. } => {
             let s = c.sources[0].node as usize;
@@ -403,6 +423,108 @@ fn solve(
         }
     }
     Some(out)
+}
+
+/// Aim and look-at: the world rotation that points from `me` at `goal`, before the offset.
+fn aimed(kind: &ConstraintKind, place: &dyn Fn(NodeIndex) -> Place, me: Vec3, goal: Vec3) -> Option<Quat> {
+    match *kind {
+        ConstraintKind::Aim {
+            aim_axis,
+            up_axis,
+            world_up,
+            ..
+        } => {
+            let up = match world_up {
+                WorldUp::SceneUp => Some([0.0, 1.0, 0.0]),
+                WorldUp::Vector(v) => Some(v),
+                WorldUp::ObjectUp(n) => Some(sub(place(n).pos, me)),
+                WorldUp::ObjectRotationUp(n, v) => Some(rotate(place(n).rot, v)),
+                WorldUp::None => None,
+            };
+            aim(aim_axis, up_axis, sub(goal, me), up)
+        }
+        ConstraintKind::LookAt {
+            roll, world_up_node, ..
+        } => {
+            let up = world_up_node.map_or([0.0, 1.0, 0.0], |n| sub(place(n).pos, me));
+            let q = aim([0.0, 0.0, 1.0], [0.0, 1.0, 0.0], sub(goal, me), Some(up))?;
+            Some(mul(q, euler_to_quat([0.0, 0.0, -roll])))
+        }
+        _ => None,
+    }
+}
+
+/// The offsets with which `c` gives the target its current local values `cur` (*Rebake Offsets When Unfrozen*, ADR
+/// 0046); `None` without source weight or for the VRM kinds. `place` and `parent` as for [`solve`].
+fn bake(
+    c: &Constraint,
+    l: &Live,
+    place: &dyn Fn(NodeIndex) -> Place,
+    parent: &Place,
+    cur: &Transform,
+) -> Option<Offsets> {
+    let total: f32 = l.sources.iter().map(|w| w.max(0.0)).sum();
+    if c.sources.is_empty() || total <= 0.0 {
+        return None;
+    }
+    let weighted = || {
+        c.sources
+            .iter()
+            .zip(&l.sources)
+            .map(|(s, sw)| (place(s.node), sw.max(0.0)))
+    };
+    let goal = || mean(&mut weighted().map(|(s, sw)| (s.pos, sw)), total);
+    let me = parent.then(cur);
+    // The Euler offset that turns world rotation `q` into the target's local rotation.
+    let turn = |q: Quat| quat_to_euler(mul(conj(mul(conj(parent.rot), q)), cur.rotation));
+    let mut out = l.offsets.clone();
+    match c.kind {
+        ConstraintKind::Position { .. } => out.kind = sub(cur.translation, parent.local_point(goal(), cur.translation)),
+        ConstraintKind::Rotation { .. } => out.kind = turn(blend(&mut weighted().map(|(s, sw)| (s.rot, sw)), total)),
+        ConstraintKind::Scale { .. } => {
+            // The SDK divides by the product of the weighted sources' scales, not by their blend.
+            let product = (weighted().filter(|&(_, sw)| sw > 0.0)).fold([1.0; 3], |acc, (s, _)| mul3(acc, s.scale));
+            out.kind = div3(mul3(cur.scale, parent.scale), product, out.kind);
+        }
+        ConstraintKind::Parent { .. } => {
+            // One translation from the sources' mean position, turned into each source's frame.
+            let shift = sub(me.pos, goal());
+            for (o, s) in out.sources.iter_mut().zip(&c.sources) {
+                let p = place(s.node);
+                o.translation = rotate(conj(p.rot), shift);
+                o.rotation = mul(conj(p.rot), me.rot);
+            }
+        }
+        ConstraintKind::Aim { .. } | ConstraintKind::LookAt { .. } => {
+            out.kind = turn(aimed(&c.kind, place, me.pos, goal())?)
+        }
+        _ => return None,
+    }
+    Some(out)
+}
+
+/// The factor a scale offset applies, as recorded from the VRChat SDK (ADR 0046): the offset to the power of the
+/// number of weighted sources over their total weight, plus one per unweighted source when only one has weight. That
+/// is the offset itself for one source of weight 1.
+fn scaled(l: &Live, offset: Vec3) -> Vec3 {
+    let n = (l.sources.iter()).filter(|&&w| w > 0.0).count();
+    let total: f32 = l.sources.iter().map(|w| w.max(0.0)).sum();
+    let zeros = if n == 1 { l.sources.len() - n } else { 0 };
+    offset.map(|f| f.powf(n as f32 / total + zeros as f32))
+}
+
+/// The weighted mean of `points`.
+fn mean(points: &mut dyn Iterator<Item = (Vec3, f32)>, total: f32) -> Vec3 {
+    let sum = points.fold([0.0; 3], |acc, (p, sw)| add(acc, scale(p, sw)));
+    scale(sum, 1.0 / total)
+}
+
+/// The weighted geometric mean of the placements' scales.
+fn mean_scale(places: &mut dyn Iterator<Item = (Place, f32)>, total: f32) -> Vec3 {
+    let log = places.fold([0.0; 3], |acc, (s, sw)| {
+        add(acc, scale(s.scale.map(|x| x.max(f32::MIN_POSITIVE).ln()), sw))
+    });
+    scale(log, 1.0 / total).map(f32::exp)
 }
 
 /// The local transform that keeps a frozen target at `held` (a world placement) on the parts its constraint

@@ -28,13 +28,16 @@ pub struct Constraint {
     pub options: ConstraintOptions,
 }
 
-/// VRChat constraint options Unity's constraints lack (ADR 0040).
+/// VRChat constraint options Unity's constraints lack (ADR 0040, 0046).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ConstraintOptions {
     /// Match the sources' local values instead of their world placements (*Solve In Local Space*).
     pub local_space: bool,
     /// Hold the target where it is in world space, ignoring the sources (*Freeze To World*), at start.
     pub freeze: bool,
+    /// On unfreezing, bake offsets that keep the target where it is (*Rebake Offsets When Unfrozen*, ADR 0046).
+    #[serde(default)]
+    pub rebake: bool,
 }
 
 /// What a clip can animate on a constraint (ADR 0040).
