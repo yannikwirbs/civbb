@@ -226,6 +226,7 @@ Internal deps: none
 - `docs/adr/0042-vrchat-components-in-the-exporter.md`: 0042: The exporter reads VRChat components by field name; X_avatar gains muscle frames and the face
 - `docs/adr/0043-toon-materials-from-saved-unity-properties.md`: 0043: X_toon_material carries Unity's saved material; the importer fingerprints the shader and maps it
 - `docs/adr/0044-session-state-split-by-read-frequency.md`: 0044: Session state is split by how often it is read
+- `docs/adr/0045-pinned-rust-toolchain.md`: 0045: One pinned Rust toolchain for this machine and CI
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

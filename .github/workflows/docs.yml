@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # Installs the toolchain rust-toolchain.toml pins, with its components (ADR 0045).
+      - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - run: cargo xtask arch
       - run: cargo xtask codemap --check

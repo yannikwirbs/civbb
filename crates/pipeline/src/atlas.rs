@@ -178,6 +178,10 @@ pub fn atlas(imported: &mut Imported, max_side: u32) -> Result<Atlased, String> 
             let slot_count = rects[bin[0]].textures.len();
             let mut columns: Vec<(Vec<u32>, u32)> = Vec::new();
             let mut slot_image = Vec::with_capacity(slot_count);
+            #[allow(
+                clippy::needless_range_loop,
+                reason = "`p` picks the same slot in every rect of the bin, not one collection's items"
+            )]
             for p in 0..slot_count {
                 let column: Vec<u32> = bin.iter().map(|&r| rects[r].textures[p]).collect();
                 let index = match columns.iter().find(|(c, _)| *c == column) {

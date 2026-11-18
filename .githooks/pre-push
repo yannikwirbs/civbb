@@ -1,0 +1,4 @@
+#!/bin/sh
+# The gate before every push (CLAUDE.md): fmt, clippy, the full workspace test suite (never only changed crates),
+# arch rules, code map and shaders. Enable once per clone: git config core.hooksPath .githooks
+exec cargo xtask ci

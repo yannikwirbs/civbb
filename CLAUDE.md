@@ -26,7 +26,7 @@ Use these helpers, not raw cargo or Unity command lines: each prints one line on
 
 - Build: `cargo build --workspace` (dev profile: workspace crates at opt-level 1, dependencies at 2). `--release` only for timings.
 - Quick test: `cargo xtask test` (crates changed since `HEAD` and their dependents). One test file: `cargo test -p <crate> --test <file> --quiet`.
-- Full test, before every commit: `cargo fmt --all && cargo xtask ci` (~20 s warm).
+- Full test, before every commit: `cargo fmt --all && cargo xtask ci` (~20 s warm; the whole workspace test suite). `cargo xtask test` never replaces it. `.githooks/pre-push` runs it on every push (once per clone: `git config core.hooksPath .githooks`).
 - Unity: `tools/unity-batch.sh <project> <Class.Method> [args]` (the method must exit itself; `Muscles.Record` still needs `unity run`). Grep the log it names only when you need more.
 - Edit with the Edit tool, not Python heredocs (escape bugs, LESSONS.md); read big files by range (`grep -n`, then Read with an offset).
 
@@ -50,4 +50,4 @@ Use these helpers, not raw cargo or Unity command lines: each prints one line on
 
 ## Environment
 
-Windows 11, PowerShell and Git Bash. i5-12600K (6P+4E), RTX 5070 Ti, 32 GB RAM. This matches the design doc's reference PC. Rust stable MSVC via rustup. Unity 6000.3.28f1 (Personal licence active); never hardcode an Editor path, ask `unity editors` / `unity editors path <version>`. Unity CLI at `C:/Users/xxsay/AppData/Local/Unity/bin/unity.exe`. No VRChat SDK or Creator Companion.
+Windows 11, PowerShell and Git Bash. i5-12600K (6P+4E), RTX 5070 Ti, 32 GB RAM. This matches the design doc's reference PC. Rust MSVC via rustup, version pinned by `rust-toolchain.toml` for this machine and CI (ADR 0045; bump it deliberately). Unity 6000.3.28f1 (Personal licence active); never hardcode an Editor path, ask `unity editors` / `unity editors path <version>`. Unity CLI at `C:/Users/xxsay/AppData/Local/Unity/bin/unity.exe`. No VRChat SDK or Creator Companion.

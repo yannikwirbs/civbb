@@ -1,0 +1,5 @@
+# One toolchain for this machine and CI (ADR 0045): a new stable release must not turn CI red on unchanged code.
+# Bump deliberately: change the version, run `cargo fmt --all && cargo xtask ci`, fix what it reports, commit.
+[toolchain]
+channel = "1.100.0"
+components = ["clippy", "rustfmt"]
