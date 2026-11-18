@@ -1,0 +1,92 @@
+# Iteration baseline
+
+What one iteration (change request, edit, build, test, result) cost before the 2026-11-18 tuning, and what changed.
+Reference PC (i5-12600K, 16 threads, RTX 5070 Ti), Windows 11, Rust stable MSVC, `corpus/local` present. Tokens are
+estimated as bytes / 4.
+
+## Build and test timings
+
+All warm timings in the repo's own `target/`, run alone (nothing else compiling).
+
+| Measurement | Command | Time |
+| --- | --- | --- |
+| Clean build (fresh target dir) | `cargo test --workspace --no-run` | 119 s |
+| No-op build | `cargo test --workspace --no-run` | 4.0 s |
+| Incremental, one line in `crates/format/src/lib.rs` (everything depends on it) | `cargo test --workspace --no-run` | 18.4 s |
+| Incremental, one line in `crates/pipeline/src/report.rs` (a glue crate) | `cargo test --workspace --no-run` | 6.5 s |
+| Incremental, one line in `crates/anim/src/curve.rs` | `cargo build --workspace` | 3.4 s |
+| Full test suite, binaries built | `cargo test --workspace --quiet` | 82.1 s |
+| Smallest run covering one module | `cargo test -p civbb-anim --test curve --quiet` | 5.6 s |
+| Full gate | `cargo xtask ci` | 88.0 s |
+
+The test suite is 45 test binaries; cargo runs them one after another. Three single tests are 67 of the 82 s:
+
+| Test | Time |
+| --- | --- |
+| `civbb-pipeline` `parity::bloated_compiled_matches_its_import_in_every_state` | 25.6 s |
+| `civbb-pipeline` `lod::corpus_avatars_keep_their_look` | 23.2 s |
+| `civbb-pipeline` `merge::corpus_avatars_look_the_same` | 18.4 s |
+| `civbb-pipeline` `lod::local_avatars_keep_their_look` (local data only) | 13.0 s |
+| `civbb-pipeline` `merge::local_avatars_look_the_same` (local data only) | 8.8 s |
+
+They step avatar islands and skin every vertex on the CPU in workspace crates, which the dev profile compiles at
+opt-level 0 (dependencies were already at 2). Experiment with `CARGO_PROFILE_DEV_OPT_LEVEL`: opt-level 1 gave a full
+test run of 19.4 s, opt-level 2 18.7 s at a 14 s slower rebuild of the workspace crates.
+
+## Context loaded per session
+
+Loaded automatically:
+
+| Source | Bytes | ~Tokens |
+| --- | --- | --- |
+| `~/.claude/CLAUDE.md` (global) | 532 | 130 |
+| `CLAUDE.md` (project) | 4,006 | 1,000 |
+| Memory (`MEMORY.md`), rules, imports | none | 0 |
+
+Read by the session protocol in `CLAUDE.md` before any work:
+
+| File | Bytes | ~Tokens |
+| --- | --- | --- |
+| `docs/ai/STATUS.md` (13 KB of it is a per-area narrative of everything built, 6 KB the full session log) | 20,762 | 5,200 |
+| `docs/ai/CODEMAP.md` (read whole) | 21,868 | 5,500 |
+| `docs/ai/LESSONS.md` (77 lessons, any area, no sections) | 21,333 | 5,300 |
+| `docs/ai/NEXT_PROMPT.md` (pasted by the owner) | 2,221 | 550 |
+| Total | 70,190 | 17,500 |
+
+`docs/design-doc.md` (84 KB) is read by section only. `target/`, `corpus/local/` and the Unity `Library/` folders
+are gitignored, so the Grep and Glob tools (ripgrep) already skip them.
+
+## Tool use in the last 10 sessions
+
+From the transcripts under `~/.claude/projects/` (10 sessions, 2026-11-03 to 2026-11-07).
+
+Calls: Bash 1,395, Edit 162, Write 79, Read 67, PowerShell 19, other 13.
+
+Most frequent Bash patterns:
+
+| Pattern | Calls | Note |
+| --- | --- | --- |
+| `python - <<'EOF'` / `'PY'` / `'PYEOF'` heredocs | 190 | mostly file edits by string replace; three lessons record escape bugs from them |
+| `export PATH="$HOME/.cargo/bin:$PATH" && ...` | ~90 | required by CLAUDE.md step 5; `cargo` is on PATH in these shells |
+| `S=<scratchpad>; ...` analysis scripts | ~160 | per-session corpus and Unity analysis |
+| `grep -n` / `sed -n` chains | ~250 | reading code in slices (`sed -n -> sed -n` 86 times in a row) |
+| `gh issue ...`, `gh run list/watch` | ~70 | queue and CI watching |
+| Unity batch runs (`-executeMethod`) | 23 | each rebuilt the editor path, log path and log grep by hand |
+| `cargo test -p ... --test ...` | ~30 | targeted runs between gates |
+
+Tool output by kind (characters, all 10 sessions): ad-hoc Bash 1.44 M, Read 382 K, Unity runs and log greps 179 K,
+`cargo test` 45 K, `gh` 32 K, `git` 11 K, `cargo xtask ci` 3 K.
+
+Session start: in full (non-resumed) sessions the protocol reads put 25 to 60 KB of `docs/ai` into context before
+the first edit (e.g. 59,892 chars in e446bce0, 46,635 in 8d7ced96, 42,149 in 3c85b956).
+
+Largest single outputs (over 15 K characters): `STATUS.md` + `LESSONS.md` read together (24 to 28 K, five
+sessions), `CODEMAP.md` whole (21 K, two sessions), `tools/unity-exporter/Editor/Glb.cs` and `AnimatorExport.cs`
+read whole (26 K each, five times), a Unity import log grep (16 K), per-node debug dumps from a test (16 K).
+
+A passing `cargo xtask ci` prints 281 lines (7.1 KB, ~1,800 tokens): one `running N tests` / `test result` block
+per test binary plus cargo's `Checking` lines.
+
+## Changes
+
+Filled in as each change is kept or reverted.

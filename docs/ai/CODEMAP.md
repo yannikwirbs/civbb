@@ -229,3 +229,4 @@ Internal deps: none
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/STATUS.md`: Status
 - `docs/design-doc.md`: CIVBB — Design Doc
+- `docs/iteration-baseline.md`: Iteration baseline
