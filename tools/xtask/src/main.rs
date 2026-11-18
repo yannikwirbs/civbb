@@ -112,7 +112,18 @@ fn relevant(text: &str) -> String {
         "running ",
         "test result: ok.",
     ];
-    text.lines()
+    // CI sets `CARGO_TERM_COLOR=always`: drop ANSI colour codes (`ESC [ ... m`) so the prefixes match.
+    let mut plain = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' {
+            chars.by_ref().find(|c| c.is_ascii_alphabetic());
+        } else {
+            plain.push(c);
+        }
+    }
+    plain
+        .lines()
         .filter(|l| {
             let t = l.trim();
             // `--quiet` progress: dots, `i` for ignored, and a ` 100/250` counter on long runs.
