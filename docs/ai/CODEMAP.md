@@ -225,8 +225,17 @@ Internal deps: none
 - `docs/adr/0041-source-extensions-are-the-format-model-as-json.md`: 0041: The source package's X_* extensions carry the format model as JSON, with glTF node indices
 - `docs/adr/0042-vrchat-components-in-the-exporter.md`: 0042: The exporter reads VRChat components by field name; X_avatar gains muscle frames and the face
 - `docs/adr/0043-toon-materials-from-saved-unity-properties.md`: 0043: X_toon_material carries Unity's saved material; the importer fingerprints the shader and maps it
+- `docs/adr/0044-session-state-split-by-read-frequency.md`: 0044: Session state is split by how often it is read
+- `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
+- `docs/ai/LESSONS-data.md`: Lessons: avatar data
+- `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
+- `docs/ai/LESSONS-render.md`: Lessons: renderer and viewer
+- `docs/ai/LESSONS-textures.md`: Lessons: textures
+- `docs/ai/LESSONS-unity.md`: Lessons: Unity
 - `docs/ai/LESSONS.md`: Lessons
 - `docs/ai/NEXT_PROMPT.md`: Next prompt
+- `docs/ai/SESSIONS.md`: Sessions
+- `docs/ai/STATE.md`: State
 - `docs/ai/STATUS.md`: Status
 - `docs/design-doc.md`: CIVBB — Design Doc
 - `docs/iteration-baseline.md`: Iteration baseline

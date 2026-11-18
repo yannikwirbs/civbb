@@ -4,11 +4,10 @@ CIVBB is a social VR platform on a custom Rust + Vulkan engine. The product spec
 
 ## Start of every session
 
-1. Read `docs/ai/STATUS.md`: current milestone, focus, blockers, last session.
-2. Read `docs/ai/CODEMAP.md` instead of walking the tree. Open a file only when you need its contents.
-3. Read `docs/ai/LESSONS.md` (environment gotchas and past mistakes).
+1. Read `docs/ai/STATUS.md` (milestone, focus, blockers, last sessions) and `docs/ai/LESSONS.md` (general gotchas).
+2. Before working in an area, read its section of `docs/ai/STATE.md` (what exists there) and its topic file `docs/ai/LESSONS-<topic>.md` (listed in LESSONS.md).
+3. Find code with `grep -n <word> docs/ai/CODEMAP.md` (one line per file: its job) instead of walking the tree or reading the whole map. Open a file only when you need its contents.
 4. Get the queue: `gh issue list --repo yannikwirbs/civbb --milestone "<current milestone>" --state open`.
-5. Rust tools may not be on PATH in Git Bash: prefix commands with `export PATH="$HOME/.cargo/bin:$PATH" &&`.
 
 ## Working loop
 
@@ -19,13 +18,13 @@ CIVBB is a social VR platform on a custom Rust + Vulkan engine. The product spec
 - A decision the design doc doesn't make, or a deviation from it: write an ADR in `docs/adr/` (copy `0000-template.md`). ADRs are not edited after acceptance; supersede them.
 - Found work outside the current issue: open an issue with labels and milestone, don't do it now.
 - Something the human must do (install, hardware test, licence call): open an issue labelled `needs-user` and list it in STATUS.md.
-- Sessions may run Unity themselves (batch mode via `unity run`, or the Editor binary from `unity editors path` for play-mode methods; LESSONS) on projects inside this repo. Never drive an Editor the human has open on another project.
+- Sessions may run Unity themselves (batch mode via `unity run`, or the Editor binary from `unity editors path` for play-mode methods; `LESSONS-unity.md`) on projects inside this repo. Never drive an Editor the human has open on another project.
 
 ## End of every session (always, even when stopping early)
 
 1. `cargo xtask codemap`, then `cargo xtask ci`.
-2. Update `docs/ai/STATUS.md`: focus, what got done, blockers, needs-user, and append one line to the session log.
-3. Add any new gotcha to `docs/ai/LESSONS.md`.
+2. Update `docs/ai/STATUS.md` (focus, blockers, needs-user, the newest three sessions), append one line to `docs/ai/SESSIONS.md`, and update the `docs/ai/STATE.md` sections of the areas you changed.
+3. Add any new gotcha to `docs/ai/LESSONS.md` (general) or the matching `LESSONS-<topic>.md`.
 4. Rewrite `docs/ai/NEXT_PROMPT.md` with the exact prompt the human should paste next.
 5. Commit and push.
 
