@@ -14,6 +14,7 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`.
 
 ## Blockers and needs-user
 
+- #76: CI is red since Rust 1.100 (new clippy lint in `atlas.rs`); fix first.
 - #38 baselines later.
 - Local data: the three Cokoro Blender GLBs sit in `corpus/local/hold/` until #74 is fixed (the local LOD test fails
   on them).
