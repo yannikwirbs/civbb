@@ -42,7 +42,12 @@ fn main() -> ExitCode {
         _ => Err("usage: cargo xtask <ci|arch|codemap [--check]|shaders [--check]>".into()),
     };
     match result {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(()) => {
+            if args.first().is_some_and(|a| a != "ci") {
+                eprintln!("xtask: {} ok", args.join(" "));
+            }
+            ExitCode::SUCCESS
+        }
         Err(e) => {
             eprintln!("xtask: {e}");
             ExitCode::FAILURE
@@ -73,17 +78,83 @@ fn run(cmd: &str, args: &[&str]) -> Result<(), String> {
     }
 }
 
+/// Runs a command with its output captured and returns that output; on failure the error holds only the relevant
+/// lines (see `relevant`).
+fn quiet(cmd: &str, args: &[&str]) -> Result<String, String> {
+    let out = Command::new(cmd)
+        .args(args)
+        .current_dir(root())
+        .output()
+        .map_err(|e| format!("{cmd}: {e}"))?;
+    let text = String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr);
+    if out.status.success() {
+        Ok(text)
+    } else {
+        Err(format!("`{cmd} {}` failed:\n{}", args.join(" "), relevant(&text)))
+    }
+}
+
+/// Cargo and libtest output without progress lines and passing-test noise: errors, warnings and failures remain.
+fn relevant(text: &str) -> String {
+    const NOISE: &[&str] = &[
+        "Compiling ",
+        "Checking ",
+        "Finished ",
+        "Running ",
+        "Doc-tests ",
+        "Blocking ",
+        "Downloaded ",
+        "Downloading ",
+        "Updating ",
+        "Locking ",
+        "running ",
+        "test result: ok.",
+    ];
+    text.lines()
+        .filter(|l| {
+            let t = l.trim();
+            // `--quiet` progress: dots, `i` for ignored, and a ` 100/250` counter on long runs.
+            let progress = t.chars().all(|c| ".i0123456789/ ".contains(c));
+            !progress && !NOISE.iter().any(|n| t.starts_with(n))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Totals of the `test result:` lines in libtest output, e.g. `812 passed, 3 ignored`.
+fn test_totals(text: &str) -> String {
+    let (mut passed, mut ignored) = (0, 0);
+    for line in text.lines().filter(|l| l.starts_with("test result:")) {
+        for part in line.split([';', '.']) {
+            let mut words = part.split_whitespace();
+            if let (Some(n), Some(what)) = (words.next(), words.next()) {
+                match (n.parse::<u32>(), what) {
+                    (Ok(n), "passed") => passed += n,
+                    (Ok(n), "ignored") => ignored += n,
+                    _ => {}
+                }
+            }
+        }
+    }
+    format!("{passed} passed, {ignored} ignored")
+}
+
 fn ci() -> Result<(), String> {
-    run("cargo", &["fmt", "--all", "--", "--check"])?;
-    run(
+    let start = std::time::Instant::now();
+    quiet("cargo", &["fmt", "--all", "--", "--check"])?;
+    quiet(
         "cargo",
         &["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"],
     )?;
-    run("cargo", &["test", "--workspace", "--quiet"])?;
+    let tests = quiet("cargo", &["test", "--workspace", "--quiet"])?;
     arch()?;
     codemap(true)?;
     shaders(true)?;
-    eprintln!("xtask: ci passed");
+    eprintln!(
+        "xtask: ci passed (fmt, clippy, tests: {}, arch, codemap, shaders) in {:.0} s",
+        test_totals(&tests),
+        start.elapsed().as_secs_f32()
+    );
     Ok(())
 }
 
@@ -165,7 +236,6 @@ fn arch() -> Result<(), String> {
         }
     }
     if errors.is_empty() {
-        eprintln!("xtask: arch rules ok");
         Ok(())
     } else {
         Err(format!("arch rules violated:\n  {}", errors.join("\n  ")))
@@ -282,7 +352,6 @@ fn codemap(check: bool) -> Result<(), String> {
         if current != md {
             return Err(format!("{CODEMAP} is stale; run `cargo xtask codemap`"));
         }
-        eprintln!("xtask: code map fresh");
     } else if current != md {
         fs::write(&target, md).map_err(|e| e.to_string())?;
         eprintln!("xtask: wrote {CODEMAP}");
@@ -364,6 +433,5 @@ fn shaders(check: bool) -> Result<(), String> {
             stale.join("\n  ")
         ));
     }
-    eprintln!("xtask: shaders fresh");
     Ok(())
 }
