@@ -13,3 +13,5 @@ Read before working on Booth archives, Blender conversions, GLB files, meshes or
 - Blender's GLB morph targets are sparse accessors without a `bufferView`; scratch GLB readers must handle sparse.
   The Unity export shares one attribute set across a mesh's primitives, so count vertices per accessor, not per
   primitive. Install numpy with `python -m pip install --user numpy` for such scripts.
+- Blender conversions can hold zero-area triangles (two corners at one position after welding). Mesh checks that
+  count welded edges must skip them: their zero-length edge looks like an open border, and simplifiers drop them (#74).

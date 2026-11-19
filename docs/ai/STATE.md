@@ -20,7 +20,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   `crates/pipeline/tests/unity_export.rs` compares, local only): muscle, rotation, Euler, scale and blendshape
   curves of HAOLAN, Tessakuchan, Cokoro, Little Blackbird and Yumeka clips exact; 10 Unity constraints within
   0.0002 degrees; Yumeka's 4 VRChat constraints evaluated by the SDK's own editor runtime within 0.0001. The SDK
-  runtime is the ground truth for #75 (constraint options, contacts, PhysBones).
+  runtime is the ground truth for #75: `tools/unity-truth/Assets/Editor/VrcConstraints.cs` (73 generated
+  constraint-option cases, ADR 0046) and `VrcContacts.cs` (39 contact cases, ADR 0047) run in the SDK host project
+  by reflection and write committed goldens (`crates/anim/tests/unity/vrc_constraints.json`,
+  `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. PhysBones are next in #75.
 - The muscle rig leaves the hips to the body pose (#52); real muscle frames had turned Yumeka over.
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
   `.unitypackage` or Unity YAML.
@@ -32,10 +35,11 @@ What exists, by area. Read the section for the area you touch; update it when th
   `civbb_corpus::gltf::to_source_glb` writes them (round-trip test).
 - Curves (ADR 0039): the format stays Hermite; the exporter will bake weighted tangents, split equal key times and
   mirror position x, Euler and quaternion y/z. No Booth clip uses either (28,693 keys).
-- Constraint fields (ADR 0040, format v9): `Property::Constraint { kind, field }` binds weight, active, source
+- Constraint fields (ADR 0040, 0046, format v10): `Property::Constraint { kind, field }` binds weight, active, source
   weights and freeze of the first constraint of a type on a node; per-island values and frozen placements live in
-  `constraint::Scratch`; `Instance::write_constraints` after `write_nodes`. Solve In Local Space and Freeze To
-  World run; rebake is #73.
+  `constraint::Scratch`; `Instance::write_constraints` after `write_nodes`. Solve In Local Space, Freeze To World
+  (captures the animated placement, kept while inactive) and Rebake Offsets When Unfrozen (per-island offsets) run
+  as the SDK does (ADR 0046), including its scale-offset power `n / total weight`.
 - Unity ground truth: `tools/unity-truth` runs in batch mode and records JSON into crate test dirs (ADR 0013,
   `tools/unity-truth/README.md`). Muscle space and constraints (44 cases, batch play mode) are verified against it;
   animator goldens are still hand-derived (#54).
@@ -135,8 +139,10 @@ What exists, by area. Read the section for the area you touch; update it when th
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). `civbb-dynamics`: XPBD PhysBone chains
   with grab/pose, colliders and limits (ADRs 0015, 0016), and contacts with the cross-avatar grid broadphase
-  (`contact::step`, ADR 0017). Format v9 (constraint fields and options, ADR 0040).
+  (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the component's node apart from the
+  root transform, Proximity from a sender's second frame (ADR 0047). Format v11 (`rebake` ADR 0046, contact shapes
+  ADR 0047).
 
 ## Test data
 
-- Test avatars: `civbb-corpus` (`lean()`, `bloated()`, `generate`, `gltf::to_glb`), and locally `corpus/local/khronos/` (23 Khronos samples) `corpus/local/vrm/` (AliciaSolid 0.x, Seed-san and the twist sample 1.0) and `corpus/local/glb/` (Booth FBX conversions: HAOLAN, Taro, Tessakuchan, Yumeka, Little Blackbird, Ostgaroa; Cokoro's in `hold/`, #74), `corpus/local/unity-glb/` (13 exporter outputs) and `corpus/local/unity-truth/` (Unity recordings); see `corpus/README.md`. `civbb inspect <file>` prints what an avatar contains.
+- Test avatars: `civbb-corpus` (`lean()`, `bloated()`, `generate`, `gltf::to_glb`), and locally `corpus/local/khronos/` (23 Khronos samples) `corpus/local/vrm/` (AliciaSolid 0.x, Seed-san and the twist sample 1.0) and `corpus/local/glb/` (Booth FBX conversions: HAOLAN, Taro, Tessakuchan, Yumeka, Little Blackbird, Ostgaroa, Cokoro), `corpus/local/unity-glb/` (13 exporter outputs, listed with their prefabs in its `exports.txt`) and `corpus/local/unity-truth/` (Unity recordings); see `corpus/README.md`. `civbb inspect <file>` prints what an avatar contains.

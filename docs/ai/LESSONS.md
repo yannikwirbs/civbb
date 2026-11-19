@@ -61,3 +61,5 @@ Add a line to the matching file whenever something costs more than one attempt.
   with "another Unity instance is running with this project open". Find leftovers with PowerShell
   `Get-CimInstance Win32_Process` filtered by command line and stop them by PID; never stop every `Unity.exe` (the
   owner may have an Editor open). Git Bash has no `setsid`.
+- `a && b >> file` in one Bash call skips the append when `a` fails (a `grep` with no match): check that an appended
+  file changed. A background `cargo test` started before an edit compiles the old code; rerun after editing.

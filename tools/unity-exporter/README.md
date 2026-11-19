@@ -54,6 +54,19 @@ SDK).
 Each exits by itself (0, or 1 with `CIVBB failed:` in the log). Check the result with `civbb inspect <glb>`
 next to the Blender conversion in `corpus/local/glb/`.
 
+Re-export all local exports after an exporter change (about 20 s each). `corpus/local/unity-glb/exports.txt`
+(gitignored) lists them as `<name>|<prefab asset path>`; the GLB's root node is the prefab's name:
+
+```
+while IFS='|' read -r name prefab; do
+  unity run corpus/local/unity-export-vrc --no-tail --log-file "<scratch>/exp-$name.log" -- -executeMethod Civbb.Exporter.Batch.Export \
+    -civbbAvatar "$prefab" -civbbOut "D:/Documents/Repos/CIVBB/corpus/local/unity-glb/$name.glb" > /dev/null 2>&1
+  echo "$name $(grep -aE 'CIVBB (exported|failed)' "<scratch>/exp-$name.log" | head -1 | cut -c1-80)"
+done < corpus/local/unity-glb/exports.txt
+```
+
+Then `cargo test -p civbb-pipeline --test unity_export --test gltf_import`.
+
 ## Compile check without a licence
 
 ```

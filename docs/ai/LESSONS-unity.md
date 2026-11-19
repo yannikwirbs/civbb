@@ -35,3 +35,12 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   `.shader.meta` files on GitHub (ADR 0043). Saved properties include leftovers of earlier shaders: fingerprint by
   GUID or name before marker properties.
 - Grepping Unity logs for `CIVBB` matches every path under the repo; grep `CIVBB (exported|failed|imported)`.
+- The VRChat SDK's runtime components are drivable by reflection without an SDK reference: VRChat constraints have
+  public fields (`FreezeToWorld`, `IsActive`, `GlobalWeight`, ...; sources via `GetSource`/`SetSource`) and need
+  `ApplyConfigurationChanges()` after edits; contact receivers expose their value as the public `paramValue`. Dump a
+  type's API with a reflection probe (`ApiProbe.cs` pattern) before guessing names. The SDK registers contacts during
+  the first play-mode frame: compare from the second.
+- `Time.captureDeltaTime = 1/60f` (set each tick) pins play mode's frame time in batch runs, so recorded velocities
+  are exact.
+- Recorded paths that land exactly where two shapes touch go either way in the SDK (float noise, worse far from the
+  origin): offset paths a fraction of a step from round distances.
