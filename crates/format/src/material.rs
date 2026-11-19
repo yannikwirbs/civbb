@@ -95,6 +95,8 @@ pub struct Toon {
     pub rim_color: Vec3,
     /// Rim falloff exponent.
     pub rim_power: f32,
+    /// Darkens the lit colour towards grazing angles (lilToon's rim shade).
+    pub rim_shade: Option<RimShade>,
     /// Matcap texture.
     pub matcap_tex: Option<TextureSlot>,
     /// Matcap blend strength.
@@ -123,6 +125,19 @@ pub enum ToonLight {
     /// lilToon, Poiyomi, UTS2 and VRChat's toon shaders: light plus ambient, clamped to 1 per channel, lights the
     /// blend, so a lit surface shows its own colour at most.
     Clamped,
+}
+
+/// lilToon's rim shade: after lighting, the colour is multiplied towards `color` by
+/// `strength * ramp((1 - |n . v|)^power)`, the ramp linear from `border - blur / 2` to `border + blur / 2` (both clamped
+/// to 0 to 1).
+#[allow(missing_docs)] // Field names follow lilToon's `_RimShade*` properties.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RimShade {
+    pub color: Vec3,
+    pub strength: f32,
+    pub power: f32,
+    pub border: f32,
+    pub blur: f32,
 }
 
 /// How a toon material's matcap combines with the lit colour.

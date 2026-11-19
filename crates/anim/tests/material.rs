@@ -127,6 +127,8 @@ fn values_are_in_unity_units() {
     close(&p.base_color, &[1.0, to_linear(0.5), 0.0, 1.0]);
     close(&[to_linear(0.5)], &[0.214_041_14]);
     close(&[to_srgb(to_linear(0.7))], &[0.7]);
+    // HDR: Unity's `Mathf.GammaToLinearSpace` raises values above 1 to 2.2 (measured: 32 gives 2048).
+    close(&[to_linear(32.0) / 2048.0, to_srgb(to_linear(5.0))], &[1.0, 5.0]);
     // Smoothness is one minus roughness.
     close(&material::get(&m, Field::Smoothness).unwrap()[..1], &[0.75]);
     material::set(&mut m, Field::Smoothness, 0, 0.1);

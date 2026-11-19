@@ -11,11 +11,15 @@ const LTS_TRANS_O: &str = "3c79b10c7e0b2784aaa4c2f8dd17d55e";
 
 /// One triangle whose material carries `x` as its `X_toon_material`, with one embedded PNG as texture 0.
 fn gltf(x: Value) -> Vec<u8> {
+    gltf_png(x, b"\x89PNG\r\n\x1a\n\0\0\0\0")
+}
+
+/// [`gltf`] with `png` as texture 0's image.
+fn gltf_png(x: Value, png: &[u8]) -> Vec<u8> {
     let mut bin: Vec<u8> = [0.0f32, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
         .iter()
         .flat_map(|v| v.to_le_bytes())
         .collect();
-    let png = b"\x89PNG\r\n\x1a\n\0\0\0\0";
     bin.extend_from_slice(png);
     let doc = json!({
         "asset": {"version": "2.0"},
@@ -64,7 +68,7 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
         "shader": "Hidden/InternalErrorShader", "shader_guid": LTS_TRANS_O, "render_queue": -1,
         "floats": {"_lilToonVersion": 45, "_Cull": 0, "_UseShadow": 1, "_ShadowStrength": 0.5, "_ShadowBorder": 0.6,
             "_ShadowBlur": 0.2, "_UseRim": 0, "_UseMatCap": 1, "_MatCapBlend": 0.7, "_UseEmission": 0,
-            "_OutlineWidth": 0.1, "_BumpScale": 0.8, "_UseBumpMap": 0},
+            "_OutlineWidth": 0.1, "_BumpScale": 0.8, "_UseBumpMap": 0, "_UseRimShade": 1, "_RimShadeBorder": 0.6},
         "colors": {"_Color": [0.5, 0.5, 0.5, 1], "_ShadowColor": [0.5, 0.5, 0.5, 1], "_OutlineColor": [1, 0, 0, 1],
             "_RimColor": [1, 1, 1, 1], "_EmissionColor": [1, 1, 1, 1]},
         "textures": {"_MainTex": tex([2.0, 3.0, 0.25, 0.5]), "_MatCapTex": tex([1.0, 1.0, 0.0, 0.0]),
@@ -94,6 +98,8 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
     assert_eq!(t.shade_tex, t.base_color_tex, "no shadow texture: the main one");
     assert!(t.matcap_tex.is_some() && close(t.matcap_strength, 0.7));
     assert_eq!(t.matcap_blend, MatcapBlend::Add, "lilToon's default blend mode adds");
+    let rim_shade = t.rim_shade.expect("rim shade on");
+    assert!(close(rim_shade.color[0], half) && rim_shade.border == 0.6 && rim_shade.blur == 1.0);
     assert_eq!(
         (t.rim_color, t.emissive),
         ([0.0; 3], [0.0; 3]),
@@ -232,4 +238,24 @@ fn hostile_toon_materials() {
         "{:?}",
         imported.warnings
     );
+}
+
+#[test]
+fn liltoon_emission_gradient_scales_the_emission_by_its_start() {
+    // A 2x1 gradient, white then black: a repeating sampler at u = 0 averages them.
+    let mut png = Vec::new();
+    let img = image::RgbaImage::from_raw(2, 1, vec![255, 255, 255, 255, 0, 0, 0, 255]).unwrap();
+    img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .unwrap();
+    let x = json!({
+        "shader": "lilToon", "render_queue": -1,
+        "floats": {"_UseEmission": 1, "_EmissionUseGrad": 1},
+        "colors": {"_EmissionColor": [2, 2, 2, 1]},
+        "textures": {"_EmissionGradTex": tex([1.0, 1.0, 0.0, 0.0])},
+    });
+    let imported = import(&gltf_png(x, &png), &Limits::default(), |_| None).unwrap();
+    let t = toon(&imported.avatar.materials[0]);
+    // HDR 2 is 2^2.2 in linear (Unity's GammaToLinearSpace), times the averaged texel 0.5.
+    let want = 2f32.powf(2.2) * 0.5;
+    assert!(close(t.emissive[0], want), "{:?} != {want}", t.emissive);
 }

@@ -438,6 +438,7 @@ impl Importer<'_> {
                 shade_toony: num(&x["shadingToonyFactor"], 0.9),
                 rim_color: arr(&x["parametricRimColorFactor"], [0.0; 3]),
                 rim_power: num(&x["parametricRimFresnelPowerFactor"], 5.0),
+                rim_shade: None,
                 matcap_strength: if matcap_tex.is_some() {
                     arr(&x["matcapFactor"], [1.0; 3]).into_iter().fold(0.0, f32::max)
                 } else {
@@ -499,6 +500,7 @@ impl Importer<'_> {
                 shade_toony: num(&f["_ShadeToony"], 0.9),
                 rim_color: rgb(color("_RimColor", [0.0, 0.0, 0.0, 1.0])),
                 rim_power: num(&f["_RimFresnelPower"], 1.0),
+                rim_shade: None,
                 matcap_strength: if matcap_tex.is_some() { 1.0 } else { 0.0 },
                 matcap_blend: MatcapBlend::Add,
                 matcap_tex,

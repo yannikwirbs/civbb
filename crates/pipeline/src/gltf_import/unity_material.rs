@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use civbb_anim::material::to_linear;
 use civbb_format::material::{
-    AlphaMode, ColorSpace, MatcapBlend, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit,
+    AlphaMode, ColorSpace, MatcapBlend, Material, MaterialModel, Pbr, RimShade, TextureSlot, Toon, ToonLight, Unlit,
 };
 use civbb_format::math::Vec3;
 use serde::Deserialize;
@@ -267,6 +267,7 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         shade_toony: 0.9,
         rim_color: [0.0; 3],
         rim_power: 5.0,
+        rim_shade: None,
         matcap_tex: None,
         matcap_strength: 0.0,
         matcap_blend: MatcapBlend::Add,
@@ -308,6 +309,28 @@ impl Importer<'_> {
             return None;
         };
         self.slot(&texture, 0, Some(st_to_gltf(t.scale_offset)), space)
+    }
+
+    /// What a repeating bilinear sampler returns at `u = 0` on the middle row of a colour texture property (the
+    /// first and last texels averaged), linear; `None` when unset or undecodable.
+    fn unity_texel_at_zero(&mut self, x: &XToonMaterial, key: &str) -> Option<Vec3> {
+        let index = x.textures.get(key)?.index? as usize;
+        let image = self.doc.textures().nth(index)?.source().index();
+        let decoded = self
+            .image_bytes(image)
+            .and_then(|(bytes, format)| crate::texture::decode(&bytes, format));
+        let img = match decoded {
+            Ok(img) => img,
+            Err(e) => {
+                self.warnings.push(format!("X_toon_material: {key}: {e}; ignored"));
+                return None;
+            }
+        };
+        let y = img.height() / 2;
+        let (a, b) = (img.get_pixel(0, y).0, img.get_pixel(img.width() - 1, y).0);
+        Some(std::array::from_fn(|c| {
+            (to_linear(f32::from(a[c]) / 255.0) + to_linear(f32::from(b[c]) / 255.0)) * 0.5
+        }))
     }
 
     fn unity_material(&mut self, x: &XToonMaterial) -> Material {
@@ -534,6 +557,17 @@ impl Importer<'_> {
             );
             t.rim_power = p.f("_RimFresnelPower", 3.0);
         }
+        if p.on("_UseRimShade") {
+            // The mask and the normal strength are not modelled.
+            let grey = [0.5, 0.5, 0.5, 1.0];
+            t.rim_shade = Some(RimShade {
+                color: p.rgb("_RimShadeColor", grey),
+                strength: p.color("_RimShadeColor", grey)[3],
+                power: p.f("_RimShadeFresnelPower", 1.0),
+                border: p.f("_RimShadeBorder", 0.5),
+                blur: p.f("_RimShadeBlur", 1.0),
+            });
+        }
         if p.on("_UseMatCap") {
             t.matcap_tex = self.unity_slot(x, "_MatCapTex", srgb);
             t.matcap_strength = if t.matcap_tex.is_some() {
@@ -549,6 +583,13 @@ impl Importer<'_> {
         if p.on("_UseEmission") {
             t.emissive = scale(p.rgb("_EmissionColor", WHITE), p.color("_EmissionColor", WHITE)[3]);
             t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
+            if p.on("_EmissionUseGrad") {
+                // The gradient is sampled at speed times time; without time in our runtime, at its start (where
+                // Unity's reference renders sample it too).
+                if let Some(g) = self.unity_texel_at_zero(x, "_EmissionGradTex") {
+                    t.emissive = mul(t.emissive, g);
+                }
+            }
         }
         if outline {
             // lilToon outline width is in centimetres.

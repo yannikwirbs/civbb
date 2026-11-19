@@ -503,8 +503,8 @@ impl Importer<'_> {
         })
     }
 
-    /// Stores an image's encoded bytes as a blob. Read from the JSON: the wrapper panics on malformed images.
-    fn image(&mut self, image: usize, name: &str, space: ColorSpace) -> Result<u32, String> {
+    /// An image's encoded bytes and format. Read from the JSON: the wrapper panics on malformed images.
+    fn image_bytes(&mut self, image: usize) -> Result<(Vec<u8>, ImageFormat), String> {
         let doc = self.doc;
         let json = &doc.as_json().images[image];
         let bytes = match (&json.buffer_view, &json.uri) {
@@ -526,6 +526,13 @@ impl Importer<'_> {
         } else {
             return Err("not PNG or JPEG".into());
         };
+        Ok((bytes, format))
+    }
+
+    /// Stores an image's encoded bytes as a blob.
+    fn image(&mut self, image: usize, name: &str, space: ColorSpace) -> Result<u32, String> {
+        let (bytes, format) = self.image_bytes(image)?;
+        let json = &self.doc.as_json().images[image];
         let blob = BlobId::of(&bytes);
         self.blobs.insert(blob, bytes);
         self.textures.push(Texture {

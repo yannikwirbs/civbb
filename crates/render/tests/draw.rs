@@ -5,7 +5,7 @@
 
 use civbb_format::Avatar;
 use civbb_format::material::{
-    AlphaMode, MatcapBlend, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit,
+    AlphaMode, MatcapBlend, Material, MaterialModel, Pbr, RimShade, TextureSlot, Toon, ToonLight, Unlit,
 };
 use civbb_format::math::Mat4;
 use civbb_format::mesh::{Mesh, Submesh};
@@ -77,6 +77,7 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         shade_toony: 0.9,
         rim_color: [0.0; 3],
         rim_power: 0.0,
+        rim_shade: None,
         matcap_tex: None,
         matcap_strength: 0.0,
         matcap_blend: MatcapBlend::Add,
@@ -384,6 +385,53 @@ fn matcaps_add_or_multiply() {
     // 0.5 lit: plus the matcap 0.5 + 0.502 saturates; times it 0.5 * 0.502 = 0.251.
     assert_near(pixel(&pixels, 16, 32), [255, 255, 255], 1, "add (MToon, lilToon)");
     assert_near(pixel(&pixels, 48, 32), [64, 64, 64], 1, "multiply (VRChat MatCap Lit)");
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+#[test]
+fn rim_shade_darkens_away_from_the_view_direction() {
+    let Some(ctx) = context() else { return };
+    let mut scene = Scene::new(
+        &ctx,
+        Capacity {
+            vertices: 8,
+            indices: 12,
+            deltas: 0,
+            skinned: 8,
+            materials: 2,
+        },
+    )
+    .unwrap();
+    let grey = |rim_shade| {
+        let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
+        if let MaterialModel::Toon(t) = &mut m {
+            t.light = ToonLight::Clamped;
+            t.rim_shade = rim_shade;
+        }
+        material(m, AlphaMode::Opaque)
+    };
+    // A zero-width ramp at 0: a surface not facing the eye exactly is fully shaded, halfway to black.
+    let shade = RimShade {
+        color: [0.0; 3],
+        strength: 0.5,
+        power: 1.0,
+        border: 0.0,
+        blur: 0.0,
+    };
+    let shaded = scene.add_material(&ctx, &grey(Some(shade)), &[]).unwrap();
+    let plain = scene.add_material(&ctx, &grey(None), &[]).unwrap();
+    let meshes = [
+        quad([-3.0, 0.0], [-3.0, 3.0], 0.0, 0),
+        quad([0.0, 3.0], [-3.0, 3.0], 0.0, 1),
+    ];
+    let mut view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+    view.light_dir = [0.0, 0.0, 1.0];
+    view.light_color = [1.0; 3];
+    view.ambient = [0.0; 3];
+    let pixels = render(&ctx, &mut scene, &meshes, &[shaded, plain], &[], &view);
+    assert_near(pixel(&pixels, 16, 32), [64, 64, 64], 1, "rim shaded");
+    assert_near(pixel(&pixels, 48, 32), [128, 128, 128], 1, "no rim shade");
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }

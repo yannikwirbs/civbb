@@ -42,6 +42,8 @@ struct Material
     Slot slots[6];   // base, normal, metallic-roughness or shade, occlusion, emissive, matcap
     float4 outline;  // toon outline colour in xyz, width in metres in w
     Slot outline_width; // multiplies the width by its G channel
+    float4 rim_shade;      // toon rim shade colour in xyz, strength in w (0: off)
+    float4 rim_shade_ramp; // its ramp's start and end, fresnel power
 };
 
 struct View
@@ -201,6 +203,13 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
         color *= saturate(v.light_color.rgb + v.ambient.rgb); // lilToon, Poiyomi, UTS2, VRChat toon
     else
         color = color * v.light_color.rgb + lit.rgb * v.ambient.rgb; // MToon
+    if (m.rim_shade.w > 0)
+    {
+        // lilToon's rim shade, after lighting.
+        float f = pow(saturate(1 - abs(dot(n, e))), m.rim_shade_ramp.z);
+        float r = saturate((f - m.rim_shade_ramp.x) / max(m.rim_shade_ramp.y - m.rim_shade_ramp.x, 1e-4));
+        color = lerp(color, color * m.rim_shade.xyz, r * m.rim_shade.w);
+    }
     if (m.toon.z > 0)
         color += m.rim.xyz * pow(saturate(1 - dot(n, e)), m.toon.z);
     if (m.slots[5].tex.x != NONE)

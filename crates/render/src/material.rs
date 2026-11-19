@@ -4,7 +4,7 @@
 use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, TextureSlot, ToonLight};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
-pub const MATERIAL_WORDS: usize = 84;
+pub const MATERIAL_WORDS: usize = 92;
 /// A texture slot without a texture.
 pub const NONE: u32 = u32::MAX;
 
@@ -98,6 +98,9 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut slots: [Option<TextureSlot>; 7] = [None; 7];
     // Outline colour and width.
     let mut outline = [0.0; 4];
+    // Rim shade colour and strength (0: off); its ramp's start and end and its fresnel power.
+    let mut rim_shade = [0.0; 4];
+    let mut rim_shade_ramp = [0.0, 1.0, 1.0, 0.0];
     match &m.model {
         MaterialModel::Pbr(p) => {
             base_color = p.base_color;
@@ -125,6 +128,14 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
             };
             rim = [t.rim_color[0], t.rim_color[1], t.rim_color[2], multiply];
             params[2] = t.normal_scale;
+            if let Some(r) = t.rim_shade {
+                rim_shade = [r.color[0], r.color[1], r.color[2], r.strength];
+                let (lo, hi) = (
+                    (r.border - r.blur * 0.5).clamp(0.0, 1.0),
+                    (r.border + r.blur * 0.5).clamp(0.0, 1.0),
+                );
+                rim_shade_ramp = [lo, hi, r.power, 0.0];
+            }
             toon = [t.shade_shift, t.shade_toony, t.rim_power, t.matcap_strength];
             outline = [
                 t.outline_color[0],
@@ -172,5 +183,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     words.extend(&slot_words[..48]);
     words.extend(outline.map(f32::to_bits));
     words.extend(&slot_words[48..]);
+    words.extend(rim_shade.map(f32::to_bits));
+    words.extend(rim_shade_ramp.map(f32::to_bits));
     words.try_into().expect("a material record is MATERIAL_WORDS long")
 }

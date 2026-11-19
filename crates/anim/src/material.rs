@@ -203,13 +203,15 @@ impl Place<'_> {
     }
 }
 
-/// sRGB-encoded to linear, the conversion Unity applies to colour properties in a linear-space project. Values above
-/// 1 (HDR) follow the same curve.
+/// sRGB-encoded to linear, the conversion Unity applies to colour properties in a linear-space project
+/// (`Mathf.GammaToLinearSpace`): values above 1 (HDR) are raised to 2.2, measured in Unity 2022.3.
 pub fn to_linear(c: f32) -> f32 {
     if c <= 0.04045 {
         c / 12.92
-    } else {
+    } else if c < 1.0 {
         ((c + 0.055) / 1.055).powf(2.4)
+    } else {
+        c.powf(2.2)
     }
 }
 
@@ -217,7 +219,9 @@ pub fn to_linear(c: f32) -> f32 {
 pub fn to_srgb(l: f32) -> f32 {
     if l <= 0.003_130_8 {
         l * 12.92
-    } else {
+    } else if l < 1.0 {
         1.055 * l.powf(1.0 / 2.4) - 0.055
+    } else {
+        l.powf(1.0 / 2.2)
     }
 }
