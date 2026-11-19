@@ -38,3 +38,12 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   render-and-score batch runs (it scores with `target/release`).
 - A light-model change can help one family and hurt another: score per family before applying it to all (VRChat's
   mobile shaders got worse clamped; ADR 0050).
+- Unity linearises colour properties above 1 (HDR) with `pow(x, 2.2)`, not the sRGB curve (`Mathf.GammaToLinearSpace`,
+  probed: 32 gives 2048, the extended sRGB curve 3617). Probe a Unity fact with a 10-line static method in the host
+  project's `Assets/Editor` (`tools/unity-batch.sh`, about 16 s) instead of reasoning from memory.
+- A uniform brightness gap between Unity and ours on one avatar (Cokoro ten times darker) is likely an FX-layer
+  default animating a material property (`_LightMaxLimit` from a slider at 0): grep the export's `X_animator` for
+  material bindings before changing shading.
+- Before modelling a shader feature, survey which of the 13 exports use it (a short script over each GLB's
+  `X_toon_material`): lilToon Multi turns features on by repurposed keywords (`AUTO_KEY_VALUE` is rim shade,
+  `EFFECT_HUE_VARIATION` tone correction; table in lilToon's `lil_replace_keywords.hlsl`), so check keywords too.

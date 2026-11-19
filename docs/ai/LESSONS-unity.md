@@ -64,3 +64,5 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   `Time.captureDeltaTime`. The SDK's PhysBones take two steps on a chain's first frame.
 - GitHub's Windows CI job can sit in rust-cache's post step for many minutes after `cargo xtask ci` succeeded:
   read the step conclusions (`gh api repos/.../actions/jobs/<id>`) before suspecting a hang.
+- The exporter used to skip every texture that was not PNG or JPEG without a warning in the output (only a count in
+  the log line, "N textures skipped"): check that count after an export; a skipped albedo renders white.

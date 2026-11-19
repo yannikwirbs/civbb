@@ -12,11 +12,16 @@ What exists, by area. Read the section for the area you touch; update it when th
   copied; each layer's mask intersected with its group's descriptor mask, #80), behaviours, viewpoint, visemes, blink, eye look, expressions, PhysBones and colliders, contacts, VRChat
   constraints. `X_avatar` carries muscle frames and the face. Unity constraints export the target's local
   transform as at-rest (`Object.Instantiate` resets it). `Batch.Import` survives the SDK's domain reload.
+  Textures other than PNG/JPEG (PSD, TGA) are re-encoded as PNG from Unity's import (readable, uncompressed, then
+  restored); normal maps in those formats are still skipped.
 - Materials (ADR 0043): `X_toon_material` is the material as Unity saved it plus the shader GUID; the importer
   fingerprints GUID (lilToon variant table), name, markers, and maps lilToon, Poiyomi, UTS2, MToon, Standard,
   VRChat Mobile and unlit to Toon/PBR/Unlit (`gltf_import/unity_material.rs`). Toon materials name their light
-  model (ADR 0050): lilToon, Poiyomi, UTS2 clamp light plus ambient; MToon, VRM and VRChat Mobile add the
-  ambient. Mappings are scored against Unity reference renders (#82).
+  model (ADR 0050): lilToon, Poiyomi, UTS2 clamp light plus ambient (lilToon between `_LightMinLimit` and
+  `_LightMaxLimit`, animatable, ADR 0054); MToon, VRM and VRChat Mobile add the ambient. Matcaps add or multiply
+  (MatCap Lit multiplies, ADR 0051) with a tint and a mask (lilToon `_MatCapColor`/`_MatCapBlendMask`, Poiyomi's
+  add/multiply weights, ADR 0053); lilToon rim shade, the emission gradient's start and `_EmissionMainStrength`
+  (ADRs 0052, 0053). HDR colours linearise as Unity does (`pow(x, 2.2)` above 1). Scores on #82; residuals #87.
 - Verified against Unity (`tools/unity-truth/Assets/Editor/Exported.cs` records into `corpus/local/unity-truth`,
   `crates/pipeline/tests/unity_export.rs` compares, local only): muscle, rotation, Euler, scale and blendshape
   curves of HAOLAN, Tessakuchan, Cokoro, Little Blackbird and Yumeka clips exact; 10 Unity constraints within
@@ -107,15 +112,16 @@ What exists, by area. Read the section for the area you touch; update it when th
   accepted yellow). lean and bloated are green in every state (`crates/pipeline/tests/parity.rs`).
 - Unity as the reference (ADR 0048): `civbb build --unstaged` packages the import, `civbb-client rig <pkg>` writes
   the hand-off (`parity::Handoff`: rig, light, dt, parameters, states), the exporter renders `<state>-<view>.png`,
-  and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). All 13 exports red at rest;
-  since the toon light models (ADR 0050, #81) Inuinu (UTS2) 0.09 to 0.21 and Taro 0.11 to 0.21 best, Blackbird
-  0.77 to 0.83 worst; per-family tables on #79, #81 and #82.
+  and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). All 13 exports still red at
+  rest, but after #82 the shading matches on every family: Megumi 0.08 to 0.26, Inuinu 0.09 to 0.21, Taro 0.11 to
+  0.21 best; HAOLAN PC and Quest 0.46 to 0.59 worst, from rest-pose differences (#86). Table on #82.
 
 ## Renderer and viewer
 
 - Toon outlines (ADR 0034): inverted hulls, a second indirect draw per outlined toon submesh (`Shader::Outline`,
   front faces culled), width in metres times the width texture's G channel sampled in the vertex shader, unlit
-  outline colour. Material records are 108 words.
+  outline colour. Material records are 108 words (toon: light model and bounds, matcap blend, tint and mask, rim
+  shade; ADRs 0050 to 0054).
 - The viewer's title and `--frames` summary report draws and skinned meshes of the last frame. KTX2 textures are
   checked (header, level index, one 2D image) and transcoded to BC7 by the pure-Rust `basisu` crate (ETC1S, UASTC
   and XUASTC); the renderer uploads BC7 levels and device selection requires BC textures. RGBA8 textures get CPU
