@@ -9,6 +9,8 @@ use civbb_format::Avatar;
 use civbb_format::cost::{Light, Parity, Rig, RigView, StateParity, Thresholds, ViewScore};
 use civbb_format::math::{Mat4, Vec3};
 use civbb_render::Renderer;
+use civbb_render::forward::{AMBIENT, LIGHT_COLOR, LIGHT_TOWARDS};
+use serde::{Deserialize, Serialize};
 
 use crate::frame;
 use crate::island::{Island, Model};
@@ -29,8 +31,10 @@ pub const THRESHOLDS: Thresholds = Thresholds {
     red_mean: 0.1,
     red_p99: 0.5,
 };
-/// Simulation frames stepped per state, at 60 Hz.
+/// Simulation frames stepped per state.
 pub const FRAMES_PER_STATE: u32 = 3;
+/// Seconds per simulation frame.
+pub const DT: f32 = 1.0 / 60.0;
 
 /// One side of a comparison: a validated avatar and its decoded textures.
 pub struct Side<'a> {
@@ -38,6 +42,129 @@ pub struct Side<'a> {
     pub avatar: &'a Avatar,
     /// Its textures, from [`view::decode_textures`].
     pub textures: &'a [Option<TextureImage>],
+}
+
+/// Where the reference images come from.
+pub enum Reference<'a> {
+    /// Our renderer drawing another package: the import before any compiler stage (ADR 0033).
+    Package(Side<'a>),
+    /// Unity's renders of the source (ADR 0048): `<state>-<view>.png` in `dir`, one per state of `handoff` and view.
+    Unity {
+        /// The hand-off Unity rendered.
+        handoff: &'a Handoff,
+        /// The directory holding the images.
+        dir: &'a Path,
+    },
+}
+
+/// Why parity was not scored.
+#[derive(Debug)]
+pub enum Error {
+    /// The renderer failed, or there is no Vulkan loader or device.
+    Render(civbb_render::Error),
+    /// A Unity reference image is missing, unreadable or of another state.
+    Reference(String),
+}
+
+impl From<civbb_render::Error> for Error {
+    fn from(e: civbb_render::Error) -> Self {
+        Self::Render(e)
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Render(e) => e.fmt(f),
+            Error::Reference(e) => f.write_str(e),
+        }
+    }
+}
+
+/// What a Unity reference render reproduces (ADR 0048), avatar space: `civbb-client rig` writes it, the exporter's
+/// `Civbb.Exporter.Reference.Render` reads it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Handoff {
+    /// The camera rig.
+    pub rig: Rig,
+    /// Unit direction towards the one directional light.
+    pub light_towards: Vec3,
+    /// What a white Lambert surface facing the light shows, linear.
+    pub light_color: Vec3,
+    /// Uniform ambient light, linear.
+    pub ambient: Vec3,
+    /// Seconds per simulation frame.
+    pub dt: f32,
+    /// Frames stepped per state before it renders.
+    pub frames_per_state: u32,
+    /// Every animator parameter with the value it starts at.
+    pub parameters: Vec<HandoffParameter>,
+    /// [`states`] in order: rest, then one parameter set per state on top of the state before.
+    pub states: Vec<HandoffState>,
+}
+
+/// An animator parameter and a value.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HandoffParameter {
+    /// The parameter's name.
+    pub name: String,
+    /// Its value.
+    pub value: f32,
+}
+
+/// One state of [`Handoff::states`].
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HandoffState {
+    /// `rest`, `Hat=1`.
+    pub name: String,
+    /// The parameter this state sets; empty for rest.
+    pub parameter: String,
+    /// The value it sets.
+    pub value: f32,
+}
+
+/// The hand-off for a Unity reference render of `avatar` (ADR 0048).
+pub fn handoff(avatar: &Avatar) -> Handoff {
+    let len = LIGHT_TOWARDS.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let rest = HandoffState {
+        name: "rest".into(),
+        parameter: String::new(),
+        value: 0.0,
+    };
+    Handoff {
+        rig: rig(avatar),
+        light_towards: LIGHT_TOWARDS.map(|x| x / len),
+        light_color: LIGHT_COLOR,
+        ambient: AMBIENT,
+        dt: DT,
+        frames_per_state: FRAMES_PER_STATE,
+        parameters: avatar
+            .animator
+            .iter()
+            .flat_map(|x| &x.parameters)
+            .map(|p| HandoffParameter {
+                name: p.name.clone(),
+                value: p.default,
+            })
+            .collect(),
+        states: std::iter::once(rest)
+            .chain(toggles(avatar).into_iter().map(|(p, v)| HandoffState {
+                name: format!("{p}={v}"),
+                parameter: p,
+                value: v,
+            }))
+            .collect(),
+    }
+}
+
+/// Each parameter of the avatar's animator with the value away from its default it takes in [`states`].
+fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
+    avatar
+        .animator
+        .iter()
+        .flat_map(|x| &x.parameters)
+        .map(|p| (p.name.clone(), if p.default == 0.0 { 1.0 } else { 0.0 }))
+        .collect()
 }
 
 /// Steps one island per avatar through the same states: rest, then each of the first avatar's parameters set away
@@ -48,12 +175,7 @@ pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &str, &[Island])
         .iter()
         .map(|a| Island::new(Arc::new(Model::new(a)), 1, true, Pose::IDENTITY))
         .collect();
-    let params: Vec<(String, f32)> = avatars[0]
-        .animator
-        .iter()
-        .flat_map(|x| &x.parameters)
-        .map(|p| (p.name.clone(), if p.default == 0.0 { 1.0 } else { 0.0 }))
-        .collect();
+    let params = toggles(avatars[0]);
     for state in 0..=params.len() {
         for island in &mut islands {
             if state > 0 {
@@ -64,7 +186,7 @@ pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &str, &[Island])
                 }
             }
             for _ in 0..FRAMES_PER_STATE {
-                frame::step(std::slice::from_mut(island), |_, _| true, 1.0 / 60.0);
+                frame::step(std::slice::from_mut(island), |_, _| true, DT);
             }
         }
         let name = match state {
@@ -115,7 +237,7 @@ pub fn rig(avatar: &Avatar) -> Rig {
 pub fn rest_bounds(avatar: &Avatar) -> (Vec3, Vec3) {
     let mut island = Island::new(Arc::new(Model::new(avatar)), 1, true, Pose::IDENTITY);
     for _ in 0..FRAMES_PER_STATE {
-        frame::step(std::slice::from_mut(&mut island), |_, _| true, 1.0 / 60.0);
+        frame::step(std::slice::from_mut(&mut island), |_, _| true, DT);
     }
     let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
     for (mesh, vertices) in avatar.meshes.iter().zip(placed(avatar, &island)) {
@@ -173,21 +295,24 @@ fn transform(m: &Mat4, p: Vec3) -> Vec3 {
     std::array::from_fn(|r| m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r])
 }
 
-/// Renders `test` and `reference` with the reference's [`rig`] in every [`states`] state and scores each view. With
-/// `images`, writes `<state>-<view>.png` there (reference, test and the FLIP error map side by side) for the rest
-/// state and every state that is not green; a failed write is reported on stderr. Fails with
-/// [`civbb_render::Error::NoDevice`] or [`civbb_render::Error::Load`] where there is no device.
-pub fn run(reference: Side, test: Side, images: Option<&Path>) -> civbb_render::Result<Parity> {
-    let rig = rig(reference.avatar);
+/// Renders `test` and, for a package, the reference with the reference's [`rig`] (a Unity reference's hand-off rig)
+/// in every [`states`] state and scores each view. With `images`, writes `<state>-<view>.png` there (reference, test
+/// and the FLIP error map side by side) for the rest state and every state that is not green; a failed write is
+/// reported on stderr. Fails with [`civbb_render::Error::NoDevice`] or [`civbb_render::Error::Load`] where there is
+/// no device.
+pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Parity, Error> {
+    let (rig, source, sides) = match &reference {
+        Reference::Package(r) => (rig(r.avatar), "source", vec![r, &test]),
+        Reference::Unity { handoff, .. } => (handoff.rig.clone(), "unity", vec![&test]),
+    };
     let mut renderer = Renderer::headless(cfg!(debug_assertions), WIDTH, HEIGHT)?;
-    let sides = [&reference, &test];
     let mut gpus = Vec::with_capacity(2);
-    for side in sides {
+    for side in &sides {
         match Gpu::new(&renderer, side.avatar, &Model::new(side.avatar), side.textures, 1) {
             Ok(gpu) => gpus.push(gpu),
             Err(e) => {
                 destroy(&renderer, gpus);
-                return Err(e);
+                return Err(e.into());
             }
         }
     }
@@ -199,7 +324,8 @@ pub fn run(reference: Side, test: Side, images: Option<&Path>) -> civbb_render::
     {
         eprintln!("civbb-client: {}: {e}", dir.display());
     }
-    states(&[reference.avatar, test.avatar], |state, name, islands| {
+    let avatars: Vec<&Avatar> = sides.iter().map(|s| s.avatar).collect();
+    states(&avatars, |state, name, islands| {
         if failed.is_some() {
             return;
         }
@@ -207,6 +333,15 @@ pub fn run(reference: Side, test: Side, images: Option<&Path>) -> civbb_render::
         let mut views = Vec::with_capacity(rig.views.len());
         for v in &rig.views {
             let mut pair = Vec::with_capacity(2);
+            if let Reference::Unity { handoff, dir } = &reference {
+                match unity_image(dir, handoff, state, name, &v.name) {
+                    Ok(texels) => pair.push(texels),
+                    Err(e) => {
+                        failed = Some(Error::Reference(e));
+                        return;
+                    }
+                }
+            }
             for (k, side) in sides.iter().enumerate() {
                 let drawn = view::draw(
                     &mut renderer,
@@ -223,7 +358,7 @@ pub fn run(reference: Side, test: Side, images: Option<&Path>) -> civbb_render::
                 match drawn {
                     Ok(texels) => pair.push(texels),
                     Err(e) => {
-                        failed = Some(e);
+                        failed = Some(e.into());
                         return;
                     }
                 }
@@ -257,13 +392,32 @@ pub fn run(reference: Side, test: Side, images: Option<&Path>) -> civbb_render::
     let errors = renderer.context().validation_errors();
     assert!(errors == 0, "{errors} Vulkan validation errors");
     Ok(Parity {
-        reference: "source".into(),
+        reference: source.into(),
         rig,
         pixels_per_degree: PIXELS_PER_DEGREE,
         thresholds: THRESHOLDS,
         light: scored.iter().map(|s| s.light).max().unwrap_or_default(),
         states: scored,
     })
+}
+
+/// Unity's render of state `state` (named `name` here) from view `view` as [`civbb_render::HEADLESS_FORMAT`] texels.
+fn unity_image(dir: &Path, handoff: &Handoff, state: usize, name: &str, view: &str) -> Result<Vec<u8>, String> {
+    match handoff.states.get(state) {
+        Some(s) if s.name == name => {}
+        other => {
+            let theirs = other.map_or("missing", |s| s.name.as_str());
+            return Err(format!("state {state} is {name} here but {theirs} in the hand-off"));
+        }
+    }
+    let path = dir.join(format!("{state:03}-{view}.png"));
+    let image = image::open(&path)
+        .map_err(|e| format!("{}: {e}", path.display()))?
+        .into_rgb8();
+    if image.dimensions() != (WIDTH, HEIGHT) {
+        return Err(format!("{}: not {WIDTH}x{HEIGHT}", path.display()));
+    }
+    Ok(image.pixels().flat_map(|p| [p[2], p[1], p[0], 255]).collect())
 }
 
 fn destroy(renderer: &Renderer, gpus: Vec<Gpu>) {

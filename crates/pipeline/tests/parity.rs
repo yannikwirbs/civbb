@@ -2,7 +2,7 @@
 //! their import in every state, with the same rig and poses, and a compiled avatar with a wrong skin colour does not.
 //! Skips without a Vulkan device.
 
-use civbb_client::parity::{self, Side};
+use civbb_client::parity::{self, Reference, Side};
 use civbb_client::view::decode_textures;
 use civbb_format::cost::{Light, Parity};
 use civbb_format::material::MaterialModel;
@@ -31,9 +31,9 @@ fn parity(reference: &Avatar, test: &Avatar) -> Option<Parity> {
     let none = |a: &Avatar| decode_textures(a, |_| None);
     let (rt, tt) = (none(reference), none(test));
     let side = |avatar, textures| Side { avatar, textures };
-    match parity::run(side(reference, &rt), side(test, &tt), None) {
+    match parity::run(Reference::Package(side(reference, &rt)), side(test, &tt), None) {
         Ok(p) => Some(p),
-        Err(e @ (civbb_render::Error::Load(_) | civbb_render::Error::NoDevice)) => {
+        Err(e @ parity::Error::Render(civbb_render::Error::Load(_) | civbb_render::Error::NoDevice)) => {
             eprintln!("skipped: {e}");
             None
         }

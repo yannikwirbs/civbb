@@ -25,6 +25,12 @@ What exists, by area. Read the section for the area you touch; update it when th
   by reflection and write committed goldens (`crates/anim/tests/unity/vrc_constraints.json`,
   `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. PhysBones are next in #75.
 - The muscle rig leaves the hips to the body pose (#52); real muscle frames had turned Yumeka over.
+- Reference renders (#79, ADR 0048): the host project has lilToon 2.4.1 (embedded package), Poiyomi 7.3.050 and
+  UTS2 2.0.9 (unpacked into `Assets/`, GUIDs kept), so all 13 exports render with their shaders.
+  `Civbb.Exporter.Reference.Render` (`tools/unity-exporter/Editor/Reference.cs`, `tools/unity-batch.sh --graphics`)
+  renders a prefab with a `civbb-client rig` hand-off's rig, light and states in play mode, the playable layers
+  run as our runtime runs them (SDK proxy clips empty, humanoid only with muscle clips, hips at rest until #52,
+  descriptor masks applied). Not yet part of an export or `civbb build --report` (`unity_parity`).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
   `.unitypackage` or Unity YAML.
 - Exporter (ADR 0038): UPM package `tools/unity-exporter` in this repo (not a separate repo), excluded from the
@@ -95,6 +101,11 @@ What exists, by area. Read the section for the area you touch; update it when th
   vertices of shown meshes (`parity::rest_bounds`, ADR 0036). Untextured corpus/local files score exactly 0;
   textured ones are green 13 of 16 since ADR 0035 (AliciaSolid 0.025, Avocado 0.026, AlphaBlendModeTest 0.045
   accepted yellow). lean and bloated are green in every state (`crates/pipeline/tests/parity.rs`).
+- Unity as the reference (ADR 0048): `civbb build --unstaged` packages the import, `civbb-client rig <pkg>` writes
+  the hand-off (`parity::Handoff`: rig, light, dt, parameters, states), the exporter renders `<state>-<view>.png`,
+  and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). All 13 exports red at rest
+  (Taro 0.12 to 0.23 best, Blackbird 0.77 to 0.83 worst); per-family table and findings on #82, toon
+  over-brightening #81.
 
 ## Renderer and viewer
 

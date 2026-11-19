@@ -18,7 +18,8 @@ const USAGE: &str = "usage:
   civbb-client view [<package.civpkg> --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F] [--warmup W]
                     [--lod L]
   civbb-client measure <package.civpkg> --key <key-file> [--avatars N] [--frames F] [--warmup W]
-  civbb-client parity <reference.civpkg> <test.civpkg> --key <key-file> [--images <dir>]
+  civbb-client parity <reference.civpkg | unity-dir> <test.civpkg> --key <key-file> [--images <dir>]
+  civbb-client rig <package.civpkg> --key <key-file>
 
 bench steps N avatars (default 100, bloated, or a verified runtime package) for W + F frames (default 60 + 300) at each worker count (default 1,
 2, 4 ... up to the logical core count) and prints a JSON report to stdout. Build with --release for meaningful
@@ -37,7 +38,11 @@ as JSON for `civbb build --measure` (ADR 0032). GPU times are null without a Vul
 parity renders both packages' avatars with the reference's camera rig in every state (rest, then each parameter
 set in turn), compares each view with NVIDIA FLIP and prints the scores and traffic lights as JSON (ADR 0033).
 --images writes reference, test and error map side by side for the rest state and every state that is not green.
-Prints null without a Vulkan device.";
+Prints null without a Vulkan device. A directory as the reference holds Unity's renders, <state>-<view>.png, and
+the rig.json they were rendered from (ADR 0048).
+
+rig prints the hand-off for Unity reference renders of a package's avatar as JSON: camera rig, light, frame step,
+parameters and states (ADR 0048).";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -45,6 +50,7 @@ fn main() -> ExitCode {
         Some("view") => return run_view(&args[1..]),
         Some("measure") => return run_measure(&args[1..]),
         Some("parity") => return run_parity(&args[1..]),
+        Some("rig") => return run_rig(&args[1..]),
         _ => {}
     }
     let Some((mut cfg, package)) = parse(&args) else {
@@ -252,6 +258,29 @@ fn run_measure(args: &[String]) -> ExitCode {
     }
 }
 
+fn run_rig(args: &[String]) -> ExitCode {
+    let [package, flag, key] = args else {
+        eprintln!("{USAGE}");
+        return ExitCode::from(2);
+    };
+    if flag != "--key" {
+        eprintln!("{USAGE}");
+        return ExitCode::from(2);
+    }
+    let json = load_package(Path::new(package), Path::new(key))
+        .and_then(|(avatar, _)| serde_json::to_string_pretty(&parity::handoff(&avatar)).map_err(|e| e.to_string()));
+    match json {
+        Ok(json) => {
+            println!("{json}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("civbb-client: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn run_parity(args: &[String]) -> ExitCode {
     let (mut packages, mut key, mut images) = (Vec::new(), None, None);
     let mut it = args.iter();
@@ -274,18 +303,38 @@ fn run_parity(args: &[String]) -> ExitCode {
         eprintln!("{USAGE}");
         return ExitCode::from(2);
     };
-    let loaded = load_package(Path::new(reference), Path::new(&key))
-        .and_then(|r| Ok((r, load_package(Path::new(test), Path::new(&key))?)));
-    let ((ra, rt), (ta, tt)) = match loaded {
+    let dir = Path::new(reference);
+    // A directory holds Unity's renders and the hand-off they used (ADR 0048).
+    let unity = dir.is_dir();
+    let loaded = (|| {
+        let handoff = if unity {
+            let path = dir.join("rig.json");
+            let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            Some(serde_json::from_str::<parity::Handoff>(&text).map_err(|e| format!("{}: {e}", path.display()))?)
+        } else {
+            None
+        };
+        let source = if unity {
+            None
+        } else {
+            Some(load_package(dir, Path::new(&key))?)
+        };
+        Ok::<_, String>((handoff, source, load_package(Path::new(test), Path::new(&key))?))
+    })();
+    let (handoff, source, (ta, tt)) = match loaded {
         Ok(l) => l,
         Err(e) => {
             eprintln!("civbb-client: {e}");
             return ExitCode::FAILURE;
         }
     };
-    let reference = parity::Side {
-        avatar: &ra,
-        textures: &rt,
+    let reference = match (&handoff, &source) {
+        (Some(handoff), _) => parity::Reference::Unity { handoff, dir },
+        (_, Some((ra, rt))) => parity::Reference::Package(parity::Side {
+            avatar: ra,
+            textures: rt,
+        }),
+        _ => unreachable!("one of them is loaded"),
     };
     let test = parity::Side {
         avatar: &ta,
@@ -293,7 +342,7 @@ fn run_parity(args: &[String]) -> ExitCode {
     };
     let result = match parity::run(reference, test, images.as_deref().map(Path::new)) {
         Ok(p) => Some(p),
-        Err(e @ (civbb_render::Error::Load(_) | civbb_render::Error::NoDevice)) => {
+        Err(e @ parity::Error::Render(civbb_render::Error::Load(_) | civbb_render::Error::NoDevice)) => {
             eprintln!("civbb-client: parity not rendered: {e}");
             None
         }

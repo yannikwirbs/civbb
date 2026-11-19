@@ -53,6 +53,36 @@ fn a_known_perturbation_matches_the_reference() {
     }
 }
 
+/// The Unity hand-off (ADR 0048) lists the states `states` steps through, in order, with the rig and light the
+/// renderer uses, and survives JSON.
+#[test]
+fn handoff_matches_the_states() {
+    let avatar = civbb_corpus::generate(&civbb_corpus::lean());
+    let h = parity::handoff(&avatar);
+    let mut names = Vec::new();
+    parity::states(&[&avatar], |_, name, _| names.push(name.to_owned()));
+    assert!(names.len() > 1, "the lean avatar has parameters");
+    assert_eq!(h.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), names);
+    assert_eq!(h.states[0].parameter, "");
+    for s in &h.states[1..] {
+        assert_eq!(s.name, format!("{}={}", s.parameter, s.value));
+    }
+    let params = &avatar.animator.as_ref().unwrap().parameters;
+    assert_eq!(h.parameters.len(), params.len());
+    assert!(
+        h.parameters
+            .iter()
+            .zip(params)
+            .all(|(h, p)| h.name == p.name && h.value == p.default)
+    );
+    assert_eq!(h.rig, parity::rig(&avatar));
+    assert!((h.light_towards.iter().map(|x| x * x).sum::<f32>() - 1.0).abs() < 1e-6);
+    assert_eq!((h.light_color, h.ambient), ([1.0; 3], [0.3; 3]));
+    assert_eq!((h.dt, h.frames_per_state), (parity::DT, parity::FRAMES_PER_STATE));
+    let json = serde_json::to_string(&h).unwrap();
+    assert_eq!(serde_json::from_str::<parity::Handoff>(&json).unwrap(), h);
+}
+
 /// BGRA8 texels of the rig's size, all background, as the headless target stores it.
 fn background() -> Vec<u8> {
     let rig = parity::rig(&civbb_corpus::generate(&civbb_corpus::lean()));

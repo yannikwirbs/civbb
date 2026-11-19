@@ -44,3 +44,18 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   are exact.
 - Recorded paths that land exactly where two shapes touch go either way in the SDK (float noise, worse far from the
   origin): offset paths a fraction of a step from round distances.
+- Shader packages carry editor code (lilToon generates shaders with a scripted importer), so `Batch.Import` refuses
+  them. A `.unitypackage` is a tar.gz of `<guid>/{asset, asset.meta, pathname}`: unpack it into the project with the
+  GUIDs kept (check every `pathname` stays under `Assets/`), or put a VPM zip under `Packages/<name>`. Saved
+  materials find their shader by GUID only. `-nographics` logs "Shader Unsupported: All subshaders removed" for
+  every shader; harmless, but rendering needs a device (`tools/unity-batch.sh --graphics`).
+- Avatar prefab roots sit anywhere in the creator's scene (Tessakuchan at (-1.5, -0.9, -4.2)); the exporter writes
+  no root transform, so anything that compares with an export resets the instance root to identity.
+- Running VRChat playable layers in Unity without the client: a humanoid places the hips from the clip's body pose
+  (RootT/RootQ), the SDK's `proxy_*` clips are real animations (arms down), and a Gesture layer without the
+  descriptor's mask overrides the whole body. Log `GetCurrentAnimatorClipInfo` per layer before guessing why a pose
+  differs.
+- In a linear project, `Camera.backgroundColor`, `Light.color` and `RenderSettings.ambientLight` take gamma-encoded
+  colours (pass `linear.gamma`); `RenderSettings.ambientProbe` (`SphericalHarmonicsL2.AddAmbientLight`) is linear.
+  An ARGB32 sRGB target read with `ReadPixels` into an sRGB `Texture2D` and `EncodeToPNG` gives our background
+  texel exactly.

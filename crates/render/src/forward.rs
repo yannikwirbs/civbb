@@ -24,6 +24,13 @@ const VIEW_WORDS: usize = 32;
 /// The depth format: 32-bit float, cleared to 0 (reverse Z: near is 1, infinitely far is 0).
 pub const DEPTH: vk::Format = vk::Format::D32_SFLOAT;
 
+/// Towards the light of [`View::look_at`] (not normalised): the upper front left.
+pub const LIGHT_TOWARDS: Vec3 = [-0.3, 0.8, 0.5];
+/// The colour of [`View::look_at`]'s light.
+pub const LIGHT_COLOR: Vec3 = [1.0; 3];
+/// The ambient light of [`View::look_at`].
+pub const AMBIENT: Vec3 = [0.3; 3];
+
 /// The camera and the light of a frame.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct View {
@@ -101,9 +108,9 @@ impl View {
         View {
             view_proj: mul(&proj, &view),
             eye,
-            light_dir: unit([-0.3, 0.8, 0.5]),
-            light_color: [1.0; 3],
-            ambient: [0.3; 3],
+            light_dir: unit(LIGHT_TOWARDS),
+            light_color: LIGHT_COLOR,
+            ambient: AMBIENT,
         }
     }
 

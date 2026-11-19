@@ -2,9 +2,12 @@
 # Runs a Unity batch method with the Editor that the project's ProjectVersion.txt pins, without -quit: the method
 # must exit by itself (EditorApplication.Exit), which also lets play-mode and async methods finish. One line on
 # success; on failure the log's error lines. The full log is <project>/Logs/batch-<Method>.log.
-# Usage: tools/unity-batch.sh <project dir> <Class.Method> [method args, absolute paths...]
+# --graphics keeps a graphics device (no -nographics), for methods that render.
+# Usage: tools/unity-batch.sh [--graphics] <project dir> <Class.Method> [method args, absolute paths...]
 set -u
-[ $# -ge 2 ] || { echo "usage: tools/unity-batch.sh <project dir> <Class.Method> [args...]" >&2; exit 2; }
+graphics=-nographics
+if [ "${1:-}" = --graphics ]; then graphics=; shift; fi
+[ $# -ge 2 ] || { echo "usage: tools/unity-batch.sh [--graphics] <project dir> <Class.Method> [args...]" >&2; exit 2; }
 project=$(cd "$1" && pwd -W) || exit 2
 method=$2
 shift 2
@@ -13,7 +16,7 @@ editor="$(unity editors path "$version" | tr -d '\r')/Editor/Unity.exe"
 log="$project/Logs/batch-${method##*.}.log"
 mkdir -p "$project/Logs"
 start=$SECONDS
-timeout 900 "$editor" -batchmode -nographics -projectPath "$project" -logFile "$log" -executeMethod "$method" "$@" \
+timeout 900 "$editor" -batchmode $graphics -projectPath "$project" -logFile "$log" -executeMethod "$method" "$@" \
   > /dev/null 2>&1
 rc=$?
 if [ $rc -eq 0 ]; then

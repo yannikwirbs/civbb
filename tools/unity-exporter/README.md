@@ -14,6 +14,8 @@ links no VRChat SDK code.
 - `Editor/VrcExport.cs`: VRChat components (ADR 0042): descriptor (playable layers, viewpoint, visemes, blink, eye
   look, expressions), PhysBones and colliders, contacts, VRChat constraints. Read by field name; no SDK reference.
 - `Editor/Json.cs`: JSON text helpers and the X mirror for vectors, rotations and Euler angles.
+- `Editor/Reference.cs`: reference renders for parity (ADR 0048): `Civbb.Exporter.Reference.Render` renders a
+  prefab with the rig, light and states of a `civbb-client rig` hand-off, one PNG per state and view, in play mode.
 
 Status: runs on Unity 6000.3.28f1 without the VRChat SDK and on 2022.3.22f1 with it (SDK 3.10.6). All humanoid
 prefabs of the 11 local avatar packages export; meshes, triangles, shapes, joints and bind poses match the Blender
@@ -66,6 +68,22 @@ done < corpus/local/unity-glb/exports.txt
 ```
 
 Then `cargo test -p civbb-pipeline --test unity_export --test gltf_import`.
+
+## Reference renders and Unity parity (ADR 0048)
+
+The host project needs the avatars' shader families (gitignored, installed 2026-11-19): lilToon 2.4.1
+(`Packages/jp.lilxyzw.liltoon`, MIT), Poiyomi Toon 7.3.050 and UTS2 2.0.9 shader-only (`Assets/_PoiyomiShaders`,
+`Assets/Toon`, unpacked from their `.unitypackage` with GUIDs kept; MIT and Unity-Chan License 2.0). Per export:
+
+```
+civbb build corpus/local/unity-glb/<name>.glb --key <key> --unstaged -o <dir>/source.civpkg
+civbb-client rig <dir>/source.civpkg --key <key> > <dir>/rig.json
+tools/unity-batch.sh --graphics corpus/local/unity-export-vrc Civbb.Exporter.Reference.Render   -civbbAvatar "<prefab asset path>" -civbbOut <abs dir>
+civbb-client parity <dir> <dir>/source.civpkg --key <key> --images <dir>/flip
+```
+
+`Render` needs a graphics device (`--graphics` drops `-nographics`) and writes `<state>-<view>.png` next to
+`rig.json`; `parity` with a directory as the reference scores against them (`"reference": "unity"`).
 
 ## Compile check without a licence
 

@@ -118,6 +118,49 @@ fn build_validate_inspect() {
             .success()
     );
 
+    // The parity reference (ADR 0048): the import packaged without any stage, so nothing merges.
+    let unstaged = stdout(&civbb(
+        &dir,
+        &[
+            "build",
+            "lean.glb",
+            "--key",
+            "dev.key",
+            "--unstaged",
+            "-o",
+            "source.civpkg",
+        ],
+    ));
+    assert!(unstaged.starts_with("wrote source.civpkg ("), "{unstaged}");
+    assert!(unstaged.ends_with(" bytes, no compiler stage)\n"), "{unstaged}");
+    let inspected = stdout(&civbb(&dir, &["inspect", "source.civpkg", "--key", "dev.key"]));
+    let source = stdout(&civbb(&dir, &["inspect", "lean.glb"]));
+    let tail = |s: &str| {
+        s.lines()
+            .skip_while(|l| !l.starts_with("name"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    assert_eq!(tail(&inspected), tail(&source), "the unstaged package is the import");
+    assert_eq!(
+        civbb(
+            &dir,
+            &[
+                "build",
+                "lean.glb",
+                "--key",
+                "dev.key",
+                "--unstaged",
+                "--report",
+                "r.json"
+            ]
+        )
+        .status
+        .code(),
+        Some(2),
+        "unstaged with a report"
+    );
+
     assert_eq!(civbb(&dir, &["frobnicate"]).status.code(), Some(2));
     assert_eq!(
         civbb(&dir, &["build", "lean.glb"]).status.code(),

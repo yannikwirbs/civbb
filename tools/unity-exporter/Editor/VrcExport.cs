@@ -27,6 +27,10 @@ namespace Civbb.Exporter
         readonly List<string> notes = new List<string>();
         readonly Dictionary<string, int> skipped = new Dictionary<string, int>();
 
+        /// The descriptor's layer masks by group, filled by `Layers` (the exporter ignores them; reference renders
+        /// apply them as VRChat does).
+        public readonly Dictionary<string, AvatarMask> Masks = new Dictionary<string, AvatarMask>();
+
         public VrcExport(Transform root, Func<Transform, int> node)
         {
             this.root = root;
@@ -86,6 +90,7 @@ namespace Civbb.Exporter
                     continue;
                 }
                 masks += P(l, "mask").objectReferenceValue != null ? 1 : 0;
+                Masks[type] = P(l, "mask").objectReferenceValue as AvatarMask;
                 groups[type] = AssetDatabase.GetAssetPath(controller);
                 used++;
             }

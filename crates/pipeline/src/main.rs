@@ -13,7 +13,7 @@ use civbb_pipeline::{Imported, Limits, compile, import, package, stats};
 
 const USAGE: &str = "usage:
   civbb keygen <key-file>
-  civbb build <source.gltf|.glb|.vrm> --key <key-file> [-o <out.civpkg>] [--quest] [--report <r.json> [--measure]]
+  civbb build <source.gltf|.glb|.vrm> --key <key-file> [-o <out.civpkg>] [--quest] [--report <r.json> [--measure] | --unstaged]
   civbb validate <package.civpkg> --key <key-file>
   civbb inspect <source or package.civpkg> [--key <key-file>]
 
@@ -21,7 +21,8 @@ A key file holds a 32-byte Ed25519 seed. Packages are verified against the key t
 --report writes the per-avatar report as JSON and, next to it, Markdown (`r.md`); --measure adds CPU and GPU
 times from `civbb-client measure`, which must sit next to `civbb` and be a release build, and FLIP parity of the
 compiled avatar against the import before any stage from `civbb-client parity`, with images of the rest state and
-of every state that is not green in `r.parity/`.";
+of every state that is not green in `r.parity/`. --unstaged packages the import without any compiler stage
+(the parity reference; ADR 0048).";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -57,6 +58,7 @@ struct Args {
     quest: bool,
     report: Option<PathBuf>,
     measure: bool,
+    unstaged: bool,
 }
 
 fn parse(rest: &[String]) -> Result<Args, Error> {
@@ -67,6 +69,7 @@ fn parse(rest: &[String]) -> Result<Args, Error> {
         quest: false,
         report: None,
         measure: false,
+        unstaged: false,
     };
     let mut input = None;
     let mut it = rest.iter();
@@ -77,12 +80,13 @@ fn parse(rest: &[String]) -> Result<Args, Error> {
             "--quest" => a.quest = true,
             "--report" => a.report = Some(it.next().ok_or(Error::Usage)?.into()),
             "--measure" => a.measure = true,
+            "--unstaged" => a.unstaged = true,
             s if s.starts_with('-') || input.is_some() => return Err(Error::Usage),
             s => input = Some(PathBuf::from(s)),
         }
     }
     a.input = input.ok_or(Error::Usage)?;
-    if a.measure && a.report.is_none() {
+    if (a.measure && a.report.is_none()) || (a.unstaged && a.report.is_some()) {
         return Err(Error::Usage);
     }
     Ok(a)
@@ -98,6 +102,13 @@ fn run(args: &[String]) -> Result<(), Error> {
             let key = read_key(key_path)?;
             let platform = if a.quest { Platform::Quest } else { Platform::Desktop };
             let imported = import_file(&a.input)?;
+            let out = a.out.unwrap_or_else(|| a.input.with_extension("civpkg"));
+            if a.unstaged {
+                let bytes = package(imported, platform).encode_signed(&key);
+                fs::write(&out, &bytes).map_err(|e| format!("{}: {e}", out.display()))?;
+                println!("wrote {} ({} bytes, no compiler stage)", out.display(), bytes.len());
+                return Ok(());
+            }
             // The parity reference: the import packaged without any compiler stage (ADR 0033).
             let source = a.measure.then(|| {
                 let copy = Imported {
@@ -108,7 +119,6 @@ fn run(args: &[String]) -> Result<(), Error> {
                 package(copy, platform).encode_signed(&key)
             });
             let (bytes, mut report) = compile(imported, platform, &key, |l| println!("{l}"))?;
-            let out = a.out.unwrap_or_else(|| a.input.with_extension("civpkg"));
             fs::write(&out, &bytes).map_err(|e| format!("{}: {e}", out.display()))?;
             println!("wrote {} ({} bytes)", out.display(), bytes.len());
             if let Some(path) = a.report {

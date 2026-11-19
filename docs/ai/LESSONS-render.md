@@ -29,3 +29,6 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   0.9 rad, which made the parity rig's framing look wrong).
 - Parity renders are a stage ablation tool: run `parity::run` on the import after each stage prefix (a throwaway
   `#[ignore]` test in `crates/pipeline/tests`, release) to see which stage adds FLIP error.
+- FLIP against Unity: any geometry mismatch (pose, a toggle, PhysBone sag) puts a view's p99 near 1 and the mean
+  above 0.4, swamping shading. Look at the `--images` side-by-sides before reading scores as shader quality; static
+  avatars without an animator (Megumi, Ostgaroa) isolate shading.

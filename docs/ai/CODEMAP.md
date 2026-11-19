@@ -231,6 +231,7 @@ Internal deps: none
 - `docs/adr/0045-pinned-rust-toolchain.md`: 0045: One pinned Rust toolchain for this machine and CI
 - `docs/adr/0046-vrchat-constraint-options-from-the-sdk-runtime.md`: 0046: VRChat constraint options follow the SDK's own runtime: freeze capture, rebaking, scale offsets (format v10)
 - `docs/adr/0047-contacts-from-the-sdk-runtime.md`: 0047: Contacts follow the SDK's own runtime: boxes, face proximity, the component's node, proximity's first frame (format v11)
+- `docs/adr/0048-unity-reference-renders.md`: 0048: Unity reference renders reproduce our rig, light and runtime from a hand-off
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
