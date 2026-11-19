@@ -448,17 +448,55 @@ namespace Civbb.Exporter
                 }
                 var ext = Path.GetExtension(path).ToLowerInvariant();
                 string mime = ext == ".png" ? "image/png" : ext == ".jpg" || ext == ".jpeg" ? "image/jpeg" : null;
-                if (mime == null || !File.Exists(path))
+                byte[] bytes = mime != null && File.Exists(path) ? File.ReadAllBytes(path) : null;
+                if (bytes == null && tex is Texture2D)
+                {
+                    // Other formats (PSD, TGA, ...) as Unity imports them, re-encoded as PNG.
+                    bytes = AsPng(path);
+                    mime = "image/png";
+                }
+                if (bytes == null)
                 {
                     skippedTextures++;
                     textureIndex[path] = -1;
                     return -1;
                 }
-                int view = View(File.ReadAllBytes(path), null);
+                int view = View(bytes, null);
                 images.Add($"{{\"name\":{Str(Path.GetFileNameWithoutExtension(path))},\"bufferView\":{view},\"mimeType\":\"{mime}\"}}");
                 textures.Add($"{{\"source\":{images.Count - 1}}}");
                 textureIndex[path] = textures.Count - 1;
                 return textures.Count - 1;
+            }
+
+            /// A colour texture's imported pixels as PNG: reimported readable and uncompressed, read, then its import
+            /// settings restored. Normal maps (Unity may swizzle them) and non-texture importers give null.
+            static byte[] AsPng(string path)
+            {
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null || importer.textureType == TextureImporterType.NormalMap)
+                {
+                    return null;
+                }
+                bool readable = importer.isReadable;
+                var compression = importer.textureCompression;
+                importer.isReadable = true;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.SaveAndReimport();
+                try
+                {
+                    var src = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                    var copy = new Texture2D(src.width, src.height, TextureFormat.RGBA32, false, !importer.sRGBTexture);
+                    copy.SetPixels32(src.GetPixels32(0));
+                    var png = copy.EncodeToPNG();
+                    UnityEngine.Object.DestroyImmediate(copy);
+                    return png;
+                }
+                finally
+                {
+                    importer.isReadable = readable;
+                    importer.textureCompression = compression;
+                    importer.SaveAndReimport();
+                }
             }
 
             /// Writes `X_avatar`: humanoid map, muscle frames, and the descriptor's viewpoint and face if set.
