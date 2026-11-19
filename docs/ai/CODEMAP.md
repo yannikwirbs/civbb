@@ -30,7 +30,7 @@ Internal deps: civbb-core, civbb-format
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
 - `tests/material.rs`: Material curves (ADR 0025): Unity property names to native fields, Unity's units (sRGB colours, smoothness, V-up
 - `tests/muscle.rs`: Humanoid muscles (ADR 0014): the table against Unity's, hand-derived muscle space, poses recorded from Unity's
-- `tests/vrc_constraint.rs`: VRChat constraint options (ADR 0040, #73): every case recorded from the VRChat SDK's own constraint runtime
+- `tests/vrc_constraint.rs`: VRChat constraint options (ADR 0040, 0046): every case recorded from the VRChat SDK's own constraint runtime
 
 ## `crates/client` (civbb-client)
 
@@ -70,12 +70,13 @@ Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose, and c
 
 Internal deps: civbb-core, civbb-format
 
-- `src/contact.rs`: Contact senders and receivers: compiled volumes, a grid broadphase across avatars and receiver values (ADR 0017).
+- `src/contact.rs`: Contact senders and receivers: compiled volumes, a grid broadphase across avatars and receiver values (ADR 0017,
 - `src/lib.rs`: Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose, and contacts (design doc §7, ADRs 0015 to
 - `src/rig.rs`: Compiles an avatar's chains into one flat particle list, parents first, with per-particle parameters (ADR 0015).
 - `src/solver.rs`: Steps an avatar's chains against the animated pose (inertia, gravity, pull, stiffness, lengths, immobile, grab and
 - `tests/contact.rs`: Contact conformance, hand-derived from ADR 0017: receiver types, tags, self and others, permits, local-only,
 - `tests/solver.rs`: Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness, limits,
+- `tests/vrc_contact.rs`: Contacts (ADR 0017, 0047): every case recorded from the VRChat SDK's own contact runtime
 
 ## `crates/format` (civbb-format)
 
@@ -229,6 +230,7 @@ Internal deps: none
 - `docs/adr/0044-session-state-split-by-read-frequency.md`: 0044: Session state is split by how often it is read
 - `docs/adr/0045-pinned-rust-toolchain.md`: 0045: One pinned Rust toolchain for this machine and CI
 - `docs/adr/0046-vrchat-constraint-options-from-the-sdk-runtime.md`: 0046: VRChat constraint options follow the SDK's own runtime: freeze capture, rebaking, scale offsets (format v10)
+- `docs/adr/0047-contacts-from-the-sdk-runtime.md`: 0047: Contacts follow the SDK's own runtime: boxes, face proximity, the component's node, proximity's first frame (format v11)
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

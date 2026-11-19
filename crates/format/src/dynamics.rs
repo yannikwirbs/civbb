@@ -176,13 +176,38 @@ pub struct Contacts {
     pub receivers: Vec<ContactReceiver>,
 }
 
+/// Contact shapes (ADR 0017, 0047).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum ContactShape {
+    /// Sphere.
+    Sphere {
+        /// Radius.
+        radius: f32,
+    },
+    /// Capsule along local Y.
+    Capsule {
+        /// Radius.
+        radius: f32,
+        /// Total height including caps.
+        height: f32,
+    },
+    /// Box centred on the volume's position.
+    Box {
+        /// Edge lengths along local X, Y and Z.
+        size: Vec3,
+    },
+}
+
 /// A shape on a node, shared by senders and receivers.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContactVolume {
-    /// Parent node.
+    /// Node it is placed on (VRChat's *Root Transform*).
     pub node: NodeIndex,
-    /// Sphere or capsule.
-    pub shape: Shape,
+    /// Node whose activity enables the contact (the component's GameObject) when it is not `node` (ADR 0047).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub component: Option<NodeIndex>,
+    /// Sphere, capsule or box.
+    pub shape: ContactShape,
     /// Offset from the node.
     pub position: Vec3,
     /// Rotation relative to the node.
@@ -219,6 +244,9 @@ pub struct ContactReceiver {
     pub local_only: bool,
     /// Minimum sender speed relative to the receiver for `OnEnter`, metres per second.
     pub min_velocity: f32,
+    /// Box receivers: proximity towards the +Z face instead of the centre (*Use Face Proximity*, ADR 0047).
+    #[serde(default)]
+    pub face: bool,
 }
 
 /// Receiver types.

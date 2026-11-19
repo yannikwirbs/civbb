@@ -337,7 +337,7 @@ namespace Civbb.Exporter
             return $"{{\"value\":{Num(P(so, field).floatValue)},\"curve\":[{string.Join(",", points)}]}}";
         }
 
-        /// `X_contacts`: senders and receivers (box shapes have no format type yet, #55).
+        /// `X_contacts`: senders and receivers; the component's node when it is not the root transform (ADR 0047).
         public string Contacts()
         {
             var senders = new List<string>();
@@ -351,10 +351,13 @@ namespace Civbb.Exporter
                     {
                         var so = new SerializedObject(c);
                         int n = node(Or(P(so, "rootTransform"), c));
+                        int own = node(c.transform);
                         var shapeType = EnumName(P(so, "shapeType"));
                         float r = P(so, "radius").floatValue, h = P(so, "height").floatValue;
+                        var size = P(so, "size").vector3Value;
                         string shape = shapeType == "Sphere" ? $"{{\"Sphere\":{{\"radius\":{Num(r)}}}}}"
-                            : shapeType == "Capsule" ? $"{{\"Capsule\":{{\"radius\":{Num(r)},\"height\":{Num(h)}}}}}" : null;
+                            : shapeType == "Capsule" ? $"{{\"Capsule\":{{\"radius\":{Num(r)},\"height\":{Num(h)}}}}}"
+                            : shapeType == "Box" ? $"{{\"Box\":{{\"size\":{Nums(size.x, size.y, size.z)}}}}}" : null;
                         if (n < 0 || shape == null)
                         {
                             Skip($"contact {shapeType}");
@@ -362,7 +365,8 @@ namespace Civbb.Exporter
                         }
                         var tags = P(so, "collisionTags");
                         var tagList = Enumerable.Range(0, tags.arraySize).Select(i => Str(tags.GetArrayElementAtIndex(i).stringValue));
-                        var head = $"{{\"volume\":{{\"node\":{n},\"shape\":{shape},\"position\":{Vec(P(so, "position").vector3Value)}," +
+                        var component = own >= 0 && own != n ? $"\"component\":{own}," : "";
+                        var head = $"{{\"volume\":{{\"node\":{n},{component}\"shape\":{shape},\"position\":{Vec(P(so, "position").vector3Value)}," +
                             $"\"rotation\":{Quat(P(so, "rotation").quaternionValue)}}},\"tags\":[{string.Join(",", tagList)}]," +
                             $"\"local_only\":{Bool(P(so, "localOnly").boolValue)}";
                         if (!receiver)
@@ -372,7 +376,8 @@ namespace Civbb.Exporter
                         }
                         receivers.Add(head + $",\"parameter\":{Str(P(so, "parameter").stringValue)}," +
                             $"\"kind\":\"{EnumName(P(so, "receiverType"))}\",\"allow_self\":{Bool(P(so, "allowSelf").boolValue)}," +
-                            $"\"allow_others\":{Bool(P(so, "allowOthers").boolValue)},\"min_velocity\":{Num(P(so, "minVelocity").floatValue)}}}");
+                            $"\"allow_others\":{Bool(P(so, "allowOthers").boolValue)},\"min_velocity\":{Num(P(so, "minVelocity").floatValue)}," +
+                            $"\"face\":{Bool(P(so, "useFaceProximity").boolValue)}}}");
                     }
                     catch (MissingFieldException)
                     {

@@ -700,7 +700,8 @@ pub fn generate(spec: &Spec) -> Avatar {
 
     let volume = |node, radius| ContactVolume {
         node,
-        shape: Shape::Sphere { radius },
+        component: None,
+        shape: ContactShape::Sphere { radius },
         position: [0.0; 3],
         rotation: [0.0, 0.0, 0.0, 1.0],
     };
@@ -722,6 +723,7 @@ pub fn generate(spec: &Spec) -> Avatar {
             allow_others: true,
             local_only: true,
             min_velocity: 0.0,
+            face: false,
         }],
     };
 

@@ -19,6 +19,9 @@ A minimal Unity project that records Unity's behaviour as JSON test data (ADR 00
   copy it into `corpus/local/unity-export-vrc/Assets/Editor` and run it there; it reaches the SDK only by reflection
   and the cases hold no third-party data, so the output is committed:
   `tools/unity-batch.sh corpus/local/unity-export-vrc VrcConstraints.Record -civbbOut <abs path>/crates/anim/tests/unity/vrc_constraints.json`.
+- `Assets/Editor/VrcContacts.cs`: the VRChat SDK's contact runtime (#75, ADR 0047): a sender moving through a
+  receiver, one step a frame, for sphere, capsule and box shapes, the receiver types and face proximity. Run it like
+  `VrcConstraints.cs`, with `-civbbOut <abs path>/crates/dynamics/tests/unity/vrc_contacts.json`.
 
 `unity run` picks the editor pinned in `ProjectSettings/ProjectVersion.txt`. It always adds `-quit`, so
 `Constraints.Record` needs the Editor binary itself:

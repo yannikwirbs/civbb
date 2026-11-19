@@ -24,7 +24,7 @@ pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the data model. Bump on any incompatible change to the types in this crate.
-pub const FORMAT_VERSION: u32 = 10;
+pub const FORMAT_VERSION: u32 = 11;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -250,7 +250,8 @@ pub(crate) mod testutil {
                 receivers: vec![ContactReceiver {
                     volume: ContactVolume {
                         node: 1,
-                        shape: Shape::Sphere { radius: 0.1 },
+                        component: None,
+                        shape: ContactShape::Sphere { radius: 0.1 },
                         position: [0.0; 3],
                         rotation: [0.0, 0.0, 0.0, 1.0],
                     },
@@ -261,6 +262,7 @@ pub(crate) mod testutil {
                     allow_others: true,
                     local_only: true,
                     min_velocity: 0.05,
+                    face: false,
                 }],
             },
             constraints: vec![Constraint {

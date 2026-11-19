@@ -9,6 +9,7 @@ use civbb_core::math::Pose;
 use civbb_core::{System, jobs};
 use civbb_format::Avatar;
 use civbb_format::animator::{Binding, ParamKind, Parameter, Property};
+use civbb_format::dynamics::ReceiverKind;
 use civbb_format::material::{Material, MaterialModel};
 
 const DT: f32 = 1.0 / 90.0;
@@ -44,6 +45,8 @@ fn receiver_values_reach_parameters_on_the_next_frame() {
     // The corpus receiver sits on the head; put a sender there too and let the avatar touch itself.
     let receiver = &mut avatar.contacts.receivers[0];
     receiver.allow_self = true;
+    // Constant: 1 from the first frame of contact (Proximity starts on the second, ADR 0047).
+    receiver.kind = ReceiverKind::Constant;
     let (head, param) = (receiver.volume.node, receiver.parameter.clone());
     avatar.contacts.senders[0].volume.node = head;
     avatar.animator.as_mut().unwrap().parameters.push(Parameter {

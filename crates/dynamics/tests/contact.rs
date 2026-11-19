@@ -1,5 +1,6 @@
 //! Contact conformance, hand-derived from ADR 0017: receiver types, tags, self and others, permits, local-only,
-//! capsules, scale and clamps, inactive nodes, OnEnter speed, and the grid against brute force.
+//! capsules, scale and clamps, inactive nodes, OnEnter speed, and the grid against brute force (`tests/vrc_contact.rs`
+//! has the SDK recordings).
 
 use civbb_core::math::{Pose, euler_to_quat};
 use civbb_dynamics::contact::{Participant, segment_distance, step};
@@ -9,20 +10,21 @@ use civbb_format::dynamics::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Transform, Vec3};
 
-fn sphere(radius: f32) -> Shape {
-    Shape::Sphere { radius }
+fn sphere(radius: f32) -> ContactShape {
+    ContactShape::Sphere { radius }
 }
 
-fn vol(shape: Shape) -> ContactVolume {
+fn vol(shape: ContactShape) -> ContactVolume {
     ContactVolume {
         node: 0,
+        component: None,
         shape,
         position: [0.0; 3],
         rotation: [0.0, 0.0, 0.0, 1.0],
     }
 }
 
-fn sender(shape: Shape, tags: &[&str]) -> ContactSender {
+fn sender(shape: ContactShape, tags: &[&str]) -> ContactSender {
     ContactSender {
         volume: vol(shape),
         tags: tags.iter().map(|t| t.to_string()).collect(),
@@ -30,7 +32,7 @@ fn sender(shape: Shape, tags: &[&str]) -> ContactSender {
     }
 }
 
-fn receiver(shape: Shape, kind: ReceiverKind) -> ContactReceiver {
+fn receiver(shape: ContactShape, kind: ReceiverKind) -> ContactReceiver {
     ContactReceiver {
         volume: vol(shape),
         tags: vec!["Hand".into()],
@@ -40,6 +42,7 @@ fn receiver(shape: Shape, kind: ReceiverKind) -> ContactReceiver {
         allow_others: true,
         local_only: false,
         min_velocity: 0.0,
+        face: false,
     }
 }
 
@@ -112,6 +115,13 @@ impl Scene {
     fn value(&mut self) -> f32 {
         self.run()[0][0]
     }
+
+    /// Avatar 0's first receiver after two frames: Proximity counts a sender from its second frame of contact (ADR
+    /// 0047).
+    fn settled(&mut self) -> f32 {
+        self.run();
+        self.value()
+    }
 }
 
 fn close(a: f32, b: f32) {
@@ -150,13 +160,13 @@ fn constant_is_one_while_overlapping() {
 fn proximity_measures_the_senders_closest_point_against_the_receiver_radius() {
     let r = || receiver(sphere(0.2), ReceiverKind::Proximity);
     // Sender surface 0.1 from the centre of a 0.2 receiver: 1 - 0.1 / 0.2.
-    close(pair(r(), 0.05, 0.15).value(), 0.5);
+    close(pair(r(), 0.05, 0.15).settled(), 0.5);
     // Surface at or past the centre.
-    close(pair(r(), 0.05, 0.05).value(), 1.0);
-    close(pair(r(), 0.05, 0.0).value(), 1.0);
+    close(pair(r(), 0.05, 0.05).settled(), 1.0);
+    close(pair(r(), 0.05, 0.0).settled(), 1.0);
     // Just touching the edge, and outside.
-    close(pair(r(), 0.05, 0.25).value(), 0.0);
-    close(pair(r(), 0.05, 0.3).value(), 0.0);
+    close(pair(r(), 0.05, 0.25).settled(), 0.0);
+    close(pair(r(), 0.05, 0.3).settled(), 0.0);
 }
 
 #[test]
@@ -168,13 +178,13 @@ fn proximity_takes_the_closest_sender() {
     ]);
     s.at(1, [0.15, 0.0, 0.0]).at(2, [0.0, -0.1, 0.0]);
     // 0.5 and 1 - 0.05 / 0.2.
-    close(s.value(), 0.75);
+    close(s.settled(), 0.75);
 }
 
 #[test]
 fn capsules_are_segments_with_a_radius() {
     // Height 1 with radius 0.1: core from y = -0.4 to 0.4.
-    let cap = Shape::Capsule {
+    let cap = ContactShape::Capsule {
         radius: 0.1,
         height: 1.0,
     };
@@ -195,7 +205,7 @@ fn capsules_are_segments_with_a_radius() {
     close(s.at(1, [0.0, 0.3, 0.0]).value(), 0.0);
     // Proximity against a capsule measures to its core segment.
     let mut s = pair(receiver(cap, ReceiverKind::Proximity), 0.05, 0.0);
-    close(s.at(1, [0.1, 0.4, 0.0]).value(), 0.5);
+    close(s.at(1, [0.1, 0.4, 0.0]).settled(), 0.5);
 }
 
 #[test]
@@ -315,7 +325,7 @@ fn scale_grows_volumes_up_to_the_caps() {
     close(s.value(), 0.0);
 
     // Height 8 clamps to 6: radius 0.1, core to y = 2.9; a 0.1 sender reaches it up to 3.1.
-    let cap = Shape::Capsule {
+    let cap = ContactShape::Capsule {
         radius: 0.1,
         height: 8.0,
     };

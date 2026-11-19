@@ -1,4 +1,4 @@
-//! VRChat constraint options (ADR 0040, #73): every case recorded from the VRChat SDK's own constraint runtime
+//! VRChat constraint options (ADR 0040, 0046): every case recorded from the VRChat SDK's own constraint runtime
 //! (`tests/unity/vrc_constraints.json`, `tools/unity-truth/Assets/Editor/VrcConstraints.cs`), replayed frame by frame
 //! on one island.
 

@@ -403,6 +403,8 @@ dependencies = [
  "civbb-core",
  "civbb-corpus",
  "civbb-format",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

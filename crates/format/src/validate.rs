@@ -10,7 +10,7 @@ use crate::animator::{
 };
 use crate::avatar::Avatar;
 use crate::constraint::{ConstraintKind, WorldUp};
-use crate::dynamics::{ContactVolume, Graded, Limit, Shape};
+use crate::dynamics::{ContactShape, ContactVolume, Graded, Limit};
 use crate::expressions::{ControlKind, Menu};
 use crate::face::{EyeDriver, ShapeBind};
 use crate::material::{MaterialModel, TextureSlot};
@@ -555,13 +555,13 @@ impl V {
 
     fn volume(&mut self, v: &ContactVolume, nodes: usize, path: impl Fn() -> String) {
         self.index(v.node as usize, nodes, &path, "node");
+        if let Some(c) = v.component {
+            self.index(c as usize, nodes, &path, "component node");
+        }
         let dims = match v.shape {
-            Shape::Sphere { radius } => vec![radius],
-            Shape::Capsule { radius, height } => vec![radius, height],
-            Shape::Plane => {
-                self.fail(&path, "contact shape is a plane");
-                vec![]
-            }
+            ContactShape::Sphere { radius } => vec![radius],
+            ContactShape::Capsule { radius, height } => vec![radius, height],
+            ContactShape::Box { size } => size.to_vec(),
         };
         let ok = dims.iter().all(|d| *d >= 0.0);
         self.ensure(ok, &path, "negative or non-finite contact size");
@@ -870,7 +870,7 @@ mod tests {
             ("dynamics.chains[0]", |a| a.dynamics.chains[0].colliders[0] = 4),
             ("dynamics.colliders[0]", |a| a.dynamics.colliders[0].node = 40),
             ("contacts[0]", |a| a.contacts.receivers[0].volume.node = 40),
-            ("contacts[0]", |a| a.contacts.receivers[0].volume.shape = Shape::Plane),
+            ("contacts[0]", |a| a.contacts.receivers[0].volume.component = Some(40)),
             ("constraints[0]", |a| a.constraints[0].sources[0].node = 40),
             ("constraints[0]", |a| {
                 a.constraints[0].kind = ConstraintKind::LookAt {
@@ -902,10 +902,16 @@ mod tests {
     #[test]
     fn contact_shapes_are_checked() {
         for (shape, problem) in [
-            (Shape::Plane, "contact shape is a plane"),
-            (Shape::Sphere { radius: -1.0 }, "negative or non-finite contact size"),
             (
-                Shape::Capsule {
+                ContactShape::Sphere { radius: -1.0 },
+                "negative or non-finite contact size",
+            ),
+            (
+                ContactShape::Box { size: [0.1, -0.2, 0.3] },
+                "negative or non-finite contact size",
+            ),
+            (
+                ContactShape::Capsule {
                     radius: 0.1,
                     height: f32::NAN,
                 },

@@ -1,6 +1,6 @@
 # 0017: Contact model and a grid broadphase in `civbb-dynamics`
 
-Status: accepted
+Status: accepted; shapes, proximity's first frame and the component's node (points 2, 3, 6) refined by 0047
 Date: 2026-10-29
 
 ## Context
