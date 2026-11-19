@@ -9,7 +9,7 @@ use civbb_format::dynamics::*;
 use civbb_format::expressions::*;
 use civbb_format::face::{Face, ShapeBind, Viseme};
 use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, Node, NodeIndex};
-use civbb_format::material::{AlphaMode, Material, MaterialModel, Toon, ToonLight};
+use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, Toon, ToonLight};
 use civbb_format::math::{Transform, Vec3};
 use civbb_format::mesh::{BlendShape, Mesh, ShapeDelta, Skin, Submesh};
 
@@ -343,6 +343,7 @@ fn toon(name: &str, color: [f32; 4]) -> Material {
             rim_power: 3.0,
             matcap_tex: None,
             matcap_strength: 0.0,
+            matcap_blend: MatcapBlend::Add,
             emissive: [0.0; 3],
             emissive_tex: None,
             outline_width: 0.0,

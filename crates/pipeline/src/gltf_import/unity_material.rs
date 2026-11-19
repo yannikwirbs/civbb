@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use civbb_anim::material::to_linear;
 use civbb_format::material::{
-    AlphaMode, ColorSpace, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit,
+    AlphaMode, ColorSpace, MatcapBlend, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit,
 };
 use civbb_format::math::Vec3;
 use serde::Deserialize;
@@ -269,6 +269,7 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         rim_power: 5.0,
         matcap_tex: None,
         matcap_strength: 0.0,
+        matcap_blend: MatcapBlend::Add,
         emissive: [0.0; 3],
         emissive_tex: None,
         outline_width: 0.0,
@@ -433,8 +434,10 @@ impl Importer<'_> {
                 // VRChat's mobile shaders score closer to Unity unclamped (ADR 0050).
                 t.light = ToonLight::Additive;
                 if family == Family::MobileMatcap {
+                    // MatCap Lit multiplies the albedo by the matcap.
                     t.matcap_tex = self.unity_slot(x, "_MatCap", srgb);
                     t.matcap_strength = if t.matcap_tex.is_some() { 1.0 } else { 0.0 };
+                    t.matcap_blend = MatcapBlend::Multiply;
                 }
                 if let Some(e) = self.unity_slot(x, "_EmissionMap", srgb) {
                     t.emissive_tex = Some(e);
@@ -538,6 +541,10 @@ impl Importer<'_> {
             } else {
                 0.0
             };
+            // Normal 0, add 1, screen 2, multiply 3; normal and screen have no counterpart and add.
+            if p.f("_MatCapBlendMode", 1.0) as i32 == 3 {
+                t.matcap_blend = MatcapBlend::Multiply;
+            }
         }
         if p.on("_UseEmission") {
             t.emissive = scale(p.rgb("_EmissionColor", WHITE), p.color("_EmissionColor", WHITE)[3]);

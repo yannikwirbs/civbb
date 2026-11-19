@@ -1,7 +1,9 @@
 //! The forward pass without a device (ADRs 0023, 0034): pipeline keys, material records, outline draws, draw batching
 //! into runs, and the reverse-Z projection.
 
-use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit};
+use civbb_format::material::{
+    AlphaMode, MatcapBlend, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit,
+};
 use civbb_render::material::{MATERIAL_WORDS, NONE, PipelineKey, Shader, pack};
 use civbb_render::{Batches, Draw, MaterialId, View, batch};
 
@@ -101,6 +103,7 @@ fn material_records() {
             rim_power: 3.0,
             matcap_tex: tex(1, 0),
             matcap_strength: 0.5,
+            matcap_blend: MatcapBlend::Add,
             emissive: [0.0; 3],
             emissive_tex: None,
             outline_width: 0.0,
@@ -145,6 +148,7 @@ fn outlined_toon_materials_add_an_outline_draw() {
         rim_power: 0.0,
         matcap_tex: None,
         matcap_strength: 0.0,
+        matcap_blend: MatcapBlend::Add,
         emissive: [0.0; 3],
         emissive_tex: None,
         outline_width: 0.002,

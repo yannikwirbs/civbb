@@ -24,7 +24,7 @@ pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the data model. Bump on any incompatible change to the types in this crate.
-pub const FORMAT_VERSION: u32 = 13;
+pub const FORMAT_VERSION: u32 = 14;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -152,6 +152,7 @@ pub(crate) mod testutil {
                     rim_power: 2.0,
                     matcap_tex: None,
                     matcap_strength: 0.0,
+                    matcap_blend: MatcapBlend::Add,
                     emissive: [0.0; 3],
                     emissive_tex: None,
                     outline_width: 0.001,

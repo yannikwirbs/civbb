@@ -12,7 +12,9 @@ use civbb_format::dynamics::{
 use civbb_format::expressions::{Control, ControlKind, ExpressionParam, ExpressionParamKind, Expressions, Menu};
 use civbb_format::face::{EyeDriver, EyeLook, Face, RangeMap, ShapeBind, Viseme};
 use civbb_format::hierarchy::{HumanBone, Humanoid, NodeIndex};
-use civbb_format::material::{AlphaMode, ColorSpace, Material, MaterialModel, TextureSlot, Toon, ToonLight};
+use civbb_format::material::{
+    AlphaMode, ColorSpace, MatcapBlend, Material, MaterialModel, TextureSlot, Toon, ToonLight,
+};
 use civbb_format::math::{Quat, Transform, Vec3};
 use civbb_format::mesh::FirstPerson;
 use civbb_format::meta::{AvatarUse, Commercial, Licence, Meta, Modification};
@@ -442,6 +444,7 @@ impl Importer<'_> {
                     0.0
                 },
                 matcap_tex,
+                matcap_blend: MatcapBlend::Add,
                 emissive,
                 emissive_tex,
                 outline_width,
@@ -497,6 +500,7 @@ impl Importer<'_> {
                 rim_color: rgb(color("_RimColor", [0.0, 0.0, 0.0, 1.0])),
                 rim_power: num(&f["_RimFresnelPower"], 1.0),
                 matcap_strength: if matcap_tex.is_some() { 1.0 } else { 0.0 },
+                matcap_blend: MatcapBlend::Add,
                 matcap_tex,
                 emissive: rgb(color("_EmissionColor", [0.0, 0.0, 0.0, 1.0])),
                 emissive_tex: self.mtoon_slot(&t["_EmissionMap"], ColorSpace::Srgb, None),

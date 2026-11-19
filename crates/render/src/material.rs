@@ -1,7 +1,7 @@
 //! Materials as the uber-shaders read them: one fixed-size record per material in the material buffer, and the
 //! pipeline each material draws with (design doc §6, ADR 0023).
 
-use civbb_format::material::{AlphaMode, Material, MaterialModel, TextureSlot, ToonLight};
+use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, TextureSlot, ToonLight};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
 pub const MATERIAL_WORDS: usize = 84;
@@ -88,7 +88,8 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut emissive = [0.0; 3];
     // Toon shadow colour, and 1 in w for the clamped light model.
     let mut shade = [0.0; 4];
-    let mut rim = [0.0; 3];
+    // Toon rim colour, and 1 in w for a multiplying matcap.
+    let mut rim = [0.0; 4];
     // Metallic, roughness, normal scale, alpha cutoff.
     let mut params = [0.0, 1.0, 1.0, 0.0];
     // Shade shift, shade toony, rim power, matcap strength.
@@ -117,7 +118,12 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
             emissive = t.emissive;
             let clamped = if t.light == ToonLight::Clamped { 1.0 } else { 0.0 };
             shade = [t.shade_color[0], t.shade_color[1], t.shade_color[2], clamped];
-            rim = t.rim_color;
+            let multiply = if t.matcap_blend == MatcapBlend::Multiply {
+                1.0
+            } else {
+                0.0
+            };
+            rim = [t.rim_color[0], t.rim_color[1], t.rim_color[2], multiply];
             params[2] = t.normal_scale;
             toon = [t.shade_shift, t.shade_toony, t.rim_power, t.matcap_strength];
             outline = [
@@ -150,7 +156,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     vec4(base_color);
     vec4(xyz(emissive));
     vec4(shade);
-    vec4(xyz(rim));
+    vec4(rim);
     vec4(params);
     vec4(toon);
     let mut slot_words = Vec::with_capacity(56);

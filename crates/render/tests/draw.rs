@@ -4,7 +4,9 @@
 //! Vulkan device.
 
 use civbb_format::Avatar;
-use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit};
+use civbb_format::material::{
+    AlphaMode, MatcapBlend, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit,
+};
 use civbb_format::math::Mat4;
 use civbb_format::mesh::{Mesh, Submesh};
 use civbb_render::material::{MATERIAL_WORDS, pack};
@@ -77,6 +79,7 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         rim_power: 0.0,
         matcap_tex: None,
         matcap_strength: 0.0,
+        matcap_blend: MatcapBlend::Add,
         emissive: [0.0; 3],
         emissive_tex: None,
         outline_width: 0.0,
@@ -333,6 +336,54 @@ fn toon_light_models_add_or_clamp_the_ambient() {
         1,
         "clamped (lilToon and others)",
     );
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+#[test]
+fn matcaps_add_or_multiply() {
+    let Some(ctx) = context() else { return };
+    let mut scene = Scene::new(
+        &ctx,
+        Capacity {
+            vertices: 8,
+            indices: 12,
+            deltas: 0,
+            skinned: 8,
+            materials: 2,
+        },
+    )
+    .unwrap();
+    // A uniform half-grey matcap (linear 128 / 255).
+    let half = scene.add_texture(&ctx, 1, 1, &[128, 128, 128, 255], false).unwrap();
+    let grey = |blend| {
+        let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
+        if let MaterialModel::Toon(t) = &mut m {
+            t.light = ToonLight::Clamped;
+            t.matcap_tex = Some(TextureSlot {
+                texture: 0,
+                uv_set: 0,
+                scale_offset: [1.0, 1.0, 0.0, 0.0],
+            });
+            t.matcap_strength = 1.0;
+            t.matcap_blend = blend;
+        }
+        material(m, AlphaMode::Opaque)
+    };
+    let add = scene.add_material(&ctx, &grey(MatcapBlend::Add), &[half]).unwrap();
+    let multiply = scene.add_material(&ctx, &grey(MatcapBlend::Multiply), &[half]).unwrap();
+    let meshes = [
+        quad([-3.0, 0.0], [-3.0, 3.0], 0.0, 0),
+        quad([0.0, 3.0], [-3.0, 3.0], 0.0, 1),
+    ];
+    let mut view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+    view.light_dir = [0.0, 0.0, 1.0];
+    view.light_color = [1.0; 3];
+    view.ambient = [0.0; 3];
+    let pixels = render(&ctx, &mut scene, &meshes, &[add, multiply], &[], &view);
+    // 0.5 lit: plus the matcap 0.5 + 0.502 saturates; times it 0.5 * 0.502 = 0.251.
+    assert_near(pixel(&pixels, 16, 32), [255, 255, 255], 1, "add (MToon, lilToon)");
+    assert_near(pixel(&pixels, 48, 32), [64, 64, 64], 1, "multiply (VRChat MatCap Lit)");
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }

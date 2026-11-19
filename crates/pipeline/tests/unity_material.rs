@@ -2,7 +2,7 @@
 //! each family's mapping to the native Toon, PBR and Unlit models, on hand-written saved properties.
 
 use base64::Engine;
-use civbb_format::material::{AlphaMode, Material, MaterialModel, Toon, ToonLight};
+use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, Toon, ToonLight};
 use civbb_pipeline::gltf_import::{Imported, Limits, import};
 use serde_json::{Value, json};
 
@@ -93,6 +93,7 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
     assert!(close(t.shade_shift, 0.5) && close(t.shade_toony, 0.8));
     assert_eq!(t.shade_tex, t.base_color_tex, "no shadow texture: the main one");
     assert!(t.matcap_tex.is_some() && close(t.matcap_strength, 0.7));
+    assert_eq!(t.matcap_blend, MatcapBlend::Add, "lilToon's default blend mode adds");
     assert_eq!(
         (t.rim_color, t.emissive),
         ([0.0; 3], [0.0; 3]),
@@ -197,6 +198,7 @@ fn standard_vrchat_mobile_unlit_and_unknown_shaders() {
 
     let m = material(json!({"shader": "VRChat/Mobile/MatCap Lit", "textures": {"_MatCap": tex([1.0, 1.0, 0.0, 0.0])}}));
     assert!(toon(&m).matcap_tex.is_some() && toon(&m).matcap_strength == 1.0);
+    assert_eq!(toon(&m).matcap_blend, MatcapBlend::Multiply, "MatCap Lit multiplies");
 
     let m = material(json!({"shader": "VRChat/Mobile/Particles/Additive"}));
     assert!(matches!(m.model, MaterialModel::Unlit(_)) && m.alpha == AlphaMode::Blend);

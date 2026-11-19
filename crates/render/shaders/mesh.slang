@@ -36,7 +36,7 @@ struct Material
     float4 base_color;
     float4 emissive; // xyz
     float4 shade;    // xyz, toon shadow colour; w 1: light plus ambient, clamped, lights the blend (ToonLight)
-    float4 rim;      // xyz, toon rim colour
+    float4 rim;      // xyz, toon rim colour; w 1: the matcap multiplies (MatcapBlend)
     float4 params;   // metallic, roughness, normal scale, alpha cutoff (0: no cutoff)
     float4 toon;     // shade shift, shade toony, rim power, matcap strength
     Slot slots[6];   // base, normal, metallic-roughness or shade, occlusion, emissive, matcap
@@ -209,7 +209,11 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
         float3 x = normalize(float3(e.z, 0, -e.x));
         float3 y = cross(e, x);
         float2 uv = float2(dot(x, n), -dot(y, n)) * 0.495 + 0.5;
-        color += m.toon.w * sample(m.slots[5], float4(uv, uv)).rgb;
+        float3 mc = sample(m.slots[5], float4(uv, uv)).rgb;
+        if (m.rim.w > 0.5)
+            color = lerp(color, color * mc, m.toon.w); // VRChat MatCap Lit, lilToon multiply
+        else
+            color += m.toon.w * mc;
     }
     color += m.emissive.xyz * sample(m.slots[4], i.uv).rgb;
     return float4(color, lit.a);

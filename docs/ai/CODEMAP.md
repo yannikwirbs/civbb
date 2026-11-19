@@ -235,6 +235,7 @@ Internal deps: none
 - `docs/adr/0048-unity-reference-renders.md`: 0048: Unity reference renders reproduce our rig, light and runtime from a hand-off
 - `docs/adr/0049-physbones-from-the-sdk-runtime.md`: 0049: PhysBone chains step as the VRChat SDK's runtime does, fitted to its recordings
 - `docs/adr/0050-toon-light-models.md`: 0050: Toon materials name their light model: MToon's additive ambient or the Unity families' clamped light
+- `docs/adr/0051-matcap-blend.md`: 0051: Toon matcaps add or multiply
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
