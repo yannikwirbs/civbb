@@ -115,7 +115,7 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 - Toon outlines (ADR 0034): inverted hulls, a second indirect draw per outlined toon submesh (`Shader::Outline`,
   front faces culled), width in metres times the width texture's G channel sampled in the vertex shader, unlit
-  outline colour. Material records are 92 words.
+  outline colour. Material records are 104 words.
 - The viewer's title and `--frames` summary report draws and skinned meshes of the last frame. KTX2 textures are
   checked (header, level index, one 2D image) and transcoded to BC7 by the pure-Rust `basisu` crate (ETC1S, UASTC
   and XUASTC); the renderer uploads BC7 levels and device selection requires BC textures. RGBA8 textures get CPU

@@ -44,6 +44,8 @@ struct Material
     Slot outline_width; // multiplies the width by its G channel
     float4 rim_shade;      // toon rim shade colour in xyz, strength in w (0: off)
     float4 rim_shade_ramp; // its ramp's start and end, fresnel power
+    float4 matcap;         // toon matcap tint in xyz
+    Slot matcap_mask;      // scales the matcap strength by its R channel
 };
 
 struct View
@@ -218,11 +220,12 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
         float3 x = normalize(float3(e.z, 0, -e.x));
         float3 y = cross(e, x);
         float2 uv = float2(dot(x, n), -dot(y, n)) * 0.495 + 0.5;
-        float3 mc = sample(m.slots[5], float4(uv, uv)).rgb;
+        float3 mc = sample(m.slots[5], float4(uv, uv)).rgb * m.matcap.xyz;
+        float strength = m.toon.w * sample(m.matcap_mask, i.uv).r;
         if (m.rim.w > 0.5)
-            color = lerp(color, color * mc, m.toon.w); // VRChat MatCap Lit, lilToon multiply
+            color = lerp(color, color * mc, strength); // VRChat MatCap Lit, lilToon multiply
         else
-            color += m.toon.w * mc;
+            color += strength * mc;
     }
     color += m.emissive.xyz * sample(m.slots[4], i.uv).rgb;
     return float4(color, lit.a);

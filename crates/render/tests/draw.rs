@@ -81,6 +81,8 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         matcap_tex: None,
         matcap_strength: 0.0,
         matcap_blend: MatcapBlend::Add,
+        matcap_color: [1.0; 3],
+        matcap_mask_tex: None,
         emissive: [0.0; 3],
         emissive_tex: None,
         outline_width: 0.0,
@@ -355,24 +357,33 @@ fn matcaps_add_or_multiply() {
         },
     )
     .unwrap();
-    // A uniform half-grey matcap (linear 128 / 255).
+    // A uniform half-grey matcap (linear 128 / 255) and a mask of 64 / 255.
     let half = scene.add_texture(&ctx, 1, 1, &[128, 128, 128, 255], false).unwrap();
-    let grey = |blend| {
+    let quarter = scene.add_texture(&ctx, 1, 1, &[64, 64, 64, 255], false).unwrap();
+    let slot = |texture| {
+        Some(TextureSlot {
+            texture,
+            uv_set: 0,
+            scale_offset: [1.0, 1.0, 0.0, 0.0],
+        })
+    };
+    let grey = |blend, matcap_color, matcap_mask_tex| {
         let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
         if let MaterialModel::Toon(t) = &mut m {
             t.light = ToonLight::Clamped;
-            t.matcap_tex = Some(TextureSlot {
-                texture: 0,
-                uv_set: 0,
-                scale_offset: [1.0, 1.0, 0.0, 0.0],
-            });
+            t.matcap_tex = slot(0);
             t.matcap_strength = 1.0;
             t.matcap_blend = blend;
+            t.matcap_color = matcap_color;
+            t.matcap_mask_tex = matcap_mask_tex;
         }
         material(m, AlphaMode::Opaque)
     };
-    let add = scene.add_material(&ctx, &grey(MatcapBlend::Add), &[half]).unwrap();
-    let multiply = scene.add_material(&ctx, &grey(MatcapBlend::Multiply), &[half]).unwrap();
+    // Added at a quarter by the mask; multiplied with a half tint.
+    let add = grey(MatcapBlend::Add, [1.0; 3], slot(1));
+    let add = scene.add_material(&ctx, &add, &[half, quarter]).unwrap();
+    let multiply = grey(MatcapBlend::Multiply, [0.5; 3], None);
+    let multiply = scene.add_material(&ctx, &multiply, &[half, quarter]).unwrap();
     let meshes = [
         quad([-3.0, 0.0], [-3.0, 3.0], 0.0, 0),
         quad([0.0, 3.0], [-3.0, 3.0], 0.0, 1),
@@ -382,9 +393,20 @@ fn matcaps_add_or_multiply() {
     view.light_color = [1.0; 3];
     view.ambient = [0.0; 3];
     let pixels = render(&ctx, &mut scene, &meshes, &[add, multiply], &[], &view);
-    // 0.5 lit: plus the matcap 0.5 + 0.502 saturates; times it 0.5 * 0.502 = 0.251.
-    assert_near(pixel(&pixels, 16, 32), [255, 255, 255], 1, "add (MToon, lilToon)");
-    assert_near(pixel(&pixels, 48, 32), [64, 64, 64], 1, "multiply (VRChat MatCap Lit)");
+    // 0.5 lit: plus the matcap times the mask 0.5 + 0.502 * 0.251 = 0.626; times the tinted matcap
+    // 0.5 * 0.502 * 0.5 = 0.1255.
+    assert_near(
+        pixel(&pixels, 16, 32),
+        [160, 160, 160],
+        1,
+        "add (MToon, lilToon), masked",
+    );
+    assert_near(
+        pixel(&pixels, 48, 32),
+        [32, 32, 32],
+        1,
+        "multiply (VRChat MatCap Lit), tinted",
+    );
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }

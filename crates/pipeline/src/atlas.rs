@@ -55,6 +55,7 @@ fn slots(m: &mut MaterialModel) -> Vec<(&mut Option<TextureSlot>, bool)> {
             (&mut t.normal_tex, true),
             (&mut t.shade_tex, true),
             (&mut t.matcap_tex, false),
+            (&mut t.matcap_mask_tex, true),
             (&mut t.emissive_tex, true),
             (&mut t.outline_width_tex, true),
         ],

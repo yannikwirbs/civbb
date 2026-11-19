@@ -4,7 +4,7 @@
 use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, TextureSlot, ToonLight};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
-pub const MATERIAL_WORDS: usize = 92;
+pub const MATERIAL_WORDS: usize = 104;
 /// A texture slot without a texture.
 pub const NONE: u32 = u32::MAX;
 
@@ -94,13 +94,15 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut params = [0.0, 1.0, 1.0, 0.0];
     // Shade shift, shade toony, rim power, matcap strength.
     let mut toon = [0.0; 4];
-    // Base, normal, metallic-roughness or shade, occlusion, emissive, matcap, outline width.
-    let mut slots: [Option<TextureSlot>; 7] = [None; 7];
+    // Base, normal, metallic-roughness or shade, occlusion, emissive, matcap, outline width, matcap mask.
+    let mut slots: [Option<TextureSlot>; 8] = [None; 8];
     // Outline colour and width.
     let mut outline = [0.0; 4];
     // Rim shade colour and strength (0: off); its ramp's start and end and its fresnel power.
     let mut rim_shade = [0.0; 4];
     let mut rim_shade_ramp = [0.0, 1.0, 1.0, 0.0];
+    // Matcap tint.
+    let mut matcap = [1.0, 1.0, 1.0, 0.0];
     match &m.model {
         MaterialModel::Pbr(p) => {
             base_color = p.base_color;
@@ -112,6 +114,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 p.metallic_roughness_tex,
                 p.occlusion_tex,
                 p.emissive_tex,
+                None,
                 None,
                 None,
             ];
@@ -151,7 +154,9 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 t.emissive_tex,
                 t.matcap_tex,
                 t.outline_width_tex,
+                t.matcap_mask_tex,
             ];
+            matcap = [t.matcap_color[0], t.matcap_color[1], t.matcap_color[2], 0.0];
         }
         MaterialModel::Unlit(u) => {
             base_color = u.color;
@@ -170,7 +175,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     vec4(rim);
     vec4(params);
     vec4(toon);
-    let mut slot_words = Vec::with_capacity(56);
+    let mut slot_words = Vec::with_capacity(64);
     for slot in slots {
         let (st, tex) = match slot.and_then(|s| Some((s, *textures.get(s.texture as usize)?))) {
             Some((s, index)) => (s.scale_offset, [index, u32::from(s.uv_set), 0, 0]),
@@ -182,8 +187,10 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     // After the six slots so their offsets stay: the outline, then its width slot.
     words.extend(&slot_words[..48]);
     words.extend(outline.map(f32::to_bits));
-    words.extend(&slot_words[48..]);
+    words.extend(&slot_words[48..56]);
     words.extend(rim_shade.map(f32::to_bits));
     words.extend(rim_shade_ramp.map(f32::to_bits));
+    words.extend(matcap.map(f32::to_bits));
+    words.extend(&slot_words[56..]);
     words.try_into().expect("a material record is MATERIAL_WORDS long")
 }

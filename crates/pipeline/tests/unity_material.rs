@@ -70,9 +70,9 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
             "_ShadowBlur": 0.2, "_UseRim": 0, "_UseMatCap": 1, "_MatCapBlend": 0.7, "_UseEmission": 0,
             "_OutlineWidth": 0.1, "_BumpScale": 0.8, "_UseBumpMap": 0, "_UseRimShade": 1, "_RimShadeBorder": 0.6},
         "colors": {"_Color": [0.5, 0.5, 0.5, 1], "_ShadowColor": [0.5, 0.5, 0.5, 1], "_OutlineColor": [1, 0, 0, 1],
-            "_RimColor": [1, 1, 1, 1], "_EmissionColor": [1, 1, 1, 1]},
+            "_RimColor": [1, 1, 1, 1], "_EmissionColor": [1, 1, 1, 1], "_MatCapColor": [0.5, 0.5, 0.5, 0.5]},
         "textures": {"_MainTex": tex([2.0, 3.0, 0.25, 0.5]), "_MatCapTex": tex([1.0, 1.0, 0.0, 0.0]),
-            "_BumpMap": tex([1.0, 1.0, 0.0, 0.0])},
+            "_BumpMap": tex([1.0, 1.0, 0.0, 0.0]), "_MatCapBlendMask": tex([1.0, 1.0, 0.0, 0.0])},
     }));
     assert_eq!(m.name, "m");
     assert_eq!(
@@ -96,7 +96,9 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
     );
     assert!(close(t.shade_shift, 0.5) && close(t.shade_toony, 0.8));
     assert_eq!(t.shade_tex, t.base_color_tex, "no shadow texture: the main one");
-    assert!(t.matcap_tex.is_some() && close(t.matcap_strength, 0.7));
+    // The tint's alpha scales the strength; its colour tints the matcap.
+    assert!(t.matcap_tex.is_some() && close(t.matcap_strength, 0.35) && close(t.matcap_color[0], half));
+    assert!(t.matcap_mask_tex.is_some());
     assert_eq!(t.matcap_blend, MatcapBlend::Add, "lilToon's default blend mode adds");
     let rim_shade = t.rim_shade.expect("rim shade on");
     assert!(close(rim_shade.color[0], half) && rim_shade.border == 0.6 && rim_shade.blur == 1.0);
@@ -258,4 +260,37 @@ fn liltoon_emission_gradient_scales_the_emission_by_its_start() {
     // HDR 2 is 2^2.2 in linear (Unity's GammaToLinearSpace), times the averaged texel 0.5.
     let want = 2f32.powf(2.2) * 0.5;
     assert!(close(t.emissive[0], want), "{:?} != {want}", t.emissive);
+}
+
+#[test]
+fn poiyomi_matcap_takes_its_add_or_multiply_weight_and_tint() {
+    let matcap = |floats: Value| {
+        let mut f = json!({"_MatcapEnable": 1, "_MatcapIntensity": 2});
+        f.as_object_mut().unwrap().extend(floats.as_object().unwrap().clone());
+        toon(&material(json!({
+            "shader": "Hidden/.poiyomi/• Poiyomi Toon •/Body", "floats": f,
+            "colors": {"_MatcapColor": [0.5, 0.5, 0.5, 1]},
+            "textures": {"_Matcap": tex([1.0, 1.0, 0.0, 0.0]), "_MatcapMask": tex([1.0, 1.0, 0.0, 0.0])},
+        })))
+        .clone()
+    };
+    // Mostly replaced (no counterpart): next to nothing is added.
+    let t = matcap(json!({"_MatcapReplace": 0.02}));
+    assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Add, 0.0));
+    assert!(close(t.matcap_color[0], 0.21404114 * 2.0) && t.matcap_mask_tex.is_some());
+    let t = matcap(json!({"_MatcapMultiply": 0.5}));
+    assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Multiply, 0.5));
+    let t = matcap(json!({"_MatcapAdd": 0.25, "_MatcapEmissionStrength": 0.5}));
+    assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Add, 0.75));
+}
+
+#[test]
+fn liltoon_emission_main_strength_tints_the_emission_with_the_base_colour() {
+    let t = toon(&material(json!({
+        "shader": "lilToon",
+        "floats": {"_UseEmission": 1, "_EmissionMainStrength": 1},
+        "colors": {"_Color": [1, 0.5, 0, 1], "_EmissionColor": [1, 1, 1, 1]},
+    })))
+    .clone();
+    assert!(close(t.emissive[0], 1.0) && close(t.emissive[1], 0.21404114) && t.emissive[2] == 0.0);
 }

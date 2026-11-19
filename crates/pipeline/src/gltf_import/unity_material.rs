@@ -271,6 +271,8 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         matcap_tex: None,
         matcap_strength: 0.0,
         matcap_blend: MatcapBlend::Add,
+        matcap_color: [1.0; 3],
+        matcap_mask_tex: None,
         emissive: [0.0; 3],
         emissive_tex: None,
         outline_width: 0.0,
@@ -380,8 +382,20 @@ impl Importer<'_> {
                     t.normal_scale = p.f("_BumpScale", 1.0);
                 }
                 if p.on("_MatcapEnable") {
+                    // Poiyomi blends the tinted matcap by separate replace, multiply and add weights (the matcap
+                    // emission adds too); replace has no counterpart.
                     t.matcap_tex = self.unity_slot(x, "_Matcap", srgb);
-                    t.matcap_strength = p.f("_MatcapIntensity", 1.0);
+                    let tint = p.color("_MatcapColor", WHITE);
+                    t.matcap_color = scale([tint[0], tint[1], tint[2]], p.f("_MatcapIntensity", 1.0));
+                    let add = p.f("_MatcapAdd", 0.0) + p.f("_MatcapEmissionStrength", 0.0);
+                    let multiply = p.f("_MatcapMultiply", 0.0);
+                    if multiply > add {
+                        t.matcap_blend = MatcapBlend::Multiply;
+                    }
+                    t.matcap_strength = add.max(multiply) * tint[3];
+                    if !p.on("_MatcapMaskInvert") {
+                        t.matcap_mask_tex = self.unity_slot(x, "_MatcapMask", ColorSpace::Linear);
+                    }
                 }
                 if p.on("_EnableRimLighting") {
                     t.rim_color = scale(p.rgb("_RimLightColor", WHITE), p.color("_RimLightColor", WHITE)[3]);
@@ -579,10 +593,16 @@ impl Importer<'_> {
             if p.f("_MatCapBlendMode", 1.0) as i32 == 3 {
                 t.matcap_blend = MatcapBlend::Multiply;
             }
+            let tint = p.color("_MatCapColor", WHITE);
+            t.matcap_color = [tint[0], tint[1], tint[2]];
+            t.matcap_strength *= tint[3];
+            t.matcap_mask_tex = self.unity_slot(x, "_MatCapBlendMask", ColorSpace::Linear);
         }
         if p.on("_UseEmission") {
             t.emissive = scale(p.rgb("_EmissionColor", WHITE), p.color("_EmissionColor", WHITE)[3]);
             t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
+            // `_EmissionMainStrength` multiplies the emission by the albedo; the main texture's share is left out.
+            t.emissive = mul(t.emissive, lerp([1.0; 3], base_rgb, p.f("_EmissionMainStrength", 0.0)));
             if p.on("_EmissionUseGrad") {
                 // The gradient is sampled at speed times time; without time in our runtime, at its start (where
                 // Unity's reference renders sample it too).

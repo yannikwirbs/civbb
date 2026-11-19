@@ -103,6 +103,10 @@ pub struct Toon {
     pub matcap_strength: f32,
     /// How the matcap combines with the lit colour.
     pub matcap_blend: MatcapBlend,
+    /// Tints the matcap texture.
+    pub matcap_color: Vec3,
+    /// Scales the matcap strength per texel by its red channel.
+    pub matcap_mask_tex: Option<TextureSlot>,
     /// Emission colour.
     pub emissive: Vec3,
     /// Emission texture.

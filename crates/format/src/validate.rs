@@ -393,6 +393,7 @@ impl V {
                     &x.normal_tex,
                     &x.shade_tex,
                     &x.matcap_tex,
+                    &x.matcap_mask_tex,
                     &x.emissive_tex,
                     &x.outline_width_tex,
                 ],
