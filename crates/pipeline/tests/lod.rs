@@ -242,7 +242,7 @@ fn chain(a: &Avatar, l: &Lods, name: &str) {
     }
 }
 
-/// A submesh's edges between vertices welded by position.
+/// A submesh's edges between vertices welded by position, of triangles with three distinct positions.
 struct Edges {
     /// Used by one triangle.
     open: HashSet<(u32, u32)>,
@@ -262,8 +262,12 @@ fn edges(m: &Mesh, indices: &[u32], submeshes: &[Submesh]) -> Vec<Edges> {
             let mut uses: HashMap<(u32, u32), u32> = HashMap::new();
             let range = s.first_index as usize..(s.first_index + s.index_count) as usize;
             for t in indices[range].chunks(3) {
+                let t = [t[0], t[1], t[2]].map(|v| weld[v as usize]);
+                // Two corners at one position: the triangle draws nothing, and the simplifier drops it (#74).
+                if t[0] == t[1] || t[1] == t[2] || t[2] == t[0] {
+                    continue;
+                }
                 for (p, q) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
-                    let (p, q) = (weld[p as usize], weld[q as usize]);
                     *uses.entry((p.min(q), p.max(q))).or_default() += 1;
                 }
             }
