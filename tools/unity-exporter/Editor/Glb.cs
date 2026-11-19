@@ -29,7 +29,7 @@ namespace Civbb.Exporter
             w.Viewpoint = vrc.Viewpoint();
             w.Face = vrc.Face();
             w.Humanoid(root.transform);
-            var animator = AnimatorExport.Write(root.transform, layers);
+            var animator = AnimatorExport.Write(root.transform, layers, vrc.Masks);
             void Put(string name, string json)
             {
                 if (json != null)

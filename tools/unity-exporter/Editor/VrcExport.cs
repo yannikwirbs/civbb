@@ -27,8 +27,8 @@ namespace Civbb.Exporter
         readonly List<string> notes = new List<string>();
         readonly Dictionary<string, int> skipped = new Dictionary<string, int>();
 
-        /// The descriptor's layer masks by group, filled by `Layers` (the exporter ignores them; reference renders
-        /// apply them as VRChat does).
+        /// The descriptor's layer masks by group, filled by `Layers`: the animator export intersects each layer's mask
+        /// with its group's; reference renders apply them as VRChat does.
         public readonly Dictionary<string, AvatarMask> Masks = new Dictionary<string, AvatarMask>();
 
         public VrcExport(Transform root, Func<Transform, int> node)
@@ -101,7 +101,7 @@ namespace Civbb.Exporter
                 var l = specials.GetArrayElementAtIndex(i);
                 special += custom && !P(l, "isDefault").boolValue && P(l, "animatorController").objectReferenceValue != null ? 1 : 0;
             }
-            notes.Add($"{used} playable layers ({defaults} default, {masks} masks and {special} special layers ignored)");
+            notes.Add($"{used} playable layers ({defaults} default, {masks} masks applied, {special} special layers ignored)");
             return Playable.Select(g => (g, groups[g])).ToList();
         }
 

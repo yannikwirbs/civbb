@@ -19,7 +19,9 @@ namespace Civbb.Exporter
             o != null && AssetDatabase.GetAssetPath(o).StartsWith("Packages/com.vrchat.", StringComparison.Ordinal);
 
         /// The extension JSON (null without layers) and a report fragment. A null path leaves its group empty.
-        public static (string json, string report) Write(Transform root, IList<(string group, string path)> layers)
+        /// `masks`: the descriptor's mask per group (VRChat masks each playable layer's whole output with it).
+        public static (string json, string report) Write(Transform root, IList<(string group, string path)> layers,
+            IReadOnlyDictionary<string, AvatarMask> masks = null)
         {
             if (layers.All(l => l.path == null))
             {
@@ -35,7 +37,9 @@ namespace Civbb.Exporter
             {
                 if (controllers[g] != null)
                 {
-                    w.Layers(controllers[g], g);
+                    AvatarMask groupMask = null;
+                    masks?.TryGetValue(layers[g].group, out groupMask);
+                    w.Layers(controllers[g], g, groupMask);
                 }
             }
             // VRChat's Action layer starts at weight 0; Playable Layer Control behaviours raise it.
@@ -100,41 +104,42 @@ namespace Civbb.Exporter
                 }
             }
 
-            public void Layers(AnimatorController ac, int group)
+            /// The controller's layers; each layer's mask is intersected with the group's descriptor mask, which is
+            /// what masking the whole controller's output amounts to (#80).
+            public void Layers(AnimatorController ac, int group, AvatarMask groupMask)
             {
                 foreach (var l in ac.layers)
                 {
                     syncedLayers += l.syncedLayerIndex >= 0 ? 1 : 0;
-                    var mask = l.avatarMask != null ? Mask(l.avatarMask) : "null";
+                    var mask = Mask(l.avatarMask, groupMask);
                     layers.Add($"{{\"name\":{Str(l.name)},\"group\":{group},\"weight\":{Num(l.defaultWeight)}," +
                         $"\"blending\":\"{(l.blendingMode == AnimatorLayerBlendingMode.Additive ? "Additive" : "Override")}\"," +
                         $"\"mask\":{mask},\"state_machine\":{Machine(l.stateMachine)}}}");
                 }
             }
 
-            static string Mask(AvatarMask m)
+            /// Both masks as one: body parts active in both, transforms active in both. A missing mask, or one
+            /// without transforms, lets everything through.
+            static string Mask(AvatarMask a, AvatarMask b)
             {
+                if (a == null && b == null)
+                {
+                    return "null";
+                }
+                bool Part(AvatarMask m, int i) => m == null || m.GetHumanoidBodyPartActive((AvatarMaskBodyPart)i);
+                List<string> Paths(AvatarMask m) => m == null || m.transformCount == 0 ? null
+                    : Enumerable.Range(0, m.transformCount).Where(m.GetTransformActive).Select(m.GetTransformPath).ToList();
                 var parts = new List<string>();
                 for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)
                 {
-                    if (m.GetHumanoidBodyPartActive((AvatarMaskBodyPart)i))
+                    if (Part(a, i) && Part(b, i))
                     {
                         parts.Add(Str(((AvatarMaskBodyPart)i).ToString().Replace("IK", "Ik")));
                     }
                 }
-                string transforms = "null";
-                if (m.transformCount > 0)
-                {
-                    var paths = new List<string>();
-                    for (int i = 0; i < m.transformCount; i++)
-                    {
-                        if (m.GetTransformActive(i))
-                        {
-                            paths.Add(Str(m.GetTransformPath(i)));
-                        }
-                    }
-                    transforms = "[" + string.Join(",", paths) + "]";
-                }
+                var (pa, pb) = (Paths(a), Paths(b));
+                var paths = pa == null ? pb : pb == null ? pa : pa.Intersect(pb).ToList();
+                string transforms = paths == null ? "null" : "[" + string.Join(",", paths.Select(x => Str(x))) + "]";
                 return $"{{\"body_parts\":[{string.Join(",", parts)}],\"transforms\":{transforms}}}";
             }
 

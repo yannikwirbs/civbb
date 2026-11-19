@@ -9,14 +9,14 @@ What exists, by area. Read the section for the area you touch; update it when th
   inuinu, KohzieBoi, Megumi); 13 exports in `corpus/local/unity-glb/` all import and build (table on #36). VRChat
   components are read by type and field name, no SDK reference (ADR 0042): descriptor playable layers (groups
   Base, Additive, Gesture, Action, FX; Action starts at 0; SDK default layers and proxy clips referenced, not
-  copied), behaviours, viewpoint, visemes, blink, eye look, expressions, PhysBones and colliders, contacts, VRChat
+  copied; each layer's mask intersected with its group's descriptor mask, #80), behaviours, viewpoint, visemes, blink, eye look, expressions, PhysBones and colliders, contacts, VRChat
   constraints. `X_avatar` carries muscle frames and the face. Unity constraints export the target's local
   transform as at-rest (`Object.Instantiate` resets it). `Batch.Import` survives the SDK's domain reload.
 - Materials (ADR 0043): `X_toon_material` is the material as Unity saved it plus the shader GUID; the importer
   fingerprints GUID (lilToon variant table), name, markers, and maps lilToon, Poiyomi, UTS2, MToon, Standard,
   VRChat Mobile and unlit to Toon/PBR/Unlit (`gltf_import/unity_material.rs`). Toon materials name their light
-  model (ADR 0050): lilToon, Poiyomi, UTS2 clamp light plus ambient; MToon, VRM and VRChat Mobile add the ambient. Approximations until Unity reference
-  renders score them.
+  model (ADR 0050): lilToon, Poiyomi, UTS2 clamp light plus ambient; MToon, VRM and VRChat Mobile add the
+  ambient. Mappings are scored against Unity reference renders (#82).
 - Verified against Unity (`tools/unity-truth/Assets/Editor/Exported.cs` records into `corpus/local/unity-truth`,
   `crates/pipeline/tests/unity_export.rs` compares, local only): muscle, rotation, Euler, scale and blendshape
   curves of HAOLAN, Tessakuchan, Cokoro, Little Blackbird and Yumeka clips exact; 10 Unity constraints within
