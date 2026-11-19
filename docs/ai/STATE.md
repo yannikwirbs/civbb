@@ -115,8 +115,9 @@ What exists, by area. Read the section for the area you touch; update it when th
 - Unity as the reference (ADR 0048): `civbb build --unstaged` packages the import, `civbb-client rig <pkg>` writes
   the hand-off (`parity::Handoff`: rig, light, dt, parameters, states), the exporter renders `<state>-<view>.png`,
   and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). All 13 exports still red at
-  rest, but after #82 the shading matches on every family: Megumi 0.08 to 0.26, Inuinu 0.09 to 0.21, Taro 0.11 to
-  0.21 best; HAOLAN PC and Quest 0.46 to 0.59 worst, from rest-pose differences (#86). Table on #82.
+  rest, but after #82 (shading) and #86/#85 (rest pose, ADR 0055) Blackbird Quest 0.07, Inuinu 0.06, HAOLAN Quest
+  0.09, Megumi 0.08 front are best; Yumeka 0.53 (shading of its default outfit, #87) worst. Tables on #82, #86, #85.
+  `corpus/local/unity-ref/all.sh <name>` rescores all, re-renders those whose hand-off changed, rescores.
 
 ## Renderer and viewer
 
@@ -161,7 +162,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   and keeps its scratch per island (#66): lean 0.97 to 0.49 µs, bloated 12.7 to 9.45 µs per avatar on one worker.
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
-  human pose) and instances start built-ins standing on the ground (`Builtin::at_rest`, ADR 0055). `civbb-dynamics`: PhysBone chains as the SDK
+  human pose); instances start parameters at the expression defaults (`Controller::start`, #85) and built-ins
+  standing on the ground (`Builtin::at_rest`, ADR 0055). `civbb-dynamics`: PhysBone chains as the SDK
   steps them (ADR 0049: fixed 1/60 s steps plus a partial output step, versions 1.0/1.1, simplified and advanced
   integration, immobile, limits, segment colliders) with grab/pose (ADR 0015's, unverified), and contacts with the
   cross-avatar grid broadphase (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the
