@@ -15,3 +15,7 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   throwaway release test (`Instance::update` in a loop) and delete the test afterwards.
 - `serde_json` writes non-finite floats as `null` and refuses `null` for an `f32`: Unity's step tangents (infinity)
   need `Key`'s `null`-as-infinity reader (ADR 0041). Other format floats must be finite.
+- Fitting the SDK's PhysBones (#75): a throwaway numpy model of the chain in Unity space against
+  `vrc_physbones.json` (max bone distance over all frames per case) finds the model fast; try one force at a time
+  on the cases that isolate it (`pull_high` has no spring or gravity). Frame 0 of the recording already holds one
+  step.

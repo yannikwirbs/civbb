@@ -77,6 +77,7 @@ Internal deps: civbb-core, civbb-format
 - `tests/contact.rs`: Contact conformance, hand-derived from ADR 0017: receiver types, tags, self and others, permits, local-only,
 - `tests/solver.rs`: Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness, limits,
 - `tests/vrc_contact.rs`: Contacts (ADR 0017, 0047): every case recorded from the VRChat SDK's own contact runtime
+- `tests/vrc_physbone.rs`: PhysBone chains (ADR 0015) against the VRChat SDK's own PhysBone runtime (`tests/unity/vrc_physbones.json`,
 
 ## `crates/format` (civbb-format)
 

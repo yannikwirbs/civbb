@@ -22,6 +22,11 @@ A minimal Unity project that records Unity's behaviour as JSON test data (ADR 00
 - `Assets/Editor/VrcContacts.cs`: the VRChat SDK's contact runtime (#75, ADR 0047): a sender moving through a
   receiver, one step a frame, for sphere, capsule and box shapes, the receiver types and face proximity. Run it like
   `VrcConstraints.cs`, with `-civbbOut <abs path>/crates/dynamics/tests/unity/vrc_contacts.json`.
+- `Assets/Editor/VrcPhysBones.cs`: the VRChat SDK's PhysBone runtime (#75): a four-bone chain on a root moving
+  along a scripted path (still, sway, turn, lift), 90 frames, versions 1.0 and 1.1, both integration types, then one
+  parameter at a time (pull, gravity, falloff, immobile, limits, endpoint, colliders). Run it like
+  `VrcConstraints.cs`, with `-civbbOut <abs path>/crates/dynamics/tests/unity/vrc_physbones.json`;
+  `crates/dynamics/tests/vrc_physbone.rs` replays it.
 
 `unity run` picks the editor pinned in `ProjectSettings/ProjectVersion.txt`. It always adds `-quit`, so
 `Constraints.Record` needs the Editor binary itself:

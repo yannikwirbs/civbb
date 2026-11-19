@@ -23,7 +23,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   runtime is the ground truth for #75: `tools/unity-truth/Assets/Editor/VrcConstraints.cs` (73 generated
   constraint-option cases, ADR 0046) and `VrcContacts.cs` (39 contact cases, ADR 0047) run in the SDK host project
   by reflection and write committed goldens (`crates/anim/tests/unity/vrc_constraints.json`,
-  `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. PhysBones are next in #75.
+  `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. PhysBones are recorded too
+  (`VrcPhysBones.cs`, 30 cases, `crates/dynamics/tests/unity/vrc_physbones.json`), but our solver (ADR 0015) is
+  0.04 to 0.57 m off; `tests/vrc_physbone.rs` pins today's errors as bounds until the model is refit (#75).
 - The muscle rig leaves the hips to the body pose (#52); real muscle frames had turned Yumeka over.
 - Reference renders (#79, ADR 0048): the host project has lilToon 2.4.1 (embedded package), Poiyomi 7.3.050 and
   UTS2 2.0.9 (unpacked into `Assets/`, GUIDs kept), so all 13 exports render with their shaders.
