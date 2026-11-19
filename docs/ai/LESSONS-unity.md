@@ -59,3 +59,8 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   colours (pass `linear.gamma`); `RenderSettings.ambientProbe` (`SphericalHarmonicsL2.AddAmbientLight`) is linear.
   An ARGB32 sRGB target read with `ReadPixels` into an sRGB `Texture2D` and `EncodeToPNG` gives our background
   texel exactly.
+- Components added in edit mode before `EnterPlaymode` get their first play-mode step at an unpinned frame time:
+  build recorded cases on the first play-mode tick (inactive, configure, then `SetActive(true)`), after setting
+  `Time.captureDeltaTime`. The SDK's PhysBones take two steps on a chain's first frame.
+- GitHub's Windows CI job can sit in rust-cache's post step for many minutes after `cargo xtask ci` succeeded:
+  read the step conclusions (`gh api repos/.../actions/jobs/<id>`) before suspecting a hang.

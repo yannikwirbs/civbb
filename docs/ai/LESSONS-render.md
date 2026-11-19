@@ -32,3 +32,9 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
 - FLIP against Unity: any geometry mismatch (pose, a toggle, PhysBone sag) puts a view's p99 near 1 and the mean
   above 0.4, swamping shading. Look at the `--images` side-by-sides before reading scores as shader quality; static
   avatars without an animator (Megumi, Ostgaroa) isolate shading.
+- Unity reference renders depend on the hand-off's framing, which depends on our runtime (rest bounds include
+  PhysBone sag since ADR 0049): after a runtime change, regenerate `rig.json` and `cmp` it with the one the Unity
+  images were rendered from before re-scoring; re-render when it differs. Keep the release binaries fixed while a
+  render-and-score batch runs (it scores with `target/release`).
+- A light-model change can help one family and hurt another: score per family before applying it to all (VRChat's
+  mobile shaders got worse clamped; ADR 0050).
