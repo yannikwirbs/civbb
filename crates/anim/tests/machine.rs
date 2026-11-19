@@ -269,10 +269,15 @@ fn exit_time_zero_never_fires_on_the_first_frame() {
     assert_eq!(current(&i), 1);
 }
 
+/// Probed in Unity (SDK host project): exit time 0.5 with the condition turning true at 0.3 s fired at 0.5 s for a
+/// looping clip, a non-looping clip and a state without motion alike; exit time 0 fired at 1 s.
 #[test]
-fn exit_time_below_one_repeats_every_loop_only_when_looping() {
-    for looping in [true, false] {
+fn exit_time_below_one_repeats_every_loop_whether_or_not_the_motion_loops() {
+    for (looping, empty) in [(true, false), (false, false), (false, true)] {
         let mut s0 = state(0);
+        if empty {
+            s0.motion = None;
+        }
         s0.transitions = vec![Transition {
             conditions: vec![when(0)],
             ..exit_at(1, 0.5)
@@ -288,7 +293,7 @@ fn exit_time_below_one_repeats_every_loop_only_when_looping() {
         }
         assert_eq!(current(&i), 0);
         i.update(&c, 0.25); // 1.5
-        assert_eq!(current(&i), if looping { 1 } else { 0 }, "looping {looping}");
+        assert_eq!(current(&i), 1, "looping {looping}, empty {empty}");
     }
 }
 

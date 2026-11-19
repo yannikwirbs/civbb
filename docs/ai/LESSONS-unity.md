@@ -72,3 +72,11 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   `corpus/local/unity-ref/<name>/render.log`. Muscles uniformly scaled against the clip's keys mean a transition.
 - `ParentChangeDetector` on a bone marks an SDK PhysBone chain root. The SDK rotates the root itself; edit-mode
   rest equal to the export but a different play-mode rotation means PhysBone motion, not a wrong export.
+- The SDK's state behaviours (parameter driver, playable and animator layer control) do nothing in Unity without the
+  client: drivers call the static `VRC_AvatarParameterDriver.OnApplySettings`; layer controls call an instance
+  `ApplySettings` that their static `Initialize` (from Awake) must set, so hook it before creating the controllers.
+  A reference that differs from ours right after a reset or AFK toggle is missing these hooks.
+- Animator semantics are cheap to probe in edit mode: an in-memory `AnimatorController` on a bare GameObject (or an
+  instantiated humanoid prefab with `HumanPoseHandler`) in a `PlayableGraph`, stepped with `graph.Evaluate(dt)`.
+  Give the incoming value a distinct number (a state writing 9 before the tested one): an incoming value equal to
+  the clip's makes "hold" and "renormalise" look the same.

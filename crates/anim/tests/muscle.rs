@@ -558,3 +558,86 @@ fn masks_gate_muscles_by_body_part_and_the_pose_follows_the_muscles() {
     i.update(&c, 0.1);
     assert!(i.human_pose(&c).is_empty());
 }
+
+/// Unity's answer for a humanoid muscle in a Write Defaults off state (probed in the SDK host project: a state
+/// writing 0.633, then a 1D tree of that clip and an empty clip at 0.5 gave 0.316; a tree of empty clips gave 0):
+/// Write Defaults off never holds muscles, the missing weight goes to the default, 0.
+#[test]
+fn write_defaults_off_never_holds_muscles() {
+    for (tree_clip, expected) in [(1, 0.3), (2, 0.0)] {
+        let m = "Left Arm Down-Up";
+        let clips = vec![
+            muscle_clip(&[(Property::Muscle(m.into()), 1.0)]),
+            muscle_clip(&[(Property::Muscle(m.into()), 0.6)]),
+            muscle_clip(&[]),
+        ];
+        let mut a = arm(0.5, I, clips);
+        let child = |clip: u32, threshold: f32| ChildMotion {
+            motion: Motion::Clip(clip),
+            threshold,
+            position: [0.0, 0.0],
+            direct_param: None,
+            time_scale: 1.0,
+            cycle_offset: 0.0,
+        };
+        let mut first = state(0);
+        first.write_defaults = false;
+        first.transitions = vec![Transition {
+            dest: TransitionDest::State(1),
+            conditions: vec![Condition {
+                param: 0,
+                mode: ConditionMode::Greater,
+                threshold: 0.25,
+            }],
+            has_exit_time: false,
+            exit_time: 0.0,
+            fixed_duration: true,
+            duration: 0.0,
+            offset: 0.0,
+            interruption: InterruptionSource::None,
+            ordered_interruption: true,
+            can_transition_to_self: false,
+        }];
+        let mut tree = state(0);
+        tree.write_defaults = false;
+        tree.motion = Some(Motion::BlendTree(Box::new(BlendTree {
+            kind: BlendTreeKind::Simple1D { param: 0 },
+            children: vec![child(tree_clip, 0.0), child(2, 1.0)],
+            normalize: false,
+        })));
+        let mut l = layer(0, None);
+        l.state_machine.states = vec![first, tree];
+        a.animator = Some(Animator {
+            parameters: vec![Parameter {
+                name: "b".into(),
+                kind: ParamKind::Float,
+                default: 0.0,
+            }],
+            groups: vec![LayerGroup {
+                name: "All".into(),
+                weight: 1.0,
+            }],
+            layers: vec![l],
+        });
+        let c = Controller::new(&a).unwrap();
+        let slot = c
+            .bound
+            .bindings
+            .targets
+            .iter()
+            .position(|t| *t == Target::Muscle(find(m).unwrap()))
+            .unwrap();
+        let mut i = Instance::new(&c, true);
+        i.update(&c, 1.0 / 60.0);
+        assert_eq!(i.pose()[slot], 1.0);
+        i.params[0] = 0.5;
+        for _ in 0..3 {
+            i.update(&c, 1.0 / 60.0);
+            assert!(
+                (i.pose()[slot] - expected).abs() < 1e-6,
+                "{} != {expected}",
+                i.pose()[slot]
+            );
+        }
+    }
+}

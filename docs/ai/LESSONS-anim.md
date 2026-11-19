@@ -31,3 +31,5 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   frame bit for bit proved fixed 1/60 s steps; compare with exact equality, not tolerances.
 - VRChat's engine sets built-ins every frame: a runtime that leaves them at the creator's defaults starts
   `Grounded` at 0 and plays the falling states (`Builtin::at_rest`, ADR 0055).
+- Hand-derived animator rules (#54) have been wrong twice against Unity probes (ADR 0056: Write Defaults off on
+  muscles, exit times on non-looping and empty states). Probe a rule before relying on it for parity.

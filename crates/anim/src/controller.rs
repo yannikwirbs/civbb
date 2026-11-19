@@ -29,6 +29,9 @@ pub struct Controller {
     first_in_group: Vec<bool>,
     /// Some state has Write Defaults off: frames start from the last pose instead of defaults (ADR 0010).
     pub wd_off: bool,
+    /// Slots of humanoid muscles. Write Defaults off never holds them: Unity writes the whole human pose each frame,
+    /// muscles nothing animates at their default (probed in the SDK host project), so frames start them there.
+    muscles: Vec<usize>,
     /// Per parameter, the value an instance starts at: its expression parameter's default when the expressions
     /// declare it (VRChat loads those, #85), else the animator's default; in the parameter's type.
     pub start: Vec<f32>,
@@ -89,6 +92,9 @@ impl Controller {
             .iter()
             .flat_map(|l| &l.state_machine.states)
             .any(|s| !s.write_defaults);
+        let muscles = (0..bound.bindings.targets.len())
+            .filter(|&s| matches!(bound.bindings.targets[s], Target::Muscle(_)))
+            .collect();
         let start = animator
             .parameters
             .iter()
@@ -108,6 +114,7 @@ impl Controller {
             rot,
             first_in_group,
             wd_off,
+            muscles,
             start,
         })
     }
@@ -254,6 +261,10 @@ impl Instance {
         self.blend_weights(dt);
         if !c.wd_off {
             self.pose.copy_from_slice(&c.bound.bindings.defaults);
+        } else {
+            for &s in &c.muscles {
+                self.pose[s] = c.bound.bindings.defaults[s];
+            }
         }
         self.written.fill(false);
         for (li, layer) in c.animator.layers.iter().enumerate() {

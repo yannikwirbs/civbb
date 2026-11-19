@@ -39,7 +39,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   `Civbb.Exporter.Reference.Render` (`tools/unity-exporter/Editor/Reference.cs`, `tools/unity-batch.sh --graphics`)
   renders a prefab with a `civbb-client rig` hand-off's rig, light and states in play mode, the playable layers
   run as our runtime runs them (SDK proxy clips empty, humanoid only with muscle clips, hips at rest until #52,
-  descriptor masks applied). It logs each layer's clips and the rest muscles (`CIVBB rest`, #86). Not yet part of an
+  descriptor masks applied). It logs every state's layers (mixer and clip weights) and muscles (`CIVBB <state>`), and runs the SDK's
+  parameter drivers and layer controls through their client hooks (ADR 0056). Not yet part of an
   export or `civbb build --report` (`unity_parity`).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
   `.unitypackage` or Unity YAML.
@@ -162,7 +163,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   and keeps its scratch per island (#66): lean 0.97 to 0.49 µs, bloated 12.7 to 9.45 µs per avatar on one worker.
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
-  human pose); instances start parameters at the expression defaults (`Controller::start`, #85) and built-ins
+  human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056); instances start parameters at the expression defaults (`Controller::start`, #85) and built-ins
   standing on the ground (`Builtin::at_rest`, ADR 0055). `civbb-dynamics`: PhysBone chains as the SDK
   steps them (ADR 0049: fixed 1/60 s steps plus a partial output step, versions 1.0/1.1, simplified and advanced
   integration, immobile, limits, segment colliders) with grab/pose (ADR 0015's, unverified), and contacts with the

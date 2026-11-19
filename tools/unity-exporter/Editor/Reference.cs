@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
@@ -69,8 +70,11 @@ namespace Civbb.Exporter
         static Texture2D readback;
         static PlayableGraph graph;
         static readonly List<AnimatorControllerPlayable> controllers = new List<AnimatorControllerPlayable>();
+        /// Each playable layer's descriptor group (Base, Additive, Gesture, Action, FX), in `controllers` order.
+        static readonly List<string> groups = new List<string>();
         static int start = -1, state, late, masked, proxies;
         static bool human;
+        static string hooked = "no animator";
         static Transform hips;
         static (Vector3, Quaternion) hipsRest;
 
@@ -130,6 +134,7 @@ namespace Civbb.Exporter
                     start = Time.frameCount;
                     return;
                 }
+                Blend();
                 int frames = Time.frameCount - start, due = handoff.frames_per_state * (state + 1);
                 if (frames < due)
                 {
@@ -146,10 +151,7 @@ namespace Civbb.Exporter
                 {
                     Shoot(handoff.rig.views[v], Path.Combine(outDir, $"{state:D3}-{handoff.rig.views[v].name}.png"));
                 }
-                if (state == 0)
-                {
-                    LogRest();
-                }
+                LogState();
                 state++;
                 done = state == handoff.states.Length;
                 if (!done)
@@ -159,7 +161,7 @@ namespace Civbb.Exporter
                 else
                 {
                     Debug.Log($"CIVBB rendered {state} states x {handoff.rig.views.Length} views to {outDir}" +
-                              $" ({controllers.Count} playable layers, {masked} masked, {proxies} SDK clips emptied, {(human ? "humanoid" : "generic")}, {late} states rendered late)");
+                              $" ({controllers.Count} playable layers, {masked} masked, {proxies} SDK clips emptied, {(human ? "humanoid" : "generic")}, {hooked}, {late} states rendered late)");
                 }
             }
             catch (Exception e)
@@ -235,6 +237,13 @@ namespace Civbb.Exporter
             }
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            // Before the controllers exist: their behaviours' Awake calls the layer controls' Initialize.
+            hooked = string.Join(", ", new[]
+            {
+                ("VRC_AvatarParameterDriver", "OnApplySettings", nameof(Drive)),
+                ("VRC_PlayableLayerControl", "Initialize", nameof(InitLayerControl)),
+                ("VRC_AnimatorLayerControl", "Initialize", nameof(InitLayerControl)),
+            }.Select(h => $"{h.Item1} {(Hook(h.Item1, h.Item2, h.Item3) ? "hooked" : "missing")}"));
             graph = PlayableGraph.Create("civbb reference");
             graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
             var mixer = AnimationLayerMixerPlayable.Create(graph, layers.Count);
@@ -250,6 +259,7 @@ namespace Civbb.Exporter
                     masked++;
                 }
                 controllers.Add(playable);
+                groups.Add(layers[i].group);
             }
             AnimationPlayableOutput.Create(graph, "civbb", animator).SetSourcePlayable(mixer);
             foreach (var p in handoff.parameters)
@@ -273,6 +283,163 @@ namespace Civbb.Exporter
             o.ApplyOverrides(sdk.Select(a => new KeyValuePair<AnimationClip, AnimationClip>(a, empty)).ToList());
             proxies += sdk.Count;
             return o;
+        }
+
+        /// The SDK's state behaviours (parameter drivers, playable and animator layer control) only call delegates the
+        /// VRChat client sets; without them they do nothing. Sets the static `VRC.SDKBase.<type>.<field>` to one of
+        /// ours, by reflection (no SDK reference, ADR 0042); false when the SDK lacks it.
+        static bool Hook(string type, string field, string method)
+        {
+            var f = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(a => a.GetType("VRC.SDKBase." + type)).FirstOrDefault(t => t != null)
+                ?.GetField(field, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            f?.SetValue(null, Delegate.CreateDelegate(f.FieldType, typeof(Reference).GetMethod(method, BindingFlags.NonPublic | BindingFlags.Static)));
+            return f != null;
+        }
+
+        /// Weights moving linearly to a goal (layer control behaviours), stepped each frame by `Blend`.
+        static readonly List<(Action<float> set, float from, float to, float start, float duration)> blends =
+            new List<(Action<float>, float, float, float, float)>();
+
+        static void StartBlend(Action<float> set, float from, float to, float duration)
+        {
+            blends.Add((set, from, to, Time.time, duration));
+            Blend();
+        }
+
+        static void Blend()
+        {
+            for (int i = blends.Count - 1; i >= 0; i--)
+            {
+                var b = blends[i];
+                float t = b.duration > 0 ? Mathf.Clamp01((Time.time - b.start) / b.duration) : 1;
+                b.set(Mathf.Lerp(b.from, b.to, t));
+                if (t >= 1)
+                {
+                    blends.RemoveAt(i);
+                }
+            }
+        }
+
+        static object Field(object o, string name) => o.GetType().GetField(name).GetValue(o);
+
+        /// The layer controls' static `Initialize` (from each behaviour's Awake) is where the client gives the instance
+        /// its `ApplySettings`; ours points it at `PlayableLayer` or `AnimatorLayer`.
+        static void InitLayerControl(object control)
+        {
+            var f = control.GetType().GetField("ApplySettings", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var method = control.GetType().Name.Contains("Playable") ? nameof(PlayableLayer) : nameof(AnimatorLayer);
+            f?.SetValue(control, Delegate.CreateDelegate(f.FieldType, typeof(Reference).GetMethod(method, BindingFlags.NonPublic | BindingFlags.Static)));
+        }
+
+        /// `VRC_PlayableLayerControl`: blends a group's playable layer (Action, FX, Gesture, Additive) to a weight.
+        static void PlayableLayer(object control, Animator animator)
+        {
+            var group = Field(control, "layer").ToString();
+            var mixer = graph.GetOutput(0).GetSourcePlayable();
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (groups[i] == group)
+                {
+                    int input = i;
+                    StartBlend(w => mixer.SetInputWeight(input, w), mixer.GetInputWeight(input), (float)Field(control, "goalWeight"), (float)Field(control, "blendDuration"));
+                }
+            }
+        }
+
+        /// `VRC_AnimatorLayerControl`: blends one layer of a group's controller to a weight.
+        static void AnimatorLayer(object control, Animator animator)
+        {
+            var group = Field(control, "playable").ToString();
+            int layer = (int)Field(control, "layer");
+            for (int i = 0; i < groups.Count; i++)
+            {
+                var c = controllers[i];
+                if (groups[i] == group && layer < c.GetLayerCount())
+                {
+                    StartBlend(w => c.SetLayerWeight(layer, w), c.GetLayerWeight(layer), (float)Field(control, "goalWeight"), (float)Field(control, "blendDuration"));
+                }
+            }
+        }
+
+        /// Applies a driver's operations to every layer's controller, as the client does for the local avatar
+        /// (Set, Add, Random, Copy with an optional range conversion; Random uses Unity's generator, not ours).
+        static void Drive(object driver, Animator animator)
+        {
+            object F(object o, string name) => Field(o, name);
+            foreach (var p in (System.Collections.IEnumerable)F(driver, "parameters"))
+            {
+                var name = (string)F(p, "name");
+                float value = (float)F(p, "value");
+                switch (F(p, "type").ToString())
+                {
+                    case "Set": SetParameter(name, value); break;
+                    case "Add": SetParameter(name, GetParameter(name) + value); break;
+                    case "Random":
+                        float min = (float)F(p, "valueMin"), max = (float)F(p, "valueMax");
+                        switch (ParameterType(name))
+                        {
+                            case AnimatorControllerParameterType.Bool:
+                            case AnimatorControllerParameterType.Trigger:
+                                SetParameter(name, UnityEngine.Random.value < (float)F(p, "chance") ? 1 : 0);
+                                break;
+                            case AnimatorControllerParameterType.Int:
+                                SetParameter(name, UnityEngine.Random.Range((int)min, (int)max + 1));
+                                break;
+                            default: SetParameter(name, UnityEngine.Random.Range(min, max)); break;
+                        }
+                        break;
+                    case "Copy":
+                        float v = GetParameter((string)F(p, "source"));
+                        if ((bool)F(p, "convertRange"))
+                        {
+                            float s0 = (float)F(p, "sourceMin"), s1 = (float)F(p, "sourceMax");
+                            float d0 = (float)F(p, "destMin"), d1 = (float)F(p, "destMax");
+                            // Unclamped, as our runtime converts (civbb_anim::behaviour).
+                            v = s1 != s0 ? d0 + (v - s0) / (s1 - s0) * (d1 - d0) : d0;
+                        }
+                        SetParameter(name, v);
+                        break;
+                }
+            }
+        }
+
+        static AnimatorControllerParameterType? ParameterType(string name)
+        {
+            foreach (var c in controllers)
+            {
+                for (int i = 0; i < c.GetParameterCount(); i++)
+                {
+                    if (c.GetParameter(i).name == name)
+                    {
+                        return c.GetParameter(i).type;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /// A parameter's value from the first layer's controller that has it.
+        static float GetParameter(string name)
+        {
+            foreach (var c in controllers)
+            {
+                for (int i = 0; i < c.GetParameterCount(); i++)
+                {
+                    var p = c.GetParameter(i);
+                    if (p.name != name)
+                    {
+                        continue;
+                    }
+                    switch (p.type)
+                    {
+                        case AnimatorControllerParameterType.Float: return c.GetFloat(name);
+                        case AnimatorControllerParameterType.Int: return c.GetInteger(name);
+                        default: return c.GetBool(name) ? 1 : 0;
+                    }
+                }
+            }
+            return 0;
         }
 
         /// Sets a parameter on every layer's controller that has it, as VRChat shares parameters across layers.
@@ -301,24 +468,30 @@ namespace Civbb.Exporter
             }
         }
 
-        /// One line per playable layer at rest (its controller layers' weights, current clips and, mid-transition, the
-        /// next state's clips after `->`), and the human
-        /// pose's muscles, to tell a pose difference's source (#86).
-        static void LogRest()
+        /// Per rendered state, one line per playable layer (its mixer weight, its controller layers' weights, current
+        /// clips and, mid-transition, the next state's clips after `->`) and the human pose's muscles, to tell a pose
+        /// difference's source (#86). Lines start `CIVBB <state name>`.
+        static void LogState()
         {
+            if (!graph.IsValid())
+            {
+                return;
+            }
+            var mixer = graph.GetOutput(0).GetSourcePlayable();
+            var name = handoff.states[state].name;
             for (int i = 0; i < controllers.Count; i++)
             {
                 var c = controllers[i];
                 var parts = Enumerable.Range(0, c.GetLayerCount()).Select(l =>
-                    $"{c.GetLayerName(l)}@{c.GetLayerWeight(l):0.##}=[{string.Join(",", c.GetCurrentAnimatorClipInfo(l).Select(ci => $"{ci.clip.name}{(ci.clip.humanMotion ? "(human)" : "")}"))}]" +
+                    $"{c.GetLayerName(l)}@{c.GetLayerWeight(l):0.##}=[{string.Join(",", c.GetCurrentAnimatorClipInfo(l).Select(ci => $"{ci.clip.name}{(ci.clip.humanMotion ? "(human)" : "")}{(ci.weight < 0.999f ? $"*{ci.weight:0.##}" : "")}"))}]" +
                     (c.IsInTransition(l) ? $"->[{string.Join(",", c.GetNextAnimatorClipInfo(l).Select(ci => ci.clip.name))}]" : ""));
-                Debug.Log($"CIVBB rest layer {i}: {string.Join(" ", parts)}");
+                Debug.Log($"CIVBB {name} layer {i}@{mixer.GetInputWeight(i):0.##}: {string.Join(" ", parts)}");
             }
             if (human)
             {
                 var pose = new HumanPose();
                 new HumanPoseHandler(avatar.GetComponent<Animator>().avatar, avatar.transform).GetHumanPose(ref pose);
-                Debug.Log($"CIVBB rest muscles: {string.Join(" ", pose.muscles.Select(m => m.ToString("0.###")))}");
+                Debug.Log($"CIVBB {name} muscles: {string.Join(" ", pose.muscles.Select(m => m.ToString("0.###")))}");
             }
         }
 

@@ -150,16 +150,13 @@ fn holds(c: &Condition, params: &[f32]) -> bool {
 }
 
 /// Whether the exit time `e` was reached during the last advance of `p`: on the first frame that reaches it,
-/// every cycle for `e < 1` in looping states, once otherwise.
-fn exit_reached(p: &Playing, e: f32, looping: bool) -> bool {
+/// every cycle for `e < 1`, once otherwise. Whether the motion loops does not matter: Unity's normalised time keeps
+/// counting past a non-looping clip's end, and an empty state's too (probed in the SDK host project).
+fn exit_reached(p: &Playing, e: f32) -> bool {
     let (prev, cur) = (p.prev, p.time);
-    let mut point = if looping && e < 1.0 {
-        (prev - e).ceil().max(0.0) + e
-    } else {
-        e
-    };
+    let mut point = if e < 1.0 { (prev - e).ceil().max(0.0) + e } else { e };
     if !p.inclusive && point <= prev {
-        if !(looping && e < 1.0) {
+        if e >= 1.0 {
             return false;
         }
         point += 1.0;
@@ -264,8 +261,7 @@ impl LayerRun {
                 (Clock::From, From::Snapshot(_), Some(a)) if matches!(t, TransitionRef::Any(_)) => a.to,
                 _ => return false,
             };
-            let looping = motion::loops(ctx.state(playing.state).motion.as_ref(), ctx.clips);
-            if !exit_reached(&playing, tr.exit_time, looping) {
+            if !exit_reached(&playing, tr.exit_time) {
                 return false;
             }
         }
