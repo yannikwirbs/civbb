@@ -4,6 +4,7 @@
 use civbb_anim::{Builtin, Controller, Instance};
 use civbb_format::Avatar;
 use civbb_format::animator::*;
+use civbb_format::expressions::{ExpressionParam, ExpressionParamKind, Expressions, Menu};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::Transform;
 
@@ -47,6 +48,10 @@ fn layer(states: Vec<State>, group: u32) -> Layer {
 }
 
 fn controller(parameters: Vec<Parameter>, layers: Vec<Layer>) -> Controller {
+    controller_with(parameters, layers, None)
+}
+
+fn controller_with(parameters: Vec<Parameter>, layers: Vec<Layer>, expressions: Option<Expressions>) -> Controller {
     let a = Avatar {
         hierarchy: Hierarchy {
             nodes: vec![Node {
@@ -66,6 +71,7 @@ fn controller(parameters: Vec<Parameter>, layers: Vec<Layer>) -> Controller {
                 .collect(),
             layers,
         }),
+        expressions,
         ..Avatar::default()
     };
     civbb_format::validate(&a, &civbb_format::Caps::default(), |_| true).unwrap();
@@ -116,6 +122,41 @@ fn instances_start_standing_on_the_ground() {
     ];
     let c = controller(params, vec![layer(vec![state(vec![], vec![])], 0)]);
     assert_eq!(Instance::new(&c, false).params, [1.0, 1.0, 3.0, 1.0, 0.0, 0.0, 0.0]);
+}
+
+#[test]
+fn instances_start_at_the_expression_defaults() {
+    // Cokoro's brightness slider: 0 in the animator, 0.5 in the expressions, which VRChat loads (#85).
+    let expression = |name: &str, kind, default| ExpressionParam {
+        name: name.into(),
+        kind,
+        default,
+        saved: true,
+        synced: true,
+    };
+    let params = vec![
+        param("07_mat", ParamKind::Float),
+        param("WingsClosed", ParamKind::Bool),
+        // Declared as an int in the menu, a float in the animator: the animator's type holds it.
+        param("Outfit", ParamKind::Float),
+        Parameter {
+            default: 0.25,
+            ..param("local", ParamKind::Float)
+        },
+        param("Grounded", ParamKind::Bool),
+    ];
+    let e = Expressions {
+        parameters: vec![
+            expression("07_mat", ExpressionParamKind::Float, 0.5),
+            expression("WingsClosed", ExpressionParamKind::Bool, 1.0),
+            expression("Outfit", ExpressionParamKind::Int, 2.0),
+            expression("Unused", ExpressionParamKind::Int, 3.0),
+        ],
+        menu: Menu::default(),
+    };
+    let c = controller_with(params, vec![layer(vec![state(vec![], vec![])], 0)], Some(e));
+    assert_eq!(c.start, [0.5, 1.0, 2.0, 0.25, 0.0]);
+    assert_eq!(Instance::new(&c, false).params, [0.5, 1.0, 2.0, 0.25, 1.0]);
 }
 
 fn driver(local_only: bool, ops: Vec<DriverOp>) -> Behaviour {

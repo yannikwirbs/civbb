@@ -153,8 +153,8 @@ pub fn handoff(avatar: &Avatar) -> Handoff {
     }
 }
 
-/// Each parameter of the avatar's animator with the value a fresh local instance starts it at (the animator's
-/// default, or a built-in's `Builtin::at_rest`).
+/// Each parameter of the avatar's animator with the value a fresh local instance starts it at
+/// (`Controller::start`: the expression default, else the animator's; a built-in's `Builtin::at_rest`).
 fn start(avatar: &Avatar) -> Vec<(String, f32)> {
     let Some(c) = Controller::new(avatar) else {
         return Vec::new();

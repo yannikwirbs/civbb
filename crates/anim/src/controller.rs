@@ -29,6 +29,9 @@ pub struct Controller {
     first_in_group: Vec<bool>,
     /// Some state has Write Defaults off: frames start from the last pose instead of defaults (ADR 0010).
     pub wd_off: bool,
+    /// Per parameter, the value an instance starts at: its expression parameter's default when the expressions
+    /// declare it (VRChat loads those, #85), else the animator's default; in the parameter's type.
+    pub start: Vec<f32>,
 }
 
 impl Controller {
@@ -86,6 +89,18 @@ impl Controller {
             .iter()
             .flat_map(|l| &l.state_machine.states)
             .any(|s| !s.write_defaults);
+        let start = animator
+            .parameters
+            .iter()
+            .map(|p| {
+                let expression = avatar
+                    .expressions
+                    .iter()
+                    .flat_map(|e| &e.parameters)
+                    .find(|e| e.name == p.name);
+                coerce(p.kind, expression.map_or(p.default, |e| e.default))
+            })
+            .collect();
         Some(Self {
             animator,
             bound,
@@ -93,6 +108,7 @@ impl Controller {
             rot,
             first_in_group,
             wd_off,
+            start,
         })
     }
 
@@ -139,14 +155,14 @@ struct Blend {
 }
 
 impl Instance {
-    /// A fresh instance at the parameters' defaults, built-ins at [`Builtin::at_rest`]; the first
+    /// A fresh instance at [`Controller::start`], built-ins at [`Builtin::at_rest`]; the first
     /// [`Instance::update`] enters the start states. `local` is true for the owner's own avatar; it also sets the
     /// `IsLocal` built-in.
     pub fn new(c: &Controller, local: bool) -> Self {
         let a = &c.animator;
         let n = c.bound.bindings.len();
         let mut i = Self {
-            params: a.parameters.iter().map(|p| p.default).collect(),
+            params: c.start.clone(),
             layer_weights: a.layers.iter().map(|l| l.weight).collect(),
             group_weights: a.groups.iter().map(|g| g.weight).collect(),
             tracking: [TrackingMode::Tracking; 10],
