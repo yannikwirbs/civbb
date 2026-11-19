@@ -353,6 +353,8 @@ fn toon(name: &str, color: [f32; 4]) -> Material {
             outline_color: [0.0; 3],
             outline_width_tex: None,
             light: ToonLight::Additive,
+            light_min: 0.0,
+            light_max: 1.0,
         }),
         alpha: AlphaMode::Opaque,
         double_sided: false,

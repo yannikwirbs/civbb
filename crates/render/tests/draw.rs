@@ -89,6 +89,8 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         outline_color: [0.0; 3],
         outline_width_tex: None,
         light: ToonLight::Additive,
+        light_min: 0.0,
+        light_max: 1.0,
     })
 }
 
@@ -294,6 +296,46 @@ fn draws_quads_with_each_shader_depth_textures_and_blending() {
         2,
         "blended over textured, top left",
     );
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+#[test]
+fn toon_light_limits_bound_the_clamped_light() {
+    let Some(ctx) = context() else { return };
+    let mut scene = Scene::new(
+        &ctx,
+        Capacity {
+            vertices: 8,
+            indices: 12,
+            deltas: 0,
+            skinned: 8,
+            materials: 2,
+        },
+    )
+    .unwrap();
+    let grey = |light_min, light_max| {
+        let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
+        if let MaterialModel::Toon(t) = &mut m {
+            t.light = ToonLight::Clamped;
+            (t.light_min, t.light_max) = (light_min, light_max);
+        }
+        material(m, AlphaMode::Opaque)
+    };
+    let dimmed = scene.add_material(&ctx, &grey(0.0, 0.5), &[]).unwrap();
+    let raised = scene.add_material(&ctx, &grey(2.0, 3.0), &[]).unwrap();
+    let meshes = [
+        quad([-3.0, 0.0], [-3.0, 3.0], 0.0, 0),
+        quad([0.0, 3.0], [-3.0, 3.0], 0.0, 1),
+    ];
+    let mut view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+    view.light_dir = [0.0, 0.0, 1.0];
+    view.light_color = [1.0; 3];
+    view.ambient = [0.3; 3];
+    let pixels = render(&ctx, &mut scene, &meshes, &[dimmed, raised], &[], &view);
+    // Light plus ambient 1.3 bounded to 0.5 (lilToon's `_LightMaxLimit` lowered) and raised to 2.
+    assert_near(pixel(&pixels, 16, 32), [64, 64, 64], 1, "upper bound");
+    assert_near(pixel(&pixels, 48, 32), [255, 255, 255], 1, "lower bound");
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }

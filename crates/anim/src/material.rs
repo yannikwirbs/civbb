@@ -35,6 +35,10 @@ pub enum Field {
     MatcapStrength,
     /// Base colour texture tiling (x, y) and offset (z, w).
     MainTexSt,
+    /// Toon clamped light's lower bound.
+    LightMin,
+    /// Toon clamped light's upper bound.
+    LightMax,
 }
 
 /// Unity property names of the common avatar shader families and the field each maps to. One flat table for every
@@ -62,6 +66,8 @@ const NAMES: &[(&str, Field)] = &[
     ("_RimFresnelPower", Field::RimPower),   // MToon
     ("_MatCapBlend", Field::MatcapStrength), // lilToon
     ("_MainTex_ST", Field::MainTexSt),       // every family
+    ("_LightMinLimit", Field::LightMin),     // lilToon
+    ("_LightMaxLimit", Field::LightMax),     // lilToon
 ];
 
 impl Field {
@@ -156,6 +162,8 @@ fn place(m: &mut Material, field: Field) -> Option<Place<'_>> {
         (Field::ShadeToony, Toon(t)) => Place::Scalar(&mut t.shade_toony),
         (Field::RimPower, Toon(t)) => Place::Scalar(&mut t.rim_power),
         (Field::MatcapStrength, Toon(t)) => Place::Scalar(&mut t.matcap_strength),
+        (Field::LightMin, Toon(t)) => Place::Scalar(&mut t.light_min),
+        (Field::LightMax, Toon(t)) => Place::Scalar(&mut t.light_max),
         (Field::MainTexSt, Pbr(p)) => Place::St(&mut p.base_color_tex.as_mut()?.scale_offset),
         (Field::MainTexSt, Toon(t)) => Place::St(&mut t.base_color_tex.as_mut()?.scale_offset),
         (Field::MainTexSt, Unlit(u)) => Place::St(&mut u.color_tex.as_mut()?.scale_offset),

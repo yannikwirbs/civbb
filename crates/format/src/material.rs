@@ -119,6 +119,11 @@ pub struct Toon {
     pub outline_width_tex: Option<TextureSlot>,
     /// How the main light and the ambient light the surface.
     pub light: ToonLight,
+    /// The clamped model's lower bound on light plus ambient, per channel (lilToon's `_LightMinLimit`; 0 for the other
+    /// families).
+    pub light_min: f32,
+    /// The clamped model's upper bound (lilToon's `_LightMaxLimit`; 1 for the other families).
+    pub light_max: f32,
 }
 
 /// How a toon material combines the main light and the ambient.
@@ -126,8 +131,8 @@ pub struct Toon {
 pub enum ToonLight {
     /// MToon: the light lights the shade-to-lit blend; the ambient adds on top, times the lit colour.
     Additive,
-    /// lilToon, Poiyomi, UTS2 and VRChat's toon shaders: light plus ambient, clamped to 1 per channel, lights the
-    /// blend, so a lit surface shows its own colour at most.
+    /// lilToon, Poiyomi, UTS2 and VRChat's toon shaders: light plus ambient, clamped per channel to `Toon::light_min`
+    /// and `Toon::light_max`, lights the blend, so with the default bounds a lit surface shows its own colour at most.
     Clamped,
 }
 

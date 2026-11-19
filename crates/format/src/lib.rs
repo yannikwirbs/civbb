@@ -24,7 +24,7 @@ pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the data model. Bump on any incompatible change to the types in this crate.
-pub const FORMAT_VERSION: u32 = 16;
+pub const FORMAT_VERSION: u32 = 17;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -162,6 +162,8 @@ pub(crate) mod testutil {
                     outline_color: [0.0; 3],
                     outline_width_tex: None,
                     light: ToonLight::Clamped,
+                    light_min: 0.0,
+                    light_max: 1.0,
                 }),
                 alpha: AlphaMode::Opaque,
                 double_sided: false,

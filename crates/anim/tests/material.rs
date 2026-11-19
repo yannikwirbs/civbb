@@ -109,6 +109,8 @@ fn names_parse_to_fields_and_components() {
     assert_eq!(material::parse("_MainTex_ST.w"), Some((Field::MainTexSt, 3)));
     assert_eq!(material::parse("_Glossiness"), Some((Field::Smoothness, 0)));
     assert_eq!(material::parse("_LineColor.g"), Some((Field::OutlineColor, 1)));
+    assert_eq!(material::parse("_LightMaxLimit"), Some((Field::LightMax, 0)));
+    assert_eq!(material::parse("_LightMinLimit"), Some((Field::LightMin, 0)));
     // Vectors need a component, scalars must not have one, unknown names and suffixes bind to nothing.
     for bad in ["_Color", "_Metallic.x", "_Color.q", "_Nope.r", "", "."] {
         assert_eq!(material::parse(bad), None, "{bad}");

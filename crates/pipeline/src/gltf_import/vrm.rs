@@ -454,6 +454,8 @@ impl Importer<'_> {
                 outline_color: arr(&x["outlineColorFactor"], [0.0; 3]),
                 outline_width_tex: self.mtoon_slot(&x["outlineWidthMultiplyTexture"], ColorSpace::Linear, None),
                 light: ToonLight::Additive,
+                light_min: 0.0,
+                light_max: 1.0,
             }),
             render_queue: base.render_queue + offset,
             ..base
@@ -514,6 +516,8 @@ impl Importer<'_> {
                 outline_color: rgb(color("_OutlineColor", [0.0, 0.0, 0.0, 1.0])),
                 outline_width_tex: self.mtoon_slot(&t["_OutlineWidthTexture"], ColorSpace::Linear, None),
                 light: ToonLight::Additive,
+                light_min: 0.0,
+                light_max: 1.0,
             }),
             alpha,
             double_sided: num(&f["_CullMode"], 2.0) as i32 == 0,

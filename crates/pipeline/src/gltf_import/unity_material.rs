@@ -279,6 +279,8 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         outline_color: [0.0; 3],
         outline_width_tex: None,
         light: ToonLight::Clamped,
+        light_min: 0.0,
+        light_max: 1.0,
     }
 }
 
@@ -543,6 +545,8 @@ impl Importer<'_> {
         let base = p.color("_Color", WHITE);
         let mut t = plain_toon(base, main);
         let base_rgb = [base[0], base[1], base[2]];
+        t.light_min = p.f("_LightMinLimit", 0.05);
+        t.light_max = p.f("_LightMaxLimit", 1.0);
         if p.on("_UseBumpMap") {
             t.normal_tex = self.unity_slot(x, "_BumpMap", ColorSpace::Linear);
             t.normal_scale = p.f("_BumpScale", 1.0);

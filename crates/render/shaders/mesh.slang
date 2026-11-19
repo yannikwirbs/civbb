@@ -46,6 +46,7 @@ struct Material
     float4 rim_shade_ramp; // its ramp's start and end, fresnel power
     float4 matcap;         // toon matcap tint in xyz
     Slot matcap_mask;      // scales the matcap strength by its R channel
+    float4 light;          // the clamped toon light's lower and upper bound
 };
 
 struct View
@@ -202,7 +203,7 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
     s = saturate((s + 1 - toony) / max(2 - 2 * toony, 1e-4));
     float3 color = lerp(shade, lit.rgb, s);
     if (m.shade.w > 0.5)
-        color *= saturate(v.light_color.rgb + v.ambient.rgb); // lilToon, Poiyomi, UTS2, VRChat toon
+        color *= clamp(v.light_color.rgb + v.ambient.rgb, m.light.x, m.light.y); // lilToon, Poiyomi, UTS2
     else
         color = color * v.light_color.rgb + lit.rgb * v.ambient.rgb; // MToon
     if (m.rim_shade.w > 0)

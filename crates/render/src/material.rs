@@ -4,7 +4,7 @@
 use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, TextureSlot, ToonLight};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
-pub const MATERIAL_WORDS: usize = 104;
+pub const MATERIAL_WORDS: usize = 108;
 /// A texture slot without a texture.
 pub const NONE: u32 = u32::MAX;
 
@@ -103,6 +103,8 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut rim_shade_ramp = [0.0, 1.0, 1.0, 0.0];
     // Matcap tint.
     let mut matcap = [1.0, 1.0, 1.0, 0.0];
+    // The clamped light's bounds.
+    let mut light = [0.0, 1.0, 0.0, 0.0];
     match &m.model {
         MaterialModel::Pbr(p) => {
             base_color = p.base_color;
@@ -157,6 +159,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 t.matcap_mask_tex,
             ];
             matcap = [t.matcap_color[0], t.matcap_color[1], t.matcap_color[2], 0.0];
+            light = [t.light_min, t.light_max, 0.0, 0.0];
         }
         MaterialModel::Unlit(u) => {
             base_color = u.color;
@@ -192,5 +195,6 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     words.extend(rim_shade_ramp.map(f32::to_bits));
     words.extend(matcap.map(f32::to_bits));
     words.extend(&slot_words[56..]);
+    words.extend(light.map(f32::to_bits));
     words.try_into().expect("a material record is MATERIAL_WORDS long")
 }

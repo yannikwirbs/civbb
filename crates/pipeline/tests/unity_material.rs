@@ -68,7 +68,8 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
         "shader": "Hidden/InternalErrorShader", "shader_guid": LTS_TRANS_O, "render_queue": -1,
         "floats": {"_lilToonVersion": 45, "_Cull": 0, "_UseShadow": 1, "_ShadowStrength": 0.5, "_ShadowBorder": 0.6,
             "_ShadowBlur": 0.2, "_UseRim": 0, "_UseMatCap": 1, "_MatCapBlend": 0.7, "_UseEmission": 0,
-            "_OutlineWidth": 0.1, "_BumpScale": 0.8, "_UseBumpMap": 0, "_UseRimShade": 1, "_RimShadeBorder": 0.6},
+            "_OutlineWidth": 0.1, "_BumpScale": 0.8, "_UseBumpMap": 0, "_UseRimShade": 1, "_RimShadeBorder": 0.6,
+            "_LightMaxLimit": 0.8},
         "colors": {"_Color": [0.5, 0.5, 0.5, 1], "_ShadowColor": [0.5, 0.5, 0.5, 1], "_OutlineColor": [1, 0, 0, 1],
             "_RimColor": [1, 1, 1, 1], "_EmissionColor": [1, 1, 1, 1], "_MatCapColor": [0.5, 0.5, 0.5, 0.5]},
         "textures": {"_MainTex": tex([2.0, 3.0, 0.25, 0.5]), "_MatCapTex": tex([1.0, 1.0, 0.0, 0.0]),
@@ -99,6 +100,11 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
     // The tint's alpha scales the strength; its colour tints the matcap.
     assert!(t.matcap_tex.is_some() && close(t.matcap_strength, 0.35) && close(t.matcap_color[0], half));
     assert!(t.matcap_mask_tex.is_some());
+    assert_eq!(
+        (t.light_min, t.light_max),
+        (0.05, 0.8),
+        "lilToon's light limits, the lower one by default"
+    );
     assert_eq!(t.matcap_blend, MatcapBlend::Add, "lilToon's default blend mode adds");
     let rim_shade = t.rim_shade.expect("rim shade on");
     assert!(close(rim_shade.color[0], half) && rim_shade.border == 0.6 && rim_shade.blur == 1.0);
