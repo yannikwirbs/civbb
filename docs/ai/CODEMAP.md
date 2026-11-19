@@ -239,6 +239,7 @@ Internal deps: none
 - `docs/adr/0052-liltoon-rim-shade-and-emission-gradient.md`: 0052: lilToon rim shade, emission gradients and Unity's HDR colour conversion
 - `docs/adr/0053-matcap-tint-mask-and-weights.md`: 0053: Matcap tint and mask; Poiyomi's matcap weights; lilToon's emission main strength
 - `docs/adr/0054-liltoon-light-limits.md`: 0054: lilToon's light limits bound the clamped toon light
+- `docs/adr/0055-rest-as-vrchat-loads-it.md`: 0055: Rest as VRChat loads an avatar: zero muscles, standing built-ins, settled states
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

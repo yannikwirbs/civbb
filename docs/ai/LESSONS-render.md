@@ -47,3 +47,7 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
 - Before modelling a shader feature, survey which of the 13 exports use it (a short script over each GLB's
   `X_toon_material`): lilToon Multi turns features on by repurposed keywords (`AUTO_KEY_VALUE` is rim shade,
   `EFFECT_HUE_VARIATION` tone correction; table in lilToon's `lil_replace_keywords.hlsl`), so check keywords too.
+- Parity states against Unity must settle (ADR 0055: 60 frames): after three frames Unity still showed startup
+  transients (the first-frame swing from the bind pose dragging version 1.0 PhysBones 100 degrees, a SmallHop
+  transition from `Grounded` 0) that our runtime does not share. Before blaming geometry, log the reference's rest
+  layers and compare a bone's play-mode and edit-mode transforms.

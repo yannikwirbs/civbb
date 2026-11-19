@@ -4,6 +4,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use civbb_anim::{Controller, Instance};
 use civbb_core::math::Pose;
 use civbb_format::Avatar;
 use civbb_format::cost::{Light, Parity, Rig, RigView, StateParity, Thresholds, ViewScore};
@@ -32,7 +33,7 @@ pub const THRESHOLDS: Thresholds = Thresholds {
     red_p99: 0.5,
 };
 /// Simulation frames stepped per state.
-pub const FRAMES_PER_STATE: u32 = 3;
+pub const FRAMES_PER_STATE: u32 = 60;
 /// Seconds per simulation frame.
 pub const DT: f32 = 1.0 / 60.0;
 
@@ -138,14 +139,9 @@ pub fn handoff(avatar: &Avatar) -> Handoff {
         ambient: AMBIENT,
         dt: DT,
         frames_per_state: FRAMES_PER_STATE,
-        parameters: avatar
-            .animator
-            .iter()
-            .flat_map(|x| &x.parameters)
-            .map(|p| HandoffParameter {
-                name: p.name.clone(),
-                value: p.default,
-            })
+        parameters: start(avatar)
+            .into_iter()
+            .map(|(name, value)| HandoffParameter { name, value })
             .collect(),
         states: std::iter::once(rest)
             .chain(toggles(avatar).into_iter().map(|(p, v)| HandoffState {
@@ -157,18 +153,31 @@ pub fn handoff(avatar: &Avatar) -> Handoff {
     }
 }
 
-/// Each parameter of the avatar's animator with the value away from its default it takes in [`states`].
-fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
-    avatar
-        .animator
+/// Each parameter of the avatar's animator with the value a fresh local instance starts it at (the animator's
+/// default, or a built-in's `Builtin::at_rest`).
+fn start(avatar: &Avatar) -> Vec<(String, f32)> {
+    let Some(c) = Controller::new(avatar) else {
+        return Vec::new();
+    };
+    let i = Instance::new(&c, true);
+    c.animator
+        .parameters
         .iter()
-        .flat_map(|x| &x.parameters)
-        .map(|p| (p.name.clone(), if p.default == 0.0 { 1.0 } else { 0.0 }))
+        .map(|p| p.name.clone())
+        .zip(i.params)
+        .collect()
+}
+
+/// Each parameter of the avatar's animator with the value away from its start it takes in [`states`].
+fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
+    start(avatar)
+        .into_iter()
+        .map(|(p, v)| (p, if v == 0.0 { 1.0 } else { 0.0 }))
         .collect()
 }
 
 /// Steps one island per avatar through the same states: rest, then each of the first avatar's parameters set away
-/// from its default (0 to 1, anything else to 0) on top of the state before, [`FRAMES_PER_STATE`] frames each.
+/// from its start (0 to 1, anything else to 0) on top of the state before, [`FRAMES_PER_STATE`] frames each.
 /// Calls `check` with the state number, its name (`rest`, `Hat=1`) and the islands after each.
 pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &str, &[Island])) {
     let mut islands: Vec<Island> = avatars

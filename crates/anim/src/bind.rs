@@ -347,7 +347,8 @@ impl<'a> Binder<'a> {
             Target::Active(n) => f32::from(u8::from(a.hierarchy.nodes[n as usize].active)),
             Target::RendererEnabled(_) => 1.0,
             Target::Parameter(p) => a.animator.as_ref().expect("bound").parameters[p as usize].default,
-            Target::Muscle(m) => self.rig.as_ref().expect("bound").rest[m as usize],
+            // Unity's default human pose is every muscle at 0, not the rest pose (#86, recorded at rest).
+            Target::Muscle(_) => 0.0,
             Target::Material(m, f, c) => renderer_default(a, m, f).expect("bound")[c as usize],
             Target::Constraint(i, field) => {
                 let c = &a.constraints[i as usize];

@@ -95,7 +95,7 @@ namespace Civbb.Exporter
                 avatar.transform.localPosition = Vector3.zero;
                 avatar.transform.localRotation = Quaternion.identity;
                 avatar.transform.localScale = Vector3.one;
-                camera = new GameObject("civbb camera").AddComponent<Camera>();
+                camera =new GameObject("civbb camera").AddComponent<Camera>();
                 var light = new GameObject("civbb light").AddComponent<Light>();
                 light.type = LightType.Directional;
                 light.color = Gamma(handoff.light_color);
@@ -145,6 +145,10 @@ namespace Civbb.Exporter
                 for (int v = 0; v < handoff.rig.views.Length; v++)
                 {
                     Shoot(handoff.rig.views[v], Path.Combine(outDir, $"{state:D3}-{handoff.rig.views[v].name}.png"));
+                }
+                if (state == 0)
+                {
+                    LogRest();
                 }
                 state++;
                 done = state == handoff.states.Length;
@@ -294,6 +298,27 @@ namespace Civbb.Exporter
                             break;
                     }
                 }
+            }
+        }
+
+        /// One line per playable layer at rest (its controller layers' weights, current clips and, mid-transition, the
+        /// next state's clips after `->`), and the human
+        /// pose's muscles, to tell a pose difference's source (#86).
+        static void LogRest()
+        {
+            for (int i = 0; i < controllers.Count; i++)
+            {
+                var c = controllers[i];
+                var parts = Enumerable.Range(0, c.GetLayerCount()).Select(l =>
+                    $"{c.GetLayerName(l)}@{c.GetLayerWeight(l):0.##}=[{string.Join(",", c.GetCurrentAnimatorClipInfo(l).Select(ci => $"{ci.clip.name}{(ci.clip.humanMotion ? "(human)" : "")}"))}]" +
+                    (c.IsInTransition(l) ? $"->[{string.Join(",", c.GetNextAnimatorClipInfo(l).Select(ci => ci.clip.name))}]" : ""));
+                Debug.Log($"CIVBB rest layer {i}: {string.Join(" ", parts)}");
+            }
+            if (human)
+            {
+                var pose = new HumanPose();
+                new HumanPoseHandler(avatar.GetComponent<Animator>().avatar, avatar.transform).GetHumanPose(ref pose);
+                Debug.Log($"CIVBB rest muscles: {string.Join(" ", pose.muscles.Select(m => m.ToString("0.###")))}");
             }
         }
 

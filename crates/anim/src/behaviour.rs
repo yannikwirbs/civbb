@@ -113,6 +113,18 @@ impl Builtin {
         }
     }
 
+    /// Its value for an avatar standing still on the ground at its own scale, which an instance starts at (#86);
+    /// `None` leaves the animator's default until the engine sets it. A creator's default of 0 for `Grounded`
+    /// would start the avatar falling (VRChat's locomotion layer leaves Standing for SmallHop).
+    pub fn at_rest(self) -> Option<f32> {
+        use Builtin::*;
+        match self {
+            Grounded | Upright | IsAnimatorEnabled | ScaleFactor | ScaleFactorInverse => Some(1.0),
+            AvatarVersion => Some(3.0),
+            _ => None,
+        }
+    }
+
     /// The type the engine provides it as.
     pub fn kind(self) -> ParamKind {
         use Builtin::*;

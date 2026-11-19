@@ -431,7 +431,7 @@ fn muscle_clip(curves: &[(Property, f32)]) -> Clip {
 }
 
 #[test]
-fn muscle_curves_bind_to_slots_with_rest_defaults() {
+fn muscle_curves_bind_to_slots_with_zero_defaults() {
     let clip = muscle_clip(&[
         (Property::Muscle("Left Arm Down-Up".into()), 1.0),
         (Property::Muscle("Left Arm Up".into()), 1.0),
@@ -442,7 +442,8 @@ fn muscle_curves_bind_to_slots_with_rest_defaults() {
     let b = bind(&a);
     let m = find("Left Arm Down-Up").unwrap();
     assert_eq!(b.bindings.targets, [Target::Muscle(m)]);
-    assert!((b.bindings.defaults[0] - 0.5).abs() < 1e-5);
+    // Unity's default human pose, not the rest pose's 0.5 (#86: a humanoid at rest in Unity reads all zeros).
+    assert_eq!(b.bindings.defaults[0], 0.0);
     let reasons: Vec<_> = b.unbound.iter().map(|u| (u.curve, u.reason)).collect();
     assert_eq!(
         reasons,
@@ -532,6 +533,22 @@ fn masks_gate_muscles_by_body_part_and_the_pose_follows_the_muscles() {
     i.update(&c, 0.1);
     let p: HashMap<NodeIndex, Quat> = i.human_pose(&c).into_iter().collect();
     same(p[&2], about(2, -60.0));
+
+    // Muscles no clip binds take Unity's default human pose, 0, not the rest pose (#86).
+    let mut b = arm(
+        0.5,
+        about(2, 50.0),
+        vec![muscle_clip(&[(Property::Muscle("Left Hand Down-Up".into()), 1.0)])],
+    );
+    b.animator = Some(Animator {
+        layers: vec![layer(0, None)],
+        ..a.animator.clone().unwrap()
+    });
+    let c = Controller::new(&b).unwrap();
+    let mut i = Instance::new(&c, true);
+    i.update(&c, 0.1);
+    let p: HashMap<NodeIndex, Quat> = i.human_pose(&c).into_iter().collect();
+    same(p[&2], pose_of(&rig(&b), &[])[&2]);
 
     // Without muscle curves the bones keep their rotation slots.
     a.clips = vec![muscle_clip(&[])];

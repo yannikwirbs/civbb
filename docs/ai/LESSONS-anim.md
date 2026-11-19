@@ -29,3 +29,5 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   different driver for an hour. Keep one driver in one module.
 - Frame-rate questions: record the same cases at other frame times (`-civbbDt`). 30 Hz equal to every second 60 Hz
   frame bit for bit proved fixed 1/60 s steps; compare with exact equality, not tolerances.
+- VRChat's engine sets built-ins every frame: a runtime that leaves them at the creator's defaults starts
+  `Grounded` at 0 and plays the falling states (`Builtin::at_rest`, ADR 0055).

@@ -39,7 +39,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   `Civbb.Exporter.Reference.Render` (`tools/unity-exporter/Editor/Reference.cs`, `tools/unity-batch.sh --graphics`)
   renders a prefab with a `civbb-client rig` hand-off's rig, light and states in play mode, the playable layers
   run as our runtime runs them (SDK proxy clips empty, humanoid only with muscle clips, hips at rest until #52,
-  descriptor masks applied). Not yet part of an export or `civbb build --report` (`unity_parity`).
+  descriptor masks applied). It logs each layer's clips and the rest muscles (`CIVBB rest`, #86). Not yet part of an
+  export or `civbb build --report` (`unity_parity`).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
   `.unitypackage` or Unity YAML.
 - Exporter (ADR 0038): UPM package `tools/unity-exporter` in this repo (not a separate repo), excluded from the
@@ -102,7 +103,8 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 - FLIP parity (ADR 0033): `civbb-client parity <reference> <test> --key <k> [--images <dir>]` renders both avatars
   with the reference's rig (640x640, front/left/back/right framed from the bind-pose bounds) in every state
-  (`civbb_client::parity::states`: rest, then each parameter set in turn; the stage tests call it too), reads
+  (`civbb_client::parity::states`: rest, then each parameter set away from its start in turn, 60 frames each so
+  states settle, ADR 0055; the stage tests call it too), reads
   pixels back (`Renderer::read_last`) and scores each view with FLIP (`flip-rs`, checked against NVIDIA's
   `flip-evaluator`) over the avatar's pixels: mean, p99, traffic light (green mean <= 0.02 and p99 <= 0.2, red
   mean > 0.1 or p99 > 0.5). `civbb build --report --measure` compares the compiled package with the import before
@@ -158,7 +160,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   2 twist helpers, bloated 67 (twists and tail bones). The constraint pass places only the nodes constraints read
   and keeps its scratch per island (#66): lean 0.97 to 0.49 µs, bloated 12.7 to 9.45 µs per avatar on one worker.
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
-  humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). `civbb-dynamics`: PhysBone chains as the SDK
+  humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
+  human pose) and instances start built-ins standing on the ground (`Builtin::at_rest`, ADR 0055). `civbb-dynamics`: PhysBone chains as the SDK
   steps them (ADR 0049: fixed 1/60 s steps plus a partial output step, versions 1.0/1.1, simplified and advanced
   integration, immobile, limits, segment colliders) with grab/pose (ADR 0015's, unverified), and contacts with the
   cross-avatar grid broadphase (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the

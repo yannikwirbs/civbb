@@ -139,8 +139,9 @@ struct Blend {
 }
 
 impl Instance {
-    /// A fresh instance at the parameters' defaults; the first [`Instance::update`] enters the start states.
-    /// `local` is true for the owner's own avatar; it also sets the `IsLocal` built-in.
+    /// A fresh instance at the parameters' defaults, built-ins at [`Builtin::at_rest`]; the first
+    /// [`Instance::update`] enters the start states. `local` is true for the owner's own avatar; it also sets the
+    /// `IsLocal` built-in.
     pub fn new(c: &Controller, local: bool) -> Self {
         let a = &c.animator;
         let n = c.bound.bindings.len();
@@ -158,6 +159,11 @@ impl Instance {
             written: vec![false; n],
             mixer: Mixer::new(n),
         };
+        for b in Builtin::ALL {
+            if let Some(v) = b.at_rest() {
+                i.set_builtin(c, b, v);
+            }
+        }
         i.set_builtin(c, Builtin::IsLocal, f32::from(u8::from(local)));
         i
     }
@@ -175,13 +181,13 @@ impl Instance {
     }
 
     /// Local rotations of the humanoid's framed bones from the muscle slots, parents first; muscles no clip binds
-    /// hold their rest values. Empty when no clip animates muscles, so the bones keep their rotation slots. Where it
-    /// is not empty it takes precedence over rotation slots of the same bones (ADR 0014).
+    /// are 0, as in Unity's default human pose (#86). Empty when no clip animates muscles, so the bones keep their
+    /// rotation slots. Where it is not empty it takes precedence over rotation slots of the same bones (ADR 0014).
     pub fn human_pose(&self, c: &Controller) -> Vec<(NodeIndex, Quat)> {
         let Some(rig) = &c.bound.rig else {
             return Vec::new();
         };
-        let mut muscles: [f32; COUNT] = rig.rest;
+        let mut muscles = [0.0; COUNT];
         let mut any = false;
         for (s, t) in c.bound.bindings.targets.iter().enumerate() {
             if let Target::Muscle(m) = t {

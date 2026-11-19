@@ -102,6 +102,22 @@ fn builtins_have_legacy_names_and_convert_to_the_declared_type() {
     assert_eq!(i.params, [1.0, 3.0, 1.5, 1.0]);
 }
 
+#[test]
+fn instances_start_standing_on_the_ground() {
+    // Creators often leave Grounded and Upright at 0; VRChat's locomotion would then start in SmallHop (#86).
+    let params = vec![
+        param("Grounded", ParamKind::Bool),
+        param("Upright", ParamKind::Float),
+        param("AvatarVersion", ParamKind::Int),
+        param("ScaleFactor", ParamKind::Float),
+        param("VelocityY", ParamKind::Float),
+        param("Seated", ParamKind::Bool),
+        param("user", ParamKind::Float),
+    ];
+    let c = controller(params, vec![layer(vec![state(vec![], vec![])], 0)]);
+    assert_eq!(Instance::new(&c, false).params, [1.0, 1.0, 3.0, 1.0, 0.0, 0.0, 0.0]);
+}
+
 fn driver(local_only: bool, ops: Vec<DriverOp>) -> Behaviour {
     Behaviour::ParameterDriver { local_only, ops }
 }

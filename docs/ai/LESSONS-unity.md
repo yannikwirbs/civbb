@@ -66,3 +66,9 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   read the step conclusions (`gh api repos/.../actions/jobs/<id>`) before suspecting a hang.
 - The exporter used to skip every texture that was not PNG or JPEG without a warning in the output (only a count in
   the log line, "N textures skipped"): check that count after an export; a skipped albedo renders white.
+- A humanoid in Unity writes every muscle each frame; muscles no active clip animates read exactly 0 (the muscle-zero
+  pose: arms down, hands forward), not the bind pose. `Reference.Render` logs each layer's clips (`->` marks a
+  transition's next state) and the rest muscles into the run's log (`CIVBB rest`); `rerender.sh` keeps them in
+  `corpus/local/unity-ref/<name>/render.log`. Muscles uniformly scaled against the clip's keys mean a transition.
+- `ParentChangeDetector` on a bone marks an SDK PhysBone chain root. The SDK rotates the root itself; edit-mode
+  rest equal to the export but a different play-mode rotation means PhysBone motion, not a wrong export.
