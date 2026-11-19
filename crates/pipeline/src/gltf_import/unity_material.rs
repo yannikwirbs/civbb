@@ -7,7 +7,9 @@
 use std::collections::BTreeMap;
 
 use civbb_anim::material::to_linear;
-use civbb_format::material::{AlphaMode, ColorSpace, Material, MaterialModel, Pbr, TextureSlot, Toon, Unlit};
+use civbb_format::material::{
+    AlphaMode, ColorSpace, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit,
+};
 use civbb_format::math::Vec3;
 use serde::Deserialize;
 
@@ -251,8 +253,8 @@ fn st_to_gltf(st: [f32; 4]) -> [f32; 4] {
     [st[0], st[1], st[2], 1.0 - st[1] - st[3]]
 }
 
-/// A plain toon over a base colour: shadows a quarter darker, nothing else. The fallback where a family's own
-/// shading has no counterpart.
+/// A plain toon over a base colour: shadows a quarter darker, lit as Unity's toon families light (light plus ambient,
+/// clamped), nothing else. The fallback where a family's own shading has no counterpart.
 fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon {
     Toon {
         base_color,
@@ -272,6 +274,7 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         outline_width: 0.0,
         outline_color: [0.0; 3],
         outline_width_tex: None,
+        light: ToonLight::Clamped,
     }
 }
 
@@ -374,6 +377,7 @@ impl Importer<'_> {
             Family::MToon => {
                 let base = p.color("_Color", WHITE);
                 let mut t = plain_toon(base, main);
+                t.light = ToonLight::Additive;
                 t.shade_color = p.rgb("_ShadeColor", [0.97, 0.81, 0.86, 1.0]);
                 t.shade_tex = self.unity_slot(x, "_ShadeTexture", srgb);
                 t.shade_shift = p.f("_ShadeShift", 0.0);
@@ -426,6 +430,8 @@ impl Importer<'_> {
             }
             Family::MobileToon | Family::MobileMatcap => {
                 let mut t = plain_toon(p.color("_Color", WHITE), main);
+                // VRChat's mobile shaders score closer to Unity unclamped (ADR 0050).
+                t.light = ToonLight::Additive;
                 if family == Family::MobileMatcap {
                     t.matcap_tex = self.unity_slot(x, "_MatCap", srgb);
                     t.matcap_strength = if t.matcap_tex.is_some() { 1.0 } else { 0.0 };

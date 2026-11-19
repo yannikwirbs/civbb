@@ -14,7 +14,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   transform as at-rest (`Object.Instantiate` resets it). `Batch.Import` survives the SDK's domain reload.
 - Materials (ADR 0043): `X_toon_material` is the material as Unity saved it plus the shader GUID; the importer
   fingerprints GUID (lilToon variant table), name, markers, and maps lilToon, Poiyomi, UTS2, MToon, Standard,
-  VRChat Mobile and unlit to Toon/PBR/Unlit (`gltf_import/unity_material.rs`). Approximations until Unity reference
+  VRChat Mobile and unlit to Toon/PBR/Unlit (`gltf_import/unity_material.rs`). Toon materials name their light
+  model (ADR 0050): lilToon, Poiyomi, UTS2 clamp light plus ambient; MToon, VRM and VRChat Mobile add the ambient. Approximations until Unity reference
   renders score them.
 - Verified against Unity (`tools/unity-truth/Assets/Editor/Exported.cs` records into `corpus/local/unity-truth`,
   `crates/pipeline/tests/unity_export.rs` compares, local only): muscle, rotation, Euler, scale and blendshape
@@ -106,9 +107,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   accepted yellow). lean and bloated are green in every state (`crates/pipeline/tests/parity.rs`).
 - Unity as the reference (ADR 0048): `civbb build --unstaged` packages the import, `civbb-client rig <pkg>` writes
   the hand-off (`parity::Handoff`: rig, light, dt, parameters, states), the exporter renders `<state>-<view>.png`,
-  and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). All 13 exports red at rest
-  (Taro 0.12 to 0.23 best, Blackbird 0.77 to 0.83 worst); per-family table and findings on #82, toon
-  over-brightening #81.
+  and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). All 13 exports red at rest;
+  since the toon light models (ADR 0050, #81) Inuinu (UTS2) 0.09 to 0.21 and Taro 0.11 to 0.21 best, Blackbird
+  0.77 to 0.83 worst; per-family tables on #79, #81 and #82.
 
 ## Renderer and viewer
 
@@ -155,8 +156,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   steps them (ADR 0049: fixed 1/60 s steps plus a partial output step, versions 1.0/1.1, simplified and advanced
   integration, immobile, limits, segment colliders) with grab/pose (ADR 0015's, unverified), and contacts with the
   cross-avatar grid broadphase (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the
-  component's node apart from the root transform, Proximity from a sender's second frame (ADR 0047). Format v12
-  (`rebake` ADR 0046, contact shapes ADR 0047, PhysBone `version` ADR 0049).
+  component's node apart from the root transform, Proximity from a sender's second frame (ADR 0047). Format v13
+  (`rebake` ADR 0046, contact shapes ADR 0047, PhysBone `version` ADR 0049, `Toon::light` ADR 0050).
 
 ## Test data
 

@@ -2,7 +2,7 @@
 //! each family's mapping to the native Toon, PBR and Unlit models, on hand-written saved properties.
 
 use base64::Engine;
-use civbb_format::material::{AlphaMode, Material, MaterialModel, Toon};
+use civbb_format::material::{AlphaMode, Material, MaterialModel, Toon, ToonLight};
 use civbb_pipeline::gltf_import::{Imported, Limits, import};
 use serde_json::{Value, json};
 
@@ -143,6 +143,20 @@ fn a_shader_name_wins_over_leftover_markers() {
         (t.emissive, t.matcap_tex.is_none(), t.outline_width),
         ([2.0; 3], true, 0.0)
     );
+}
+
+#[test]
+fn unity_toon_families_clamp_the_light_while_mtoon_and_mobile_add_the_ambient() {
+    // ADR 0050.
+    let light = |shader: &str| toon(&material(json!({"shader": shader, "render_queue": -1}))).light;
+    assert_eq!(light("VRM/MToon"), ToonLight::Additive);
+    assert_eq!(light("VRChat/Mobile/Toon Lit"), ToonLight::Additive);
+    for shader in [
+        "Hidden/.poiyomi/• Poiyomi Toon •/Body",
+        "UnityChanToonShader/Toon_DoubleShadeWithFeather",
+    ] {
+        assert_eq!(light(shader), ToonLight::Clamped, "{shader}");
+    }
 }
 
 #[test]

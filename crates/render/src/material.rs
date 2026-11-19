@@ -1,7 +1,7 @@
 //! Materials as the uber-shaders read them: one fixed-size record per material in the material buffer, and the
 //! pipeline each material draws with (design doc §6, ADR 0023).
 
-use civbb_format::material::{AlphaMode, Material, MaterialModel, TextureSlot};
+use civbb_format::material::{AlphaMode, Material, MaterialModel, TextureSlot, ToonLight};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
 pub const MATERIAL_WORDS: usize = 84;
@@ -86,7 +86,8 @@ impl PipelineKey {
 pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let base_color;
     let mut emissive = [0.0; 3];
-    let mut shade = [0.0; 3];
+    // Toon shadow colour, and 1 in w for the clamped light model.
+    let mut shade = [0.0; 4];
     let mut rim = [0.0; 3];
     // Metallic, roughness, normal scale, alpha cutoff.
     let mut params = [0.0, 1.0, 1.0, 0.0];
@@ -114,7 +115,8 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
         MaterialModel::Toon(t) => {
             base_color = t.base_color;
             emissive = t.emissive;
-            shade = t.shade_color;
+            let clamped = if t.light == ToonLight::Clamped { 1.0 } else { 0.0 };
+            shade = [t.shade_color[0], t.shade_color[1], t.shade_color[2], clamped];
             rim = t.rim_color;
             params[2] = t.normal_scale;
             toon = [t.shade_shift, t.shade_toony, t.rim_power, t.matcap_strength];
@@ -147,7 +149,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let xyz = |v: [f32; 3]| [v[0], v[1], v[2], 0.0];
     vec4(base_color);
     vec4(xyz(emissive));
-    vec4(xyz(shade));
+    vec4(shade);
     vec4(xyz(rim));
     vec4(params);
     vec4(toon);

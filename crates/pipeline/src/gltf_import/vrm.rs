@@ -12,7 +12,7 @@ use civbb_format::dynamics::{
 use civbb_format::expressions::{Control, ControlKind, ExpressionParam, ExpressionParamKind, Expressions, Menu};
 use civbb_format::face::{EyeDriver, EyeLook, Face, RangeMap, ShapeBind, Viseme};
 use civbb_format::hierarchy::{HumanBone, Humanoid, NodeIndex};
-use civbb_format::material::{AlphaMode, ColorSpace, Material, MaterialModel, TextureSlot, Toon};
+use civbb_format::material::{AlphaMode, ColorSpace, Material, MaterialModel, TextureSlot, Toon, ToonLight};
 use civbb_format::math::{Quat, Transform, Vec3};
 use civbb_format::mesh::FirstPerson;
 use civbb_format::meta::{AvatarUse, Commercial, Licence, Meta, Modification};
@@ -447,6 +447,7 @@ impl Importer<'_> {
                 outline_width,
                 outline_color: arr(&x["outlineColorFactor"], [0.0; 3]),
                 outline_width_tex: self.mtoon_slot(&x["outlineWidthMultiplyTexture"], ColorSpace::Linear, None),
+                light: ToonLight::Additive,
             }),
             render_queue: base.render_queue + offset,
             ..base
@@ -502,6 +503,7 @@ impl Importer<'_> {
                 outline_width,
                 outline_color: rgb(color("_OutlineColor", [0.0, 0.0, 0.0, 1.0])),
                 outline_width_tex: self.mtoon_slot(&t["_OutlineWidthTexture"], ColorSpace::Linear, None),
+                light: ToonLight::Additive,
             }),
             alpha,
             double_sided: num(&f["_CullMode"], 2.0) as i32 == 0,

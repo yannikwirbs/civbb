@@ -4,7 +4,7 @@
 //! Vulkan device.
 
 use civbb_format::Avatar;
-use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr, TextureSlot, Toon, Unlit};
+use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit};
 use civbb_format::math::Mat4;
 use civbb_format::mesh::{Mesh, Submesh};
 use civbb_render::material::{MATERIAL_WORDS, pack};
@@ -82,6 +82,7 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         outline_width: 0.0,
         outline_color: [0.0; 3],
         outline_width_tex: None,
+        light: ToonLight::Additive,
     })
 }
 
@@ -286,6 +287,51 @@ fn draws_quads_with_each_shader_depth_textures_and_blending() {
         [128, 255, 128],
         2,
         "blended over textured, top left",
+    );
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+#[test]
+fn toon_light_models_add_or_clamp_the_ambient() {
+    let Some(ctx) = context() else { return };
+    let mut scene = Scene::new(
+        &ctx,
+        Capacity {
+            vertices: 8,
+            indices: 12,
+            deltas: 0,
+            skinned: 8,
+            materials: 2,
+        },
+    )
+    .unwrap();
+    let grey = |light| {
+        let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.0; 3], 0.0);
+        if let MaterialModel::Toon(t) = &mut m {
+            t.light = light;
+        }
+        material(m, AlphaMode::Opaque)
+    };
+    let additive = scene.add_material(&ctx, &grey(ToonLight::Additive), &[]).unwrap();
+    let clamped = scene.add_material(&ctx, &grey(ToonLight::Clamped), &[]).unwrap();
+    let meshes = [
+        quad([-3.0, 0.0], [-3.0, 3.0], 0.0, 0),
+        quad([0.0, 3.0], [-3.0, 3.0], 0.0, 1),
+    ];
+    let mut view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+    view.light_dir = [0.0, 0.0, 1.0];
+    view.light_color = [1.0; 3];
+    view.ambient = [0.3; 3];
+    let pixels = render(&ctx, &mut scene, &meshes, &[additive, clamped], &[], &view);
+    // Fully lit (facing the light, no shift). MToon adds the ambient on the lit colour: 0.5 + 0.5 * 0.3 = 0.65; the
+    // Unity toon families clamp light plus ambient to 1, so the surface shows its own 0.5.
+    assert_near(pixel(&pixels, 16, 32), [166, 166, 166], 1, "additive (MToon)");
+    assert_near(
+        pixel(&pixels, 48, 32),
+        [128, 128, 128],
+        1,
+        "clamped (lilToon and others)",
     );
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");

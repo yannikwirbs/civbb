@@ -109,6 +109,18 @@ pub struct Toon {
     pub outline_color: Vec3,
     /// Per-vertex outline width mask.
     pub outline_width_tex: Option<TextureSlot>,
+    /// How the main light and the ambient light the surface.
+    pub light: ToonLight,
+}
+
+/// How a toon material combines the main light and the ambient.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ToonLight {
+    /// MToon: the light lights the shade-to-lit blend; the ambient adds on top, times the lit colour.
+    Additive,
+    /// lilToon, Poiyomi, UTS2 and VRChat's toon shaders: light plus ambient, clamped to 1 per channel, lights the
+    /// blend, so a lit surface shows its own colour at most.
+    Clamped,
 }
 
 /// Unlit colour or texture.

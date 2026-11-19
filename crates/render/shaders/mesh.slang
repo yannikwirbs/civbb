@@ -35,7 +35,7 @@ struct Material
 {
     float4 base_color;
     float4 emissive; // xyz
-    float4 shade;    // xyz, toon shadow colour
+    float4 shade;    // xyz, toon shadow colour; w 1: light plus ambient, clamped, lights the blend (ToonLight)
     float4 rim;      // xyz, toon rim colour
     float4 params;   // metallic, roughness, normal scale, alpha cutoff (0: no cutoff)
     float4 toon;     // shade shift, shade toony, rim power, matcap strength
@@ -196,7 +196,11 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
     float toony = m.toon.y;
     float s = dot(n, v.light_dir.xyz) + m.toon.x;
     s = saturate((s + 1 - toony) / max(2 - 2 * toony, 1e-4));
-    float3 color = lerp(shade, lit.rgb, s) * v.light_color.rgb + lit.rgb * v.ambient.rgb;
+    float3 color = lerp(shade, lit.rgb, s);
+    if (m.shade.w > 0.5)
+        color *= saturate(v.light_color.rgb + v.ambient.rgb); // lilToon, Poiyomi, UTS2, VRChat toon
+    else
+        color = color * v.light_color.rgb + lit.rgb * v.ambient.rgb; // MToon
     if (m.toon.z > 0)
         color += m.rim.xyz * pow(saturate(1 - dot(n, e)), m.toon.z);
     if (m.slots[5].tex.x != NONE)
