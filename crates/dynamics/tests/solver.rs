@@ -1,5 +1,6 @@
-//! Chain solver behaviour, hand-derived from ADR 0015: rest, gravity against pull, falloff, spring, stiffness, limits,
-//! colliders, immobile, frame-rate independence, multi-child roots, grab, pose and the reported parameters.
+//! Chain solver behaviour in closed form or by property (ADR 0049; the SDK replay is `vrc_physbone.rs`): rest,
+//! gravity by version, falloff, spring, stiffness, limits, colliders, immobile, frame rates, multi-child roots, grab,
+//! pose and the reported parameters.
 
 use civbb_core::math::{Pose, length, normalize, sub};
 use civbb_dynamics::rig::eval;
@@ -32,6 +33,7 @@ fn chain(root: u32) -> Chain {
         ignore: Vec::new(),
         endpoint: [0.0; 3],
         multi_child: MultiChild::First,
+        version: Version::V1_1,
         integration: Integration::Simplified,
         pull: g(0.5),
         spring: g(0.0),
@@ -131,48 +133,49 @@ fn without_forces_the_chain_holds_its_rest_pose() {
 }
 
 #[test]
-fn gravity_and_pull_balance_at_tan_gravity_times_one_minus_pull_over_pull() {
-    // One bone: at equilibrium the gravity drift per step, g h^2 cos(theta), is undone by the pull's share
-    // h^2 / (h^2 + alpha) of the tangential gap len sin(theta) after it; with alpha = ref^2 (1 - pull) / pull and
-    // g = gravity len / ref^2 this gives tan(theta) = gravity (1 - pull) / pull for any step h.
-    for (gravity, pull) in [(0.25f32, 0.5f32), (0.1, 0.2), (0.5, 0.8)] {
-        let expected = (gravity * (1.0 - pull) / pull).atan().to_degrees();
+fn gravity_bends_the_rest_direction_in_version_1_1_and_balances_pull_in_1_0() {
+    // Version 1.1: the rest direction turns to normalize(lerp(rest, down, gravity)), tan = gravity / (1 - gravity),
+    // whatever the pull or frame rate. Version 1.0: gravity is a force of `gravity` bone lengths per step against
+    // the pull's share of the gap, tan = gravity / pull.
+    for (gravity, pull) in [(0.25f32, 0.5f32), (0.5, 0.2), (-0.25, 0.5)] {
         for hz in [60.0, 144.0] {
-            let got = settle(
-                Chain {
-                    gravity: g(gravity),
-                    pull: g(pull),
-                    ..chain(1)
-                },
-                1,
-                hz,
+            let sag = |version| {
+                settle(
+                    Chain {
+                        gravity: g(gravity),
+                        pull: g(pull),
+                        version,
+                        ..chain(1)
+                    },
+                    1,
+                    hz,
+                )
+            };
+            let v11 = (gravity / (1.0 - gravity.abs())).atan().to_degrees();
+            let v10 = (gravity / pull).atan().to_degrees();
+            assert!(
+                (sag(Version::V1_1) - v11).abs() < 0.1,
+                "{gravity} {pull} {hz}: {}",
+                sag(Version::V1_1)
             );
             assert!(
-                (got - expected).abs() < 0.2,
-                "gravity {gravity} pull {pull} at {hz} Hz: {got} != {expected}"
+                (sag(Version::V1_0) - v10).abs() < 0.1,
+                "{gravity} {pull} {hz}: {}",
+                sag(Version::V1_0)
             );
         }
     }
-    // Negative gravity lifts; no pull lets the bone hang straight down.
-    let up = settle(
+    // Without pull nothing moves, whatever the gravity.
+    let frozen = settle(
         Chain {
-            gravity: g(-0.25),
-            ..chain(1)
-        },
-        1,
-        60.0,
-    );
-    assert!((up + 14.036).abs() < 0.2, "{up}");
-    let hang = settle(
-        Chain {
-            gravity: g(0.5),
+            gravity: g(1.0),
             pull: g(0.0),
             ..chain(1)
         },
         1,
         60.0,
     );
-    assert!((hang - 90.0).abs() < 0.5, "{hang}");
+    assert!(frozen.abs() < 1e-4, "{frozen}");
 }
 
 #[test]
@@ -214,7 +217,7 @@ fn spring_keeps_momentum_and_overshoots_while_zero_spring_does_not() {
         }
         peak
     };
-    let equilibrium = (0.5f32).atan().to_degrees();
+    let equilibrium = 45.0;
     assert!(peak(0.0) < equilibrium + 0.01, "{}", peak(0.0));
     assert!(peak(0.9) > equilibrium + 2.0, "{}", peak(0.9));
 }
@@ -225,7 +228,6 @@ fn full_stiffness_holds_the_animated_pose_with_advanced_integration_only() {
         settle(
             Chain {
                 gravity: g(1.0),
-                pull: g(0.0),
                 stiffness: g(1.0),
                 integration,
                 ..chain(1)
@@ -303,10 +305,7 @@ fn multi_child_roots_ignore_first_or_average() {
     let (rot, ..) = rooted(MultiChild::Ignore);
     assert_eq!(rot, [0.0, 0.0, 0.0, 1.0], "the root stays");
     let (_, first, other) = rooted(MultiChild::First);
-    assert!(
-        (first - 26.565).abs() < 0.3,
-        "the root aims at its first child: {first}"
-    );
+    assert!((first - 45.0).abs() < 0.3, "the root aims at its first child: {first}");
     // The other child (along +Z) lies on the axis the root turns about for the first, so it stays level.
     assert!(other.abs() < 0.01, "{other}");
     let (_, a, b) = rooted(MultiChild::Average);
@@ -433,9 +432,9 @@ fn the_bloated_corpus_avatar_stays_finite() {
     }
 }
 
-/// One horizontal bone falling without pull, with a limit or colliders.
+/// One horizontal bone pulled straight down (gravity 1 bends its rest direction there), with a limit or colliders.
 fn hang(c: Chain, colliders: Vec<Collider>) -> (f32, f32) {
-    let mut a = avatar(1, Chain { pull: g(0.0), ..c });
+    let mut a = avatar(1, Chain { gravity: g(1.0), ..c });
     a.dynamics.colliders = colliders;
     let rig = Rig::new(&a);
     let mut s = State::new(&rig);
@@ -510,12 +509,11 @@ fn collider(shape: Shape, position: Vec3, rotation: [f32; 4], inside: bool) -> C
 
 #[test]
 fn colliders_push_bones_out_or_keep_them_in() {
-    // Gravity 0.2 moves the tip 2 cm per step: a bone that moves its whole length in one step can pass through
-    // a collider thinner than that (ADR 0015).
+    // Each step pushes the bone out by its depth at its closest point, then the bone keeps its length (ADR 0049).
     let with = |radius: f32, col: Collider| {
         hang(
             Chain {
-                gravity: g(0.2),
+                pull: g(0.2),
                 radius: g(radius),
                 colliders: vec![0],
                 ..chain(1)
@@ -524,40 +522,34 @@ fn colliders_push_bones_out_or_keep_them_in() {
         )
     };
     const I: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
-    // A floor at y = 0.95 under the bone (base at y = 1, length 0.1): the tip stops 0.05 down, asin(0.5) = 30
-    // degrees; with a 0.02 bone radius 0.03 down, asin(0.3).
+    // A floor at y = 0.95 under the bone (base at y = 1, length 0.1) with a 0.02 bone radius: the bone touches at
+    // asin(0.3) = 17.46 degrees, but each step's pull sinks it before the push and the length step after it, so it
+    // rests lower, as the SDK's does (`collider_plane` in vrc_physbone.rs).
     let floor = collider(Shape::Plane, [0.0, 0.95, 0.0], I, false);
-    let rest = with(0.0, floor.clone()).0;
-    assert!((rest - 30.0).abs() < 0.2, "{rest}");
-    assert!((with(0.02, floor).0 - 17.458).abs() < 0.2);
-    // A ball of radius 0.06 at (0.1, 0.9): the tip's circle meets it where sin(t + 45) = 1.32 / sqrt(2), t = 23.97.
-    let ball = collider(Shape::Sphere { radius: 0.06 }, [0.1, 0.9, 0.0], I, false);
+    let rest = with(0.02, floor).0;
+    assert!(rest > 17.46 && rest < 35.0, "{rest}");
+    // A ball of radius 0.03 at (0.05, 0.94), 50 degrees down and 0.078 from the base: the bone's middle touches it at
+    // 50 - asin(0.03 / 0.078) = 27.4 degrees and rests a little past that. (A ball the tip runs into head-on is
+    // passed: pushes along the bone are undone by the length step, as in the SDK.)
+    let ball = collider(Shape::Sphere { radius: 0.03 }, [0.05, 0.94, 0.0], I, false);
     let rest = with(0.0, ball).0;
-    assert!((rest - 23.97).abs() < 1.5, "{rest}");
+    assert!(rest > 27.4 && rest < 35.0, "{rest}");
     // The same circle across a capsule lying along Z through that point.
     let h = std::f32::consts::FRAC_1_SQRT_2;
     let rod = collider(
         Shape::Capsule {
-            radius: 0.06,
+            radius: 0.03,
             height: 0.5,
         },
-        [0.1, 0.9, 0.0],
+        [0.05, 0.94, 0.0],
         [h, 0.0, 0.0, h],
         false,
     );
-    assert!((with(0.0, rod).0 - 23.97).abs() < 1.5);
-    // Inside a ball of radius 0.15 around the base, a bone of radius 0.07 has 0.08 of room: it squishes to 0.8 of
-    // its length, 0.4 of its 0.5 max squish.
-    let cage = collider(Shape::Sphere { radius: 0.15 }, [0.0, 1.0, 0.0], I, true);
-    let (_, squish) = hang(
-        Chain {
-            gravity: g(0.2),
-            radius: g(0.07),
-            colliders: vec![0],
-            max_squish: g(0.5),
-            ..chain(1)
-        },
-        vec![cage],
-    );
-    assert!((squish - 0.4).abs() < 1e-3, "{squish}");
+    let on_rod = with(0.0, rod).0;
+    assert!((on_rod - rest).abs() < 1e-3, "{on_rod} {rest}");
+    // Inside a ball of radius 0.12 around (0.1, 1.0), the tip reaches the ball's edge where 0.01 (2 - 2 cos t) =
+    // 0.0144, t = 73.7 degrees, and rests a little past it (pull, then push, then length).
+    let cage = collider(Shape::Sphere { radius: 0.12 }, [0.1, 1.0, 0.0], I, true);
+    let held = with(0.0, cage).0;
+    assert!(held > 0.28f32.acos().to_degrees() && held < 80.0, "{held}");
 }

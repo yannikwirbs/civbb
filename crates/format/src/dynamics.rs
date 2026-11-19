@@ -44,6 +44,8 @@ pub struct Chain {
     pub endpoint: Vec3,
     /// How the root behaves when it has several children.
     pub multi_child: MultiChild,
+    /// Solver version: 1.1 bends the rest direction towards gravity, 1.0 pulls with a force.
+    pub version: Version,
     /// Integration model.
     pub integration: Integration,
     /// Pull back to rest pose, 0 to 1.
@@ -85,6 +87,16 @@ pub enum MultiChild {
     Ignore,
     First,
     Average,
+}
+
+/// PhysBone versions, named as the VRChat SDK serialises them.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Version {
+    #[serde(rename = "Version_1_0")]
+    V1_0,
+    #[serde(rename = "Version_1_1")]
+    V1_1,
 }
 
 /// Integration models.

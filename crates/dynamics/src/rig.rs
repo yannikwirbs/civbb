@@ -1,7 +1,7 @@
-//! Compiles an avatar's chains into one flat particle list, parents first, with per-particle parameters (ADR 0015).
+//! Compiles an avatar's chains into one flat particle list, parents first, with per-particle parameters (ADR 0049).
 
 use civbb_format::Avatar;
-use civbb_format::dynamics::{Chain, Collider, Graded, ImmobileType, Integration, Limit, MultiChild};
+use civbb_format::dynamics::{Chain, Collider, Graded, ImmobileType, Integration, Limit, MultiChild, Version};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Vec3};
 
@@ -26,6 +26,8 @@ pub struct ChainRig {
     pub count: u32,
     /// Advanced integration (momentum and stiffness).
     pub advanced: bool,
+    /// PhysBone version 1.0: gravity is a force, not a bend of the rest direction.
+    pub version_1_0: bool,
     /// `immobile` cancels only translation (`World`), not rotation too (`AllMotion`).
     pub immobile_world: bool,
     /// How the root aims at several children.
@@ -74,7 +76,7 @@ pub struct Rig {
     pub endpoint: Vec<Vec3>,
     /// Pull, 0 to 1.
     pub pull: Vec<f32>,
-    /// Spring or momentum (velocity kept per reference step), 0 to 1.
+    /// Spring (simplified) or momentum (advanced), 0 to 1.
     pub spring: Vec<f32>,
     /// Stiffness, 0 to 1 (0 with simplified integration).
     pub stiffness: Vec<f32>,
@@ -193,6 +195,7 @@ impl Rig {
             first,
             count: order.len() as u32,
             advanced,
+            version_1_0: c.version == Version::V1_0,
             immobile_world: c.immobile_type == ImmobileType::World,
             // A root with one child aims at it whatever the mode.
             multi_child: if root_children > 1 {

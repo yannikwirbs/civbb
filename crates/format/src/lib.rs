@@ -24,7 +24,7 @@ pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the data model. Bump on any incompatible change to the types in this crate.
-pub const FORMAT_VERSION: u32 = 11;
+pub const FORMAT_VERSION: u32 = 12;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -211,6 +211,7 @@ pub(crate) mod testutil {
                     ignore: vec![],
                     endpoint: [0.0, 0.1, 0.0],
                     multi_child: MultiChild::Ignore,
+                    version: Version::V1_1,
                     integration: Integration::Simplified,
                     pull: Graded::constant(0.2),
                     spring: Graded {

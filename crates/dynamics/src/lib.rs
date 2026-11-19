@@ -1,5 +1,5 @@
-//! Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose, and contacts (design doc §7, ADRs 0015 to
-//! 0017).
+//! Bone dynamics: PhysBone chains as the VRChat SDK steps them, with grab and pose, and contacts (design doc §7,
+//! ADRs 0016, 0017, 0049).
 
 pub mod contact;
 pub mod rig;

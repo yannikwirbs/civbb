@@ -1,7 +1,7 @@
 {
   "avatar": "lean",
   "compiler": "civbb-pipeline 0.0.0",
-  "format_version": 11,
+  "format_version": 12,
   "parity": null,
   "platform": "Desktop",
   "report": 1,

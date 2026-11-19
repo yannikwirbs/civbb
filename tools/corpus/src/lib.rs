@@ -507,6 +507,7 @@ pub fn generate(spec: &Spec) -> Avatar {
                 ignore: vec![],
                 endpoint: [0.0, 0.0, -0.05],
                 multi_child: MultiChild::Ignore,
+                version: Version::V1_1,
                 integration: Integration::Advanced,
                 pull: graded(0.2),
                 spring: graded(0.4),

@@ -23,9 +23,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   runtime is the ground truth for #75: `tools/unity-truth/Assets/Editor/VrcConstraints.cs` (73 generated
   constraint-option cases, ADR 0046) and `VrcContacts.cs` (39 contact cases, ADR 0047) run in the SDK host project
   by reflection and write committed goldens (`crates/anim/tests/unity/vrc_constraints.json`,
-  `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. PhysBones are recorded too
-  (`VrcPhysBones.cs`, 30 cases, `crates/dynamics/tests/unity/vrc_physbones.json`), but our solver (ADR 0015) is
-  0.04 to 0.57 m off; `tests/vrc_physbone.rs` pins today's errors as bounds until the model is refit (#75).
+  `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. PhysBones too (ADR 0049):
+  `VrcPhysBones.cs` (81 cases at 60 Hz, 18 at 90 and 30 Hz, `crates/dynamics/tests/unity/vrc_physbones*.json`);
+  `tests/vrc_physbone.rs` replays them: version 1.1 within 0.5 mm in 55 of 62 cases at 60 Hz and at 30 Hz, the rest
+  pinned as bounds (version 1.0 transients #83; 90 Hz output, collider velocity, polar corners #84).
 - The muscle rig leaves the hips to the body pose (#52); real muscle frames had turned Yumeka over.
 - Reference renders (#79, ADR 0048): the host project has lilToon 2.4.1 (embedded package), Poiyomi 7.3.050 and
   UTS2 2.0.9 (unpacked into `Assets/`, GUIDs kept), so all 13 exports render with their shaders.
@@ -150,11 +151,12 @@ What exists, by area. Read the section for the area you touch; update it when th
   2 twist helpers, bloated 67 (twists and tail bones). The constraint pass places only the nodes constraints read
   and keeps its scratch per island (#66): lean 0.97 to 0.49 µs, bloated 12.7 to 9.45 µs per avatar on one worker.
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
-  humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). `civbb-dynamics`: XPBD PhysBone chains
-  with grab/pose, colliders and limits (ADRs 0015, 0016), and contacts with the cross-avatar grid broadphase
-  (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the component's node apart from the
-  root transform, Proximity from a sender's second frame (ADR 0047). Format v11 (`rebake` ADR 0046, contact shapes
-  ADR 0047).
+  humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). `civbb-dynamics`: PhysBone chains as the SDK
+  steps them (ADR 0049: fixed 1/60 s steps plus a partial output step, versions 1.0/1.1, simplified and advanced
+  integration, immobile, limits, segment colliders) with grab/pose (ADR 0015's, unverified), and contacts with the
+  cross-avatar grid broadphase (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the
+  component's node apart from the root transform, Proximity from a sender's second frame (ADR 0047). Format v12
+  (`rebake` ADR 0046, contact shapes ADR 0047, PhysBone `version` ADR 0049).
 
 ## Test data
 

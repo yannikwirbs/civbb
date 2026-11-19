@@ -1,6 +1,6 @@
 # 0015: PhysBone chains are solved as XPBD particles against the animated pose
 
-Status: accepted
+Status: superseded by 0049
 Date: 2026-10-28
 
 ## Context

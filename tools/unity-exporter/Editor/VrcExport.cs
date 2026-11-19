@@ -314,7 +314,8 @@ namespace Civbb.Exporter
                     var parameter = P(so, "parameter").stringValue;
                     chains.Add($"{{\"root\":{rootNode},\"ignore\":[{string.Join(",", ignored)}]," +
                         $"\"endpoint\":{Vec(P(so, "endpointPosition").vector3Value)}," +
-                        $"\"multi_child\":\"{EnumName(P(so, "multiChildType"))}\",\"integration\":\"{EnumName(P(so, "integrationType"))}\"," +
+                        $"\"multi_child\":\"{EnumName(P(so, "multiChildType"))}\",\"version\":\"{EnumName(P(so, "version"))}\"," +
+                        $"\"integration\":\"{EnumName(P(so, "integrationType"))}\"," +
                         $"\"pull\":{G("pull")},\"spring\":{G("spring")},\"stiffness\":{G("stiffness")},\"gravity\":{G("gravity")}," +
                         $"\"gravity_falloff\":{G("gravityFalloff")},\"immobile\":{G("immobile")}," +
                         $"\"immobile_type\":\"{EnumName(P(so, "immobileType"))}\",\"limit\":{limit},\"radius\":{G("radius")}," +

@@ -6,7 +6,9 @@
 
 use civbb_format::animator::*;
 use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
-use civbb_format::dynamics::{Chain, Collider, Dynamics, Graded, ImmobileType, Integration, Limit, MultiChild, Shape};
+use civbb_format::dynamics::{
+    Chain, Collider, Dynamics, Graded, ImmobileType, Integration, Limit, MultiChild, Shape, Version,
+};
 use civbb_format::expressions::{Control, ControlKind, ExpressionParam, ExpressionParamKind, Expressions, Menu};
 use civbb_format::face::{EyeDriver, EyeLook, Face, RangeMap, ShapeBind, Viseme};
 use civbb_format::hierarchy::{HumanBone, Humanoid, NodeIndex};
@@ -1003,6 +1005,7 @@ fn chain(root: NodeIndex, ignore: Vec<NodeIndex>, endpoint: Vec3, p: &Params, co
         ignore,
         endpoint,
         multi_child: MultiChild::First,
+        version: Version::V1_0,
         integration: Integration::Simplified,
         pull: map(&p.stiffness, |s| (s / 4.0).clamp(0.0, 1.0)),
         spring: map(&p.drag, |d| (1.0 - d).clamp(0.0, 1.0)),

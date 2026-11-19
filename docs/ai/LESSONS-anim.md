@@ -17,5 +17,15 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   need `Key`'s `null`-as-infinity reader (ADR 0041). Other format floats must be finite.
 - Fitting the SDK's PhysBones (#75): a throwaway numpy model of the chain in Unity space against
   `vrc_physbones.json` (max bone distance over all frames per case) finds the model fast; try one force at a time
-  on the cases that isolate it (`pull_high` has no spring or gravity). Frame 0 of the recording already holds one
-  step.
+  on the cases that isolate it (`pull_high` has no spring or gravity). The SDK takes two steps on a chain's first
+  frame (built in edit mode, the first was even at an unpinned frame time: build cases in play mode).
+- To identify a step's force terms when the parent is pinned (bone 1), regress the pre-length-step point on candidate
+  vectors with the condition `cross(P - parent, recorded direction) = 0` (linear in the coefficients): it gave
+  stiffness as "carried with the parent" (residual 2e-6) at once. It is degenerate near equilibrium; use frames
+  with motion (sway).
+- Teacher forcing (one model step from the recorded previous frame, spring 0 cases) isolates a contact rule: the
+  chord a bone moves equals the collider depth at its closest point, so the SDK pushes the end by that depth.
+- Python `from a import x` followed by `from b import *` silently replaces `x` with `b.x`: a scratch model ran a
+  different driver for an hour. Keep one driver in one module.
+- Frame-rate questions: record the same cases at other frame times (`-civbbDt`). 30 Hz equal to every second 60 Hz
+  frame bit for bit proved fixed 1/60 s steps; compare with exact equality, not tolerances.

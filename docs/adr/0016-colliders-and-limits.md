@@ -1,6 +1,6 @@
 # 0016: Chain colliders and rotation limits
 
-Status: accepted
+Status: accepted; frames, polar shape, colliders and order (points 1 to 4) superseded by 0049
 Date: 2026-10-28
 
 ## Context

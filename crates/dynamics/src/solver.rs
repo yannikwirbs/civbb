@@ -1,22 +1,22 @@
-//! Steps an avatar's chains against the animated pose (inertia, gravity, pull, stiffness, lengths, immobile, grab and
-//! pose) and writes the simulated rotations back into the local pose (ADR 0015).
+//! Steps an avatar's chains against the animated pose and writes the simulated rotations back into the local pose:
+//! the VRChat SDK's PhysBone model as fitted to its recordings (ADR 0049), plus grab and pose.
 
 use civbb_format::dynamics::{MultiChild, Shape};
-use civbb_format::math::{Transform, Vec3};
+use civbb_format::math::{Quat, Transform, Vec3};
 
 use crate::rig::{LimitKind, NO_PARENT, Rig};
 use civbb_core::math::{
-    Pose, add, conj, cross, dot, from_to, length, mul, normalize, qnormalize, rotate, scale, sub, world_poses,
+    IDENTITY, Pose, add, conj, cross, dot, from_to, length, mul, nlerp, normalize, qnormalize, rotate, scale, sub,
+    unit, world_poses,
 };
 
-/// The step that per-step parameters (pull, spring) refer to, seconds.
-pub const REFERENCE_STEP: f32 = 1.0 / 60.0;
-/// Longest substep; longer frames are split.
-pub const MAX_STEP: f32 = 1.0 / 60.0;
+/// The fixed simulation step, seconds. Frame time accumulates; leftover time is simulated for the output only.
+pub const STEP: f32 = 1.0 / 60.0;
 /// Longer frames (hitches) are simulated as this long.
 pub const MAX_FRAME: f32 = 0.1;
-/// Collider and length projections per particle and substep, at most.
-pub const COLLISION_PASSES: u32 = 8;
+/// Simplified integration keeps this fraction of `spring` as velocity.
+const SPRING_KEEP: f32 = 0.99;
+const DOWN: Vec3 = [0.0, -1.0, 0.0];
 
 /// What a chain reports to the animator under its parameter prefix (`_IsGrabbed`, `_IsPosed`, `_Angle`,
 /// `_Stretch`, `_Squish`).
@@ -43,19 +43,64 @@ enum Placed {
     Plane { point: Vec3, normal: Vec3 },
 }
 
+/// Per-particle simulation state.
+#[derive(Clone, Debug, Default)]
+struct Particles {
+    pos: Vec<Vec3>,
+    /// Position before the last step (advanced integration's velocity).
+    prev: Vec<Vec3>,
+    /// Displacement of the last step before the length constraint (simplified integration's velocity).
+    vel: Vec<Vec3>,
+    /// Offset from the parent after the last step, before immobile moved anything.
+    off: Vec<Vec3>,
+    /// Animated (or posed) offset from the parent at the last step, world space.
+    rest: Vec<Vec3>,
+}
+
+impl Particles {
+    fn new(n: usize) -> Self {
+        let v = vec![[0.0; 3]; n];
+        Self {
+            pos: v.clone(),
+            prev: v.clone(),
+            vel: v.clone(),
+            off: v.clone(),
+            rest: v,
+        }
+    }
+
+    fn copy_range(&mut self, from: &Self, r: std::ops::Range<usize>) {
+        for (a, b) in [
+            (&mut self.pos, &from.pos),
+            (&mut self.prev, &from.prev),
+            (&mut self.vel, &from.vel),
+            (&mut self.off, &from.off),
+            (&mut self.rest, &from.rest),
+        ] {
+            a[r.clone()].copy_from_slice(&b[r.clone()]);
+        }
+    }
+}
+
 /// One avatar's simulation state, for the [`Rig`] it was made for.
 #[derive(Clone, Debug)]
 pub struct State {
-    pos: Vec<Vec3>,
-    prev: Vec<Vec3>,
-    /// Each particle's rest vector from its parent at the last step, world space.
-    rest: Vec<Vec3>,
+    /// After the last full step.
+    p: Particles,
+    /// At the frame's time: the last full step plus a partial one for the leftover time.
+    out: Particles,
+    /// Per particle: rotation of its bone from the animated to the simulated direction (scratch).
+    turn: Vec<Quat>,
     /// Per chain: the grabbed particle and where it is held.
     grab: Vec<Option<(u32, Vec3)>>,
     /// Per chain: posed rest vectors per particle, in the chain frame's space.
     posed: Vec<Option<Vec<Vec3>>>,
-    /// Per chain: the frame's placement at the last step; `None` before the first.
+    /// Per chain: the frame's placement at the last full step.
     frame: Vec<Option<Pose>>,
+    /// The animated world pose at the last frame; `None` before the first.
+    last: Option<Vec<Pose>>,
+    /// Seconds since the last full step.
+    time: f32,
 }
 
 impl State {
@@ -63,12 +108,14 @@ impl State {
     pub fn new(rig: &Rig) -> Self {
         let chains = rig.chains.len();
         Self {
-            pos: vec![[0.0; 3]; rig.len()],
-            prev: vec![[0.0; 3]; rig.len()],
-            rest: vec![[0.0; 3]; rig.len()],
+            p: Particles::new(rig.len()),
+            out: Particles::new(rig.len()),
+            turn: vec![IDENTITY; rig.len()],
             grab: vec![None; chains],
             posed: vec![None; chains],
             frame: vec![None; chains],
+            last: None,
+            time: 0.0,
         }
     }
 
@@ -76,205 +123,99 @@ impl State {
     /// overwritten with the simulated rotations, and translations where bones stretch; `origin` places the avatar
     /// root's parent in the world.
     pub fn step(&mut self, rig: &Rig, origin: Pose, locals: &mut [Transform], dt: f32) {
+        if rig.chains.is_empty() {
+            return;
+        }
         let mut world = world_poses(&rig.parents, origin, locals);
-        let placed: Vec<(Placed, bool)> = rig
-            .colliders
-            .iter()
-            .map(|col| {
-                let w = world[col.node as usize];
-                let center = w.point(col.position);
-                let up = rotate(mul(w.rot, col.rotation), [0.0, 1.0, 0.0]);
-                let shape = match col.shape {
-                    Shape::Sphere { radius } => Placed::Capsule {
-                        a: center,
-                        b: center,
-                        radius: radius.max(0.0) * w.scale,
-                    },
-                    Shape::Capsule { radius, height } => {
-                        let radius = radius.max(0.0) * w.scale;
-                        let half = (height * 0.5 * w.scale - radius).max(0.0);
-                        Placed::Capsule {
-                            a: add(center, scale(up, -half)),
-                            b: add(center, scale(up, half)),
-                            radius,
-                        }
-                    }
-                    Shape::Plane => Placed::Plane {
-                        point: center,
-                        normal: up,
-                    },
-                };
-                (shape, col.inside)
-            })
-            .collect();
+        let start = match self.last.take() {
+            Some(start) => start,
+            None => {
+                for c in 0..rig.chains.len() {
+                    self.start(rig, c, origin, &world);
+                }
+                world.clone()
+            }
+        };
         let dt = dt.clamp(0.0, MAX_FRAME);
-        let steps = (dt / MAX_STEP).ceil().max(1.0);
-        let h = dt / steps;
-        let r = h / REFERENCE_STEP;
-        for (c, ch) in rig.chains.iter().enumerate() {
-            let range = ch.first as usize..(ch.first + ch.count) as usize;
-            let frame = ch.frame.map_or(origin, |f| world[f as usize]);
-            let anim: Vec<Vec3> = range
-                .clone()
-                .map(|k| match rig.node[k] {
-                    Some(n) => world[n as usize].pos,
-                    None => {
-                        let leaf = rig.node[rig.parent[k] as usize].expect("tips hang off nodes");
-                        world[leaf as usize].point(rig.endpoint[k])
-                    }
-                })
-                .collect();
-            let a = |k: usize| anim[k - ch.first as usize];
-            for k in range.clone() {
-                let p = rig.parent[k];
-                self.rest[k] = match (&self.posed[c], p) {
-                    (_, NO_PARENT) => [0.0; 3],
-                    (Some(posed), _) => rotate(frame.rot, scale(posed[k - ch.first as usize], frame.scale)),
-                    (None, p) => sub(a(k), a(p as usize)),
+        // Full steps at their time within the frame, against the animated pose interpolated to that time.
+        let total = self.time + dt;
+        let steps = ((total + 1e-6) / STEP).floor() as u32;
+        let mut between = world.clone();
+        for j in 1..=steps {
+            let t = if dt > 0.0 {
+                ((j as f32 * STEP - self.time) / dt).clamp(0.0, 1.0)
+            } else {
+                1.0
+            };
+            for (b, (s, w)) in between.iter_mut().zip(start.iter().zip(&world)) {
+                *b = Pose {
+                    pos: add(s.pos, scale(sub(w.pos, s.pos), t)),
+                    rot: nlerp(s.rot, w.rot, t),
+                    scale: s.scale + (w.scale - s.scale) * t,
                 };
             }
-            // Each particle's limit frame: the parent node's animated rotation swung so its Y (Unity bones point
-            // along Y) lies along the rest direction, then turned by the limit rotation. Returns its Y and X.
-            let axes: Vec<(Vec3, Vec3)> = range
-                .clone()
-                .map(|k| {
-                    let p = rig.parent[k];
-                    if p == NO_PARENT || ch.limit == LimitKind::None {
-                        return ([0.0; 3], [0.0; 3]);
-                    }
-                    let parent = rig.node[p as usize].map_or(Pose::IDENTITY, |n| world[n as usize]).rot;
-                    let swing = from_to(rotate(parent, [0.0, 1.0, 0.0]), normalize(self.rest[k]));
-                    let frame = mul(mul(swing, parent), ch.limit_rotation);
-                    (rotate(frame, [0.0, 1.0, 0.0]), rotate(frame, [1.0, 0.0, 0.0]))
-                })
-                .collect();
-            let Some(last) = self.frame[c].replace(frame) else {
-                for k in range {
-                    self.pos[k] = a(k);
-                    self.prev[k] = a(k);
-                }
-                continue;
-            };
-            // Immobile carries particles along with the frame's motion, so that motion adds no inertia.
-            for k in range.clone() {
-                let im = rig.immobile[k];
-                if im > 0.0 && !rig.pinned[k] {
-                    for x in [&mut self.pos[k], &mut self.prev[k]] {
-                        let moved = if ch.immobile_world {
-                            add(*x, sub(frame.pos, last.pos))
-                        } else {
-                            let local = scale(rotate(conj(last.rot), sub(*x, last.pos)), 1.0 / last.scale);
-                            frame.point(local)
-                        };
-                        *x = add(*x, scale(sub(moved, *x), im));
-                    }
-                }
+            let placed = place(rig, &between);
+            for c in 0..rig.chains.len() {
+                let frame = frame_of(rig, c, origin, &between);
+                let last = self.frame[c].replace(frame);
+                let ctx = Ctx {
+                    world: &between,
+                    placed: &placed,
+                    frame,
+                    last,
+                    posed: self.posed[c].as_deref(),
+                    grab: self.grab[c],
+                    r: 1.0,
+                };
+                advance(rig, c, &ctx, &mut self.p, &mut self.turn);
             }
-            if dt > 0.0 {
-                for _ in 0..steps as u32 {
-                    self.substep(rig, c, &anim, &axes, &placed, h, r);
-                }
+        }
+        self.time = (total - steps as f32 * STEP).max(0.0);
+        // The output: the leftover time as a partial step that is not kept.
+        let r = self.time / STEP;
+        let placed = place(rig, &world);
+        for c in 0..rig.chains.len() {
+            let ch = &rig.chains[c];
+            let range = ch.first as usize..(ch.first + ch.count) as usize;
+            self.out.copy_range(&self.p, range);
+            if r > 1e-4 {
+                let ctx = Ctx {
+                    world: &world,
+                    placed: &placed,
+                    frame: frame_of(rig, c, origin, &world),
+                    last: self.frame[c],
+                    posed: self.posed[c].as_deref(),
+                    grab: self.grab[c],
+                    r,
+                };
+                advance(rig, c, &ctx, &mut self.out, &mut self.turn);
             }
+        }
+        let animated = world.clone();
+        for c in 0..rig.chains.len() {
             self.write(rig, c, origin, &mut world, locals);
         }
+        self.last = Some(animated);
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn substep(
-        &mut self,
-        rig: &Rig,
-        c: usize,
-        anim: &[Vec3],
-        axes: &[(Vec3, Vec3)],
-        placed: &[(Placed, bool)],
-        h: f32,
-        r: f32,
-    ) {
+    /// Puts chain `c` at the animated pose, at rest.
+    fn start(&mut self, rig: &Rig, c: usize, origin: Pose, world: &[Pose]) {
         let ch = &rig.chains[c];
-        let first = ch.first as usize;
-        let h2 = h * h;
-        for k in first..first + ch.count as usize {
-            if rig.pinned[k] {
-                self.pos[k] = anim[k - first];
-                self.prev[k] = anim[k - first];
-                continue;
-            }
-            let p = rig.parent[k] as usize;
-            let rest = self.rest[k];
-            let len = length(rest);
-            let target = add(self.pos[p], rest);
-            // Inertia, damped by spring (or momentum) per reference step.
-            let v = scale(sub(self.pos[k], self.prev[k]), rig.spring[k].powf(r));
-            self.prev[k] = self.pos[k];
-            let mut x = add(self.pos[k], v);
-            // Gravity in bone lengths per reference step squared, reduced near the rest direction by the falloff.
-            let restness = dot(normalize(rest), normalize(sub(self.pos[k], self.pos[p]))).clamp(0.0, 1.0);
-            let g =
-                rig.gravity[k] * len / (REFERENCE_STEP * REFERENCE_STEP) * (1.0 - rig.gravity_falloff[k] * restness);
-            x[1] -= g * h2;
-            // Pull: an XPBD constraint towards the rest target with compliance from `pull`.
-            let pull = rig.pull[k];
-            if pull > 0.0 {
-                let alpha = REFERENCE_STEP * REFERENCE_STEP * (1.0 - pull) / pull;
-                x = add(x, scale(sub(target, x), h2 / (h2 + alpha)));
-            }
-            // Stiffness: how far from the rest target a bone may get, 2 bone lengths at 0, none at 1.
-            let stiff = rig.stiffness[k];
-            if stiff > 0.0 {
-                let off = sub(x, target);
-                let max = len * (1.0 - stiff) * 2.0;
-                if length(off) > max {
-                    x = add(target, scale(normalize(off), max));
-                }
-            }
-            // Motion keeps bone lengths, within the limit; colliders push out, and may squish or stretch the bone
-            // within its range.
-            let mut dir = normalize(sub(x, self.pos[p]));
-            if ch.limit != LimitKind::None {
-                let (axis, across) = axes[k - first];
-                dir = limit(ch.limit, axis, across, rig.limit_a[k], rig.limit_b[k], dir);
-            }
-            x = add(self.pos[p], scale(dir, len));
-            // Alternating collider and length projections slide the bone along a collider instead of leaving it
-            // where one pass would (re-extending the bone through the surface).
-            for _ in 0..COLLISION_PASSES {
-                let before = x;
-                for &ci in &ch.colliders {
-                    let (shape, inside) = placed[ci as usize];
-                    x = collide(shape, inside, rig.radius[k], x);
-                }
-                if x == before {
-                    break;
-                }
-                let d = sub(x, self.pos[p]);
-                let reach = length(d).clamp(len * (1.0 - rig.max_squish[k]), len * (1.0 + rig.max_stretch[k]));
-                if length(d) > 1e-9 {
-                    x = add(self.pos[p], scale(normalize(d), reach));
-                }
-            }
-            self.pos[k] = x;
-        }
-        if let Some((g, target)) = self.grab[c] {
-            // The path from the first free ancestor down to the grabbed particle points straight at the hand.
-            let mut path = Vec::new();
-            let mut k = g as usize;
-            while !rig.pinned[k] {
-                path.push(k);
-                k = rig.parent[k] as usize;
-            }
-            for &k in path.iter().rev() {
-                let p = rig.parent[k] as usize;
-                let len = length(self.rest[k]);
-                let to = sub(target, self.pos[p]);
-                let reach = if k == g as usize {
-                    length(to).clamp(len * (1.0 - rig.max_squish[k]), len * (1.0 + rig.max_stretch[k]))
-                } else {
-                    len
-                };
-                self.pos[k] = add(self.pos[p], scale(normalize(to), reach));
-                self.prev[k] = self.pos[k];
+        for k in ch.first as usize..(ch.first + ch.count) as usize {
+            let a = anim(rig, world, k);
+            let off = match rig.parent[k] {
+                NO_PARENT => [0.0; 3],
+                p => sub(a, anim(rig, world, p as usize)),
+            };
+            for ps in [&mut self.p, &mut self.out] {
+                ps.pos[k] = a;
+                ps.prev[k] = a;
+                ps.vel[k] = [0.0; 3];
+                ps.off[k] = off;
+                ps.rest[k] = off;
             }
         }
+        self.frame[c] = Some(frame_of(rig, c, origin, world));
     }
 
     /// Turns each chain node so its rest directions point at its simulated children, parents first.
@@ -282,6 +223,7 @@ impl State {
         let ch = &rig.chains[c];
         let first = ch.first as usize;
         let range = first..first + ch.count as usize;
+        let pos = &self.out.pos;
         for k in range.clone() {
             let Some(n) = rig.node[k] else { continue };
             let n = n as usize;
@@ -300,7 +242,7 @@ impl State {
                     None => rig.endpoint[q],
                 };
                 let rest_dir = normalize(rotate(base.rot, rest_dir));
-                let swing = from_to(rest_dir, normalize(sub(self.pos[q], base.pos)));
+                let swing = from_to(rest_dir, normalize(sub(pos[q], base.pos)));
                 let sign = if sum.iter().zip(swing).map(|(a, b)| a * b).sum::<f32>() < 0.0 {
                     -1.0
                 } else {
@@ -320,7 +262,7 @@ impl State {
                 if let Some(m) = rig.node[q] {
                     let t = &mut locals[m as usize].translation;
                     let rest = length(*t) * base.scale;
-                    let now = length(sub(self.pos[q], base.pos));
+                    let now = length(sub(pos[q], base.pos));
                     if rest > 1e-9 && (now / rest - 1.0).abs() > 1e-4 {
                         *t = scale(*t, now / rest);
                     }
@@ -350,13 +292,11 @@ impl State {
         let Some(frame) = self.frame[chain] else { return };
         if pose && ch.allow_posing {
             let range = ch.first as usize..(ch.first + ch.count) as usize;
+            let pos = &self.p.pos;
             let shape = range
                 .map(|k| match rig.parent[k] {
                     NO_PARENT => [0.0; 3],
-                    p => scale(
-                        rotate(conj(frame.rot), sub(self.pos[k], self.pos[p as usize])),
-                        1.0 / frame.scale,
-                    ),
+                    p => scale(rotate(conj(frame.rot), sub(pos[k], pos[p as usize])), 1.0 / frame.scale),
                 })
                 .collect();
             self.posed[chain] = Some(shape);
@@ -372,14 +312,15 @@ impl State {
     pub fn params(&self, rig: &Rig, chain: usize) -> ChainParams {
         let ch = &rig.chains[chain];
         let range = ch.first as usize..(ch.first + ch.count) as usize;
+        let (pos, rest) = (&self.out.pos, &self.out.rest);
         let mut out = ChainParams {
             is_grabbed: self.grab[chain].is_some(),
             is_posed: self.posed[chain].is_some(),
             ..ChainParams::default()
         };
         for k in range.clone().filter(|&k| !rig.pinned[k]) {
-            let rest = length(self.rest[k]);
-            let now = length(sub(self.pos[k], self.pos[rig.parent[k] as usize]));
+            let rest = length(rest[k]);
+            let now = length(sub(pos[k], pos[rig.parent[k] as usize]));
             if rest <= 1e-9 {
                 continue;
             }
@@ -392,12 +333,231 @@ impl State {
             }
         }
         if let Some(k) = range.last().filter(|&k| !rig.pinned[k]) {
-            let now = normalize(sub(self.pos[k], self.pos[rig.parent[k] as usize]));
-            let cos = dot(normalize(self.rest[k]), now).clamp(-1.0, 1.0);
+            let now = normalize(sub(pos[k], pos[rig.parent[k] as usize]));
+            let cos = dot(normalize(rest[k]), now).clamp(-1.0, 1.0);
             out.angle = cos.acos().to_degrees() / 180.0;
         }
         out
     }
+}
+
+/// What one step of one chain reads.
+struct Ctx<'a> {
+    /// The animated world pose at the step's time.
+    world: &'a [Pose],
+    placed: &'a [(Placed, bool)],
+    /// The chain frame now and at the last full step.
+    frame: Pose,
+    last: Option<Pose>,
+    posed: Option<&'a [Vec3]>,
+    grab: Option<(u32, Vec3)>,
+    /// The step's length as a fraction of [`STEP`] (below 1 for the partial output step).
+    r: f32,
+}
+
+/// The node whose motion `immobile` cancels, placed: the chain root's parent, or the avatar origin.
+fn frame_of(rig: &Rig, c: usize, origin: Pose, world: &[Pose]) -> Pose {
+    rig.chains[c].frame.map_or(origin, |f| world[f as usize])
+}
+
+/// Particle `k`'s animated position.
+fn anim(rig: &Rig, world: &[Pose], k: usize) -> Vec3 {
+    match rig.node[k] {
+        Some(n) => world[n as usize].pos,
+        None => {
+            let leaf = rig.node[rig.parent[k] as usize].expect("tips hang off nodes");
+            world[leaf as usize].point(rig.endpoint[k])
+        }
+    }
+}
+
+/// Every collider placed in the world.
+fn place(rig: &Rig, world: &[Pose]) -> Vec<(Placed, bool)> {
+    rig.colliders
+        .iter()
+        .map(|col| {
+            let w = world[col.node as usize];
+            let center = w.point(col.position);
+            let up = rotate(mul(w.rot, col.rotation), [0.0, 1.0, 0.0]);
+            let shape = match col.shape {
+                Shape::Sphere { radius } => Placed::Capsule {
+                    a: center,
+                    b: center,
+                    radius: radius.max(0.0) * w.scale,
+                },
+                Shape::Capsule { radius, height } => {
+                    let radius = radius.max(0.0) * w.scale;
+                    let half = (height * 0.5 * w.scale - radius).max(0.0);
+                    Placed::Capsule {
+                        a: add(center, scale(up, -half)),
+                        b: add(center, scale(up, half)),
+                        radius,
+                    }
+                }
+                Shape::Plane => Placed::Plane {
+                    point: center,
+                    normal: up,
+                },
+            };
+            (shape, col.inside)
+        })
+        .collect()
+}
+
+/// One step of chain `c`, parents first (ADR 0049).
+fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]) {
+    let ch = &rig.chains[c];
+    let first = ch.first as usize;
+    let range = first..first + ch.count as usize;
+    let world = ctx.world;
+    let (frame, r) = (ctx.frame, ctx.r);
+    // Each particle's animated (or posed) offset from its parent.
+    let base = |k: usize| -> Vec3 {
+        match (ctx.posed, rig.parent[k]) {
+            (_, NO_PARENT) => [0.0; 3],
+            (Some(posed), _) => rotate(frame.rot, scale(posed[k - first], frame.scale)),
+            (None, p) => sub(anim(rig, world, k), anim(rig, world, p as usize)),
+        }
+    };
+    // Immobile carries particles along with the frame's motion since the last step, so it adds no velocity.
+    if let Some(last) = ctx.last {
+        for k in range.clone() {
+            let im = rig.immobile[k];
+            if im > 0.0 && !rig.pinned[k] {
+                for x in [&mut ps.pos[k], &mut ps.prev[k]] {
+                    let moved = if ch.immobile_world {
+                        add(*x, sub(frame.pos, last.pos))
+                    } else {
+                        frame.point(scale(rotate(conj(last.rot), sub(*x, last.pos)), 1.0 / last.scale))
+                    };
+                    *x = add(*x, scale(sub(moved, *x), im));
+                }
+            }
+        }
+    }
+    for k in range.clone() {
+        if rig.pinned[k] {
+            let a = anim(rig, world, k);
+            ps.pos[k] = a;
+            ps.prev[k] = a;
+            ps.vel[k] = [0.0; 3];
+            turn[k] = IDENTITY;
+            continue;
+        }
+        let p = rig.parent[k] as usize;
+        let parent = ps.pos[p];
+        let b = base(k);
+        let len = length(b);
+        // The rest offset follows the parent bone's simulated rotation.
+        let off = rotate(turn[p], b);
+        let dir = normalize(off);
+        let mut g = rig.gravity[k];
+        if g != 0.0 && rig.gravity_falloff[k] > 0.0 {
+            let at_rest = dot(normalize(ps.off[k]), normalize(b)).max(0.0);
+            g *= 1.0 - rig.gravity_falloff[k] * at_rest;
+        }
+        let rest_dir = if g != 0.0 && !ch.version_1_0 {
+            // Version 1.1: gravity bends the rest direction towards down.
+            unit(add(scale(dir, 1.0 - g.abs()), scale(DOWN, g))).unwrap_or(dir)
+        } else {
+            dir
+        };
+        let target = add(parent, scale(rest_dir, len));
+        let pos = ps.pos[k];
+        let pull = rig.pull[k] * r;
+        let mut x = if ch.advanced {
+            let mut x = add(pos, scale(sub(pos, ps.prev[k]), rig.spring[k] * r));
+            x = add(x, scale(sub(target, x), pull));
+            // Stiffness keeps the bone's last offset from its parent.
+            let stiff = add(parent, ps.off[k]);
+            add(x, scale(sub(stiff, x), rig.stiffness[k]))
+        } else {
+            let keep = rig.spring[k] * SPRING_KEEP * r;
+            add(
+                pos,
+                add(scale(ps.vel[k], keep), scale(sub(target, pos), pull * (1.0 - keep))),
+            )
+        };
+        let mut vel = sub(x, pos);
+        if g != 0.0 && ch.version_1_0 {
+            // Version 1.0: gravity is a force of `gravity` bone lengths per step.
+            x = add(x, scale(DOWN, g * len));
+        }
+        if ch.limit != LimitKind::None {
+            let reach = sub(x, parent);
+            let (axis, across) = limit_axes(rig, world, turn[p], ch.limit_rotation, k, p);
+            let d = limit(ch.limit, axis, across, rig.limit_a[k], rig.limit_b[k], normalize(reach));
+            x = add(parent, scale(d, length(reach)));
+        }
+        x = add(parent, scale(normalize(sub(x, parent)), len));
+        // Colliders push the bone (the segment from its parent) out, then the bone keeps its length.
+        for &ci in &ch.colliders {
+            let (shape, inside) = ctx.placed[ci as usize];
+            let pushed = collide(shape, inside, rig.radius[k], parent, x);
+            if pushed != x {
+                if let Some(n) = unit(sub(pushed, x)) {
+                    // The push stops motion into the collider.
+                    let into = dot(vel, n);
+                    if into < 0.0 {
+                        vel = sub(vel, scale(n, into));
+                    }
+                }
+                x = add(parent, scale(normalize(sub(pushed, parent)), len));
+            }
+        }
+        ps.prev[k] = pos;
+        ps.pos[k] = x;
+        ps.vel[k] = vel;
+        ps.rest[k] = b;
+        turn[k] = from_to(dir_or(b), normalize(sub(x, parent)));
+    }
+    if let Some((g, target)) = ctx.grab {
+        // The path from the first free ancestor down to the grabbed particle points straight at the hand.
+        let mut path = Vec::new();
+        let mut k = g as usize;
+        while !rig.pinned[k] {
+            path.push(k);
+            k = rig.parent[k] as usize;
+        }
+        for &k in path.iter().rev() {
+            let p = rig.parent[k] as usize;
+            let len = length(base(k));
+            let to = sub(target, ps.pos[p]);
+            let reach = if k == g as usize {
+                length(to).clamp(len * (1.0 - rig.max_squish[k]), len * (1.0 + rig.max_stretch[k]))
+            } else {
+                len
+            };
+            ps.pos[k] = add(ps.pos[p], scale(normalize(to), reach));
+            ps.prev[k] = ps.pos[k];
+            ps.vel[k] = [0.0; 3];
+        }
+    }
+    for k in range {
+        if rig.parent[k] != NO_PARENT {
+            ps.off[k] = sub(ps.pos[k], ps.pos[rig.parent[k] as usize]);
+        }
+    }
+}
+
+fn dir_or(v: Vec3) -> Vec3 {
+    unit(v).unwrap_or([0.0, 1.0, 0.0])
+}
+
+/// Particle `k`'s limit frame (its Y and X): the parent node's animated rotation turned with the parent bone
+/// (`turn`), swung in the parent's space so Y lies along the child's local direction, then by the limit rotation.
+fn limit_axes(rig: &Rig, world: &[Pose], turn: Quat, limit_rotation: Quat, k: usize, p: usize) -> (Vec3, Vec3) {
+    let node = rig.node[p].expect("limits apply below nodes");
+    let rot = world[node as usize].rot;
+    let local = match rig.node[k] {
+        Some(n) => rotate(conj(rot), sub(world[n as usize].pos, world[node as usize].pos)),
+        None => rig.endpoint[k],
+    };
+    let frame = mul(
+        mul(mul(turn, rot), from_to([0.0, 1.0, 0.0], dir_or(local))),
+        limit_rotation,
+    );
+    (rotate(frame, [0.0, 1.0, 0.0]), rotate(frame, [1.0, 0.0, 0.0]))
 }
 
 /// Direction `d` brought within a limit around `axis` (the limit frame's Y); `across` is the frame's X, which the
@@ -417,60 +577,103 @@ fn limit(kind: LimitKind, axis: Vec3, across: Vec3, a: f32, b: f32, d: Vec3) -> 
     let x = normalize(x);
     let z = cross(axis, x);
     let (along, px, pz) = (dot(d, axis), dot(d, x), dot(d, z));
-    if kind == LimitKind::Hinge {
-        // Turning about X keeps the direction in the plane of the axis and Z.
-        let angle = pz.atan2(along).clamp(-a, a);
-        return add(scale(axis, angle.cos()), scale(z, angle.sin()));
-    }
-    let theta = along.clamp(-1.0, 1.0).acos();
-    let phi = pz.atan2(px);
-    let max = match kind {
-        // Pitch (about X) limits travel along Z, yaw (about Z) travel along X: an elliptical cone.
-        LimitKind::Polar => {
-            let term = |c: f32, m: f32| if c == 0.0 { 0.0 } else { (c / m).powi(2) };
-            1.0 / (term(phi.cos(), b) + term(phi.sin(), a)).sqrt()
+    match kind {
+        LimitKind::Hinge => {
+            // Turning about X keeps the direction in the plane of the axis and Z.
+            let angle = pz.atan2(along).clamp(-a, a);
+            add(scale(axis, angle.cos()), scale(z, angle.sin()))
         }
-        _ => a,
-    };
-    if theta <= max {
-        return d;
+        LimitKind::Polar => {
+            // Yaw (about Z, travel along X) as a latitude, pitch (about X, travel along Z) as a longitude, each
+            // clamped on its own.
+            let yaw = px.clamp(-1.0, 1.0).asin().clamp(-b, b);
+            let pitch = pz.atan2(along).clamp(-a, a);
+            add(
+                scale(add(scale(axis, pitch.cos()), scale(z, pitch.sin())), yaw.cos()),
+                scale(x, yaw.sin()),
+            )
+        }
+        _ => {
+            let theta = along.clamp(-1.0, 1.0).acos();
+            if theta <= a {
+                return d;
+            }
+            let side = unit(add(scale(x, px), scale(z, pz))).unwrap_or(x);
+            add(scale(axis, a.cos()), scale(side, a.sin()))
+        }
     }
-    let side = add(scale(x, phi.cos()), scale(z, phi.sin()));
-    add(scale(axis, max.cos()), scale(side, max.sin()))
 }
 
-/// Point `x` of radius `r` pushed out of a collider, or kept inside it.
-fn collide(shape: Placed, inside: bool, r: f32, x: Vec3) -> Vec3 {
+/// Bone end `x` (parent at `a`, bone radius `r`) pushed so the bone leaves a collider, or stays inside one: by the
+/// depth at the bone's closest point, along that point's normal.
+fn collide(shape: Placed, inside: bool, r: f32, a: Vec3, x: Vec3) -> Vec3 {
     match shape {
-        Placed::Capsule { a, b, radius } => {
-            let ab = sub(b, a);
-            let t = if dot(ab, ab) > 1e-12 {
-                (dot(sub(x, a), ab) / dot(ab, ab)).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-            let center = add(a, scale(ab, t));
-            let d = sub(x, center);
-            let l = length(d);
-            let dir = if l > 1e-9 { scale(d, 1.0 / l) } else { [0.0, 1.0, 0.0] };
+        Placed::Capsule { a: p, b: q, radius } => {
             if inside {
+                // The bone point farthest from the core is an end: the tip.
+                let (c, _) = closest_on(p, q, x);
+                let d = sub(x, c);
+                let l = length(d);
                 let room = (radius - r).max(0.0);
-                if l > room { add(center, scale(dir, room)) } else { x }
-            } else if l < radius + r {
-                add(center, scale(dir, radius + r))
-            } else {
-                x
+                return if l > room { add(c, scale(dir_or(d), room)) } else { x };
             }
+            let (on_bone, on_core) = closest_between(a, x, p, q);
+            let d = sub(on_bone, on_core);
+            let l = length(d);
+            if l >= radius + r {
+                return x;
+            }
+            add(x, scale(dir_or(d), radius + r - l))
         }
         Placed::Plane { point, normal } => {
-            let s = dot(sub(x, point), normal);
-            if inside && s > -r {
-                sub(x, scale(normal, s + r))
-            } else if !inside && s < r {
-                add(x, scale(normal, r - s))
+            let (sa, sx) = (dot(sub(a, point), normal), dot(sub(x, point), normal));
+            if inside {
+                let m = sa.max(sx);
+                if m > -r { sub(x, scale(normal, m + r)) } else { x }
             } else {
-                x
+                let m = sa.min(sx);
+                if m < r { add(x, scale(normal, r - m)) } else { x }
             }
         }
     }
+}
+
+/// The point of segment `p`-`q` closest to `x`, and its parameter.
+fn closest_on(p: Vec3, q: Vec3, x: Vec3) -> (Vec3, f32) {
+    let pq = sub(q, p);
+    let n = dot(pq, pq);
+    let t = if n > 1e-12 {
+        (dot(sub(x, p), pq) / n).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (add(p, scale(pq, t)), t)
+}
+
+/// The closest points of segments `p1`-`q1` and `p2`-`q2` (Ericson, Real-Time Collision Detection 5.1.9).
+fn closest_between(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (Vec3, Vec3) {
+    let (d1, d2, r) = (sub(q1, p1), sub(q2, p2), sub(p1, p2));
+    let (a, e, f) = (dot(d1, d1), dot(d2, d2), dot(d2, r));
+    if e <= 1e-12 {
+        return (closest_on(p1, q1, p2).0, p2);
+    }
+    if a <= 1e-12 {
+        return (p1, closest_on(p2, q2, p1).0);
+    }
+    let (c, b) = (dot(d1, r), dot(d1, d2));
+    let den = a * e - b * b;
+    let mut s = if den > 1e-12 {
+        ((b * f - c * e) / den).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let mut t = (b * s + f) / e;
+    if t < 0.0 {
+        t = 0.0;
+        s = (-c / a).clamp(0.0, 1.0);
+    } else if t > 1.0 {
+        t = 1.0;
+        s = ((b - c) / a).clamp(0.0, 1.0);
+    }
+    (add(p1, scale(d1, s)), add(p2, scale(d2, t)))
 }
