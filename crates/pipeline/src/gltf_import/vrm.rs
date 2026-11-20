@@ -439,6 +439,8 @@ impl Importer<'_> {
                 rim_color: arr(&x["parametricRimColorFactor"], [0.0; 3]),
                 rim_power: num(&x["parametricRimFresnelPowerFactor"], 5.0),
                 rim_shade: None,
+                rim_ramp: None,
+                shade_bands: None,
                 matcap_strength: if matcap_tex.is_some() {
                     arr(&x["matcapFactor"], [1.0; 3]).into_iter().fold(0.0, f32::max)
                 } else {
@@ -450,6 +452,7 @@ impl Importer<'_> {
                 matcap_mask_tex: None,
                 emissive,
                 emissive_tex,
+                emissive_main_strength: 0.0,
                 outline_width,
                 outline_color: arr(&x["outlineColorFactor"], [0.0; 3]),
                 outline_width_tex: self.mtoon_slot(&x["outlineWidthMultiplyTexture"], ColorSpace::Linear, None),
@@ -505,6 +508,8 @@ impl Importer<'_> {
                 rim_color: rgb(color("_RimColor", [0.0, 0.0, 0.0, 1.0])),
                 rim_power: num(&f["_RimFresnelPower"], 1.0),
                 rim_shade: None,
+                rim_ramp: None,
+                shade_bands: None,
                 matcap_strength: if matcap_tex.is_some() { 1.0 } else { 0.0 },
                 matcap_blend: MatcapBlend::Add,
                 matcap_color: [1.0; 3],
@@ -512,6 +517,7 @@ impl Importer<'_> {
                 matcap_tex,
                 emissive: rgb(color("_EmissionColor", [0.0, 0.0, 0.0, 1.0])),
                 emissive_tex: self.mtoon_slot(&t["_EmissionMap"], ColorSpace::Srgb, None),
+                emissive_main_strength: 0.0,
                 outline_width,
                 outline_color: rgb(color("_OutlineColor", [0.0, 0.0, 0.0, 1.0])),
                 outline_width_tex: self.mtoon_slot(&t["_OutlineWidthTexture"], ColorSpace::Linear, None),

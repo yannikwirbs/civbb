@@ -5,7 +5,8 @@
 
 use civbb_format::Avatar;
 use civbb_format::material::{
-    AlphaMode, MatcapBlend, Material, MaterialModel, Pbr, RimShade, TextureSlot, Toon, ToonLight, Unlit,
+    AlphaMode, MatcapBlend, Material, MaterialModel, Pbr, RimRamp, RimShade, ShadeBands, TextureSlot, Toon, ToonLight,
+    Unlit,
 };
 use civbb_format::math::Mat4;
 use civbb_format::mesh::{Mesh, Submesh};
@@ -78,6 +79,8 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         rim_color: [0.0; 3],
         rim_power: 0.0,
         rim_shade: None,
+        rim_ramp: None,
+        shade_bands: None,
         matcap_tex: None,
         matcap_strength: 0.0,
         matcap_blend: MatcapBlend::Add,
@@ -85,6 +88,7 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         matcap_mask_tex: None,
         emissive: [0.0; 3],
         emissive_tex: None,
+        emissive_main_strength: 0.0,
         outline_width: 0.0,
         outline_color: [0.0; 3],
         outline_width_tex: None,
@@ -498,6 +502,116 @@ fn rim_shade_darkens_away_from_the_view_direction() {
     assert_near(pixel(&pixels, 48, 32), [128, 128, 128], 1, "no rim shade");
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+/// Draws two grey toon quads (left, right) with the clamped light model, a white light along `light_dir` and no
+/// ambient, after `edit` changes each; returns the left and right pixels.
+fn two_grey_toons(edit: [&dyn Fn(&mut Toon); 2], light_dir: [f32; 3]) -> Option<([u8; 4], [u8; 4])> {
+    let ctx = context()?;
+    let mut scene = Scene::new(
+        &ctx,
+        Capacity {
+            vertices: 8,
+            indices: 12,
+            deltas: 0,
+            skinned: 8,
+            materials: 2,
+        },
+    )
+    .unwrap();
+    let ids = edit.map(|edit| {
+        let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
+        if let MaterialModel::Toon(t) = &mut m {
+            t.light = ToonLight::Clamped;
+            edit(t);
+        }
+        scene.add_material(&ctx, &material(m, AlphaMode::Opaque), &[]).unwrap()
+    });
+    let meshes = [
+        quad([-3.0, 0.0], [-3.0, 3.0], 0.0, 0),
+        quad([0.0, 3.0], [-3.0, 3.0], 0.0, 1),
+    ];
+    let mut view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+    view.light_dir = light_dir;
+    view.light_color = [1.0; 3];
+    view.ambient = [0.0; 3];
+    let pixels = render(&ctx, &mut scene, &meshes, &ids, &[], &view);
+    let got = (pixel(&pixels, 16, 32), pixel(&pixels, 48, 32));
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+    Some(got)
+}
+
+#[test]
+fn shade_bands_mix_the_second_shadow_the_albedo_and_the_strength() {
+    let bands = ShadeBands {
+        strength: 1.0,
+        main_strength: 0.0,
+        second_color: [0.5; 3],
+        second_strength: 0.0,
+        second_border: 0.5,
+        second_blur: 0.0,
+        border_color: [0.0; 3],
+        border_range: 0.0,
+    };
+    // Lit from behind: fully in shadow, half-Lambert 0, below the second band's ramp.
+    let Some((left, right)) = two_grey_toons(
+        [
+            &|t| {
+                t.shade_bands = Some(ShadeBands {
+                    strength: 0.5,
+                    main_strength: 1.0,
+                    second_strength: 1.0,
+                    ..bands
+                })
+            },
+            &|t| {
+                t.shade_color = [1.0; 3];
+                t.shade_bands = Some(bands);
+            },
+        ],
+        [0.0, 0.0, -1.0],
+    ) else {
+        return;
+    };
+    // The second shadow 0.5 * 0.5, times the albedo 0.125, half strength: 0.3125.
+    assert_near(left, [80, 80, 80], 1, "second shadow, main strength, strength");
+    assert_near(
+        right,
+        [128, 128, 128],
+        1,
+        "a shadow brighter than lit stays at the lit colour",
+    );
+}
+
+#[test]
+fn rim_ramp_gates_and_tints_the_rim_and_emission_takes_the_albedo() {
+    let ramp = RimRamp {
+        border: 0.0,
+        blur: 0.0,
+        shadow_mask: 1.0,
+        main_strength: 1.0,
+    };
+    // Lit from the front; a zero-width ramp at 0 turns the rim fully on off-axis, at 1 off.
+    let Some((left, right)) = two_grey_toons(
+        [
+            &|t| {
+                (t.rim_color, t.rim_power, t.rim_ramp) = ([0.5; 3], 1.0, Some(ramp));
+            },
+            &|t| {
+                (t.rim_color, t.rim_power) = ([0.5; 3], 1.0);
+                t.rim_ramp = Some(RimRamp { border: 1.0, ..ramp });
+                (t.emissive, t.emissive_main_strength) = ([0.2; 3], 1.0);
+            },
+        ],
+        [0.0, 0.0, 1.0],
+    ) else {
+        return;
+    };
+    // 0.5 lit plus the rim 0.5 times the albedo 0.5.
+    assert_near(left, [191, 191, 191], 1, "rim on, tinted by the albedo");
+    // 0.5 lit plus the emission 0.2 times the albedo.
+    assert_near(right, [153, 153, 153], 1, "rim ramped off; emission times the albedo");
 }
 
 #[test]

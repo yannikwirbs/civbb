@@ -47,7 +47,18 @@ struct Material
     float4 matcap;         // toon matcap tint in xyz
     Slot matcap_mask;      // scales the matcap strength by its R channel
     float4 light;          // the clamped toon light's lower and upper bound
+    float4 shade_mix;      // shadow strength, main strength, 1: the shadow stays below the lit colour
+    float4 shade_second;   // second shadow colour in xyz, strength in w
+    float4 shade_ramps;    // the second shadow's ramp start and end, the border colour's (half-Lambert)
+    float4 shade_border;   // shadow border colour in xyz; the emission's main strength in w
+    float4 rim_ramp;       // rim ramp start and end, shadow mask, main strength
 };
+
+// A linear ramp from `lo` to `hi`, clamped to 0 to 1 (lilToon's tooning scale without anti-aliasing).
+float ramp(float x, float lo, float hi)
+{
+    return saturate((x - lo) / max(hi - lo, 1e-4));
+}
 
 struct View
 {
@@ -197,6 +208,15 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
     float3 shade = m.shade.xyz * sample(m.slots[2], i.uv).rgb;
     float3 n = normal(m, i, front);
     float3 e = normalize(v.eye.xyz - i.world);
+    // lilToon's shade bands (neutral for the other families): a second shadow below its ramp, the albedo
+    // multiplied in, the border colour towards the lit colour, then the strength.
+    float ln = dot(n, v.light_dir.xyz) * 0.5 + 0.5;
+    shade = lerp(shade, lit.rgb * m.shade_second.xyz, m.shade_second.w * (1 - ramp(ln, m.shade_ramps.x, m.shade_ramps.y)));
+    shade = lerp(shade, shade * lit.rgb, m.shade_mix.y);
+    if (m.shade_mix.z > 0.5)
+        shade = min(shade, lit.rgb);
+    shade = lerp(shade, lit.rgb, ramp(ln, m.shade_ramps.z, m.shade_ramps.w) * m.shade_border.xyz);
+    shade = lerp(lit.rgb, shade, m.shade_mix.x);
     // MToon 1.0: shift the Lambert term, then a linear step whose width shrinks as toony goes to 1.
     float toony = m.toon.y;
     float s = dot(n, v.light_dir.xyz) + m.toon.x;
@@ -214,7 +234,12 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
         color = lerp(color, color * m.rim_shade.xyz, r * m.rim_shade.w);
     }
     if (m.toon.z > 0)
-        color += m.rim.xyz * pow(saturate(1 - dot(n, e)), m.toon.z);
+    {
+        // The fresnel rim; lilToon ramps it, fades it in shadow and tints it by the albedo.
+        float f = ramp(pow(saturate(1 - dot(n, e)), m.toon.z), m.rim_ramp.x, m.rim_ramp.y);
+        f = lerp(f, f * s, m.rim_ramp.z);
+        color += m.rim.xyz * lerp(1, lit.rgb, m.rim_ramp.w) * f;
+    }
     if (m.slots[5].tex.x != NONE)
     {
         // MToon's matcap frame: view x and y around the view direction, world up kept upright.
@@ -228,7 +253,7 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
         else
             color += strength * mc;
     }
-    color += m.emissive.xyz * sample(m.slots[4], i.uv).rgb;
+    color += m.emissive.xyz * sample(m.slots[4], i.uv).rgb * lerp(1, lit.rgb, m.shade_border.w);
     return float4(color, lit.a);
 }
 

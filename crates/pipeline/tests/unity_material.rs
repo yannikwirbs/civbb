@@ -2,7 +2,7 @@
 //! each family's mapping to the native Toon, PBR and Unlit models, on hand-written saved properties.
 
 use base64::Engine;
-use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, Toon, ToonLight};
+use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, RimRamp, Toon, ToonLight};
 use civbb_pipeline::gltf_import::{Imported, Limits, import};
 use serde_json::{Value, json};
 
@@ -89,13 +89,12 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
     );
     // Unity's V-up tiling becomes V-down: offset 1 - 3 - 0.5.
     assert_eq!(t.base_color_tex.unwrap().scale_offset, [2.0, 3.0, 0.25, -2.5]);
-    // Shadow: albedo times shadow colour by strength, ramp from border - blur/2, toony 1 - blur.
-    assert!(
-        close(t.shade_color[0], half * (1.0 + (half - 1.0) * 0.5)),
-        "{:?}",
-        t.shade_color
-    );
-    assert!(close(t.shade_shift, 0.5) && close(t.shade_toony, 0.8));
+    // Shadow: albedo times shadow colour, mixed in by strength; the half-Lambert ramp 0.5 to 0.7 is n . l 0 to 0.4,
+    // MToon's shift -0.2 and toony 0.8.
+    assert!(close(t.shade_color[0], half * half), "{:?}", t.shade_color);
+    assert!(close(t.shade_shift, -0.2) && close(t.shade_toony, 0.8));
+    let bands = t.shade_bands.expect("shadow on");
+    assert!(bands.strength == 0.5 && bands.main_strength == 0.0 && bands.second_border == 0.15);
     assert_eq!(t.shade_tex, t.base_color_tex, "no shadow texture: the main one");
     // The tint's alpha scales the strength; its colour tints the matcap.
     assert!(t.matcap_tex.is_some() && close(t.matcap_strength, 0.35) && close(t.matcap_color[0], half));
@@ -115,6 +114,30 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
     );
     assert!(t.normal_tex.is_none(), "normal map off");
     assert!(close(t.outline_width, 0.001) && t.outline_color == [1.0, 0.0, 0.0]);
+}
+
+#[test]
+fn liltoon_rim_and_emission_take_their_ramp_and_main_strength() {
+    let m = material(json!({
+        "shader": "Hidden/InternalErrorShader", "shader_guid": LTS_TRANS_O, "render_queue": -1,
+        "floats": {"_lilToonVersion": 45, "_UseRim": 1, "_RimBorder": 0.9, "_RimBlur": 0.2, "_RimShadowMask": 1,
+            "_RimMainStrength": 0.25, "_RimFresnelPower": 0.2, "_UseEmission": 1, "_EmissionMainStrength": 1},
+        "colors": {"_Color": [0.5, 0.5, 0.5, 1], "_RimColor": [1, 1, 1, 0.5], "_EmissionColor": [1, 1, 1, 1]},
+    }));
+    let t = toon(&m);
+    assert_eq!(
+        t.rim_ramp,
+        Some(RimRamp {
+            border: 0.9,
+            blur: 0.2,
+            shadow_mask: 1.0,
+            main_strength: 0.25
+        })
+    );
+    assert!(close(t.rim_color[0], 0.5) && close(t.rim_power, 0.2));
+    // The shader multiplies by the albedo, main texture included; the colour stays as saved.
+    assert!(t.emissive == [1.0; 3] && t.emissive_main_strength == 1.0);
+    assert!(t.shade_bands.is_none(), "shadow off");
 }
 
 #[test]
@@ -288,15 +311,4 @@ fn poiyomi_matcap_takes_its_add_or_multiply_weight_and_tint() {
     assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Multiply, 0.5));
     let t = matcap(json!({"_MatcapAdd": 0.25, "_MatcapEmissionStrength": 0.5}));
     assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Add, 0.75));
-}
-
-#[test]
-fn liltoon_emission_main_strength_tints_the_emission_with_the_base_colour() {
-    let t = toon(&material(json!({
-        "shader": "lilToon",
-        "floats": {"_UseEmission": 1, "_EmissionMainStrength": 1},
-        "colors": {"_Color": [1, 0.5, 0, 1], "_EmissionColor": [1, 1, 1, 1]},
-    })))
-    .clone();
-    assert!(close(t.emissive[0], 1.0) && close(t.emissive[1], 0.21404114) && t.emissive[2] == 0.0);
 }

@@ -4,7 +4,7 @@
 use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, TextureSlot, ToonLight};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
-pub const MATERIAL_WORDS: usize = 108;
+pub const MATERIAL_WORDS: usize = 128;
 /// A texture slot without a texture.
 pub const NONE: u32 = u32::MAX;
 
@@ -105,6 +105,16 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut matcap = [1.0, 1.0, 1.0, 0.0];
     // The clamped light's bounds.
     let mut light = [0.0, 1.0, 0.0, 0.0];
+    // Shadow strength, main strength, and 1 to keep the shadow below the lit colour (lilToon's shade bands).
+    let mut shade_mix = [1.0, 0.0, 0.0, 0.0];
+    // Second shadow colour and strength.
+    let mut shade_second = [0.0; 4];
+    // The second shadow's ramp start and end, the border colour's ramp start and end (half-Lambert).
+    let mut shade_ramps = [0.0, 1.0, 0.0, 1.0];
+    // The shadow border colour; the emission's main strength in w.
+    let mut shade_border = [0.0; 4];
+    // Rim ramp start and end, shadow mask, main strength.
+    let mut rim_ramp = [0.0, 1.0, 0.0, 0.0];
     match &m.model {
         MaterialModel::Pbr(p) => {
             base_color = p.base_color;
@@ -135,13 +145,30 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
             params[2] = t.normal_scale;
             if let Some(r) = t.rim_shade {
                 rim_shade = [r.color[0], r.color[1], r.color[2], r.strength];
-                let (lo, hi) = (
-                    (r.border - r.blur * 0.5).clamp(0.0, 1.0),
-                    (r.border + r.blur * 0.5).clamp(0.0, 1.0),
-                );
+                let (lo, hi) = ramp(r.border, r.blur);
                 rim_shade_ramp = [lo, hi, r.power, 0.0];
             }
             toon = [t.shade_shift, t.shade_toony, t.rim_power, t.matcap_strength];
+            if let Some(b) = t.shade_bands {
+                // The first ramp's start and end in half-Lambert terms, from MToon's shift and toony.
+                let lo = (t.shade_toony - t.shade_shift) * 0.5;
+                let hi = lo + 1.0 - t.shade_toony;
+                let (lo2, hi2) = ramp(b.second_border, b.second_blur);
+                shade_mix = [b.strength, b.main_strength, 1.0, 0.0];
+                shade_second = [
+                    b.second_color[0],
+                    b.second_color[1],
+                    b.second_color[2],
+                    b.second_strength,
+                ];
+                shade_ramps = [lo2, hi2, (lo - b.border_range).max(0.0), hi];
+                shade_border = [b.border_color[0], b.border_color[1], b.border_color[2], 0.0];
+            }
+            shade_border[3] = t.emissive_main_strength;
+            if let Some(r) = t.rim_ramp {
+                let (lo, hi) = ramp(r.border, r.blur);
+                rim_ramp = [lo, hi, r.shadow_mask, r.main_strength];
+            }
             outline = [
                 t.outline_color[0],
                 t.outline_color[1],
@@ -196,5 +223,16 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     words.extend(matcap.map(f32::to_bits));
     words.extend(&slot_words[56..]);
     words.extend(light.map(f32::to_bits));
+    for v in [shade_mix, shade_second, shade_ramps, shade_border, rim_ramp] {
+        words.extend(v.map(f32::to_bits));
+    }
     words.try_into().expect("a material record is MATERIAL_WORDS long")
+}
+
+/// lilToon's ramp from `border - blur / 2` to `border + blur / 2`, both clamped to 0 to 1.
+fn ramp(border: f32, blur: f32) -> (f32, f32) {
+    (
+        (border - blur * 0.5).clamp(0.0, 1.0),
+        (border + blur * 0.5).clamp(0.0, 1.0),
+    )
 }

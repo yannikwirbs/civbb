@@ -35,6 +35,7 @@ pub enum AlphaMode {
 }
 
 /// The native shading models. Every source shader maps to one of these or is translated (design doc §10).
+#[allow(clippy::large_enum_variant)] // An avatar has tens of materials; boxing the toon variant saves nothing that matters.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MaterialModel {
     /// glTF metallic-roughness and Unity Standard.
@@ -97,6 +98,10 @@ pub struct Toon {
     pub rim_power: f32,
     /// Darkens the lit colour towards grazing angles (lilToon's rim shade).
     pub rim_shade: Option<RimShade>,
+    /// lilToon's rim ramp and masks; `None` adds the plain fresnel rim.
+    pub rim_ramp: Option<RimRamp>,
+    /// lilToon's shadow strength, second shadow and border colour; `None` uses the shade colour as it is.
+    pub shade_bands: Option<ShadeBands>,
     /// Matcap texture.
     pub matcap_tex: Option<TextureSlot>,
     /// Matcap blend strength.
@@ -111,6 +116,8 @@ pub struct Toon {
     pub emissive: Vec3,
     /// Emission texture.
     pub emissive_tex: Option<TextureSlot>,
+    /// Multiplies the emission towards itself times the albedo (lilToon's `_EmissionMainStrength`).
+    pub emissive_main_strength: f32,
     /// Outline width in metres; 0 disables the outline pass.
     pub outline_width: f32,
     /// Outline colour.
@@ -147,6 +154,36 @@ pub struct RimShade {
     pub power: f32,
     pub border: f32,
     pub blur: f32,
+}
+
+/// lilToon's rim light: the fresnel term `(1 - |n . v|)^rim_power` ramps linearly from `border - blur / 2` to
+/// `border + blur / 2` (both clamped to 0 to 1), fades towards the shadow by `shadow_mask`, and the rim colour is
+/// multiplied towards itself times the albedo by `main_strength`.
+#[allow(missing_docs)] // Field names follow lilToon's `_Rim*` properties.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RimRamp {
+    pub border: f32,
+    pub blur: f32,
+    pub shadow_mask: f32,
+    pub main_strength: f32,
+}
+
+/// lilToon's shadow beyond one colour: `Toon::shade_color` is the full shadow colour (times the shadow texture), and
+/// the shadow mixes in by `strength`. Where the half-Lambert term is below the second band's ramp (`second_border`,
+/// `second_blur`, as the first's), the shadow turns towards the albedo times `second_color` by `second_strength`;
+/// then it is multiplied towards itself times the albedo by `main_strength`; then it turns towards the lit colour by
+/// `border_color` times a ramp that starts `border_range` before the first one.
+#[allow(missing_docs)] // Field names follow lilToon's `_Shadow*` properties.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ShadeBands {
+    pub strength: f32,
+    pub main_strength: f32,
+    pub second_color: Vec3,
+    pub second_strength: f32,
+    pub second_border: f32,
+    pub second_blur: f32,
+    pub border_color: Vec3,
+    pub border_range: f32,
 }
 
 /// How a toon material's matcap combines with the lit colour.

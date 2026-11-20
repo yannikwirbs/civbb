@@ -8,7 +8,8 @@ use std::collections::BTreeMap;
 
 use civbb_anim::material::to_linear;
 use civbb_format::material::{
-    AlphaMode, ColorSpace, MatcapBlend, Material, MaterialModel, Pbr, RimShade, TextureSlot, Toon, ToonLight, Unlit,
+    AlphaMode, ColorSpace, MatcapBlend, Material, MaterialModel, Pbr, RimRamp, RimShade, ShadeBands, TextureSlot, Toon,
+    ToonLight, Unlit,
 };
 use civbb_format::math::Vec3;
 use serde::Deserialize;
@@ -236,14 +237,6 @@ fn mul(a: Vec3, b: Vec3) -> Vec3 {
     [a[0] * b[0], a[1] * b[1], a[2] * b[2]]
 }
 
-fn lerp(a: Vec3, b: Vec3, t: f32) -> Vec3 {
-    [
-        a[0] + (b[0] - a[0]) * t,
-        a[1] + (b[1] - a[1]) * t,
-        a[2] + (b[2] - a[2]) * t,
-    ]
-}
-
 fn scale(a: Vec3, s: f32) -> Vec3 {
     a.map(|x| x * s)
 }
@@ -268,6 +261,8 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         rim_color: [0.0; 3],
         rim_power: 5.0,
         rim_shade: None,
+        rim_ramp: None,
+        shade_bands: None,
         matcap_tex: None,
         matcap_strength: 0.0,
         matcap_blend: MatcapBlend::Add,
@@ -275,6 +270,7 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         matcap_mask_tex: None,
         emissive: [0.0; 3],
         emissive_tex: None,
+        emissive_main_strength: 0.0,
         outline_width: 0.0,
         outline_color: [0.0; 3],
         outline_width_tex: None,
@@ -552,19 +548,29 @@ impl Importer<'_> {
             t.normal_scale = p.f("_BumpScale", 1.0);
         }
         if p.on("_UseShadow") {
-            // Shadowed albedo is the albedo times the shadow colour, by strength; the shadow texture replaces the
-            // main texture there when set. The boundary sits at `_ShadowBorder` in half-Lambert space, `_ShadowBlur`
-            // wide (MToon's shift is where the ramp starts).
-            let strength = p.f("_ShadowStrength", 1.0);
-            t.shade_color = lerp(
-                base_rgb,
-                mul(base_rgb, p.rgb("_ShadowColor", [0.82, 0.76, 0.85, 1.0])),
-                strength,
-            );
+            // Shadowed albedo is the albedo times the shadow colour, mixed in by strength; the shadow texture replaces
+            // the main texture there when set. The ramp runs over half-Lambert `(n . l + 1) / 2` from
+            // `_ShadowBorder - _ShadowBlur / 2` to `_ShadowBorder + _ShadowBlur / 2`, both clamped to 0 to 1; in MToon's
+            // terms (a ramp over `n . l + shift` from `toony - 1` to `1 - toony`) that is the shift and toony below.
+            // The third shadow, the masks and the environment strength are not modelled.
+            t.shade_color = mul(base_rgb, p.rgb("_ShadowColor", [0.82, 0.76, 0.85, 1.0]));
             t.shade_tex = self.unity_slot(x, "_ShadowColorTex", srgb).or(main);
+            let second = [0.68, 0.66, 0.79, 1.0];
+            t.shade_bands = Some(ShadeBands {
+                strength: p.f("_ShadowStrength", 1.0),
+                main_strength: p.f("_ShadowMainStrength", 0.0),
+                second_color: p.rgb("_Shadow2ndColor", second),
+                second_strength: p.color("_Shadow2ndColor", second)[3],
+                second_border: p.f("_Shadow2ndBorder", 0.15),
+                second_blur: p.f("_Shadow2ndBlur", 0.1),
+                border_color: p.rgb("_ShadowBorderColor", [1.0, 0.1, 0.0, 1.0]),
+                border_range: p.f("_ShadowBorderRange", 0.08),
+            });
             let (border, blur) = (p.f("_ShadowBorder", 0.5), p.f("_ShadowBlur", 0.1));
-            t.shade_shift = (border - blur * 0.5).clamp(-1.0, 1.0);
-            t.shade_toony = (1.0 - blur).clamp(0.0, 1.0);
+            let lo = (border - blur * 0.5).clamp(0.0, 1.0);
+            let hi = (border + blur * 0.5).clamp(0.0, 1.0);
+            t.shade_shift = 1.0 - lo - hi;
+            t.shade_toony = 1.0 - (hi - lo);
         } else {
             t.shade_color = base_rgb;
         }
@@ -574,6 +580,13 @@ impl Importer<'_> {
                 p.color("_RimColor", WHITE)[3],
             );
             t.rim_power = p.f("_RimFresnelPower", 3.0);
+            // The light direction terms, the colour texture and the normal strength are not modelled.
+            t.rim_ramp = Some(RimRamp {
+                border: p.f("_RimBorder", 0.5),
+                blur: p.f("_RimBlur", 0.65),
+                shadow_mask: p.f("_RimShadowMask", 0.5),
+                main_strength: p.f("_RimMainStrength", 0.0),
+            });
         }
         if p.on("_UseRimShade") {
             // The mask and the normal strength are not modelled.
@@ -605,8 +618,7 @@ impl Importer<'_> {
         if p.on("_UseEmission") {
             t.emissive = scale(p.rgb("_EmissionColor", WHITE), p.color("_EmissionColor", WHITE)[3]);
             t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
-            // `_EmissionMainStrength` multiplies the emission by the albedo; the main texture's share is left out.
-            t.emissive = mul(t.emissive, lerp([1.0; 3], base_rgb, p.f("_EmissionMainStrength", 0.0)));
+            t.emissive_main_strength = p.f("_EmissionMainStrength", 0.0);
             if p.on("_EmissionUseGrad") {
                 // The gradient is sampled at speed times time; without time in our runtime, at its start (where
                 // Unity's reference renders sample it too).
