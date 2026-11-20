@@ -42,3 +42,7 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   case with only that node scaled) before trusting a replay that passes. HAOLAN's 1.26 bone radius was used as
   metres under a 0.01 armature, which put every tip on the far side of its inside capsule; the `scaled` case had
   scaled chain and collider together, which hid it.
+- Before fitting a Unity quantity freely, search its internals by reflection for the table it uses (a probe listing
+  members named `*Mass*` found `HumanTrait.GetBoneDefaultHierarchyMass`): free least-squares weights over rigidly
+  linked bones are degenerate (hips, spine and upper legs fitted -224, 75, 75) and do not generalise. Then fit the
+  structure (where each mass sits, which points span a frame) against cases that move one muscle group at a time.
