@@ -344,6 +344,7 @@ fn toon(name: &str, color: [f32; 4]) -> Material {
             rim_shade: None,
             rim_ramp: None,
             shade_bands: None,
+            tone: None,
             matcap_tex: None,
             matcap_strength: 0.0,
             matcap_blend: MatcapBlend::Add,

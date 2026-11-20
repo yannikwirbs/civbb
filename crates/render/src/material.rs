@@ -4,7 +4,7 @@
 use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, TextureSlot, ToonLight};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
-pub const MATERIAL_WORDS: usize = 128;
+pub const MATERIAL_WORDS: usize = 132;
 /// A texture slot without a texture.
 pub const NONE: u32 = u32::MAX;
 
@@ -115,6 +115,8 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut shade_border = [0.0; 4];
     // Rim ramp start and end, shadow mask, main strength.
     let mut rim_ramp = [0.0, 1.0, 0.0, 0.0];
+    // The base texture's tone correction: hue shift, saturation, value, gamma.
+    let mut tone = [0.0, 1.0, 1.0, 1.0];
     match &m.model {
         MaterialModel::Pbr(p) => {
             base_color = p.base_color;
@@ -165,6 +167,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 shade_border = [b.border_color[0], b.border_color[1], b.border_color[2], 0.0];
             }
             shade_border[3] = t.emissive_main_strength;
+            tone = t.tone.unwrap_or(tone);
             if let Some(r) = t.rim_ramp {
                 let (lo, hi) = ramp(r.border, r.blur);
                 rim_ramp = [lo, hi, r.shadow_mask, r.main_strength];
@@ -223,7 +226,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     words.extend(matcap.map(f32::to_bits));
     words.extend(&slot_words[56..]);
     words.extend(light.map(f32::to_bits));
-    for v in [shade_mix, shade_second, shade_ramps, shade_border, rim_ramp] {
+    for v in [shade_mix, shade_second, shade_ramps, shade_border, rim_ramp, tone] {
         words.extend(v.map(f32::to_bits));
     }
     words.try_into().expect("a material record is MATERIAL_WORDS long")

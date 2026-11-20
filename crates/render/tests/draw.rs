@@ -81,6 +81,7 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         rim_shade: None,
         rim_ramp: None,
         shade_bands: None,
+        tone: None,
         matcap_tex: None,
         matcap_strength: 0.0,
         matcap_blend: MatcapBlend::Add,
@@ -612,6 +613,17 @@ fn rim_ramp_gates_and_tints_the_rim_and_emission_takes_the_albedo() {
     assert_near(left, [191, 191, 191], 1, "rim on, tinted by the albedo");
     // 0.5 lit plus the emission 0.2 times the albedo.
     assert_near(right, [153, 153, 153], 1, "rim ramped off; emission times the albedo");
+}
+
+#[test]
+fn tone_correction_scales_the_base_texture() {
+    // No texture samples white; value 0.5 halves it before the base colour 0.5.
+    let Some((left, right)) = two_grey_toons([&|t| t.tone = Some([0.0, 1.0, 0.5, 1.0]), &|_| {}], [0.0, 0.0, 1.0])
+    else {
+        return;
+    };
+    assert_near(left, [64, 64, 64], 1, "value halved");
+    assert_near(right, [128, 128, 128], 1, "no tone correction");
 }
 
 #[test]

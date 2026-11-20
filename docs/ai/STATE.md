@@ -23,7 +23,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   add/multiply weights, ADR 0053); lilToon rim shade, the emission gradient's start and `_EmissionMainStrength`
   (ADRs 0052, 0053). HDR colours linearise as Unity does (`pow(x, 2.2)` above 1). lilToon's shadow ramp in
   half-Lambert terms, shadow bands (strength, second shadow, main strength, border colour), rim ramp and masks, and
-  emission main strength times the full albedo (ADR 0057, format v18). Scores on #82 and #87.
+  emission main strength times the full albedo (ADR 0057), main texture tone correction (ADR 0058, format v19). Scores
+  on #82 and #87.
 - Verified against Unity (`tools/unity-truth/Assets/Editor/Exported.cs` records into `corpus/local/unity-truth`,
   `crates/pipeline/tests/unity_export.rs` compares, local only): muscle, rotation, Euler, scale and blendshape
   curves of HAOLAN, Tessakuchan, Cokoro, Little Blackbird and Yumeka clips exact; 10 Unity constraints within
@@ -126,8 +127,8 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 - Toon outlines (ADR 0034): inverted hulls, a second indirect draw per outlined toon submesh (`Shader::Outline`,
   front faces culled), width in metres times the width texture's G channel sampled in the vertex shader, unlit
-  outline colour. Material records are 128 words (toon: light model and bounds, matcap blend, tint and mask, rim
-  shade, shadow bands, rim ramp; ADRs 0050 to 0054, 0057).
+  outline colour. Material records are 132 words (toon: light model and bounds, matcap blend, tint and mask, rim
+  shade, shadow bands, rim ramp, tone correction; ADRs 0050 to 0054, 0057, 0058).
 - The viewer's title and `--frames` summary report draws and skinned meshes of the last frame. KTX2 textures are
   checked (header, level index, one 2D image) and transcoded to BC7 by the pure-Rust `basisu` crate (ETC1S, UASTC
   and XUASTC); the renderer uploads BC7 levels and device selection requires BC textures. RGBA8 textures get CPU

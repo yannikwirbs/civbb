@@ -141,6 +141,22 @@ fn liltoon_rim_and_emission_take_their_ramp_and_main_strength() {
 }
 
 #[test]
+fn liltoon_tone_correction_needs_the_keyword_only_on_the_multi_shader() {
+    let hsvg = [-0.05, 0.9, 1.24, 1.0];
+    let tone = |shader: &str, keywords: &[&str]| {
+        toon(&material(json!({
+            "shader": shader, "keywords": keywords,
+            "floats": {"_lilToonVersion": 45},
+            "colors": {"_MainTexHSVG": hsvg},
+        })))
+        .tone
+    };
+    assert_eq!(tone("lilToon", &[]), Some(hsvg), "as saved, not linearised");
+    assert_eq!(tone("_lil/lilToonMulti", &[]), None);
+    assert_eq!(tone("_lil/lilToonMulti", &["EFFECT_HUE_VARIATION"]), Some(hsvg));
+}
+
+#[test]
 fn liltoon_by_markers_takes_transparency_from_the_queue_and_leaves_the_outline_off() {
     let imported = import_material(json!({
         "shader": "Hidden/InternalErrorShader", "shader_guid": "", "render_queue": 2450,

@@ -52,6 +52,7 @@ struct Material
     float4 shade_ramps;    // the second shadow's ramp start and end, the border colour's (half-Lambert)
     float4 shade_border;   // shadow border colour in xyz; the emission's main strength in w
     float4 rim_ramp;       // rim ramp start and end, shadow mask, main strength
+    float4 tone;           // the base texture's hue shift, saturation, value, gamma (0, 1, 1, 1: none)
 };
 
 // A linear ramp from `lo` to `hi`, clamped to 0 to 1 (lilToon's tooning scale without anti-aliasing).
@@ -145,10 +146,28 @@ float4 sample(Slot s, float4 uv)
     return textures[NonUniformResourceIndex(s.tex.x)].Sample(c);
 }
 
-// Base colour times its texture; discards below the alpha cutoff.
+// lilToon's tone correction (`lilToneCorrection`): gamma, then hue shift, saturation and value scaled in HSV.
+float3 toned(Material m, float3 c)
+{
+    float4 hsvg = m.tone;
+    if (all(hsvg == float4(0, 1, 1, 1)))
+        return c;
+    c = pow(abs(c), hsvg.w);
+    float4 p = (c.b > c.g) ? float4(c.bg, -1.0, 2.0 / 3.0) : float4(c.gb, 0.0, -1.0 / 3.0);
+    float4 q = (p.x > c.r) ? float4(p.xyw, c.r) : float4(c.r, p.yzx);
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    float3 hsv = float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+    hsv = float3(hsv.x + hsvg.x, saturate(hsv.y * hsvg.y), saturate(hsv.z * hsvg.z));
+    return hsv.z - hsv.z * hsv.y + hsv.z * hsv.y * saturate(abs(frac(hsv.x + float3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0);
+}
+
+// Base colour times its (tone-corrected) texture; discards below the alpha cutoff.
 float4 base(Material m, float4 uv)
 {
-    float4 c = m.base_color * sample(m.slots[0], uv);
+    float4 t = sample(m.slots[0], uv);
+    t.rgb = toned(m, t.rgb);
+    float4 c = m.base_color * t;
     if (m.params.w > 0 && c.a < m.params.w)
         discard;
     return c;
@@ -205,7 +224,10 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
     Material m = pc.materials[i.material];
     View v = *pc.view;
     float4 lit = base(m, i.uv);
-    float3 shade = m.shade.xyz * sample(m.slots[2], i.uv).rgb;
+    float3 shade_tex = sample(m.slots[2], i.uv).rgb;
+    if (m.slots[2].tex.x == m.slots[0].tex.x)
+        shade_tex = toned(m, shade_tex); // the shadow takes the main texture as lilToon corrects it
+    float3 shade = m.shade.xyz * shade_tex;
     float3 n = normal(m, i, front);
     float3 e = normalize(v.eye.xyz - i.world);
     // lilToon's shade bands (neutral for the other families): a second shadow below its ramp, the albedo

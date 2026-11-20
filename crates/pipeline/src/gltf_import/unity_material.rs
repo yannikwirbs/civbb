@@ -155,6 +155,12 @@ fn lil_variant(name: &str) -> LilVariant {
     LilVariant { alpha, outline }
 }
 
+/// Whether a lilToon material uses the multi shader, by GUID or shader name.
+fn lil_multi(x: &XToonMaterial) -> bool {
+    let file = LILTOON.iter().find(|(g, _)| *g == x.shader_guid).map(|(_, f)| *f);
+    file.unwrap_or(&x.shader).to_ascii_lowercase().contains("multi")
+}
+
 /// The family of a saved material: its shader GUID, then its shader name, then marker properties (a material keeps
 /// the properties of shaders it used before, so a GUID or name wins over markers).
 pub fn family(x: &XToonMaterial) -> Family {
@@ -263,6 +269,7 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         rim_shade: None,
         rim_ramp: None,
         shade_bands: None,
+        tone: None,
         matcap_tex: None,
         matcap_strength: 0.0,
         matcap_blend: MatcapBlend::Add,
@@ -543,6 +550,13 @@ impl Importer<'_> {
         let base_rgb = [base[0], base[1], base[2]];
         t.light_min = p.f("_LightMinLimit", 0.05);
         t.light_max = p.f("_LightMaxLimit", 1.0);
+        // Tone correction: every variant applies it, the multi shader only with its keyword (`EFFECT_HUE_VARIATION`,
+        // lilToon's `lil_replace_keywords.hlsl`). A vector, not a colour: as saved. The mask is not modelled.
+        let identity = [0.0, 1.0, 1.0, 1.0];
+        let hsvg = x.colors.get("_MainTexHSVG").copied().unwrap_or(identity);
+        if hsvg != identity && (!lil_multi(x) || x.keywords.iter().any(|k| k == "EFFECT_HUE_VARIATION")) {
+            t.tone = Some(hsvg);
+        }
         if p.on("_UseBumpMap") {
             t.normal_tex = self.unity_slot(x, "_BumpMap", ColorSpace::Linear);
             t.normal_scale = p.f("_BumpScale", 1.0);

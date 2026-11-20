@@ -441,6 +441,7 @@ impl Importer<'_> {
                 rim_shade: None,
                 rim_ramp: None,
                 shade_bands: None,
+                tone: None,
                 matcap_strength: if matcap_tex.is_some() {
                     arr(&x["matcapFactor"], [1.0; 3]).into_iter().fold(0.0, f32::max)
                 } else {
@@ -510,6 +511,7 @@ impl Importer<'_> {
                 rim_shade: None,
                 rim_ramp: None,
                 shade_bands: None,
+                tone: None,
                 matcap_strength: if matcap_tex.is_some() { 1.0 } else { 0.0 },
                 matcap_blend: MatcapBlend::Add,
                 matcap_color: [1.0; 3],

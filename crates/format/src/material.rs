@@ -102,6 +102,9 @@ pub struct Toon {
     pub rim_ramp: Option<RimRamp>,
     /// lilToon's shadow strength, second shadow and border colour; `None` uses the shade colour as it is.
     pub shade_bands: Option<ShadeBands>,
+    /// lilToon's tone correction of the base colour texture (`_MainTexHSVG`): hue shift (turns), saturation and value
+    /// factors, gamma; applied to linear texels, before `base_color`. `None` leaves the texture as it is.
+    pub tone: Option<[f32; 4]>,
     /// Matcap texture.
     pub matcap_tex: Option<TextureSlot>,
     /// Matcap blend strength.

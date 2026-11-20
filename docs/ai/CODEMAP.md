@@ -242,6 +242,7 @@ Internal deps: none
 - `docs/adr/0055-rest-as-vrchat-loads-it.md`: 0055: Rest as VRChat loads an avatar: zero muscles, standing built-ins, settled states
 - `docs/adr/0056-toggle-states-against-unity.md`: 0056: Toggle states against Unity: muscles ignore Write Defaults off, exit times recur, the reference runs state behaviours
 - `docs/adr/0057-liltoon-shadow-bands-and-rim-ramp.md`: 0057: lilToon's shadow ramp, shadow bands, rim ramp and emission main strength
+- `docs/adr/0058-liltoon-tone-correction.md`: 0058: lilToon's tone correction of the main texture
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
