@@ -3,6 +3,7 @@
 
 pub mod behaviour;
 pub mod bind;
+pub mod body;
 pub mod clip;
 pub mod constraint;
 pub mod controller;

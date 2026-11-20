@@ -11,6 +11,7 @@ Internal deps: civbb-core, civbb-format
 
 - `src/behaviour.rs`: Legacy built-in parameters and state behaviours: parameter drivers, tracking, layer and locomotion control.
 - `src/bind.rs`: Compile-time binding: resolves curve paths to slots in one flat buffer with per-slot defaults (ADR 0007).
+- `src/body.rs`: Unity's humanoid body pose (#52): a pose's centre of mass and body orientation from its bones' positions, the
 - `src/clip.rs`: A clip bound to slots, and sampling it into the slot buffer.
 - `src/constraint.rs`: Constraints: ordered by dependency once when compiled, then evaluated in one pass over the local pose (ADR 0018).
 - `src/controller.rs`: A compiled animator controller and one running instance of it: parameters, layers, the evaluated pose.
@@ -24,6 +25,7 @@ Internal deps: civbb-core, civbb-format
 - `tests/behaviour.rs`: Built-in parameters and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
 - `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order,
 - `tests/blend.rs`: Blend tree weights, hand-derived (ADR 0009): 1D, 2D simple directional, freeform cartesian and polar gradient
+- `tests/body_pose.rs`: Unity's humanoid body pose (#52) against `HumanPoseHandler` recordings on the generated test skeleton, plain and
 - `tests/constraint.rs`: Constraints (ADR 0018): every case recorded from Unity's constraints (`tests/unity/constraints.json`), and
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
 - `tests/golden.rs`: Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.

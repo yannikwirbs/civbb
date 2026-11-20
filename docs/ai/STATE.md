@@ -44,6 +44,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   bone radius, unclamped (negative puts it on the far side of the core). A bone's collision radius scales with its
   own node's world scale (an endpoint's with its leaf), recorded with scaled bones against unscaled colliders (#90).
 - The muscle rig leaves the hips to the body pose (#52); real muscle frames had turned Yumeka over.
+  `civbb_anim::body` has Unity's body pose as recorded (`BodyPose.cs`, #52): centre of mass from Unity's internal
+  mass table at segment midpoints (within 6 mm; `humanScale` is the T-pose's centre-of-mass height), orientation from
+  the upper legs' and arms' midpoints and left-to-right vectors (within 0.35 degrees). Not yet used to place the hips.
 - Reference renders (#79, ADR 0048): the host project has lilToon 2.4.1 (embedded package), Poiyomi 7.3.050 and
   UTS2 2.0.9 (unpacked into `Assets/`, GUIDs kept), so all 13 exports render with their shaders.
   `Civbb.Exporter.Reference.Render` (`tools/unity-exporter/Editor/Reference.cs`, `tools/unity-batch.sh --graphics`)

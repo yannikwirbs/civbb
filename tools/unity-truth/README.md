@@ -25,6 +25,11 @@ A minimal Unity project that records Unity's behaviour as JSON test data (ADR 00
 - `Assets/Editor/VrcContacts.cs`: the VRChat SDK's contact runtime (#75, ADR 0047): a sender moving through a
   receiver, one step a frame, for sphere, capsule and box shapes, the receiver types and face proximity. Run it like
   `VrcConstraints.cs`, with `-civbbOut <abs path>/crates/dynamics/tests/unity/vrc_contacts.json`.
+- `Assets/Editor/BodyPose.cs`: Unity's humanoid body pose (#52) on `Muscles.cs`'s generated skeletons (plain and
+  rolled axes): `HumanPoseHandler` poses with muscles, body position and rotation set, every node's world placement and
+  `GetHumanPose` of the result. Runs in this project:
+  `tools/unity-batch.sh tools/unity-truth BodyPose.Record -civbbOut <abs path>/crates/anim/tests/unity/body_pose.json`;
+  `crates/anim/tests/body_pose.rs` replays it.
 - `Assets/Editor/VrcPhysBones.cs`: the VRChat SDK's PhysBone runtime (#75, ADR 0049): a four-bone chain on a root
   moving along a scripted path (still, sway, turn, lift) for 1.5 s, versions 1.0 and 1.1, both integration types,
   one parameter at a time and sweeps (pull, spring, momentum, stiffness, gravity, falloff, immobile, limits,
