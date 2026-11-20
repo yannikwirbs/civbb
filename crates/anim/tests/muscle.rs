@@ -471,6 +471,8 @@ fn state(clip: u32) -> State {
         cycle_offset_param: None,
         time_param: None,
         write_defaults: true,
+        mirror: false,
+        mirror_param: None,
         transitions: Vec::new(),
         behaviours: Vec::new(),
     }
@@ -578,6 +580,7 @@ fn write_defaults_off_never_holds_muscles() {
             position: [0.0, 0.0],
             direct_param: None,
             time_scale: 1.0,
+            mirror: false,
             cycle_offset: 0.0,
         };
         let mut first = state(0);

@@ -114,6 +114,8 @@ fn layers_that_are_not_plain_toggles_stay() {
         cycle_offset_param: None,
         time_param: None,
         write_defaults: false,
+        mirror: false,
+        mirror_param: None,
         transitions: vec![transition],
         behaviours,
     };

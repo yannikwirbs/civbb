@@ -1,6 +1,6 @@
 //! A compiled animator controller and one running instance of it: parameters, layers, the evaluated pose.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
 use civbb_format::animator::{Animator, Behaviour, BodyPart, ParamIndex, TrackingMode};
@@ -8,11 +8,11 @@ use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform};
 
 use crate::behaviour::{Builtin, Rng, Tracking, coerce, drive, part_index};
-use crate::bind::{Bound, Target, bind, node_paths};
+use crate::bind::{Bound, Slot, Target, bind, node_paths};
 use crate::constraint::{Constraints, Scratch};
 use crate::machine::{Ctx, LayerRun};
 use crate::mix::Mixer;
-use crate::muscle::{COUNT, MUSCLES};
+use crate::muscle::{self, COUNT, MUSCLES};
 
 /// An avatar's animator with its clips bound to slots and its masks resolved. Shared by every instance.
 #[derive(Clone, Debug)]
@@ -25,6 +25,9 @@ pub struct Controller {
     pub(crate) masks: Vec<Option<Vec<bool>>>,
     /// Per slot, 0 or the quaternion component plus 1 (1 marks a rotation's first slot).
     pub(crate) rot: Vec<u8>,
+    /// Per slot, where a mirrored motion writes its value and with which sign: the counterpart's slot for muscles
+    /// that have one (ADR 0060), else itself.
+    pub(crate) mirror: Vec<(Slot, f32)>,
     /// Per layer, whether it is the first of its group, whose weight Unity fixes at 1.
     first_in_group: Vec<bool>,
     /// Some state has Write Defaults off: frames start from the last pose instead of defaults (ADR 0010).
@@ -86,6 +89,19 @@ impl Controller {
                 _ => 0,
             })
             .collect();
+        let targets = &bound.bindings.targets;
+        let slot_of: HashMap<Target, Slot> = (targets.iter().enumerate()).map(|(s, t)| (*t, s as Slot)).collect();
+        let mirror = (targets.iter().enumerate())
+            .map(|(s, t)| match *t {
+                Target::Muscle(m) => {
+                    let (other, sign) = muscle::mirror(m);
+                    slot_of
+                        .get(&Target::Muscle(other))
+                        .map_or((s as Slot, 1.0), |&o| (o, sign))
+                }
+                _ => (s as Slot, 1.0),
+            })
+            .collect();
         let mut seen = HashSet::new();
         let first_in_group = animator.layers.iter().map(|l| seen.insert(l.group)).collect();
         let wd_off = animator
@@ -113,6 +129,7 @@ impl Controller {
             bound,
             masks,
             rot,
+            mirror,
             first_in_group,
             wd_off,
             muscles,

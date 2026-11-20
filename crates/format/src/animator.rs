@@ -141,6 +141,12 @@ pub struct State {
     pub time_param: Option<ParamIndex>,
     /// Write Defaults: animated properties not in this state's motion revert to their defaults.
     pub write_defaults: bool,
+    /// Plays humanoid muscles mirrored left to right (Unity "Mirror"; ADR 0060).
+    #[serde(default)]
+    pub mirror: bool,
+    /// Bool parameter replacing `mirror`.
+    #[serde(default)]
+    pub mirror_param: Option<ParamIndex>,
     /// Outgoing transitions, checked in order.
     pub transitions: Vec<Transition>,
     /// State behaviours run on enter.
@@ -193,6 +199,9 @@ pub struct ChildMotion {
     pub time_scale: f32,
     /// Normalised time offset.
     pub cycle_offset: f32,
+    /// Mirrors the child's humanoid muscles; combines with its state's and parents' mirrors by exclusive or.
+    #[serde(default)]
+    pub mirror: bool,
 }
 
 /// A transition.

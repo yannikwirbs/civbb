@@ -168,6 +168,7 @@ namespace Civbb.Exporter
                         $"\"cycle_offset_param\":{Param(s.cycleOffsetParameterActive, s.cycleOffsetParameter)}," +
                         $"\"time_param\":{Param(s.timeParameterActive, s.timeParameter)}," +
                         $"\"write_defaults\":{Bool(s.writeDefaultValues)}," +
+                        $"\"mirror\":{Bool(s.mirror)},\"mirror_param\":{Param(s.mirrorParameterActive, s.mirrorParameter)}," +
                         $"\"transitions\":[{Transitions(s.transitions, index)}],\"behaviours\":[{StateBehaviours(s)}]}}");
                 }
                 foreach (var m in machines)
@@ -310,7 +311,7 @@ namespace Civbb.Exporter
                     string direct = tree.blendType == BlendTreeType.Direct && paramIndex.TryGetValue(c.directBlendParameter ?? "", out var p)
                         ? p.index.ToString() : "null";
                     return $"{{\"motion\":{motion},\"threshold\":{Num(c.threshold)},\"position\":{Nums(c.position.x, c.position.y)}," +
-                        $"\"direct_param\":{direct},\"time_scale\":{Num(c.timeScale)},\"cycle_offset\":{Num(c.cycleOffset)}}}";
+                        $"\"direct_param\":{direct},\"time_scale\":{Num(c.timeScale)},\"cycle_offset\":{Num(c.cycleOffset)},\"mirror\":{Bool(c.mirror)}}}";
                 });
                 bool normalize = new SerializedObject(tree).FindProperty("m_NormalizedBlendValues")?.boolValue ?? false;
                 return $"{{\"BlendTree\":{{\"kind\":{kind},\"children\":[{string.Join(",", children)}],\"normalize\":{Bool(normalize)}}}}}";

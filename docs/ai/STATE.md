@@ -11,7 +11,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   Base, Additive, Gesture, Action, FX; Action starts at 0; SDK default layers and proxy clips referenced, not
   copied; each layer's mask intersected with its group's descriptor mask, #80), behaviours, viewpoint, visemes, blink, eye look, expressions, PhysBones and colliders, contacts, VRChat
   constraints. Material-slot curves (`m_Materials.Array.data[n]`) export as `Property::MaterialSlot` keyed by glTF
-  material index (ADR 0059, format v20); other object-reference curves are skipped and counted. `X_avatar` carries muscle frames and the face. Unity constraints export the target's local
+  material index (ADR 0059, format v20); other object-reference curves are skipped and counted. State and blend
+  tree child mirror flags and the mirror parameter export too (ADR 0060, v21). `X_avatar` carries muscle frames and the face. Unity constraints export the target's local
   transform as at-rest (`Object.Instantiate` resets it). `Batch.Import` survives the SDK's domain reload.
   Textures other than PNG/JPEG (PSD, TGA) are re-encoded as PNG from Unity's import (readable, uncompressed, then
   restored); normal maps in those formats are still skipped.
@@ -169,7 +170,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
   human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056); instances start parameters at the expression defaults (`Controller::start`, #85) and built-ins
   standing on the ground (`Builtin::at_rest`, ADR 0055). Material slots swap per island
-  (`Target::MaterialSlot`, `Island::submesh_materials`, a per-submesh override in `MeshData::draws`; ADR 0059). `civbb-dynamics`: PhysBone chains as the SDK
+  (`Target::MaterialSlot`, `Island::submesh_materials`, a per-submesh override in `MeshData::draws`; ADR 0059).
+  Mirrored states and blend tree children map muscles as Unity records (`muscle::mirror`, exclusive or; ADR 0060). `civbb-dynamics`: PhysBone chains as the SDK
   steps them (ADR 0049: fixed 1/60 s steps plus a partial output step, versions 1.0/1.1, simplified and advanced
   integration, immobile, limits, segment colliders) with grab/pose (ADR 0015's, unverified), and contacts with the
   cross-avatar grid broadphase (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the

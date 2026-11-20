@@ -127,6 +127,7 @@ impl Case {
             position: [0.0; 2],
             direct_param,
             time_scale: 1.0,
+            mirror: false,
             cycle_offset: 0.0,
         };
         let tree = |kind, children| {
@@ -200,6 +201,8 @@ impl Case {
                         cycle_offset_param: None,
                         time_param: None,
                         write_defaults: s.wd,
+                        mirror: false,
+                        mirror_param: None,
                         transitions: s.transitions.iter().map(|t| self.transition(t, index(&t.to))).collect(),
                         behaviours: Vec::new(),
                     })

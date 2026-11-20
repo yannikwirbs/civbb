@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
-use civbb_format::animator::{ClipIndex, Curve, Key, ParamIndex, ParamKind, Property};
+use civbb_format::animator::{Animator, ClipIndex, Curve, Key, Motion, ParamIndex, ParamKind, Property};
 use civbb_format::constraint::{ConstraintField, ConstraintType};
 use civbb_format::hierarchy::{Hierarchy, NodeIndex};
 use civbb_format::mesh::MeshIndex;
@@ -107,6 +107,21 @@ pub fn node_paths(h: &Hierarchy) -> Vec<String> {
 pub fn bind(avatar: &Avatar) -> Bound {
     let mut b = Binder::new(avatar);
     let clips = (0..avatar.clips.len()).map(|ci| b.clip(ci)).collect();
+    // A mirrored motion writes each muscle's counterpart (ADR 0060): give those slots too.
+    if avatar.animator.as_ref().is_some_and(mirrors)
+        && let Some(rig) = &b.rig
+    {
+        let counterparts: Vec<u8> = (b.targets.iter())
+            .filter_map(|t| match *t {
+                Target::Muscle(m) => Some(muscle::mirror(m).0),
+                _ => None,
+            })
+            .filter(|&m| rig.has(MUSCLES[m as usize].bone))
+            .collect();
+        for m in counterparts {
+            b.slot(Target::Muscle(m));
+        }
+    }
     Bound {
         bindings: Bindings {
             targets: b.targets,
@@ -116,6 +131,18 @@ pub fn bind(avatar: &Avatar) -> Bound {
         unbound: b.unbound,
         rig: b.rig,
     }
+}
+
+/// Whether any state or blend tree child of `animator` mirrors.
+fn mirrors(animator: &Animator) -> bool {
+    fn motion(m: &Motion) -> bool {
+        match m {
+            Motion::Clip(_) => false,
+            Motion::BlendTree(t) => t.children.iter().any(|c| c.mirror || motion(&c.motion)),
+        }
+    }
+    (animator.layers.iter().flat_map(|l| &l.state_machine.states))
+        .any(|s| s.mirror || s.mirror_param.is_some() || s.motion.as_ref().is_some_and(motion))
 }
 
 struct Binder<'a> {

@@ -151,6 +151,8 @@ pub fn collapse(a: &mut Avatar) -> usize {
         let l = &mut an.layers[map[groups[0].1[0].layer] as usize];
         l.state_machine.states.push(State {
             write_defaults: false,
+            mirror: false,
+            mirror_param: None,
             ..state("Hold", None, Vec::new())
         });
     }
@@ -179,6 +181,8 @@ fn toggle(an: &Animator, clips: &[Clip], li: usize) -> Option<Toggle> {
         };
         let [c] = t.conditions.as_slice() else { return None };
         if !st.behaviours.is_empty()
+            || st.mirror
+            || st.mirror_param.is_some()
             || t.dest != TransitionDest::State(1 - s as u32)
             || t.has_exit_time
             || t.duration != 0.0
@@ -230,6 +234,7 @@ fn layer(group: u32, ts: &[Toggle], one: ParamIndex) -> Layer {
         position: [0.0; 2],
         direct_param,
         time_scale: 1.0,
+        mirror: false,
         cycle_offset: 0.0,
     };
     let direct = |children| {
@@ -297,6 +302,8 @@ fn state(name: &str, motion: Option<Motion>, transitions: Vec<Transition>) -> St
         cycle_offset_param: None,
         time_param: None,
         write_defaults: true,
+        mirror: false,
+        mirror_param: None,
         transitions,
         behaviours: Vec::new(),
     }

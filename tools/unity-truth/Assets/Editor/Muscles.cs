@@ -107,7 +107,7 @@ public static class Muscles
 
     // Builds the test skeleton under `root` and its humanoid avatar. `twist` is upper arm, lower arm, upper leg,
     // lower leg twist.
-    static Avatar BuildAvatar(GameObject root, bool rolled, float[] twist, out List<Transform> nodes, out Dictionary<string, Transform> byName)
+    internal static Avatar BuildAvatar(GameObject root, bool rolled, float[] twist, out List<Transform> nodes, out Dictionary<string, Transform> byName)
     {
         var all = new List<Transform> { root.transform };
         var named = new Dictionary<string, Transform>();

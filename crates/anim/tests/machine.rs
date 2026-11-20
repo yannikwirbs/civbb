@@ -46,6 +46,8 @@ fn state(clip: u32) -> State {
         cycle_offset_param: None,
         time_param: None,
         write_defaults: true,
+        mirror: false,
+        mirror_param: None,
         transitions: Vec::new(),
         behaviours: Vec::new(),
     }

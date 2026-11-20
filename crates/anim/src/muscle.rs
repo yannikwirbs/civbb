@@ -151,6 +151,21 @@ pub fn find(name: &str) -> Option<u8> {
     MUSCLES.iter().position(|m| m.name == name).map(|i| i as u8)
 }
 
+/// Where a mirrored motion takes muscle `m` from (ADR 0060, recorded in Unity): the muscle and the sign its value
+/// takes. Limbs and fingers swap sides; the spine, chest, neck, head and jaw negate their left-right and twist
+/// muscles; each eye keeps its side and negates in-out.
+pub fn mirror(m: u8) -> (u8, f32) {
+    let name = MUSCLES[m as usize].name;
+    let side = |a: &str, b: &str| name.strip_prefix(a).map(|rest| format!("{b}{rest}"));
+    if !name.contains(" Eye ")
+        && let Some(other) = side("Left", "Right").or_else(|| side("Right", "Left"))
+    {
+        return (find(&other).expect("every left muscle has a right one"), 1.0);
+    }
+    let negate = name.ends_with("Left-Right") || name.ends_with("Eye In-Out");
+    (m, if negate { -1.0 } else { 1.0 })
+}
+
 /// An avatar's muscle frames ready for evaluation, parents first, with its rest pose in muscle values.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rig {

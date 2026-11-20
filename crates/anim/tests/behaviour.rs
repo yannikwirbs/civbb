@@ -26,6 +26,8 @@ fn state(behaviours: Vec<Behaviour>, transitions: Vec<Transition>) -> State {
         cycle_offset_param: None,
         time_param: None,
         write_defaults: true,
+        mirror: false,
+        mirror_param: None,
         transitions,
         behaviours,
     }

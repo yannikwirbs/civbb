@@ -240,6 +240,8 @@ fn source_extensions_map_nodes_and_clips() {
         cycle_offset_param: None,
         time_param: None,
         write_defaults: true,
+        mirror: false,
+        mirror_param: None,
         transitions: Vec::new(),
         behaviours: Vec::new(),
     };

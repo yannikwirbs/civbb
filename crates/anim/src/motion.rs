@@ -17,6 +17,8 @@ pub struct Leaf {
     pub time: f32,
     /// Weight within the motion.
     pub weight: f32,
+    /// Plays its humanoid muscles mirrored (ADR 0060).
+    pub mirror: bool,
 }
 
 /// Seconds a motion takes at speed 1: blend trees average their clips' lengths (divided by time scale) by
@@ -64,17 +66,34 @@ pub fn loops(motion: Option<&Motion>, clips: &[BoundClip]) -> bool {
 }
 
 /// Appends the clips `motion` plays at `normalized` time (cycle offset included) with weights above 0.
-/// Blend tree children share the normalised time, shifted by their cycle offsets.
-pub fn leaves(motion: &Motion, clips: &[BoundClip], params: &[f32], normalized: f32, out: &mut Vec<Leaf>) {
-    collect(motion, clips, params, normalized, 1.0, out);
+/// Blend tree children share the normalised time, shifted by their cycle offsets; a child's mirror flips `mirror`
+/// (Unity combines them by exclusive or).
+pub fn leaves(
+    motion: &Motion,
+    clips: &[BoundClip],
+    params: &[f32],
+    normalized: f32,
+    mirror: bool,
+    out: &mut Vec<Leaf>,
+) {
+    collect(motion, clips, params, normalized, 1.0, mirror, out);
 }
 
-fn collect(m: &Motion, clips: &[BoundClip], params: &[f32], normalized: f32, w: f32, out: &mut Vec<Leaf>) {
+fn collect(
+    m: &Motion,
+    clips: &[BoundClip],
+    params: &[f32],
+    normalized: f32,
+    w: f32,
+    mirror: bool,
+    out: &mut Vec<Leaf>,
+) {
     match m {
         Motion::Clip(c) => out.push(Leaf {
             clip: *c,
             time: clip_time(&clips[*c as usize], normalized),
             weight: w,
+            mirror,
         }),
         Motion::BlendTree(tree) => each_weight(tree, params, |i, cw| {
             let child = &tree.children[i];
@@ -85,6 +104,7 @@ fn collect(m: &Motion, clips: &[BoundClip], params: &[f32], normalized: f32, w: 
                     params,
                     normalized + child.cycle_offset,
                     w * cw,
+                    mirror != child.mirror,
                     out,
                 );
             }

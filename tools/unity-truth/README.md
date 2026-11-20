@@ -4,6 +4,9 @@ A minimal Unity project that records Unity's behaviour as JSON test data (ADR 00
 
 - `Assets/Editor/Muscles.cs`: humanoid muscle space (ADR 0014). Writes `muscles.json` (table and clip property
   names) and three skeleton recordings (`tpose`, `rolled`, `twist`) to the directory given by `-civbbOut`.
+- `Assets/Editor/Mirror.cs`: humanoid mirroring (#89, ADR 0060) on the generated skeleton of `Muscles.cs`: one clip
+  played plain, by a mirrored state, a mirrored blend tree child and both. Run
+  `tools/unity-batch.sh tools/unity-truth Mirror.Record -civbbOut <abs path>/crates/anim/tests/unity/mirror.json`.
 - `Assets/Editor/Constraints.cs`: transform constraints (ADR 0018). Writes `constraints.json`: per case the input
   hierarchy, the constraints in `civbb-format`'s serde shape and Unity's result. Constraints only run in play mode,
   so run it **without** `-quit` (it exits by itself) and give `-civbbOut` as an absolute path (Unity resolves

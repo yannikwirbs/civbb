@@ -103,6 +103,7 @@ impl Mixer {
                             &c.bound.clips,
                             params,
                             normalized(state, &p, params),
+                            state.mirror_param.map_or(state.mirror, |i| params[i as usize] != 0.0),
                             &mut self.leaves,
                         );
                     }
@@ -170,9 +171,15 @@ impl Mixer {
                 self.held[su] += hold;
                 i += 4;
             } else {
-                let reference = if additive { self.base[su] } else { defaults[su] };
-                self.add(s, w * (self.sample[su] - reference));
-                self.held[su] += hold;
+                // A mirrored muscle goes to its counterpart, signed (ADR 0060); other slots stay.
+                let (to, sign) = if leaf.mirror { c.mirror[su] } else { (s, 1.0) };
+                let reference = if additive {
+                    sign * self.base[su]
+                } else {
+                    defaults[to as usize]
+                };
+                self.add(to, w * (sign * self.sample[su] - reference));
+                self.held[to as usize] += hold;
                 i += 1;
             }
         }

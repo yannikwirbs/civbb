@@ -24,7 +24,7 @@ pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the data model. Bump on any incompatible change to the types in this crate.
-pub const FORMAT_VERSION: u32 = 20;
+pub const FORMAT_VERSION: u32 = 21;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -320,6 +320,8 @@ pub(crate) mod testutil {
             cycle_offset_param: None,
             time_param: None,
             write_defaults: false,
+            mirror: false,
+            mirror_param: None,
             transitions: vec![],
             behaviours: vec![],
         };
@@ -335,6 +337,7 @@ pub(crate) mod testutil {
                     position: [0.0; 2],
                     direct_param: Some(0),
                     time_scale: 1.0,
+                    mirror: false,
                     cycle_offset: 0.0,
                 }],
                 normalize: false,

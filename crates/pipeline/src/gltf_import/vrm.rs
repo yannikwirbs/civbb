@@ -679,6 +679,7 @@ impl Importer<'_> {
                 position: [0.0; 2],
                 direct_param: Some(i as ParamIndex),
                 time_scale: 1.0,
+                mirror: false,
                 cycle_offset: 0.0,
             });
             clips.push(Clip {
@@ -739,6 +740,8 @@ impl Importer<'_> {
                         cycle_offset_param: None,
                         time_param: None,
                         write_defaults: true,
+                        mirror: false,
+                        mirror_param: None,
                         transitions: Vec::new(),
                         behaviours: Vec::new(),
                     }],

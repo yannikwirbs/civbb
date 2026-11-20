@@ -29,6 +29,7 @@ Internal deps: civbb-core, civbb-format
 - `tests/golden.rs`: Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
 - `tests/material.rs`: Material curves (ADR 0025): Unity property names to native fields, Unity's units (sRGB colours, smoothness, V-up
+- `tests/mirror.rs`: Humanoid mirroring (ADR 0060): the muscle map against Unity's recording (`tools/unity-truth/Assets/Editor/Mirror.cs`
 - `tests/muscle.rs`: Humanoid muscles (ADR 0014): the table against Unity's, hand-derived muscle space, poses recorded from Unity's
 - `tests/vrc_constraint.rs`: VRChat constraint options (ADR 0040, 0046): every case recorded from the VRChat SDK's own constraint runtime
 
@@ -244,6 +245,7 @@ Internal deps: none
 - `docs/adr/0057-liltoon-shadow-bands-and-rim-ramp.md`: 0057: lilToon's shadow ramp, shadow bands, rim ramp and emission main strength
 - `docs/adr/0058-liltoon-tone-correction.md`: 0058: lilToon's tone correction of the main texture
 - `docs/adr/0059-material-slot-curves.md`: 0059: Material-slot curves
+- `docs/adr/0060-humanoid-mirroring.md`: 0060: Humanoid mirroring
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
