@@ -1,6 +1,6 @@
 # 0052: lilToon rim shade, emission gradients and Unity's HDR colour conversion
 
-Status: accepted
+Status: accepted; HDR conversion (point 3) for `[HDR]` properties and the reference's sample time (point 2) superseded by 0062
 Date: 2026-11-19
 
 ## Context

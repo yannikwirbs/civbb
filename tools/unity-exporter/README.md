@@ -84,7 +84,8 @@ civbb-client parity <dir> <dir>/source.civpkg --key <key> --images <dir>/flip
 ```
 
 `Render` needs a graphics device (`--graphics` drops `-nographics`) and writes `<state>-<view>.png` next to
-`rig.json`; `parity` with a directory as the reference scores against them (`"reference": "unity"`).
+`rig.json`; `parity` with a directory as the reference scores against them (`"reference": "unity"`). Shader time is pinned
+to 0 (ADR 0062), where our runtime samples time-driven material effects.
 
 ## Compile check without a licence
 

@@ -91,3 +91,8 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
 - The descriptor's standard colliders read cleanly as `SerializedObject` properties `collider_<head|torso|handL|...|
   fingerLittleR>` (`state` Automatic/Custom/Disabled, `transform`, `radius`, `height`, `position`, `rotation`) after
   `UpdateAutoColliders()` and `so.Update()`. The SDK puts feet on mapped toes and fingers on their last mapped bone.
+- lilToon Multi hard-wires every `_Use*` toggle to true (`lil_common.hlsl`, `LIL_MULTI`): features follow keywords
+  only, so setting `_UseEmission` 0 changes nothing; zero the colour instead. Change instance materials
+  (`renderer.materials`) in play-mode probes, never `sharedMaterials` (asset edits persist).
+- Probe flags matched with `Contains` overlap ("nograd" contains "grad"): an exception in the update callback is
+  logged as `CIVBB failed` while the run still exits 0, and the image looks unchanged. Grep the log for it.

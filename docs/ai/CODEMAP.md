@@ -247,6 +247,7 @@ Internal deps: none
 - `docs/adr/0059-material-slot-curves.md`: 0059: Material-slot curves
 - `docs/adr/0060-humanoid-mirroring.md`: 0060: Humanoid mirroring
 - `docs/adr/0061-standard-colliders-as-senders.md`: 0061: The descriptor's standard colliders export as body-part contact senders
+- `docs/adr/0062-hdr-colours-as-saved-and-reference-time-zero.md`: 0062: `[HDR]` colours as saved, and reference renders at shader time 0
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

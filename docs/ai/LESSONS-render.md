@@ -38,8 +38,10 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   render-and-score batch runs (it scores with `target/release`).
 - A light-model change can help one family and hurt another: score per family before applying it to all (VRChat's
   mobile shaders got worse clamped; ADR 0050).
-- Unity linearises colour properties above 1 (HDR) with `pow(x, 2.2)`, not the sRGB curve (`Mathf.GammaToLinearSpace`,
-  probed: 32 gives 2048, the extended sRGB curve 3617). Probe a Unity fact with a 10-line static method in the host
+- Unity linearises plain colour properties above 1 with `pow(x, 2.2)`, not the sRGB curve (`Mathf.GammaToLinearSpace`,
+  probed: 32 gives 2048, the extended sRGB curve 3617), but passes `[HDR]` properties as saved (5.99 stays 5.99; ADR
+  0062): a probe of one property type does not cover the other. `Shader.GetPropertyFlags` lists a shader's `[HDR]`
+  colours. Probe a Unity fact with a 10-line static method in the host
   project's `Assets/Editor` (`tools/unity-batch.sh`, about 16 s) instead of reasoning from memory.
 - A uniform brightness gap between Unity and ours on one avatar (Cokoro ten times darker) is likely an FX-layer
   default animating a material property (`_LightMaxLimit` from a slider at 0): grep the export's `X_animator` for
@@ -59,3 +61,6 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   sample at time 0 reads the texture's corner, not its middle row.
 - A state whose images match colour on colour (Blackbird's black wings on a black body) can hide a geometry
   difference: compare a state with a distinct texture before calling the geometry right.
+- Split a brightness gap term by term on both sides: render ours and Unity with the same property changed (emission
+  black, emission 1, textures swapped) and compare a few pixels. Ostgaroa's panel matched at emission 1 and not at
+  5.99, which pointed at the colour conversion after compression, mips and gradient precision were ruled out.

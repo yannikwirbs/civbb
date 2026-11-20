@@ -234,6 +234,12 @@ impl Props<'_> {
         let c = self.color(k, default);
         [c[0], c[1], c[2]]
     }
+
+    /// An `[HDR]` colour: Unity saves it linear and passes it to the shader as saved (probed, ADR 0062).
+    fn hdr_rgb(&self, k: &str, default: [f32; 4]) -> Vec3 {
+        let c = self.0.colors.get(k).copied().unwrap_or(default);
+        [c[0], c[1], c[2]]
+    }
 }
 
 const WHITE: [f32; 4] = [1.0; 4];
@@ -406,7 +412,7 @@ impl Importer<'_> {
                     t.rim_color = scale(p.rgb("_RimLightColor", WHITE), p.color("_RimLightColor", WHITE)[3]);
                 }
                 if p.on("_EnableEmission") {
-                    t.emissive = scale(p.rgb("_EmissionColor", BLACK), p.f("_EmissionStrength", 1.0));
+                    t.emissive = scale(p.hdr_rgb("_EmissionColor", BLACK), p.f("_EmissionStrength", 1.0));
                     t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
                 }
                 let alpha = queue_alpha.unwrap_or_else(|| mode_alpha(p.f("_Mode", 0.0)));
@@ -630,7 +636,7 @@ impl Importer<'_> {
             t.matcap_mask_tex = self.unity_slot(x, "_MatCapBlendMask", ColorSpace::Linear);
         }
         if p.on("_UseEmission") {
-            t.emissive = scale(p.rgb("_EmissionColor", WHITE), p.color("_EmissionColor", WHITE)[3]);
+            t.emissive = scale(p.hdr_rgb("_EmissionColor", WHITE), p.color("_EmissionColor", WHITE)[3]);
             t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
             t.emissive_main_strength = p.f("_EmissionMainStrength", 0.0);
             if p.on("_EmissionUseGrad") {
@@ -672,7 +678,7 @@ impl Importer<'_> {
             t.matcap_tex = self.unity_slot(x, "_MatCap_Sampler", srgb);
             t.matcap_strength = if t.matcap_tex.is_some() { 1.0 } else { 0.0 };
         }
-        t.emissive = p.rgb("_Emissive_Color", BLACK);
+        t.emissive = p.hdr_rgb("_Emissive_Color", BLACK);
         t.emissive_tex = self.unity_slot(x, "_Emissive_Tex", srgb);
         if x.keywords.iter().any(|k| k.starts_with("_OUTLINE_")) {
             t.outline_width = p.f("_Outline_Width", 0.0) * 0.001;

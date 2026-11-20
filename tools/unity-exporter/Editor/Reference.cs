@@ -211,6 +211,16 @@ namespace Civbb.Exporter
             camera.allowHDR = false;
             camera.allowMSAA = false;
             camera.targetTexture = target;
+            // Shader time pinned to 0, as our runtime samples time-driven material effects at their start (ADR 0062).
+            // Unity sets the time globals per camera, so only the camera's own command buffers can override them.
+            foreach (var at in new[] { CameraEvent.BeforeForwardOpaque, CameraEvent.BeforeForwardAlpha })
+            {
+                var pin = new CommandBuffer { name = "civbb time 0" };
+                pin.SetGlobalVector("_Time", Vector4.zero);
+                pin.SetGlobalVector("_SinTime", Vector4.zero);
+                pin.SetGlobalVector("_CosTime", Vector4.one);
+                camera.AddCommandBuffer(at, pin);
+            }
             foreach (var r in avatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 r.updateWhenOffscreen = true;

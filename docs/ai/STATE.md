@@ -24,7 +24,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   `_LightMaxLimit`, animatable, ADR 0054); MToon, VRM and VRChat Mobile add the ambient. Matcaps add or multiply
   (MatCap Lit multiplies, ADR 0051) with a tint and a mask (lilToon `_MatCapColor`/`_MatCapBlendMask`, Poiyomi's
   add/multiply weights, ADR 0053); lilToon rim shade, the emission gradient's start and `_EmissionMainStrength`
-  (ADRs 0052, 0053). HDR colours linearise as Unity does (`pow(x, 2.2)` above 1). lilToon's shadow ramp in
+  (ADRs 0052, 0053). Plain colours linearise as Unity does (`pow(x, 2.2)` above 1); `[HDR]` ones (lilToon, Poiyomi
+  emission, UTS2 emissive) are taken as saved (ADR 0062). lilToon's shadow ramp in
   half-Lambert terms, shadow bands (strength, second shadow, main strength, border colour), rim ramp and masks, and
   emission main strength times the full albedo (ADR 0057), main texture tone correction (ADR 0058, format v19). Scores
   on #82 and #87.
@@ -48,7 +49,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   `Civbb.Exporter.Reference.Render` (`tools/unity-exporter/Editor/Reference.cs`, `tools/unity-batch.sh --graphics`)
   renders a prefab with a `civbb-client rig` hand-off's rig, light and states in play mode, the playable layers
   run as our runtime runs them (SDK proxy clips empty, humanoid only with muscle clips, hips at rest until #52,
-  descriptor masks applied). It logs every state's layers (mixer and clip weights) and muscles (`CIVBB <state>`), and runs the SDK's
+  descriptor masks applied, shader time pinned to 0, ADR 0062). It logs every state's layers (mixer and clip weights) and muscles (`CIVBB <state>`), and runs the SDK's
   parameter drivers and layer controls through their client hooks (ADR 0056). Not yet part of an
   export or `civbb build --report` (`unity_parity`).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
@@ -126,7 +127,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   the hand-off (`parity::Handoff`: rig, light, dt, parameters, states), the exporter renders `<state>-<view>.png`,
   and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). After #82, #86/#85, #87 and
   #88 (2026-11-20) rest means (front) run 0.06 (Inuinu) to 0.23 (Cokoro Quest); worst toggled states 0.12 to 0.37
-  (Tessakuchan). Bone radii in world units (#90) took HAOLAN to 0.054 front, worst 0.072. Remaining: silhouette edges, emission (#91). Tables on #82, #86, #85, #87.
+  (Tessakuchan). Bone radii in world units (#90) took HAOLAN to 0.054 front, worst 0.072; `[HDR]` colours as saved and the reference at
+  shader time 0 (#91) Cokoro to 0.109, Ostgaroa to 0.134. Remaining: silhouette edges. Tables on #82, #86, #85, #87.
   `corpus/local/unity-ref/all.sh <name>` rescores all, re-renders those whose hand-off changed, rescores.
 
 ## Renderer and viewer

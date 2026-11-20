@@ -302,9 +302,24 @@ fn liltoon_emission_gradient_scales_the_emission_by_its_start() {
     });
     let imported = import(&gltf_png(x, &png), &Limits::default(), |_| None).unwrap();
     let t = toon(&imported.avatar.materials[0]);
-    // HDR 2 is 2^2.2 in linear (Unity's GammaToLinearSpace), times the averaged texel 0.5.
-    let want = 2f32.powf(2.2) * 0.5;
+    // `[HDR]` 2 reaches the shader as saved (ADR 0062), times the averaged texel 0.5.
+    let want = 2.0 * 0.5;
     assert!(close(t.emissive[0], want), "{:?} != {want}", t.emissive);
+}
+
+#[test]
+fn hdr_emission_colours_stay_as_saved_and_plain_ones_linearise() {
+    // UTS2 and Poiyomi declare their emission colours `[HDR]` (Unity passes them unconverted); Standard does not.
+    let uts2 = material(json!({
+        "shader": "UnityChanToonShader/Toon_DoubleShadeWithFeather", "floats": {"_utsVersion": 2},
+        "colors": {"_Emissive_Color": [0.5, 0.5, 0.5, 1]},
+    }));
+    assert!(close(toon(&uts2).emissive[0], 0.5), "{:?}", toon(&uts2).emissive);
+    let poiyomi = material(json!({
+        "shader": "Hidden/.poiyomi/• Poiyomi Toon •/Body", "floats": {"_EnableEmission": 1},
+        "colors": {"_EmissionColor": [0.5, 0.5, 0.5, 1]},
+    }));
+    assert!(close(toon(&poiyomi).emissive[0], 0.5), "{:?}", toon(&poiyomi).emissive);
 }
 
 #[test]
