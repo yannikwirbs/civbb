@@ -29,7 +29,7 @@ namespace Civbb.Exporter
             w.Viewpoint = vrc.Viewpoint();
             w.Face = vrc.Face();
             w.Humanoid(root.transform);
-            var animator = AnimatorExport.Write(root.transform, layers, vrc.Masks);
+            var animator = AnimatorExport.Write(root.transform, layers, vrc.Masks, w.MaterialFor);
             void Put(string name, string json)
             {
                 if (json != null)
@@ -319,7 +319,7 @@ namespace Civbb.Exporter
                 return skins.Count - 1;
             }
 
-            int MaterialFor(Material mat)
+            public int MaterialFor(Material mat)
             {
                 if (mat == null)
                 {

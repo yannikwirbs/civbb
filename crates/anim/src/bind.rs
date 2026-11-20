@@ -39,6 +39,8 @@ pub enum Target {
     Muscle(u8),
     /// Component of a material field on every material of a renderer that has the field (ADR 0025).
     Material(MeshIndex, Field, u8),
+    /// The material a submesh draws with, as an index into [`Avatar::materials`] (values round to the nearest).
+    MaterialSlot(MeshIndex, u8),
     /// A field of a constraint, by index into [`Avatar::constraints`] (ADR 0040).
     Constraint(u32, ConstraintField),
 }
@@ -315,6 +317,21 @@ impl<'a> Binder<'a> {
                 renderer_default(self.avatar, mesh, field).ok_or("no material on the renderer has the property")?;
                 Target::Material(mesh, field, component)
             }
+            Property::MaterialSlot(s) => {
+                let &mesh = on_node.first().ok_or("no mesh at path")?;
+                if *s as usize >= self.avatar.meshes[mesh as usize].submeshes.len() {
+                    return Err("no such material slot");
+                }
+                let n = self.avatar.materials.len() as f32;
+                if !curve
+                    .keys
+                    .iter()
+                    .all(|k| k.value >= 0.0 && k.value < n && k.value.fract() == 0.0)
+                {
+                    return Err("material slot key is not a material index");
+                }
+                Target::MaterialSlot(mesh, *s)
+            }
             Property::Constraint { kind, field } => {
                 let (i, c) = (self.avatar.constraints.iter().enumerate())
                     .find(|(_, c)| c.target == node && ConstraintType::of(&c.kind) == Some(*kind))
@@ -350,6 +367,7 @@ impl<'a> Binder<'a> {
             // Unity's default human pose is every muscle at 0, not the rest pose (#86, recorded at rest).
             Target::Muscle(_) => 0.0,
             Target::Material(m, f, c) => renderer_default(a, m, f).expect("bound")[c as usize],
+            Target::MaterialSlot(m, s) => a.meshes[m as usize].submeshes[s as usize].material as f32,
             Target::Constraint(i, field) => {
                 let c = &a.constraints[i as usize];
                 match field {

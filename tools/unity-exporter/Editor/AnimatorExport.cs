@@ -20,8 +20,9 @@ namespace Civbb.Exporter
 
         /// The extension JSON (null without layers) and a report fragment. A null path leaves its group empty.
         /// `masks`: the descriptor's mask per group (VRChat masks each playable layer's whole output with it).
+        /// `materialFor`: the glTF index of a material, written if new (material-slot curves key on it).
         public static (string json, string report) Write(Transform root, IList<(string group, string path)> layers,
-            IReadOnlyDictionary<string, AvatarMask> masks = null)
+            IReadOnlyDictionary<string, AvatarMask> masks = null, Func<Material, int> materialFor = null)
         {
             if (layers.All(l => l.path == null))
             {
@@ -30,7 +31,7 @@ namespace Civbb.Exporter
             var controllers = layers.Select(l => l.path == null ? null
                 : AssetDatabase.LoadAssetAtPath<AnimatorController>(l.path)
                 ?? throw new ArgumentException($"no animator controller at {l.path}")).ToList();
-            var w = new Writer(layers.Select(l => l.group).ToList(), controllers);
+            var w = new Writer(layers.Select(l => l.group).ToList(), controllers, materialFor);
             // Parameters first: a clip in one controller may drive another's parameter.
             controllers.Where(c => c != null).ToList().ForEach(w.Parameters);
             for (int g = 0; g < controllers.Count; g++)
@@ -58,16 +59,18 @@ namespace Civbb.Exporter
             readonly Dictionary<AnimationClip, int> clipIndex = new Dictionary<AnimationClip, int>();
             readonly HashSet<string> muscles = Muscles();
             int states, subMachines, machineTransitions, droppedTransitions, syncedLayers, typeClashes, emptyMotions,
-                curves, objectCurves, componentCurves, bakedSegments, jumps, emptyLayers, sdkClips, behaviours;
+                curves, objectCurves, slotCurves, componentCurves, bakedSegments, jumps, emptyLayers, sdkClips, behaviours;
             int emptyClip = -1;
             readonly List<string> groupNames;
             /// Index of each group's first layer in the flattened layer list.
             readonly List<int> firstLayer = new List<int>();
             readonly BehaviourExport behaviourWriter = new BehaviourExport();
+            readonly Func<Material, int> materialFor;
 
-            public Writer(List<string> groups, List<AnimatorController> controllers)
+            public Writer(List<string> groups, List<AnimatorController> controllers, Func<Material, int> materialFor)
             {
                 groupNames = groups;
+                this.materialFor = materialFor;
                 int n = 0;
                 foreach (var c in controllers)
                 {
@@ -79,7 +82,7 @@ namespace Civbb.Exporter
             public string Report() =>
                 $"animator {layers.Count} layers, {parameters.Count} parameters, {states} states, {clips.Count} clips " +
                 $"({sdkClips} SDK clips referenced), {behaviours} behaviours ({behaviourWriter.Report()}), " +
-                $"{curves} curves ({componentCurves} other component, {objectCurves} object curves skipped, " +
+                $"{curves} curves ({componentCurves} other component, {slotCurves} material-slot curves, {objectCurves} object curves skipped, " +
                 $"{bakedSegments} weighted segments baked, {jumps} jumps split), {subMachines} sub-state machines, " +
                 $"{machineTransitions} state machine transitions skipped, {droppedTransitions} transitions dropped, " +
                 $"{syncedLayers} synced layers, {typeClashes} parameter type clashes, {emptyMotions} empty motions, " +
@@ -357,11 +360,34 @@ namespace Civbb.Exporter
                     list.Add($"{{\"binding\":{{\"path\":{Str(b.path)},\"property\":{property}}},\"keys\":[{keys}]}}");
                     curves++;
                 }
-                objectCurves += AnimationUtility.GetObjectReferenceCurveBindings(clip).Length;
+                foreach (var b in AnimationUtility.GetObjectReferenceCurveBindings(clip))
+                {
+                    var slot = MaterialSlot(b);
+                    if (slot == null)
+                    {
+                        objectCurves++;
+                        continue;
+                    }
+                    // A material per key, held until the next (a step: null out tangent, ADR 0041).
+                    var keys = AnimationUtility.GetObjectReferenceCurve(clip, b).Select(k =>
+                        $"{{\"time\":{Num(k.time)},\"value\":{materialFor(k.value as Material)},\"in_tangent\":0,\"out_tangent\":null}}");
+                    list.Add($"{{\"binding\":{{\"path\":{Str(b.path)},\"property\":{slot}}},\"keys\":[{string.Join(",", keys)}]}}");
+                    slotCurves++;
+                }
                 bool loop = AnimationUtility.GetAnimationClipSettings(clip).loopTime;
                 clipIndex[clip] = clips.Count;
                 clips.Add($"{{\"name\":{Str(clip.name)},\"length\":{Num(clip.length)},\"looping\":{Bool(loop)},\"curves\":[{string.Join(",", list)}]}}");
                 return clips.Count - 1;
+            }
+
+            /// The format `Property` of a renderer's material-slot curve (`m_Materials.Array.data[n]`), or null.
+            string MaterialSlot(EditorCurveBinding b)
+            {
+                const string prefix = "m_Materials.Array.data[";
+                var name = b.propertyName;
+                return materialFor != null && typeof(Renderer).IsAssignableFrom(b.type) && name.StartsWith(prefix) &&
+                    name.EndsWith("]") && int.TryParse(name.Substring(prefix.Length, name.Length - prefix.Length - 1), out int n) &&
+                    n < 256 ? $"{{\"MaterialSlot\":{n}}}" : null;
             }
 
             /// The format `Property` of a binding, and whether its values negate under the X mirror (ADR 0039).

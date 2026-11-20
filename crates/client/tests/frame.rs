@@ -157,6 +157,51 @@ fn animated_materials_are_per_island() {
 }
 
 #[test]
+fn a_toggle_can_swap_a_material_slot_per_island() {
+    let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());
+    let params = &avatar.animator.as_ref().unwrap().parameters;
+    let name = params.iter().find(|p| p.default == 0.0).unwrap().name.clone();
+    // A second material only the toggle's on clip puts into the body's first slot.
+    let mut swapped = avatar.materials[0].clone();
+    swapped.name = "swapped".into();
+    avatar.materials.push(swapped);
+    let index = avatar.materials.len() as u32 - 1;
+    let body = avatar.meshes[0].node as usize;
+    let path = civbb_anim::bind::node_paths(&avatar.hierarchy)[body].clone();
+    let on = avatar
+        .clips
+        .iter_mut()
+        .find(|c| c.name == format!("{name}_On"))
+        .unwrap();
+    let mut slot = on.curves[0].clone();
+    slot.binding = Binding {
+        path,
+        property: Property::MaterialSlot(0),
+    };
+    slot.keys[0].value = index as f32;
+    on.curves.push(slot);
+
+    let model = Arc::new(Model::new(&avatar));
+    let mut islands: Vec<Island> = (0..2)
+        .map(|id| Island::new(Arc::clone(&model), id, id == 0, Pose::IDENTITY))
+        .collect();
+    let p = model.controller().unwrap().param(&name).unwrap() as usize;
+    islands[0].animator_mut().unwrap().params[p] = 1.0;
+    for _ in 0..3 {
+        frame::step(&mut islands, |_, _| true, DT);
+    }
+    let own: Vec<u32> = avatar.meshes[0].submeshes.iter().map(|s| s.material).collect();
+    let mut out = Vec::new();
+    islands[0].submesh_materials(&avatar, 0, &mut out);
+    assert_eq!(out[0], index);
+    assert_eq!(out[1..], own[1..]);
+    islands[1].submesh_materials(&avatar, 0, &mut out);
+    assert_eq!(out, own, "the other island keeps the mesh's own materials");
+    islands[0].submesh_materials(&avatar, 1, &mut out);
+    assert!(out.is_empty(), "no swaps on other meshes");
+}
+
+#[test]
 fn a_toggle_can_switch_a_constraint_per_island() {
     use civbb_format::constraint::{ConstraintField, ConstraintKind, ConstraintType};
     let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());

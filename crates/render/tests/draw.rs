@@ -121,7 +121,7 @@ fn render(
         .collect();
     let mut draws = Vec::new();
     for (d, i) in data.iter().zip(&instances) {
-        d.draws(i, materials, 1.0, &mut draws);
+        d.draws(i, materials, &[], 1.0, &mut draws);
     }
     let mut batches = Batches::default();
     batch(&mut draws, &mut batches);

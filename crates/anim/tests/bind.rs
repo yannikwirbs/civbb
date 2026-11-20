@@ -184,6 +184,59 @@ fn reports_what_does_not_bind() {
 }
 
 #[test]
+fn material_slots_bind_with_the_submesh_material_as_default_and_reject_other_indices() {
+    use civbb_format::material::{AlphaMode, Material, MaterialModel, Unlit};
+    use civbb_format::mesh::Submesh;
+    let with = |c: Curve| {
+        let mut a = avatar(vec![clip(vec![c])]);
+        let unlit = Material {
+            name: "m".into(),
+            model: MaterialModel::Unlit(Unlit {
+                color: [1.0; 4],
+                color_tex: None,
+            }),
+            alpha: AlphaMode::Opaque,
+            double_sided: false,
+            render_queue: 2000,
+        };
+        a.materials = vec![unlit; 3];
+        a.meshes[0].submeshes = [0, 1]
+            .map(|material| Submesh {
+                first_index: 0,
+                index_count: 0,
+                material,
+            })
+            .to_vec();
+        bind(&a)
+    };
+    let b = with(curve("Body", Property::MaterialSlot(1), &[(0.0, 2.0)]));
+    assert!(b.unbound.is_empty(), "{:?}", b.unbound);
+    assert_eq!(b.bindings.targets, [Target::MaterialSlot(0, 1)]);
+    assert_eq!(b.bindings.defaults, [1.0], "the submesh's own material");
+    for (c, reason) in [
+        (
+            curve("Body", Property::MaterialSlot(2), &[(0.0, 0.0)]),
+            "no such material slot",
+        ),
+        (
+            curve("Body", Property::MaterialSlot(0), &[(0.0, 3.0)]),
+            "material slot key is not a material index",
+        ),
+        (
+            curve("Body", Property::MaterialSlot(0), &[(0.0, 0.5)]),
+            "material slot key is not a material index",
+        ),
+        (
+            curve("Hat", Property::MaterialSlot(0), &[(0.0, 0.0)]),
+            "no mesh at path",
+        ),
+    ] {
+        let b = with(c);
+        assert_eq!(b.unbound.iter().map(|u| u.reason).collect::<Vec<_>>(), [reason]);
+    }
+}
+
+#[test]
 fn duplicate_bindings_keep_the_first_curve() {
     let a = avatar(vec![clip(vec![
         curve("Hat", Property::Active, &[(0.0, 1.0)]),

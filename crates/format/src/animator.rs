@@ -423,6 +423,9 @@ pub enum Property {
     RendererEnabled,
     /// Material property on the renderer at `path`, e.g. `_Color.r`.
     Material(String),
+    /// The material in a slot (submesh) of the renderer at `path`: key values are indices into
+    /// [`Avatar::materials`](crate::Avatar::materials), held until the next key (Unity's `m_Materials.Array.data[n]`).
+    MaterialSlot(u8),
     /// Animator parameter driven by the clip (legacy FX technique).
     Parameter(String),
     /// A field of the first constraint of this type whose target is the node at `path` (ADR 0040).

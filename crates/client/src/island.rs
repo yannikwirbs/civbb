@@ -32,6 +32,8 @@ pub struct Model {
     receivers: Vec<Option<(ParamIndex, ParamKind)>>,
     /// Renderers with animated material properties, by mesh index.
     renderers: Vec<AnimatedRenderer>,
+    /// Per mesh, the animator slot of each submesh whose material it swaps; empty for most meshes.
+    swaps: Vec<Vec<(u8, Slot)>>,
 }
 
 /// A renderer whose material properties the animator drives: each island shows its own copy of its materials
@@ -90,6 +92,15 @@ impl Model {
             renderers[i].slots.push((field, component, slot as Slot));
         }
         renderers.sort_by_key(|r| r.mesh);
+        let mut swaps = vec![Vec::new(); avatar.meshes.len()];
+        for (slot, t) in controller
+            .iter()
+            .flat_map(|c| c.bound.bindings.targets.iter().enumerate())
+        {
+            if let Target::MaterialSlot(mesh, submesh) = *t {
+                swaps[mesh as usize].push((submesh, slot as Slot));
+            }
+        }
         let nodes = &avatar.hierarchy.nodes;
         Self {
             controller,
@@ -106,6 +117,7 @@ impl Model {
                 .collect(),
             receivers,
             renderers,
+            swaps,
         }
     }
 
@@ -220,6 +232,21 @@ impl Island {
                     material::set(mat, field, component, pose[slot as usize]);
                 }
             }
+        }
+    }
+
+    /// The material index each submesh of `mesh` draws with after the last step, into `out`, when the animator
+    /// swaps any of its material slots; `out` is left empty otherwise. A blend of indices rounds to the nearest.
+    pub fn submesh_materials(&self, avatar: &Avatar, mesh: MeshIndex, out: &mut Vec<u32>) {
+        out.clear();
+        let swaps = &self.model.swaps[mesh as usize];
+        let Some(a) = self.animator.as_ref().filter(|_| !swaps.is_empty()) else {
+            return;
+        };
+        out.extend(avatar.meshes[mesh as usize].submeshes.iter().map(|s| s.material));
+        let pose = a.pose();
+        for &(submesh, slot) in swaps {
+            out[submesh as usize] = pose[slot as usize].round() as u32;
         }
     }
 

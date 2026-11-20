@@ -45,9 +45,10 @@ impl Controller {
         let paths = node_paths(&avatar.hierarchy);
         let node_of = |t: &Target| match *t {
             Target::Position(n, _) | Target::Rotation(n, _) | Target::Scale(n, _) | Target::Active(n) => Some(n),
-            Target::BlendShape(m, _) | Target::RendererEnabled(m) | Target::Material(m, _, _) => {
-                Some(avatar.meshes[m as usize].node)
-            }
+            Target::BlendShape(m, _)
+            | Target::RendererEnabled(m)
+            | Target::Material(m, _, _)
+            | Target::MaterialSlot(m, _) => Some(avatar.meshes[m as usize].node),
             Target::Constraint(i, _) => Some(avatar.constraints[i as usize].target),
             Target::Parameter(_) | Target::Muscle(_) => None,
         };

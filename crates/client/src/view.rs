@@ -468,6 +468,8 @@ pub(crate) struct Scratch {
     materials: Vec<Vec<Material>>,
     packed: Vec<Vec<[u32; MATERIAL_WORDS]>>,
     updates: Vec<(u32, [u32; MATERIAL_WORDS])>,
+    /// The material of each submesh of the mesh being drawn when its slots are swapped.
+    slots: Vec<u32>,
 }
 
 /// Running totals for the title and the summary.
@@ -728,7 +730,8 @@ pub(crate) fn draw(
                 _ => out.push(matrix(&world[mesh.node as usize])),
             }
             let materials = gpu.maps[i][m].as_deref().unwrap_or(&gpu.materials);
-            gpu.meshes[m].draws(&gpu.instances[i][m], materials, distance, &mut s.draws);
+            island.submesh_materials(avatar, m as u32, &mut s.slots);
+            gpu.meshes[m].draws(&gpu.instances[i][m], materials, &s.slots, distance, &mut s.draws);
         }
     }
     let jobs: Vec<Job> = s

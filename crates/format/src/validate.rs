@@ -617,7 +617,10 @@ impl V {
                         self.string(property, cp);
                         true
                     }
-                    Property::Active | Property::RendererEnabled | Property::Constraint { .. } => true,
+                    Property::Active
+                    | Property::RendererEnabled
+                    | Property::MaterialSlot(_)
+                    | Property::Constraint { .. } => true,
                 };
                 self.ensure(component_ok, cp, "component index out of range");
                 // Tangents may be infinite (stepped keys); times and values may not.

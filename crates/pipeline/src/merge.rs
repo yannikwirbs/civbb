@@ -52,7 +52,7 @@ pub fn merge(a: &mut Avatar) -> Merged {
         };
         match &c.binding.property {
             Property::Active => toggled[i] = true,
-            Property::RendererEnabled | Property::Material(_) => renderer[i] = true,
+            Property::RendererEnabled | Property::Material(_) | Property::MaterialSlot(_) => renderer[i] = true,
             Property::BlendShape(name) => {
                 shape_curves[i].insert(name.as_str());
             }

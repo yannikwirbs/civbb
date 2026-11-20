@@ -306,6 +306,38 @@ fn atlas_joins_eligible_materials_and_keeps_texels() {
 }
 
 #[test]
+fn atlas_keeps_and_renumbers_a_material_a_slot_swaps_in() {
+    let mut after = avatar();
+    // Drawn by no submesh: only a clip puts it into Glow's slot.
+    after
+        .avatar
+        .materials
+        .push(unlit("swap", 4, [0.5; 4], [1.0, 1.0, 0.0, 0.0]));
+    let swap = after.avatar.materials.len() as f32 - 1.0;
+    after.avatar.clips[0].curves.push(Curve {
+        binding: Binding {
+            path: "Glow".into(),
+            property: Property::MaterialSlot(0),
+        },
+        keys: vec![Key {
+            time: 0.0,
+            value: swap,
+            in_tangent: 0.0,
+            out_tangent: f32::INFINITY,
+        }],
+    });
+    atlas(&mut after, 4096).unwrap();
+    valid(&after);
+    let names: Vec<&str> = after.avatar.materials.iter().map(|m| m.name.as_str()).collect();
+    assert_eq!(names, ["a", "c", "cross", "glow", "scaled", "swap"]);
+    let key = after.avatar.clips[0].curves[1].keys[0].value;
+    assert_eq!(key, 5.0, "the key follows the material's new index");
+    let m = &after.avatar.materials[5];
+    let texture = &after.avatar.textures[uv_colour(m).unwrap().texture as usize];
+    assert_eq!(texture.name, "t4", "a swapped-in material keeps its own texture");
+}
+
+#[test]
 fn atlas_rectangles_fit_the_cap() {
     // Three 32x16 sources cannot share a 48-texel atlas with their gutters; nothing is atlased.
     let mut small = avatar();

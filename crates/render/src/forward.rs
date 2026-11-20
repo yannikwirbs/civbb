@@ -154,11 +154,20 @@ pub struct Draw {
 
 impl MeshData {
     /// Adds a draw per submesh of `instance` (an instance of this mesh), and an outline draw after it if its
-    /// material has one; `materials` maps the avatar's material indices to the scene's. Submeshes whose material is
-    /// out of range are skipped.
-    pub fn draws(&self, instance: &SkinnedMesh, materials: &[MaterialId], distance: f32, out: &mut Vec<Draw>) {
-        for s in &self.submeshes {
-            if let Some(&material) = materials.get(s.material as usize) {
+    /// material has one; `materials` maps the avatar's material indices to the scene's. `slots`, when not empty,
+    /// replaces each submesh's own material index (an animated material slot). Submeshes whose material is out of
+    /// range are skipped.
+    pub fn draws(
+        &self,
+        instance: &SkinnedMesh,
+        materials: &[MaterialId],
+        slots: &[u32],
+        distance: f32,
+        out: &mut Vec<Draw>,
+    ) {
+        for (i, s) in self.submeshes.iter().enumerate() {
+            let index = slots.get(i).copied().unwrap_or(s.material);
+            if let Some(&material) = materials.get(index as usize) {
                 let draw = Draw {
                     first_index: self.index_base + s.first_index,
                     index_count: s.index_count,
