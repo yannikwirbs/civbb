@@ -3,6 +3,7 @@
     {
       "name": "sag_v10_simplified",
       "settings": {"version": "Version_1_0", "integrationType": "Simplified", "pull": 0.2, "spring": 0, "stiffness": 0.2, "gravity": 0.5, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[0, 0, 0], [0.082645, -0.056301, 0], [0.178322, -0.085387, 0], [0.278281, -0.08823, 0], [0.378197, -0.084135, 0]]},
@@ -145,6 +146,7 @@
     {
       "name": "sag_v11_simplified",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0, "stiffness": 0.2, "gravity": 0.5, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [40, 0, 0], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[40, 0, 0], [40.09808, -0.019516, 0], [40.19794, -0.024697, 0], [40.29794, -0.024319, 0], [40.39794, -0.023941, 0]]},
@@ -287,6 +289,7 @@
     {
       "name": "sway_v11_simplified",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0.5, "stiffness": 0.2, "gravity": 0, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [45, 0, 0], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[45, 0, 0], [45.1, 0, 0], [45.2, 0, 0], [45.3, 0, 0], [45.4, 0, 0]]},
@@ -429,6 +432,7 @@
     {
       "name": "sway_v11_advanced",
       "settings": {"version": "Version_1_1", "integrationType": "Advanced", "pull": 0.2, "spring": 0.5, "stiffness": 0.2, "gravity": 0, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [15, 0, 5], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[15, 0, 5], [15.1, 0, 5], [15.2, 0, 5], [15.3, 0, 5], [15.4, 0, 5]]},
@@ -571,6 +575,7 @@
     {
       "name": "turn_v11_advanced",
       "settings": {"version": "Version_1_1", "integrationType": "Advanced", "pull": 0.3, "spring": 0.3, "stiffness": 0.2, "gravity": 0.2, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [20, 0, 5], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[20, 0, 5], [20.09967, -0.008117, 5], [20.19952, -0.013591, 5], [20.29951, -0.015228, 5], [20.39951, -0.015042, 4.999999]]},
@@ -713,6 +718,7 @@
     {
       "name": "stiff_v11_advanced",
       "settings": {"version": "Version_1_1", "integrationType": "Advanced", "pull": 0.1, "spring": 0.5, "stiffness": 0.8, "gravity": 0, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [25, 0, 5], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[25, 0, 5], [25.1, 0, 5], [25.2, 0, 5], [25.3, 0, 5], [25.4, 0, 5]]},
@@ -855,6 +861,7 @@
     {
       "name": "immobile_all",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0.3, "stiffness": 0.2, "gravity": 0, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0.5, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [0, 0, 10], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[0, 0, 10], [0.1, 0, 10], [0.2, 0, 10], [0.3, 0, 10], [0.4, 0, 10]]},
@@ -997,6 +1004,7 @@
     {
       "name": "immobile_advanced",
       "settings": {"version": "Version_1_1", "integrationType": "Advanced", "pull": 0.2, "spring": 0.5, "stiffness": 0.3, "gravity": 0, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0.5, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [20, 0, 10], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[20, 0, 10], [20.1, 0, 10], [20.2, 0, 10], [20.3, 0, 10], [20.4, 0, 10]]},
@@ -1139,6 +1147,7 @@
     {
       "name": "scaled",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0.5, "stiffness": 0.2, "gravity": 0.3, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0.01, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [{"shape": "Sphere", "radius": 0.04, "height": 0, "position": [0.25, -0.05, 0.09], "rotation": [0, 0, 0, 1], "inside": false}],
       "frames": [
         {"root": {"position": [30, 0, 10], "rotation": [0, 0, 0, 1], "scale": 2}, "dt": 0.0111111114, "bones": [[30, 0, 10], [30.19962, -0.012346, 10], [30.3996, -0.01478, 9.999999], [30.5996, -0.014118, 9.999998], [30.7996, -0.013456, 9.999997]]},
@@ -1281,6 +1290,7 @@
     {
       "name": "limit_angle",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0, "stiffness": 0.2, "gravity": 1, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "Angle", "maxAngleX": 20, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [40, 0, 10], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[40, 0, 10], [40.09456, -0.032532, 10], [40.19455, -0.034324, 10], [40.29454, -0.034401, 9.999999], [40.39454, -0.034478, 9.999998]]},
@@ -1423,6 +1433,7 @@
     {
       "name": "limit_angle_sway",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0.5, "stiffness": 0.2, "gravity": 0.6, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "Angle", "maxAngleX": 25, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [25, 0, 15], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[25, 0, 15], [25.09906, -0.013685, 15], [25.19905, -0.014998, 15], [25.29905, -0.014807, 15], [25.39905, -0.014616, 15]]},
@@ -1565,6 +1576,7 @@
     {
       "name": "collider_sphere",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0, "stiffness": 0.2, "gravity": 1, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0.02, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [{"shape": "Sphere", "radius": 0.05, "height": 0, "position": [0.22, -0.12, 0], "rotation": [0, 0, 0, 1], "inside": false}],
       "frames": [
         {"root": {"position": [35, 0, 15], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[35, 0, 15], [35.09456, -0.032532, 15], [35.19455, -0.034322, 15], [35.29454, -0.034401, 15], [35.39454, -0.03448, 15]]},
@@ -1707,6 +1719,7 @@
     {
       "name": "collider_sway",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0.5, "stiffness": 0.2, "gravity": 0, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0.01, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [{"shape": "Sphere", "radius": 0.04, "height": 0, "position": [0.25, 0, 0.09], "rotation": [0, 0, 0, 1], "inside": false}],
       "frames": [
         {"root": {"position": [25, 0, 20], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[25, 0, 20], [25.1, 0, 20], [25.2, 0, 20], [25.3, 0, 20], [25.4, 0, 20]]},
@@ -1849,6 +1862,7 @@
     {
       "name": "simplified_p40_s70",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.4, "spring": 0.7, "stiffness": 0.2, "gravity": 0, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [10, 0, 25], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[10, 0, 25], [10.1, 0, 25], [10.2, 0, 25], [10.3, 0, 25], [10.4, 0, 25]]},
@@ -1991,6 +2005,7 @@
     {
       "name": "advanced_p20_m50_k50",
       "settings": {"version": "Version_1_1", "integrationType": "Advanced", "pull": 0.2, "spring": 0.5, "stiffness": 0.5, "gravity": 0, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [40, 0, 25], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[40, 0, 25], [40.1, 0, 25], [40.2, 0, 25], [40.3, 0, 25], [40.4, 0, 25]]},
@@ -2133,6 +2148,7 @@
     {
       "name": "falloff_v10_100",
       "settings": {"version": "Version_1_0", "integrationType": "Simplified", "pull": 0.2, "spring": 0, "stiffness": 0.2, "gravity": 0.5, "gravityFalloff": 1, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [20, 0, 35], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[20, 0, 35], [20.1, 0, 35], [20.2, 0, 35], [20.3, 0, 35], [20.4, 0, 35]]},
@@ -2275,6 +2291,7 @@
     {
       "name": "gravity_v11_sway",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0.5, "stiffness": 0.2, "gravity": 0.5, "gravityFalloff": 0, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [5, 0, 40], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[5, 0, 40], [5.099349, -0.01139, 40], [5.199338, -0.012886, 40], [5.299337, -0.012577, 40], [5.399337, -0.012268, 40]]},
@@ -2417,6 +2434,7 @@
     {
       "name": "falloff_v11_50",
       "settings": {"version": "Version_1_1", "integrationType": "Simplified", "pull": 0.2, "spring": 0, "stiffness": 0.2, "gravity": 0.5, "gravityFalloff": 0.5, "immobileType": "AllMotion", "immobile": 0, "limitType": "None", "maxAngleX": 45, "maxAngleZ": 45, "limitRotation": [0, 0, 0], "radius": 0, "endpointPosition": [0, 0, 0], "maxStretch": 0, "maxSquish": 0, "stretchMotion": 0, "allowCollision": "True"},
+      "bone_scales": [1, 1, 1, 1, 1],
       "colliders": [],
       "frames": [
         {"root": {"position": [15, 0, 40], "rotation": [0, 0, 0, 1], "scale": 1}, "dt": 0.0111111114, "bones": [[15, 0, 40], [15.09965, -0.008359, 40], [15.19959, -0.011685, 40], [15.29959, -0.011371, 40], [15.39959, -0.010655, 40]]},

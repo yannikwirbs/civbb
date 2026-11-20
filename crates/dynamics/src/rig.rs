@@ -90,7 +90,7 @@ pub struct Rig {
     pub max_stretch: Vec<f32>,
     /// Max squish as a fraction of rest length, 0 to 1.
     pub max_squish: Vec<f32>,
-    /// Collision radius, 0 or more.
+    /// Collision radius in the bone node's units (scaled by its world scale when colliding), 0 or more.
     pub radius: Vec<f32>,
     /// Limit angle (angle, hinge) or pitch (polar), radians, 0 to pi.
     pub limit_a: Vec<f32>,

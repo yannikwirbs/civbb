@@ -40,7 +40,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   `tests/vrc_physbone.rs` replays them: version 1.1 within 0.5 mm in 55 of 62 cases at 60 Hz and at 30 Hz, the rest
   pinned as bounds (version 1.0 transients #83; 90 Hz output, collider velocity, polar corners #84; a bone fatter
   than its inside capsule flips sides on float noise, #90). Inside capsules keep the tip within capsule radius minus
-  bone radius, unclamped (negative puts it on the far side of the core).
+  bone radius, unclamped (negative puts it on the far side of the core). A bone's collision radius scales with its
+  own node's world scale (an endpoint's with its leaf), recorded with scaled bones against unscaled colliders (#90).
 - The muscle rig leaves the hips to the body pose (#52); real muscle frames had turned Yumeka over.
 - Reference renders (#79, ADR 0048): the host project has lilToon 2.4.1 (embedded package), Poiyomi 7.3.050 and
   UTS2 2.0.9 (unpacked into `Assets/`, GUIDs kept), so all 13 exports render with their shaders.
@@ -125,7 +126,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   the hand-off (`parity::Handoff`: rig, light, dt, parameters, states), the exporter renders `<state>-<view>.png`,
   and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). After #82, #86/#85, #87 and
   #88 (2026-11-20) rest means (front) run 0.06 (Inuinu) to 0.23 (Cokoro Quest); worst toggled states 0.12 to 0.37
-  (Tessakuchan). Remaining: silhouette edges, PhysBones (#90), emission time (#91). Tables on #82, #86, #85, #87.
+  (Tessakuchan). Bone radii in world units (#90) took HAOLAN to 0.054 front, worst 0.072. Remaining: silhouette edges, emission (#91). Tables on #82, #86, #85, #87.
   `corpus/local/unity-ref/all.sh <name>` rescores all, re-renders those whose hand-off changed, rescores.
 
 ## Renderer and viewer

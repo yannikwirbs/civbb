@@ -38,3 +38,7 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   the capsule's" guess was 25x off. A Python walk of the GLB's node scales answers it in one call.
 - Cases inserted mid-list in `VrcPhysBones.cs` move later cases on the grid: bounds within a few µm of their limit
   can trip on float noise after a re-record (`simplified_p10_s100` 0.0007 to 0.000702).
+- Every PhysBone length or radius in the SDK is in some node's units: check which scale each field takes (record a
+  case with only that node scaled) before trusting a replay that passes. HAOLAN's 1.26 bone radius was used as
+  metres under a 0.01 armature, which put every tip on the far side of its inside capsule; the `scaled` case had
+  scaled chain and collider together, which hid it.

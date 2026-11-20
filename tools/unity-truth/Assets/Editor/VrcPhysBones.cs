@@ -309,6 +309,18 @@ public static class VrcPhysBones
                 Add($"falloff_{v}_{Pct(falloff)}", Still, ("version", version), ("pull", 0.2f), ("spring", 0f), ("gravity", 0.5f),
                     ("gravityFalloff", falloff));
         }
+        // Scaled bones against unscaled colliders (#90): which scale the bone radius takes. Last, so earlier cases
+        // keep their place on the grid.
+        c = Add("collider_inside_capsule_chain_half", Still, ("pull", 0.2f), ("spring", 0f), ("gravity", 1f), ("radius", 0.08f));
+        Collide(c, "Capsule", 0.06f, 0.6f, new Vector3(0.25f, 0f, 0f), new Vector3(0f, 0f, 90f), inside: true);
+        c.Bones[0].localScale = Vector3.one * 0.5f;
+        c = Add("collider_inside_sphere_mid_double", Still, ("pull", 0.2f), ("spring", 0f), ("gravity", 1f), ("radius", 0.1f));
+        Collide(c, "Sphere", 0.5f, 0f, new Vector3(0.2f, 0f, 0f), Vector3.zero, inside: true);
+        c.Bones[2].localScale = Vector3.one * 2f;
+        // Only the leaf scaled: its own scale or its parent's.
+        c = Add("collider_inside_sphere_leaf_triple", Still, ("pull", 0.2f), ("spring", 0f), ("gravity", 1f), ("radius", 0.05f));
+        Collide(c, "Sphere", 0.4f, 0f, new Vector3(0.1f, 0f, 0f), Vector3.zero, inside: true);
+        c.Bones[4].localScale = Vector3.one * 3f;
     }
 
     static string Pct(float x) => Mathf.RoundToInt(x * 100f).ToString(CultureInfo.InvariantCulture);
@@ -325,7 +337,8 @@ public static class VrcPhysBones
             var c = written[k];
             var settings = c.Settings.Select(kv => "\"" + kv.Key + "\": " + Value(kv.Value));
             s.Append(k == 0 ? "\n    " : ",\n    ").Append("{\n      \"name\": \"").Append(c.Name).Append("\",\n      \"settings\": {")
-                .Append(string.Join(", ", settings)).Append("},\n      \"colliders\": [").Append(string.Join(", ", c.Colliders))
+                .Append(string.Join(", ", settings)).Append("},\n      \"bone_scales\": [").Append(string.Join(", ", c.Bones.Select(b => F(b.localScale.x))))
+                .Append("],\n      \"colliders\": [").Append(string.Join(", ", c.Colliders))
                 .Append("],\n      \"frames\": [\n        ").Append(string.Join(",\n        ", c.Frames)).Append("\n      ]\n    }");
         }
         File.WriteAllText(outPath, s.Append("\n  ]\n}\n").ToString());

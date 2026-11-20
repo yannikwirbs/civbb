@@ -25,6 +25,9 @@ struct Recording {
 struct Case {
     name: String,
     settings: BTreeMap<String, Value>,
+    /// B0 to B4's local scales; all 1 when absent.
+    #[serde(default)]
+    bone_scales: Vec<f32>,
     colliders: Vec<ColliderRec>,
     frames: Vec<Frame>,
 }
@@ -96,6 +99,9 @@ impl Case {
         let mut nodes = vec![node("Root", None, [0.0; 3]), node("B0", Some(0), [0.0; 3])];
         for i in 1..=4 {
             nodes.push(node(&format!("B{i}"), Some(i), mirror([bone, 0.0, 0.0])));
+        }
+        for (b, &s) in self.bone_scales.iter().enumerate() {
+            nodes[b + 1].rest.scale = [s; 3];
         }
         let g = |k: &str| Graded::constant(self.f(k));
         let rotation = {
@@ -237,8 +243,9 @@ fn the_sdk_keeps_bone_lengths_and_pins_the_root() {
                     "{file} {} frame {f}",
                     c.name
                 );
-                let bone = r.bone_length * frame.root.scale;
+                let mut bone = r.bone_length * frame.root.scale;
                 for b in 1..frame.bones.len() {
+                    bone *= c.bone_scales.get(b - 1).copied().unwrap_or(1.0);
                     let l = length(sub(frame.bones[b], frame.bones[b - 1]));
                     assert!((l - bone).abs() < 1e-3, "{file} {} frame {f} bone {b}: {l}", c.name);
                 }

@@ -490,10 +490,12 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
             x = add(parent, scale(d, length(reach)));
         }
         x = add(parent, scale(normalize(sub(x, parent)), len));
-        // Colliders push the bone (the segment from its parent) out, then the bone keeps its length.
+        // Colliders push the bone (the segment from its parent) out, then the bone keeps its length. The bone's
+        // radius scales with its node (an endpoint's with its leaf), as recorded (#90).
+        let radius = rig.radius[k] * world[rig.node[k].or(rig.node[p]).expect("tips hang off nodes") as usize].scale;
         for &ci in &ch.colliders {
             let (shape, inside) = ctx.placed[ci as usize];
-            let pushed = collide(shape, inside, rig.radius[k], parent, x);
+            let pushed = collide(shape, inside, radius, parent, x);
             if pushed != x {
                 if let Some(n) = unit(sub(pushed, x)) {
                     // The push stops motion into the collider.
