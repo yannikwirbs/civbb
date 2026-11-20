@@ -80,3 +80,11 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   instantiated humanoid prefab with `HumanPoseHandler`) in a `PlayableGraph`, stepped with `graph.Evaluate(dt)`.
   Give the incoming value a distinct number (a state writing 9 before the tested one): an incoming value equal to
   the clip's makes "hold" and "renormalise" look the same.
+- `-executeMethod` needs a zero-argument static method and fails ("has 3 arguments") when the class also has an
+  overload of that name: give helpers other names.
+- Pinning shader time in a reference render: `Shader.SetGlobalVector("_Time", ...)` before `camera.Render()` is
+  overwritten (Unity sets `_Time` per camera); set it from a camera command buffer (`CameraEvent.BeforeForwardOpaque`
+  and `BeforeForwardAlpha`). Check the images changed (`cmp`) before reading scores.
+- A muscle map (mirroring) shows in one run: give every muscle a distinct value in one clip, play it both ways and
+  match outputs by magnitude. Use `Muscles.BuildAvatar`'s generated skeleton: corpus avatars lack eyes, jaw or upper
+  chest, and its recordings can be committed.

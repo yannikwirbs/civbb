@@ -120,9 +120,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   accepted yellow). lean and bloated are green in every state (`crates/pipeline/tests/parity.rs`).
 - Unity as the reference (ADR 0048): `civbb build --unstaged` packages the import, `civbb-client rig <pkg>` writes
   the hand-off (`parity::Handoff`: rig, light, dt, parameters, states), the exporter renders `<state>-<view>.png`,
-  and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). All 13 exports still red at
-  rest, but after #82 (shading) and #86/#85 (rest pose, ADR 0055) Blackbird Quest 0.07, Inuinu 0.06, HAOLAN Quest
-  0.09, Megumi 0.08 front are best; Yumeka 0.53 (shading of its default outfit, #87) worst. Tables on #82, #86, #85.
+  and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). After #82, #86/#85, #87 and
+  #88 (2026-11-20) rest means (front) run 0.06 (Inuinu) to 0.23 (Cokoro Quest); worst toggled states 0.12 to 0.37
+  (Tessakuchan). Remaining: silhouette edges, PhysBones (#90), emission time (#91). Tables on #82, #86, #85, #87.
   `corpus/local/unity-ref/all.sh <name>` rescores all, re-renders those whose hand-off changed, rescores.
 
 ## Renderer and viewer

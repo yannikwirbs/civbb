@@ -51,3 +51,11 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   transients (the first-frame swing from the bind pose dragging version 1.0 PhysBones 100 degrees, a SmallHop
   transition from `Grounded` 0) that our runtime does not share. Before blaming geometry, log the reference's rest
   layers and compare a bone's play-mode and edit-mode transforms.
+- Map a shader family's parameters from its source, not from memory or old comments: lilToon's shadow ramp (half-
+  Lambert, `lilTooningScale`) had been mapped into MToon's shift as if in `n . l` terms and lit most shadowed
+  surfaces for months (ADR 0057). lilToon's source is in the host project's `Packages/jp.lilxyzw.liltoon/Shader/
+  Includes` (`lil_common_frag.hlsl`).
+- HLSL promotes a scalar `Texture2D.Sample` coordinate to `(u, u)` (lilToon's `LIL_SAMPLE_1D`): a "1D" gradient
+  sample at time 0 reads the texture's corner, not its middle row.
+- A state whose images match colour on colour (Blackbird's black wings on a black body) can hide a geometry
+  difference: compare a state with a distinct texture before calling the geometry right.
