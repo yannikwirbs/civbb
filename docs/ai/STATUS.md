@@ -6,8 +6,8 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`.
 ## Now
 
 - Phase 0 (prove the avatar compiler). Current milestone: **M0.10 Unity exporter** (M0.9 closed).
-- Next: #78 (standard colliders and automatic contact senders: plan on the issue), #90 (inside capsule colliders:
-  HAOLAN's tunic flaps flare), #91 (material time and Ostgaroa's emissive panel), then #52, #53, #54, #83, #84.
+- Next: #90 (HAOLAN's tunic flaps flare: not the inside-capsule rule; probe `DBC_actual`'s placement in Unity, plan on
+  the issue), #91 (material time and Ostgaroa's emissive panel), then #52, #53, #54, #83, #84.
   Blackbird's worst states (0.35) show the right wing set in a different arm pose (not yet investigated).
 - Current area: the Unity exporter and the VRChat SDK runtime as ground truth. Read `STATE.md` (Unity exporter
   and ground truth) and `LESSONS-unity.md` first.
@@ -21,28 +21,21 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`.
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0060 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
+None. ADRs 0017 to 0061 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
 bounds of 0033; 0046 the capture frame and rebaking of 0040; 0047 refines 0017's shapes and proximity; 0049
 supersedes 0015 and the solver points of 0016; 0055 the frame count of 0033). LOD follow-up: #63 runtime level switching in renderer and governor.
 Renderer follow-ups: #59 GPU culling, #60 MSAA and multiview, #61 pipeline cache and freeing scene memory, #62
 clustered lights and shadows (Phase 1). In M0.10: #52 (body pose), #53 (muscle frames for glTF/VRM), #54
 (Unity-recorded animator goldens, also material curve defaults, sRGB and `_ST` conventions per ADR 0025, and a masked
-playable layer), #71 (`X_*` extensions in the importer), #78 (standard colliders and body-part senders), #83 (PhysBone 1.0
+playable layer), #71 (`X_*` extensions in the importer), #83 (PhysBone 1.0
 transients), #84 (PhysBone residuals: non-60 Hz output, collider velocity, polar corners), #90 (inside capsule colliders), #91
-(material time). #77 (contact advanced parameters) moved to Phase 1: no export uses contacts.
+(material time). #77 (contact advanced parameters) and #92 (hand and finger colliders as global PhysBone colliders)
+in Phase 1.
 
 ## Last sessions
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-19 (6): #86 closed (ADR 0055): muscles default to 0 (Unity's default human pose, not the bind pose),
-  instances start built-ins standing (`Builtin::at_rest`: `Grounded` 1 ...), parity states settle 60 frames
-  (Tessakuchan's v1.0 PhysBones lagged 100 degrees after 3); `Reference.Render` logs rest layers and muscles. #85
-  closed: parameters start at the expression defaults (`Controller::start`), the hand-off follows. Rest FLIP (front):
-  HAOLAN 0.47 to 0.17, HAOLAN Quest 0.46 to 0.09, KohzieBoi 0.28 to 0.14, Cokoro Quest 0.45 to 0.23, Cokoro 0.37 to
-  0.20, Blackbird 0.33 to 0.11, Blackbird Quest 0.29 to 0.07, Tessakuchan 0.31 to 0.21; Yumeka 0.42 to 0.53 (now
-  dressed as VRChat loads it; shading #87). #77 to Phase 1 (no contacts in the corpus); #78 probed
-  (`UpdateAutoColliders` by reflection); opened #88. Next: #87.
 - 2026-11-20 (7): toggled parity states against Unity (ADR 0056): Write Defaults off never holds humanoid muscles,
   exit times below 1 recur whatever the motion (both probed), and the reference runs parameter drivers and layer
   controls through the SDK's client hooks. Worst states: Cokoro 0.71 to 0.37, Cokoro Quest 0.74 to 0.35, HAOLAN 0.54
@@ -55,3 +48,8 @@ The newest three; `SESSIONS.md` has them all.
   0.12. #89 closed (ADR 0060, v21): mirroring recorded in Unity (eyes keep their side; state and child mirrors XOR).
   Opened #90 (inside capsule colliders), #91 (material time; pinning Unity's `_Time` made Ostgaroa worse, cause open).
   Next: #78.
+- 2026-11-20 (9): #78 closed (ADR 0061): the exporter runs the SDK's `UpdateAutoColliders` and writes the 14
+  standard colliders as `X_contacts` senders with VRChat's body-part tags (155 across the 13 re-exported GLBs; feet
+  on toes, fingers on their last bone, as the SDK picks); global PhysBone colliders to #92. #90: four inside-capsule
+  cases recorded; a bone fatter than the capsule gets negative room (tip on the far side), fixed; HAOLAN's capsule is
+  0.3 m against 0.0126 m bones, so its flare has another cause (next step on the issue). Next: #90.

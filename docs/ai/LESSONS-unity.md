@@ -88,3 +88,6 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
 - A muscle map (mirroring) shows in one run: give every muscle a distinct value in one clip, play it both ways and
   match outputs by magnitude. Use `Muscles.BuildAvatar`'s generated skeleton: corpus avatars lack eyes, jaw or upper
   chest, and its recordings can be committed.
+- The descriptor's standard colliders read cleanly as `SerializedObject` properties `collider_<head|torso|handL|...|
+  fingerLittleR>` (`state` Automatic/Custom/Disabled, `transform`, `radius`, `height`, `position`, `rotation`) after
+  `UpdateAutoColliders()` and `so.Update()`. The SDK puts feet on mapped toes and fingers on their last mapped bone.

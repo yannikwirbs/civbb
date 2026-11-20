@@ -36,9 +36,11 @@ What exists, by area. Read the section for the area you touch; update it when th
   constraint-option cases, ADR 0046) and `VrcContacts.cs` (39 contact cases, ADR 0047) run in the SDK host project
   by reflection and write committed goldens (`crates/anim/tests/unity/vrc_constraints.json`,
   `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. PhysBones too (ADR 0049):
-  `VrcPhysBones.cs` (81 cases at 60 Hz, 18 at 90 and 30 Hz, `crates/dynamics/tests/unity/vrc_physbones*.json`);
+  `VrcPhysBones.cs` (85 cases at 60 Hz, 18 at 90 and 30 Hz, `crates/dynamics/tests/unity/vrc_physbones*.json`);
   `tests/vrc_physbone.rs` replays them: version 1.1 within 0.5 mm in 55 of 62 cases at 60 Hz and at 30 Hz, the rest
-  pinned as bounds (version 1.0 transients #83; 90 Hz output, collider velocity, polar corners #84).
+  pinned as bounds (version 1.0 transients #83; 90 Hz output, collider velocity, polar corners #84; a bone fatter
+  than its inside capsule flips sides on float noise, #90). Inside capsules keep the tip within capsule radius minus
+  bone radius, unclamped (negative puts it on the far side of the core).
 - The muscle rig leaves the hips to the body pose (#52); real muscle frames had turned Yumeka over.
 - Reference renders (#79, ADR 0048): the host project has lilToon 2.4.1 (embedded package), Poiyomi 7.3.050 and
   UTS2 2.0.9 (unpacked into `Assets/`, GUIDs kept), so all 13 exports render with their shaders.

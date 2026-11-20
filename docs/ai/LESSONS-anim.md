@@ -33,3 +33,8 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   `Grounded` at 0 and plays the falling states (`Builtin::at_rest`, ADR 0055).
 - Hand-derived animator rules (#54) have been wrong twice against Unity probes (ADR 0056: Write Defaults off on
   muscles, exit times on non-looping and empty states). Probe a rule before relying on it for parity.
+- Compare collider and bone radii in world space before blaming a rule: HAOLAN's inside capsule sits under a node
+  scaled 100 inside the 0.01 armature (0.3 m) while its chains' bones are 0.0126 m; the issue's "bone radius above
+  the capsule's" guess was 25x off. A Python walk of the GLB's node scales answers it in one call.
+- Cases inserted mid-list in `VrcPhysBones.cs` move later cases on the grid: bounds within a few µm of their limit
+  can trip on float noise after a re-record (`simplified_p10_s100` 0.0007 to 0.000702).
