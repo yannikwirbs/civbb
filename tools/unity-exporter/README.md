@@ -12,7 +12,8 @@ links no VRChat SDK code.
 - `Editor/BehaviourExport.cs`: VRChat state behaviours as format behaviours (ADR 0042).
 - `Editor/ConstraintExport.cs`: Unity constraint components as `X_constraints`.
 - `Editor/VrcExport.cs`: VRChat components (ADR 0042): descriptor (playable layers, viewpoint, visemes, blink, eye
-  look, expressions), PhysBones and colliders, contacts, VRChat constraints. Read by field name; no SDK reference.
+  look, expressions, standard colliders as body-part senders per ADR 0061), PhysBones and colliders, contacts,
+  VRChat constraints. Read by field name; no SDK reference.
 - `Editor/Json.cs`: JSON text helpers and the X mirror for vectors, rotations and Euler angles.
 - `Editor/Reference.cs`: reference renders for parity (ADR 0048): `Civbb.Exporter.Reference.Render` renders a
   prefab with the rig, light and states of a `civbb-client rig` hand-off, one PNG per state and view, in play mode.

@@ -10,7 +10,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   components are read by type and field name, no SDK reference (ADR 0042): descriptor playable layers (groups
   Base, Additive, Gesture, Action, FX; Action starts at 0; SDK default layers and proxy clips referenced, not
   copied; each layer's mask intersected with its group's descriptor mask, #80), behaviours, viewpoint, visemes, blink, eye look, expressions, PhysBones and colliders, contacts, VRChat
-  constraints. Material-slot curves (`m_Materials.Array.data[n]`) export as `Property::MaterialSlot` keyed by glTF
+  constraints. The descriptor's 14 standard colliders (computed by the SDK's `UpdateAutoColliders`) export as
+  `X_contacts` senders with VRChat's body-part tags (ADR 0061; global PhysBone colliders #92). Material-slot curves (`m_Materials.Array.data[n]`) export as `Property::MaterialSlot` keyed by glTF
   material index (ADR 0059, format v20); other object-reference curves are skipped and counted. State and blend
   tree child mirror flags and the mirror parameter export too (ADR 0060, v21). `X_avatar` carries muscle frames and the face. Unity constraints export the target's local
   transform as at-rest (`Object.Instantiate` resets it). `Batch.Import` survives the SDK's domain reload.

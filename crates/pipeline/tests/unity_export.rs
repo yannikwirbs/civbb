@@ -262,3 +262,56 @@ fn exported_avatars_match_unity() {
     }
     assert!(failures.is_empty(), "differ from Unity: {failures:?}");
 }
+
+/// The descriptor's standard colliders export as senders with VRChat's body-part tags on or below the matching
+/// humanoid bone (ADR 0061; the SDK puts feet on toes and fingers on their last bone): a swapped side or finger would
+/// make other avatars' receivers fire on the wrong hand.
+#[test]
+fn exported_standard_senders_sit_on_their_bones() {
+    use HumanBone as H;
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/local/unity-glb");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        eprintln!("corpus/local/unity-glb absent; skipped");
+        return;
+    };
+    let expected = [
+        ("Head", H::Head),
+        ("HandL", H::LeftHand),
+        ("HandR", H::RightHand),
+        ("FootL", H::LeftFoot),
+        ("FootR", H::RightFoot),
+        ("FingerIndexL", H::LeftIndexProximal),
+        ("FingerMiddleL", H::LeftMiddleProximal),
+        ("FingerRingL", H::LeftRingProximal),
+        ("FingerLittleL", H::LeftLittleProximal),
+        ("FingerIndexR", H::RightIndexProximal),
+        ("FingerMiddleR", H::RightMiddleProximal),
+        ("FingerRingR", H::RightRingProximal),
+        ("FingerLittleR", H::RightLittleProximal),
+    ];
+    let mut checked = 0;
+    for path in entries.flatten().map(|e| e.path()) {
+        if path.extension().is_none_or(|e| e != "glb") {
+            continue;
+        }
+        let bytes = std::fs::read(&path).unwrap();
+        let avatar = import(&bytes, &Limits::default(), |_| None).unwrap().avatar;
+        let Some(h) = &avatar.humanoid else { continue };
+        let senders = &avatar.contacts.senders;
+        assert!(
+            senders.iter().any(|s| s.tags.iter().any(|t| t == "Torso")),
+            "{}: no Torso sender",
+            path.display()
+        );
+        for (tag, bone) in expected {
+            let (Some(node), Some(s)) = (h.node(bone), senders.iter().find(|s| s.tags.iter().any(|t| t == tag))) else {
+                continue;
+            };
+            let nodes = &avatar.hierarchy.nodes;
+            let below = std::iter::successors(Some(s.volume.node), |&n| nodes[n as usize].parent).any(|n| n == node);
+            assert!(below, "{}: {tag} not on or below {bone:?}", path.display());
+            checked += 1;
+        }
+    }
+    eprintln!("{checked} standard senders on their bones");
+}

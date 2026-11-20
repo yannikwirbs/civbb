@@ -391,9 +391,59 @@ namespace Civbb.Exporter
                     }
                 }
             }
-            notes.Add($"{senders.Count} contact senders, {receivers.Count} receivers");
+            int authored = senders.Count;
+            senders.AddRange(StandardSenders(senders));
+            notes.Add($"{authored} contact senders, {senders.Count - authored} standard senders, {receivers.Count} receivers");
             return senders.Count + receivers.Count > 0
                 ? $"{{\"senders\":[{string.Join(",", senders)}],\"receivers\":[{string.Join(",", receivers)}]}}" : null;
+        }
+
+        /// The descriptor's standard colliders as senders with VRChat's body-part tags (ADR 0061). Automatic ones are
+        /// computed by the SDK's own `UpdateAutoColliders` (by reflection) first; disabled ones and those whose most
+        /// specific tag an author's sender already carries are left out.
+        IEnumerable<string> StandardSenders(List<string> authored)
+        {
+            if (descriptor == null)
+            {
+                yield break;
+            }
+            var update = descriptor.targetObject.GetType().GetMethod("UpdateAutoColliders", Type.EmptyTypes);
+            if (update == null)
+            {
+                Skip("standard colliders (no UpdateAutoColliders)");
+                yield break;
+            }
+            update.Invoke(descriptor.targetObject, null);
+            descriptor.Update();
+            var colliders = new List<(string field, string[] tags)> { ("head", new[] { "Head" }), ("torso", new[] { "Torso" }) };
+            foreach (var side in new[] { "L", "R" })
+            {
+                colliders.Add(("hand" + side, new[] { "Hand", "Hand" + side }));
+                colliders.Add(("foot" + side, new[] { "Foot", "Foot" + side }));
+                foreach (var finger in new[] { "Index", "Middle", "Ring", "Little" })
+                {
+                    colliders.Add(($"finger{finger}{side}", new[] { "Finger", "Finger" + side, "Finger" + finger, $"Finger{finger}{side}" }));
+                }
+            }
+            foreach (var (field, tags) in colliders)
+            {
+                var c = descriptor.FindProperty("collider_" + field);
+                if (c == null || EnumName(P(c, "state")) == "Disabled"
+                    || authored.Any(s => s.Contains(Str(tags[tags.Length - 1]))))
+                {
+                    continue;
+                }
+                int n = node(P(c, "transform").objectReferenceValue as Transform);
+                float r = P(c, "radius").floatValue, h = P(c, "height").floatValue;
+                if (n < 0 || r <= 0)
+                {
+                    Skip("standard collider (no bone)");
+                    continue;
+                }
+                string shape = h > 0 ? $"{{\"Capsule\":{{\"radius\":{Num(r)},\"height\":{Num(h)}}}}}" : $"{{\"Sphere\":{{\"radius\":{Num(r)}}}}}";
+                yield return $"{{\"volume\":{{\"node\":{n},\"shape\":{shape},\"position\":{Vec(P(c, "position").vector3Value)}," +
+                    $"\"rotation\":{Quat(P(c, "rotation").quaternionValue)}}},\"tags\":[{string.Join(",", tags.Select(Str))}],\"local_only\":false}}";
+            }
         }
 
         /// VRChat constraints as format `Constraint` JSON with their options (ADR 0040).
