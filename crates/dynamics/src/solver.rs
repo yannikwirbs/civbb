@@ -610,11 +610,12 @@ fn collide(shape: Placed, inside: bool, r: f32, a: Vec3, x: Vec3) -> Vec3 {
     match shape {
         Placed::Capsule { a: p, b: q, radius } => {
             if inside {
-                // The bone point farthest from the core is an end: the tip.
+                // The bone point farthest from the core is an end: the tip. A bone fatter than the capsule has
+                // negative room: the SDK puts the tip on the far side of the core (recorded, #90).
                 let (c, _) = closest_on(p, q, x);
                 let d = sub(x, c);
                 let l = length(d);
-                let room = (radius - r).max(0.0);
+                let room = radius - r;
                 return if l > room { add(c, scale(dir_or(d), room)) } else { x };
             }
             let (on_bone, on_core) = closest_between(a, x, p, q);

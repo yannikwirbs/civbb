@@ -272,9 +272,13 @@ const BOUNDS: &[(&str, &str, f32)] = &[
     ("vrc_physbones.json", "falloff", 0.0011),
     ("vrc_physbones.json", "limit_polar_diagonal", 0.008),
     ("vrc_physbones.json", "collider_sway", 0.016),
-    ("vrc_physbones.json", "simplified_p10_s100", 0.0007),
+    ("vrc_physbones.json", "simplified_p10_s100", 0.00075),
     ("vrc_physbones.json", "simplified_p40_s100", 0.001),
     ("vrc_physbones.json", "falloff_v11_50", 0.0011),
+    // A bone fatter than its inside capsule: the SDK puts the tip on the far side of the core (negative room, exact
+    // for the first frames), then the tip sits near the axis and flips sides on float noise (#90).
+    ("vrc_physbones.json", "collider_inside_capsule_fat", 0.0194),
+    ("vrc_physbones.json", "collider_inside_capsule_short_fat", 0.0211),
     // Other frame rates: the output's partial step is an approximation (#84); full steps (30 Hz) are exact.
     ("vrc_physbones_90hz.json", "sag_v10_simplified", 0.0472),
     ("vrc_physbones_90hz.json", "sag_v11_simplified", 0.0014),

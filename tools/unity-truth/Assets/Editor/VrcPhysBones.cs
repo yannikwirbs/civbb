@@ -276,6 +276,12 @@ public static class VrcPhysBones
         Collide(c, "Plane", 0f, 0f, new Vector3(0f, -0.15f, 0f), Vector3.zero);
         c = Add("collider_inside", Still, ("pull", 0.2f), ("spring", 0f), ("gravity", 1f), ("radius", 0.02f));
         Collide(c, "Sphere", 0.25f, 0f, new Vector3(0.1f, 0f, 0f), Vector3.zero, inside: true);
+        // Inside capsules (#90): along the chain, bone radius below and above the capsule's, the tip starting outside.
+        foreach (var (name, boneRadius, height) in new[] { ("thin", 0.02f, 0.6f), ("fat", 0.08f, 0.6f), ("short", 0.02f, 0.3f), ("short_fat", 0.08f, 0.3f) })
+        {
+            c = Add("collider_inside_capsule_" + name, Still, ("pull", 0.2f), ("spring", 0f), ("gravity", 1f), ("radius", boneRadius));
+            Collide(c, "Capsule", 0.06f, height, new Vector3(height / 2f - 0.05f, 0f, 0f), new Vector3(0f, 0f, 90f), inside: true);
+        }
         c = Add("collider_sway", Sway, ("pull", 0.2f), ("spring", 0.5f), ("radius", 0.01f));
         Collide(c, "Sphere", 0.04f, 0f, new Vector3(0.25f, 0f, 0.09f), Vector3.zero);
         // Sweeps, one force at a time: spring by pull (simplified), momentum by stiffness (advanced), gravity by pull
