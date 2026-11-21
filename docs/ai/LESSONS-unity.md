@@ -96,3 +96,7 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   (`renderer.materials`) in play-mode probes, never `sharedMaterials` (asset edits persist).
 - Probe flags matched with `Contains` overlap ("nograd" contains "grad"): an exception in the update callback is
   logged as `CIVBB failed` while the run still exits 0, and the image looks unchanged. Grep the log for it.
+- In-memory humanoid clips: `clip.SetCurve("", typeof(Animator), "RootT.y", ...)` alone does not make a humanoid clip
+  (`humanMotion` false, nothing plays); add one muscle curve. The body pose a clip writes depends on its
+  `AnimationClipSettings` (bake into pose, keep original, `level`): with `applyRootMotion` off an unbaked clip's yaw
+  is dropped. Check a clip's settings before reading its RootT/RootQ as the body pose.
