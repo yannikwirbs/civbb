@@ -179,6 +179,7 @@ fn avatar() -> Imported {
                 name: "glow".into(),
                 length: 1.0,
                 looping: false,
+                root: None,
                 curves: vec![Curve {
                     binding: Binding {
                         path: "Glow".into(),

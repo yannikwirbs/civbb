@@ -53,7 +53,7 @@ impl Controller {
             | Target::Material(m, _, _)
             | Target::MaterialSlot(m, _) => Some(avatar.meshes[m as usize].node),
             Target::Constraint(i, _) => Some(avatar.constraints[i as usize].target),
-            Target::Parameter(_) | Target::Muscle(_) => None,
+            Target::Parameter(_) | Target::Muscle(_) | Target::Body(_) => None,
         };
         // Muscles follow the mask's body parts; other targets its transform paths, if it lists any.
         let masks = animator
@@ -71,6 +71,8 @@ impl Controller {
                             (Target::Muscle(m), _) => {
                                 mask.body_parts.contains(&BodyPart::of(MUSCLES[*m as usize].bone))
                             }
+                            // The body pose follows the mask's Root part (probed in Unity, #52).
+                            (Target::Body(_), _) => mask.body_parts.contains(&BodyPart::Root),
                             (t, Some(allowed)) => {
                                 node_of(t).is_none_or(|n| allowed.contains(paths[n as usize].as_str()))
                             }
@@ -86,6 +88,7 @@ impl Controller {
             .iter()
             .map(|t| match t {
                 Target::Rotation(_, k) => k + 1,
+                Target::Body(i) if *i >= 3 => i - 2,
                 _ => 0,
             })
             .collect();
@@ -255,6 +258,20 @@ impl Instance {
         }
         for (n, q) in self.human_pose(c) {
             locals[n as usize].rotation = q;
+        }
+        // A body pose some layer wrote this update places the hips (ADR 0063); otherwise they keep their transform.
+        if let Some(body) = &c.bound.body {
+            let mut pose = body.rest;
+            let mut any = false;
+            for (s, t) in c.bound.bindings.targets.iter().enumerate() {
+                if let Target::Body(i) = *t {
+                    pose[i as usize] = self.pose[s];
+                    any |= self.written[s];
+                }
+            }
+            if any {
+                body.place(pose, locals);
+            }
         }
     }
 

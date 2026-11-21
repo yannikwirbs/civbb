@@ -138,6 +138,8 @@ fn check_recording(file: &str) {
         humanoid: Some(Humanoid {
             bones: r.axes.iter().map(|a| (bone(a), a.node)).collect(),
             viewpoint: [0.0, 1.6, 0.1],
+            human_scale: 0.0,
+            center_of_mass: None,
             muscle_frames: r
                 .axes
                 .iter()
@@ -266,6 +268,8 @@ fn arm(twist: f32, arm_rest: Quat, clips: Vec<Clip>) -> Avatar {
         humanoid: Some(Humanoid {
             bones: bones.iter().enumerate().map(|(i, b)| (*b, i as u32 + 1)).collect(),
             viewpoint: [0.0; 3],
+            human_scale: 0.0,
+            center_of_mass: None,
             muscle_frames: bones
                 .iter()
                 .map(|&bone| {
@@ -417,6 +421,7 @@ fn muscle_clip(curves: &[(Property, f32)]) -> Clip {
         name: "c".into(),
         length: 1.0,
         looping: false,
+        root: None,
         curves: curves
             .iter()
             .map(|(p, v)| Curve {
@@ -450,7 +455,7 @@ fn muscle_curves_bind_to_slots_with_zero_defaults() {
         [
             (1, "no such muscle"),
             (2, "no muscle frame for the muscle's bone"),
-            (3, "body pose curves not supported yet (#52)"),
+            (3, "no humanoid with hips, upper arms and upper legs"),
         ]
     );
 

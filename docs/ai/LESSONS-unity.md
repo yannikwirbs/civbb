@@ -100,3 +100,9 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   (`humanMotion` false, nothing plays); add one muscle curve. The body pose a clip writes depends on its
   `AnimationClipSettings` (bake into pose, keep original, `level`): with `applyRootMotion` off an unbaked clip's yaw
   is dropped. Check a clip's settings before reading its RootT/RootQ as the body pose.
+- Fitting a Unity rule over many boolean settings: record the full combination matrix once (`RootMotion.cs`: 2^8
+  flag sets x offsets, 30 s), then fit in Python with residuals grouped by flag string: one wrong term shows as
+  exactly the groups that share a flag (the level's sign showed as all 64 offset groups). Sample at times where the
+  curve's start, end and middle all differ, or terms like "relative to the start" cancel out.
+- `GetHumanPose` after a graph evaluation reads the body pose the clip actually applied (relative to the Animator's
+  transform), which is the quantity to fit; with root motion discarded it differs from the clip's RootT/RootQ.

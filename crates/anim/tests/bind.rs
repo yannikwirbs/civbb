@@ -49,6 +49,7 @@ fn clip(curves: Vec<Curve>) -> Clip {
         name: "c".into(),
         length: 1.0,
         looping: false,
+        root: None,
         curves,
     }
 }
@@ -165,7 +166,7 @@ fn reports_what_does_not_bind() {
         ),
         (
             curve("", Property::RootMotion(0), &[(0.0, 1.0)]),
-            "body pose curves not supported yet (#52)",
+            "no humanoid with hips, upper arms and upper legs",
         ),
         (
             curve("Body", Property::Material("_Nope.r".into()), &[(0.0, 1.0)]),

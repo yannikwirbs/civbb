@@ -91,6 +91,7 @@ fn avatar(curves: Vec<Curve>) -> Avatar {
             name: "c".into(),
             length: 1.0,
             looping: false,
+            root: None,
             curves,
         }],
         ..Avatar::default()

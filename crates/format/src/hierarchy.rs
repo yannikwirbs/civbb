@@ -97,6 +97,13 @@ pub struct Humanoid {
     pub viewpoint: Vec3,
     /// Muscle frames of mapped bones, at most one each; empty when the source has none (glTF and VRM, #53).
     pub muscle_frames: Vec<MuscleFrame>,
+    /// Metres per body position unit (Unity's `Animator.humanScale`, the T-pose's centre-of-mass height; ADR 0063);
+    /// 0 when the source has none.
+    pub human_scale: f32,
+    /// Unity's centre of mass of the rest pose in avatar space (`bodyPosition * humanScale`), which anchors the
+    /// runtime's mass model (ADR 0063); `None` when the source has none.
+    #[serde(default)]
+    pub center_of_mass: Option<Vec3>,
 }
 
 /// How muscle values turn one humanoid bone (Unity's per-bone axes, ADR 0014). With angles `a` in degrees from the

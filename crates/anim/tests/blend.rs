@@ -157,6 +157,7 @@ fn avatar(motion: Motion) -> Avatar {
         name: String::new(),
         length,
         looping: true,
+        root: None,
         curves,
     };
     let node = |name: &str, parent| Node {

@@ -174,6 +174,14 @@ impl V {
                 self.ensure(seen.insert(*bone), || format!("humanoid.{bone:?}"), "mapped twice");
             }
             self.finite(&h.viewpoint, || "humanoid.viewpoint".into());
+            self.ensure(
+                h.human_scale.is_finite() && h.human_scale >= 0.0,
+                || "humanoid.human_scale".into(),
+                "must be finite and 0 or more",
+            );
+            if let Some(c) = &h.center_of_mass {
+                self.finite(c, || "humanoid.center_of_mass".into());
+            }
             let mut framed = HashSet::new();
             for (i, f) in h.muscle_frames.iter().enumerate() {
                 let p = || format!("humanoid.muscle_frames[{i}]");
@@ -599,6 +607,9 @@ impl V {
             let p = || format!("clips[{ci}]");
             self.string(&clip.name, p);
             self.ensure(clip.length.is_finite() && clip.length >= 0.0, p, "invalid length");
+            if let Some(r) = &clip.root {
+                self.finite(&[r.orientation_offset, r.level], || format!("clips[{ci}].root"));
+            }
             curves += clip.curves.len();
             for (ki, curve) in clip.curves.iter().enumerate() {
                 let cp = || format!("clips[{ci}].curves[{ki}]");

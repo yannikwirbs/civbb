@@ -64,6 +64,8 @@ fn humanoid(clips: Vec<Clip>, animator: Animator) -> Avatar {
         humanoid: Some(Humanoid {
             bones: bones.iter().enumerate().map(|(i, b)| (*b, i as u32 + 1)).collect(),
             viewpoint: [0.0; 3],
+            human_scale: 0.0,
+            center_of_mass: None,
             muscle_frames: bones
                 .iter()
                 .map(|&bone| MuscleFrame {
@@ -88,6 +90,7 @@ fn clip(curves: &[(&str, f32)]) -> Clip {
         name: "c".into(),
         length: 1.0,
         looping: true,
+        root: None,
         curves: curves
             .iter()
             .map(|(m, v)| Curve {

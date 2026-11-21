@@ -369,8 +369,36 @@ pub struct Clip {
     pub length: f32,
     /// Loop time.
     pub looping: bool,
+    /// How the body pose curves (`RootMotion`) reach the pose; `None` takes them as keyed (ADR 0063).
+    #[serde(default)]
+    pub root: Option<RootSettings>,
     /// Animated properties.
     pub curves: Vec<Curve>,
+}
+
+/// A humanoid clip's root-motion settings (Unity's `AnimationClipSettings`, ADR 0063). Avatars run with root motion
+/// discarded, so what is not baked into the pose is lost: the body pose plays relative to a root that follows the
+/// body (or, keeping the original, follows its change since the clip's start).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct RootSettings {
+    /// The body's yaw stays in the pose ("Root Transform Rotation: Bake Into Pose").
+    pub bake_orientation: bool,
+    /// The body's height stays in the pose.
+    pub bake_position_y: bool,
+    /// The body's horizontal position stays in the pose.
+    pub bake_position_xz: bool,
+    /// Rotation based upon the original (the clip's start) rather than the body orientation.
+    pub original_orientation: bool,
+    /// Height based upon the original rather than the centre of mass.
+    pub original_position_y: bool,
+    /// Horizontal position based upon the original rather than the centre of mass.
+    pub original_position_xz: bool,
+    /// Loop pose: the baked part of the pose blends towards the clip's start over each cycle.
+    pub loop_pose: bool,
+    /// Root rotation offset, degrees about +Y in the format's coordinates.
+    pub orientation_offset: f32,
+    /// Root height offset ("Root Transform Position (Y) Offset"), in body position units.
+    pub level: f32,
 }
 
 /// One animated property.

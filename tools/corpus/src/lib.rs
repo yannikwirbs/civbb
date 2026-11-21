@@ -376,6 +376,7 @@ fn toggle_clip(name: String, path: String, on: bool) -> Clip {
         name,
         length: 1.0 / 60.0,
         looping: false,
+        root: None,
         curves: vec![Curve {
             binding: Binding {
                 path,
@@ -404,6 +405,8 @@ pub fn generate(spec: &Spec) -> Avatar {
         bones: Vec::new(),
         viewpoint: [0.0, 1.55, 0.08],
         muscle_frames: Vec::new(),
+        human_scale: 0.0,
+        center_of_mass: None,
     };
     for (name, parent, offset, human) in SKELETON {
         let parent = if *parent == "Armature" {

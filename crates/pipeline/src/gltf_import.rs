@@ -156,10 +156,21 @@ pub fn import(
         avatar.expressions = s.expressions;
         avatar.face = s.face;
     }
-    civbb_format::validate(&avatar, &limits.caps, |id| im.blobs.contains_key(&id)).map_err(|errors| {
-        let list: Vec<String> = errors.iter().map(ToString::to_string).collect();
-        ImportError(format!("invalid result: {}", list.join("; ")))
-    })?;
+    let validate = |avatar: &Avatar| {
+        civbb_format::validate(avatar, &limits.caps, |id| im.blobs.contains_key(&id)).map_err(|errors| {
+            let list: Vec<String> = errors.iter().map(ToString::to_string).collect();
+            ImportError(format!("invalid result: {}", list.join("; ")))
+        })
+    };
+    validate(&avatar)?;
+    // Humanoids without Unity's muscle frames (glTF, VRM) get them derived from the rest pose (#53, ADR 0064).
+    if let Some(h) = avatar.humanoid.as_ref().filter(|h| h.muscle_frames.is_empty()) {
+        let frames = civbb_anim::frames::derive(&avatar.hierarchy, h);
+        if !frames.is_empty() {
+            avatar.humanoid.as_mut().expect("checked").muscle_frames = frames;
+            validate(&avatar)?;
+        }
+    }
     let mut seen = HashSet::new();
     im.warnings.retain(|w| seen.insert(w.clone()));
     Ok(Imported {

@@ -499,15 +499,29 @@ namespace Civbb.Exporter
                 }
             }
 
-            /// Writes `X_avatar`: humanoid map, muscle frames, and the descriptor's viewpoint and face if set.
+            /// Writes `X_avatar`: humanoid map, muscle frames, human scale (ADR 0063), and the descriptor's viewpoint and
+            /// face if set.
             public void Humanoid(Transform root)
             {
                 var animator = root.GetComponent<Animator>();
                 var entries = new List<string>();
                 var frames = new List<string>();
+                var scale = "";
                 if (animator != null && animator.avatar != null && animator.avatar.isHuman)
                 {
                     HumanBones(animator.avatar, entries, frames);
+                    // Unity's rest centre of mass in avatar space, mirrored (ADR 0063). `GetHumanPose` measures in world
+                    // space, so the root goes to the origin meanwhile (prefab roots sit anywhere in their scenes).
+                    var pose = new HumanPose();
+                    var (at, turn) = (root.position, root.rotation);
+                    root.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                    using (var handler = new HumanPoseHandler(animator.avatar, root))
+                    {
+                        handler.GetHumanPose(ref pose);
+                    }
+                    root.SetPositionAndRotation(at, turn);
+                    var com = pose.bodyPosition * animator.humanScale;
+                    scale = $",\"human_scale\":{Num(animator.humanScale)},\"center_of_mass\":{Nums(-com.x, com.y, com.z)}";
                 }
                 humanBones = entries.Count;
                 if (entries.Count == 0 && Viewpoint == null && Face == null)
@@ -517,7 +531,7 @@ namespace Civbb.Exporter
                 var viewpoint = Viewpoint != null ? $",\"viewpoint\":{Vec(Viewpoint.Value)}" : "";
                 var face = Face != null ? $",\"face\":{Face}" : "";
                 extensions["X_avatar"] = $"{{\"humanoid\":{{{string.Join(",", entries)}}}," +
-                    $"\"muscle_frames\":[{string.Join(",", frames)}]{viewpoint}{face}}}";
+                    $"\"muscle_frames\":[{string.Join(",", frames)}]{scale}{viewpoint}{face}}}";
             }
 
             void HumanBones(Avatar avatar, List<string> entries, List<string> frames)

@@ -77,6 +77,9 @@ namespace Civbb.Exporter
         static string hooked = "no animator";
         static Transform hips;
         static (Vector3, Quaternion) hipsRest;
+        /// Per playable layer, whether its descriptor mask passes the body pose, and its controller layers' masks.
+        static readonly List<(bool root, AvatarMask[] layers)> rootMasks = new List<(bool, AvatarMask[])>();
+        static readonly Dictionary<AnimationClip, bool> rootCurves = new Dictionary<AnimationClip, bool>();
 
         /// `-civbbAvatar <prefab asset path> -civbbOut <absolute directory holding rig.json>`: writes
         /// `<state>-<view>.png` there for every state and view of the hand-off.
@@ -141,9 +144,10 @@ namespace Civbb.Exporter
                     return;
                 }
                 late += frames > due ? 1 : 0;
-                if (hips != null)
+                if (hips != null && !PlaysBodyPose())
                 {
-                    // Our runtime does not apply the body pose yet (#52): the hips keep their rest transform.
+                    // No clip sets the body pose: our runtime keeps the hips at rest (ADR 0063), where Unity would sink
+                    // them to body position 0.
                     hips.localPosition = hipsRest.Item1;
                     hips.localRotation = hipsRest.Item2;
                 }
@@ -263,11 +267,14 @@ namespace Civbb.Exporter
                 graph.Connect(playable, 0, mixer, i);
                 mixer.SetInputWeight(i, layers[i].group == "Action" ? 0 : 1);
                 mixer.SetLayerAdditive((uint)i, layers[i].group == "Additive");
+                bool root = true;
                 if (vrc.Masks.TryGetValue(layers[i].group, out var mask) && mask != null)
                 {
                     mixer.SetLayerMaskFromAvatarMask((uint)i, mask);
                     masked++;
+                    root = mask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.Root);
                 }
+                rootMasks.Add((root, assets[i].layers.Select(l => l.avatarMask).ToArray()));
                 controllers.Add(playable);
                 groups.Add(layers[i].group);
             }
@@ -277,6 +284,47 @@ namespace Civbb.Exporter
                 SetParameter(p.name, p.value);
             }
             graph.Play();
+        }
+
+        /// Whether clips with body pose curves (`RootT`, `RootQ`) carry the full weight of some weighted layer whose
+        /// masks keep the Root part. Our runtime then places the hips from them (ADR 0063); where they blend with an
+        /// emptied SDK clip Unity takes body position 0 from it and sinks the avatar, while our runtime blends towards
+        /// the rest body pose, so the reference resets the hips to rest there as when no clip sets the body pose.
+        static bool PlaysBodyPose()
+        {
+            var mixer = graph.GetOutput(0).GetSourcePlayable();
+            for (int i = 0; i < controllers.Count; i++)
+            {
+                if (mixer.GetInputWeight(i) <= 0 || !rootMasks[i].root)
+                {
+                    continue;
+                }
+                var c = controllers[i];
+                for (int l = 0; l < c.GetLayerCount(); l++)
+                {
+                    var mask = l < rootMasks[i].layers.Length ? rootMasks[i].layers[l] : null;
+                    if ((l > 0 && c.GetLayerWeight(l) <= 0) || (mask != null && !mask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.Root)))
+                    {
+                        continue;
+                    }
+                    var infos = c.GetCurrentAnimatorClipInfo(l).Concat(c.GetNextAnimatorClipInfo(l)).ToList();
+                    if (infos.Count > 0 && infos.Where(ci => RootCurves(ci.clip)).Sum(ci => ci.weight) >= 0.999f * infos.Sum(ci => ci.weight))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        static bool RootCurves(AnimationClip clip)
+        {
+            if (!rootCurves.TryGetValue(clip, out bool has))
+            {
+                has = rootCurves[clip] = clip.humanMotion && AnimationUtility.GetCurveBindings(clip)
+                    .Any(b => b.propertyName.StartsWith("RootT.") || b.propertyName.StartsWith("RootQ."));
+            }
+            return has;
         }
 
         /// The controller with the SDK's clips (`proxy_*`, which VRChat replaces with its own animations) played as

@@ -24,7 +24,7 @@ pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the data model. Bump on any incompatible change to the types in this crate.
-pub const FORMAT_VERSION: u32 = 21;
+pub const FORMAT_VERSION: u32 = 22;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -55,6 +55,8 @@ pub(crate) mod testutil {
             humanoid: Some(Humanoid {
                 bones: vec![(HumanBone::Hips, 1)],
                 viewpoint: [0.0, 1.5, 0.1],
+                human_scale: 1.0,
+                center_of_mass: None,
                 muscle_frames: vec![MuscleFrame {
                     bone: HumanBone::Hips,
                     pre: [0.0, 0.0, 0.0, 1.0],
@@ -184,6 +186,7 @@ pub(crate) mod testutil {
                 name: "Toggle".into(),
                 length: 1.0 / 60.0,
                 looping: false,
+                root: None,
                 curves: vec![Curve {
                     binding: Binding {
                         path: "Body".into(),

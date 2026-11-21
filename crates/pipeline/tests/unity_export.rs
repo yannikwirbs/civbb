@@ -9,6 +9,7 @@ use std::path::Path;
 use civbb_anim::bind::node_paths;
 use civbb_anim::constraint::Scratch;
 use civbb_anim::{Constraints, Target, bind};
+use civbb_core::math::{self, world_poses};
 use civbb_format::Avatar;
 use civbb_format::hierarchy::HumanBone;
 use civbb_format::math::{Quat, Transform};
@@ -69,6 +70,9 @@ struct Worst {
     position: (f32, String),
     scale: (f32, String),
     shape: (f32, String),
+    /// The hips placed from the body pose, in world space (ADR 0063).
+    hips_rotation: (f32, String),
+    hips_position: (f32, String),
     compared: usize,
 }
 
@@ -150,6 +154,20 @@ fn clips(l: &Loaded, rec: &Recording) -> HashMap<String, Worst> {
                 locals[n as usize].rotation = q;
                 driven[n as usize] = true;
             }
+        }
+        // A clip with body pose curves places the hips (ADR 0063).
+        if let (Some(b), Some(body), Some(h)) = (&clip.body, &bound.body, hips) {
+            let pose: [f32; 7] = std::array::from_fn(|i| slots[b.slot as usize + i]);
+            body.place(pose, &mut locals);
+            let mut theirs = locals.clone();
+            theirs[h as usize] = mirrored(&s.locals[l.node.iter().position(|n| *n == Some(h as usize)).unwrap()]);
+            let parents: Vec<_> = a.hierarchy.nodes.iter().map(|n| n.parent).collect();
+            let ours = world_poses(&parents, math::Pose::IDENTITY, &locals)[h as usize];
+            let theirs = world_poses(&parents, math::Pose::IDENTITY, &theirs)[h as usize];
+            let at = || format!("{} t={}", s.clip, s.time);
+            let w = out.entry(s.clip.clone()).or_default();
+            Worst::note(&mut w.hips_rotation, angle(ours.rot, theirs.rot), at);
+            Worst::note(&mut w.hips_position, dist(ours.pos, theirs.pos), at);
         }
         let w = out.entry(s.clip.clone()).or_default();
         for (ri, n) in l.node.iter().enumerate() {
@@ -247,6 +265,12 @@ fn exported_avatars_match_unity() {
                 w.shape.1
             );
             // Unity's humanoid evaluation and ours agree to 0.1 degrees on recorded skeletons (ADR 0014).
+            if w.hips_position.0 > 0.0 {
+                eprintln!(
+                    "{name} {what}: hips rotation {:.3} deg, position {:.4} m ({})",
+                    w.hips_rotation.0, w.hips_position.0, w.hips_position.1
+                );
+            }
             if w.compared == 0 || w.rotation.0 > 0.1 || w.position.0 > 1e-4 || w.scale.0 > 1e-4 || w.shape.0 > 0.01 {
                 failures.push(format!("{name} {what}"));
             }
@@ -314,4 +338,63 @@ fn exported_standard_senders_sit_on_their_bones() {
         }
     }
     eprintln!("{checked} standard senders on their bones");
+}
+
+/// Muscle frames derived from the rest pose (ADR 0064) against the ones Unity built for each export: body and limbs
+/// within 2.5 degrees (exact on most), fingers within 8 (their spread follows the hand). Thumbs (#95) and eyes
+/// are reported, not checked, as are avatars whose Unity `Avatar` came from another pose than the prefab's rest
+/// (KohzieBoi, Megumi, Taro).
+#[test]
+fn derived_muscle_frames_match_unity_exports() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/local/unity-glb");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        eprintln!("corpus/local/unity-glb absent; skipped");
+        return;
+    };
+    let mut failures = Vec::new();
+    for path in entries.flatten().map(|e| e.path()) {
+        if path.extension().is_none_or(|e| e != "glb") {
+            continue;
+        }
+        let name = path.file_stem().unwrap().to_string_lossy().into_owned();
+        let bytes = std::fs::read(&path).unwrap();
+        let avatar = import(&bytes, &Limits::default(), |_| None).unwrap().avatar;
+        let Some(h) = &avatar.humanoid else { continue };
+        let derived = civbb_anim::frames::derive(&avatar.hierarchy, h);
+        let (mut worst, mut at) = (0.0f32, String::new());
+        for f in &h.muscle_frames {
+            let Some(d) = derived.iter().find(|d| d.bone == f.bone) else {
+                failures.push(format!("{name} {:?}: no derived frame", f.bone));
+                continue;
+            };
+            let e = angle(d.pre, f.pre).max(angle(d.post, f.post));
+            let bone = format!("{:?}", f.bone);
+            let finger = ["Proximal", "Intermediate", "Distal"].iter().any(|j| bone.ends_with(j));
+            let checked = !bone.contains("Thumb") && !bone.ends_with("Eye");
+            // Fingers get a wider bound: their spread follows the hand.
+            let e = if finger { e * 2.5 / 8.0 } else { e };
+            if e > 0.1 && std::env::var_os("CIVBB_FRAMES").is_some() {
+                eprintln!(
+                    "  {name} {:?}: pre {:.2} post {:.2}",
+                    f.bone,
+                    angle(d.pre, f.pre),
+                    angle(d.post, f.post)
+                );
+            }
+            if checked && e > worst {
+                (worst, at) = (e, format!("{:?}", f.bone));
+            }
+            if d.sign != f.sign {
+                failures.push(format!("{name} {:?}: sign {:?}, Unity {:?}", f.bone, d.sign, f.sign));
+            }
+        }
+        eprintln!(
+            "{name}: {} frames, worst {worst:.3} degrees ({at})",
+            h.muscle_frames.len()
+        );
+        if worst > 2.5 && !["KohzieBoi", "Megumi", "Taro"].contains(&name.as_str()) {
+            failures.push(format!("{name}: {at} off by {worst} degrees"));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:?}");
 }

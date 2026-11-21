@@ -19,6 +19,7 @@ fn keyed_clip(keys: &[(f32, f32)], length: f32, looping: bool, path: &str, prope
         name: String::new(),
         length,
         looping,
+        root: None,
         curves: vec![Curve {
             binding: Binding {
                 path: path.into(),

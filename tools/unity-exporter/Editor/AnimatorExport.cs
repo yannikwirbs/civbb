@@ -375,9 +375,15 @@ namespace Civbb.Exporter
                     list.Add($"{{\"binding\":{{\"path\":{Str(b.path)},\"property\":{slot}}},\"keys\":[{string.Join(",", keys)}]}}");
                     slotCurves++;
                 }
-                bool loop = AnimationUtility.GetAnimationClipSettings(clip).loopTime;
+                var settings = AnimationUtility.GetAnimationClipSettings(clip);
+                // A humanoid clip's root-motion settings (ADR 0063); the offset turns about our Y, mirrored.
+                var root = !clip.humanMotion ? "" : $",\"root\":{{\"bake_orientation\":{Bool(settings.loopBlendOrientation)}," +
+                    $"\"bake_position_y\":{Bool(settings.loopBlendPositionY)},\"bake_position_xz\":{Bool(settings.loopBlendPositionXZ)}," +
+                    $"\"original_orientation\":{Bool(settings.keepOriginalOrientation)},\"original_position_y\":{Bool(settings.keepOriginalPositionY)}," +
+                    $"\"original_position_xz\":{Bool(settings.keepOriginalPositionXZ)},\"loop_pose\":{Bool(settings.loopBlend)}," +
+                    $"\"orientation_offset\":{Num(-settings.orientationOffsetY)},\"level\":{Num(settings.level)}}}";
                 clipIndex[clip] = clips.Count;
-                clips.Add($"{{\"name\":{Str(clip.name)},\"length\":{Num(clip.length)},\"looping\":{Bool(loop)},\"curves\":[{string.Join(",", list)}]}}");
+                clips.Add($"{{\"name\":{Str(clip.name)},\"length\":{Num(clip.length)},\"looping\":{Bool(settings.loopTime)}{root},\"curves\":[{string.Join(",", list)}]}}");
                 return clips.Count - 1;
             }
 

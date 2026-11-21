@@ -20,9 +20,13 @@ public static class BodyPose
             var outPath = args[Array.IndexOf(args, "-civbbOut") + 1];
             var s = new StringBuilder("{\n  \"unity\": \"" + Application.unityVersion + "\",\n  \"skeletons\": [");
             bool first = true;
-            foreach (var rolled in new[] { false, true })
+            // Plain, rolled, and plain with optional bones left unmapped (kept as nodes) as corpus avatars do: no
+            // upper chest (9 of 13 exports), and no upper chest or toes (4).
+            var noChest = new[] { "UpperChest" };
+            var noChestToes = new[] { "UpperChest", "LeftToes", "RightToes" };
+            foreach (var (rolled, unmapped) in new[] { (false, new string[0]), (true, new string[0]), (false, noChest), (false, noChestToes) })
             {
-                s.Append(first ? "\n    " : ",\n    ").Append(Skeleton(rolled));
+                s.Append(first ? "\n    " : ",\n    ").Append(Skeleton(rolled, unmapped));
                 first = false;
             }
             File.WriteAllText(outPath, s.Append("\n  ]\n}\n").ToString());
@@ -35,14 +39,15 @@ public static class BodyPose
         EditorApplication.Exit(0);
     }
 
-    static string Skeleton(bool rolled)
+    static string Skeleton(bool rolled, string[] unmapped)
     {
         var root = new GameObject("Avatar");
-        var avatar = Muscles.BuildAvatar(root, rolled, new[] { 0.5f, 0.5f, 0.5f, 0.5f }, out var nodes, out _);
+        var avatar = Muscles.BuildAvatar(root, rolled, new[] { 0.5f, 0.5f, 0.5f, 0.5f }, out var nodes, out _, unmapped);
         var animator = root.AddComponent<Animator>();
         animator.avatar = avatar;
         var handler = new HumanPoseHandler(avatar, root.transform);
-        var s = new StringBuilder("{\"rolled\": " + (rolled ? "true" : "false") + ", \"human_scale\": " + F(animator.humanScale) + ", \"nodes\": [");
+        var s = new StringBuilder("{\"rolled\": " + (rolled ? "true" : "false") + ", \"unmapped\": [" +
+            string.Join(", ", unmapped.Select(u => "\"" + u + "\"")) + "], \"human_scale\": " + F(animator.humanScale) + ", \"nodes\": [");
         for (int i = 0; i < nodes.Count; i++)
         {
             s.Append(i == 0 ? "" : ", ").Append("{\"name\": \"").Append(nodes[i].name).Append("\", \"parent\": ")

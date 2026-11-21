@@ -43,15 +43,23 @@ What exists, by area. Read the section for the area you touch; update it when th
   than its inside capsule flips sides on float noise, #90). Inside capsules keep the tip within capsule radius minus
   bone radius, unclamped (negative puts it on the far side of the core). A bone's collision radius scales with its
   own node's world scale (an endpoint's with its leaf), recorded with scaled bones against unscaled colliders (#90).
-- The muscle rig leaves the hips to the body pose (#52); real muscle frames had turned Yumeka over.
-  `civbb_anim::body` has Unity's body pose as recorded (`BodyPose.cs`, #52): centre of mass from Unity's internal
-  mass table at segment midpoints (within 6 mm; `humanScale` is the T-pose's centre-of-mass height), orientation from
-  the upper legs' and arms' midpoints and left-to-right vectors (within 0.35 degrees). Not yet used to place the hips.
+- The body pose (#52, ADR 0063, format v22): the exporter writes `Animator.humanScale` and every humanoid clip's
+  root-motion settings (`Clip::root`). `civbb_anim::body` has Unity's body pose as recorded (`BodyPose.cs`): centre of
+  mass from Unity's mass table at segment midpoints (within 5 mm; 7 mm without upper chest, whose mass then sits
+  three quarters up the chest-to-neck segment), orientation from the upper legs' and arms' midpoints and left-to-right
+  vectors (0.33 degrees); `RootMotion` applies the bake/original/loop-pose/offset settings with root motion discarded
+  (exact against `RootMotion.cs`'s 516 cases); `BodyRig::place` puts the hips (within 5 mm) when a layer wrote a body
+  slot, which follows the mask's Root part; otherwise the hips stay at rest. The mass model is anchored to Unity's rest
+  centre of mass (`Humanoid::center_of_mass`, exported): hips within 2 to 4 mm of Unity's on recorded clips (#96).
+- Muscle frames for glTF/VRM humanoids (#53, ADR 0064): `civbb_anim::frames::derive` builds Unity's frames from the
+  rest pose (post X along the bone, roll from a fixed avatar axis, pre = a fixed avatar-space turn of the post frame;
+  `MuscleFrames.cs` variants within 0.0002 degrees); the importer derives them when a humanoid has none. On the
+  T-posed exports body and limbs match, fingers within 8 degrees, thumbs 10 to 28 off (#95).
 - Reference renders (#79, ADR 0048): the host project has lilToon 2.4.1 (embedded package), Poiyomi 7.3.050 and
   UTS2 2.0.9 (unpacked into `Assets/`, GUIDs kept), so all 13 exports render with their shaders.
   `Civbb.Exporter.Reference.Render` (`tools/unity-exporter/Editor/Reference.cs`, `tools/unity-batch.sh --graphics`)
   renders a prefab with a `civbb-client rig` hand-off's rig, light and states in play mode, the playable layers
-  run as our runtime runs them (SDK proxy clips empty, humanoid only with muscle clips, hips at rest until #52,
+  run as our runtime runs them (SDK proxy clips empty, humanoid only with muscle clips, hips at rest when no playing clip has body curves (ADR 0063),
   descriptor masks applied, shader time pinned to 0, ADR 0062). It logs every state's layers (mixer and clip weights) and muscles (`CIVBB <state>`), and runs the SDK's
   parameter drivers and layer controls through their client hooks (ADR 0056). Not yet part of an
   export or `civbb build --report` (`unity_parity`).

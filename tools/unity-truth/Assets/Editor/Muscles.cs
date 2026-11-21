@@ -107,7 +107,7 @@ public static class Muscles
 
     // Builds the test skeleton under `root` and its humanoid avatar. `twist` is upper arm, lower arm, upper leg,
     // lower leg twist.
-    internal static Avatar BuildAvatar(GameObject root, bool rolled, float[] twist, out List<Transform> nodes, out Dictionary<string, Transform> byName)
+    internal static Avatar BuildAvatar(GameObject root, bool rolled, float[] twist, out List<Transform> nodes, out Dictionary<string, Transform> byName, ICollection<string> unmapped = null, Action<Dictionary<string, Transform>> tweak = null)
     {
         var all = new List<Transform> { root.transform };
         var named = new Dictionary<string, Transform>();
@@ -125,6 +125,7 @@ public static class Muscles
             Add(bone, parent, pos);
         foreach (var (bone, parent, pos) in Left)
             Add(bone.Replace("Left", "Right"), parent.Replace("Left", "Right"), new Vector3(-pos.x, pos.y, pos.z));
+        tweak?.Invoke(named);
         if (rolled)
         {
             // Same world positions, arbitrary bone orientations, as in rigs exported from DCC tools.
@@ -145,7 +146,7 @@ public static class Muscles
         for (int b = 0; b < HumanTrait.BoneCount; b++)
         {
             var name = HumanTrait.BoneName[b].Replace(" ", "");
-            if (named.ContainsKey(name))
+            if (named.ContainsKey(name) && (unmapped == null || !unmapped.Contains(name)))
                 human.Add(new HumanBone { humanName = HumanTrait.BoneName[b], boneName = name, limit = new HumanLimit { useDefaultValues = true } });
         }
         var skeleton = new List<SkeletonBone>();

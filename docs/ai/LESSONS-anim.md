@@ -46,3 +46,7 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   members named `*Mass*` found `HumanTrait.GetBoneDefaultHierarchyMass`): free least-squares weights over rigidly
   linked bones are degenerate (hips, spine and upper legs fitted -224, 75, 75) and do not generalise. Then fit the
   structure (where each mass sits, which points span a frame) against cases that move one muscle group at a time.
+- A rotation blend whose axis is right but whose angle grows faster than linear in the weight is Unity's
+  `normalize(w * q.xyz, q.w)` (loop pose, ADR 0063), not slerp or nlerp: compare `2 atan(w tan(a/2))`.
+- Before modelling a missing-bone case, check which bones the corpus actually lacks (13 exports: UpperChest in 9,
+  toes in 4, never neck or shoulders) and record exactly those skeletons.

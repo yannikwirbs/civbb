@@ -267,6 +267,7 @@ fn source_extensions_map_nodes_and_clips() {
         name: "X".into(),
         length: 0.0,
         looping: false,
+        root: None,
         curves: Vec::new(),
     };
     let constraint = Constraint {

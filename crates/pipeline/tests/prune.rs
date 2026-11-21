@@ -92,6 +92,7 @@ fn avatar() -> Avatar {
             name: "c".into(),
             length: 1.0,
             looping: false,
+            root: None,
             curves: [
                 ("Toggle", Property::Active),
                 ("Body", Property::BlendShape("Smile".into())),

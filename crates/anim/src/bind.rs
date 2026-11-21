@@ -10,7 +10,8 @@ use civbb_format::mesh::MeshIndex;
 
 use civbb_core::math::quat_to_euler;
 
-use crate::clip::{BoundClip, BoundCurve, EulerCurves};
+use crate::body::{BodyRig, RootMotion};
+use crate::clip::{BodyCurves, BoundClip, BoundCurve, EulerCurves};
 use crate::material::{self, Field};
 use crate::muscle::{self, MUSCLES, Rig};
 
@@ -43,6 +44,8 @@ pub enum Target {
     MaterialSlot(MeshIndex, u8),
     /// A field of a constraint, by index into [`Avatar::constraints`] (ADR 0040).
     Constraint(u32, ConstraintField),
+    /// Humanoid body pose: position (0..3, `RootT`) or rotation (3..7, `RootQ`) component (ADR 0063).
+    Body(u8),
 }
 
 /// Every slot of an avatar: what it drives and its default (the Write Defaults value).
@@ -88,6 +91,9 @@ pub struct Bound {
     pub unbound: Vec<Unbound>,
     /// The humanoid's muscle frames; `None` without them, and then muscle curves are unbound.
     pub rig: Option<Rig>,
+    /// Places the hips from the body pose; `None` without hips, upper arms and upper legs, and then body pose
+    /// curves are unbound.
+    pub body: Option<BodyRig>,
 }
 
 /// Unity-style binding path of every node: names below the root joined by `/`; the root's is empty.
@@ -130,6 +136,7 @@ pub fn bind(avatar: &Avatar) -> Bound {
         clips,
         unbound: b.unbound,
         rig: b.rig,
+        body: b.body,
     }
 }
 
@@ -151,6 +158,7 @@ struct Binder<'a> {
     meshes: HashMap<NodeIndex, Vec<MeshIndex>>,
     params: HashMap<&'a str, ParamIndex>,
     rig: Option<Rig>,
+    body: Option<BodyRig>,
     slots: HashMap<Target, Slot>,
     targets: Vec<Target>,
     defaults: Vec<f32>,
@@ -182,12 +190,17 @@ impl<'a> Binder<'a> {
         }
         let rest = |n: NodeIndex| avatar.hierarchy.nodes[n as usize].rest.rotation;
         let rig = avatar.humanoid.as_ref().and_then(|h| Rig::new(h, rest));
+        let body = avatar
+            .humanoid
+            .as_ref()
+            .and_then(|h| BodyRig::new(&avatar.hierarchy, h));
         Self {
             avatar,
             nodes,
             meshes,
             params,
             rig,
+            body,
             slots: HashMap::new(),
             targets: Vec::new(),
             defaults: Vec::new(),
@@ -204,6 +217,7 @@ impl<'a> Binder<'a> {
             ..BoundClip::default()
         };
         let mut rotations: Vec<(NodeIndex, NodeRotation)> = Vec::new();
+        let mut body: [Option<&[Key]>; 7] = [None; 7];
         let mut seen = HashSet::new();
         let mut skipped: Vec<(u32, &'static str)> = Vec::new();
         for (ki, curve) in clip.curves.iter().enumerate() {
@@ -233,6 +247,15 @@ impl<'a> Binder<'a> {
                     }
                     continue;
                 }
+                Ok(Resolved::Target(Target::Body(i))) => {
+                    let slot = &mut body[i as usize];
+                    if slot.is_some() {
+                        skipped.push((ki, "duplicate binding"));
+                    } else {
+                        *slot = Some(&curve.keys);
+                    }
+                    continue;
+                }
                 Ok(Resolved::Target(t)) => t,
                 Err(reason) => {
                     skipped.push((ki, reason));
@@ -256,17 +279,17 @@ impl<'a> Binder<'a> {
                 reason,
             });
         }
+        let constant = |value: f32| {
+            vec![Key {
+                time: 0.0,
+                value,
+                in_tangent: 0.0,
+                out_tangent: 0.0,
+            }]
+        };
         for (node, r) in rotations {
             let first = self.rotation_slots(node);
             let rest = avatar.hierarchy.nodes[node as usize].rest.rotation;
-            let constant = |value: f32| {
-                vec![Key {
-                    time: 0.0,
-                    value,
-                    in_tangent: 0.0,
-                    out_tangent: 0.0,
-                }]
-            };
             if r.quat.iter().any(Option::is_some) {
                 // Quaternion curves win over Euler ones on the same node; missing components hold the rest value.
                 for &ki in &r.euler_curves {
@@ -291,8 +314,23 @@ impl<'a> Binder<'a> {
                 });
             }
         }
+        if body.iter().any(Option::is_some) {
+            let slot = self.slot(Target::Body(0));
+            for i in 1..7 {
+                self.slot(Target::Body(i));
+            }
+            let axes: [Vec<Key>; 7] = std::array::from_fn(|i| {
+                body[i].map_or_else(|| constant(if i == 6 { 1.0 } else { 0.0 }), <[Key]>::to_vec)
+            });
+            let mut b = BodyCurves { slot, axes, root: None };
+            b.root = clip
+                .root
+                .map(|r| RootMotion::new(r, b.eval(0.0), b.eval(clip.length), clip.looping));
+            out.body = Some(b);
+        }
         out.slots = out.curves.iter().map(|c| c.slot).collect();
         out.slots.extend(out.eulers.iter().flat_map(|e| e.slot..e.slot + 4));
+        out.slots.extend(out.body.iter().flat_map(|b| b.slot..b.slot + 7));
         out.slots.sort_unstable();
         out
     }
@@ -337,7 +375,12 @@ impl<'a> Binder<'a> {
                     })
                     .ok_or("no such blendshape")?
             }
-            Property::RootMotion(_) => return Err("body pose curves not supported yet (#52)"),
+            Property::RootMotion(i) => {
+                self.body
+                    .as_ref()
+                    .ok_or("no humanoid with hips, upper arms and upper legs")?;
+                Target::Body(*i)
+            }
             Property::Material(name) => {
                 let (field, component) = material::parse(name).ok_or("unknown material property")?;
                 let &mesh = on_node.first().ok_or("no mesh at path")?;
@@ -393,6 +436,8 @@ impl<'a> Binder<'a> {
             Target::Parameter(p) => a.animator.as_ref().expect("bound").parameters[p as usize].default,
             // Unity's default human pose is every muscle at 0, not the rest pose (#86, recorded at rest).
             Target::Muscle(_) => 0.0,
+            // The rest pose's body: hips that are not animated stay where they rest (ADR 0063).
+            Target::Body(i) => self.body.as_ref().expect("bound").rest[i as usize],
             Target::Material(m, f, c) => renderer_default(a, m, f).expect("bound")[c as usize],
             Target::MaterialSlot(m, s) => a.meshes[m as usize].submeshes[s as usize].material as f32,
             Target::Constraint(i, field) => {

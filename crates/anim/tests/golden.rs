@@ -176,6 +176,7 @@ impl Case {
                 name: name.clone(),
                 length: c.length,
                 looping: c.looping,
+                root: None,
                 curves: c.curves.iter().map(|(target, keys)| curve(target, keys)).collect(),
             })
             .collect();

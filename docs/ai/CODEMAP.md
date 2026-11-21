@@ -16,6 +16,7 @@ Internal deps: civbb-core, civbb-format
 - `src/constraint.rs`: Constraints: ordered by dependency once when compiled, then evaluated in one pass over the local pose (ADR 0018).
 - `src/controller.rs`: A compiled animator controller and one running instance of it: parameters, layers, the evaluated pose.
 - `src/curve.rs`: Evaluates a curve of Hermite keys with Unity `AnimationCurve` semantics (ADR 0007).
+- `src/frames.rs`: Unity's muscle frames derived from a humanoid's rest pose (#53, ADR 0064), for sources that carry none (glTF,
 - `src/lib.rs`: Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles and constraints (design
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
 - `src/material.rs`: Animated material properties: Unity shader property names mapped to native material fields, read and written in
@@ -33,6 +34,8 @@ Internal deps: civbb-core, civbb-format
 - `tests/material.rs`: Material curves (ADR 0025): Unity property names to native fields, Unity's units (sRGB colours, smoothness, V-up
 - `tests/mirror.rs`: Humanoid mirroring (ADR 0060): the muscle map against Unity's recording (`tools/unity-truth/Assets/Editor/Mirror.cs`
 - `tests/muscle.rs`: Humanoid muscles (ADR 0014): the table against Unity's, hand-derived muscle space, poses recorded from Unity's
+- `tests/muscle_frames.rs`: Muscle frames derived from a rest pose against Unity's `AvatarBuilder` (#53, ADR 0064): the generated humanoid
+- `tests/root_motion.rs`: A humanoid clip's root-motion settings against Unity (#52, ADR 0063): one clip whose body pose moves and turns,
 - `tests/vrc_constraint.rs`: VRChat constraint options (ADR 0040, 0046): every case recorded from the VRChat SDK's own constraint runtime
 
 ## `crates/client` (civbb-client)
@@ -250,6 +253,8 @@ Internal deps: none
 - `docs/adr/0060-humanoid-mirroring.md`: 0060: Humanoid mirroring
 - `docs/adr/0061-standard-colliders-as-senders.md`: 0061: The descriptor's standard colliders export as body-part contact senders
 - `docs/adr/0062-hdr-colours-as-saved-and-reference-time-zero.md`: 0062: `[HDR]` colours as saved, and reference renders at shader time 0
+- `docs/adr/0063-humanoid-body-pose.md`: 0063: The humanoid body pose, clips' root-motion settings, and hips at rest without one
+- `docs/adr/0064-derived-muscle-frames.md`: 0064: Muscle frames derived from the rest pose for glTF and VRM humanoids
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

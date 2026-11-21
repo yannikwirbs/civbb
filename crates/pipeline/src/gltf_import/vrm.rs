@@ -686,6 +686,7 @@ impl Importer<'_> {
                 name: name.clone(),
                 length: 1.0 / 60.0,
                 looping: false,
+                root: None,
                 curves,
             });
             params.push(Parameter {

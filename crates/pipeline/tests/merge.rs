@@ -137,6 +137,7 @@ fn avatar() -> Avatar {
             name: "c".into(),
             length: 1.0,
             looping: false,
+            root: None,
             curves: vec![
                 curve("Toggle", Property::Active),
                 curve("Toggle/ShirtB", Property::BlendShape("Fold".into())),

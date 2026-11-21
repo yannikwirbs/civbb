@@ -42,6 +42,12 @@ struct XAvatar {
     /// (ADR 0042).
     #[serde(default)]
     face: Option<Face>,
+    /// Unity's `Animator.humanScale` (ADR 0063).
+    #[serde(default)]
+    human_scale: f32,
+    /// Unity's rest centre of mass (ADR 0063).
+    #[serde(default)]
+    center_of_mass: Option<[f32; 3]>,
 }
 
 #[derive(Deserialize)]
@@ -151,6 +157,8 @@ impl Importer<'_> {
         }
         h.bones.sort_unstable_by_key(|&(b, _)| b);
         h.muscle_frames = x.muscle_frames;
+        h.human_scale = x.human_scale;
+        h.center_of_mass = x.center_of_mass;
         h.viewpoint = match (x.viewpoint, h.node(HumanBone::Head)) {
             (Some(v), _) => v,
             (None, Some(head)) => {
