@@ -1,5 +1,5 @@
 {
-  "source": "Hand-derived. VRC School, Write Defaults: with WD off, returning to an empty state leaves the hat on.",
+  "source": "Recorded in Unity (tests/unity/goldens.json, #54); first hand-derived. VRC School, Write Defaults: with WD off, returning to an empty state leaves the hat on.",
   "nodes": [
     {
       "name": "Hat",

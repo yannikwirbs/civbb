@@ -31,6 +31,12 @@ A minimal Unity project that records Unity's behaviour as JSON test data (ADR 00
   `GetHumanPose` of the result. Runs in this project:
   `tools/unity-batch.sh tools/unity-truth BodyPose.Record -civbbOut <abs path>/crates/anim/tests/unity/body_pose.json`;
   `crates/anim/tests/body_pose.rs` replays it.
+- `Assets/Editor/Goldens.cs`: the animator golden cases (#54, ADR 0065): builds each `crates/anim/tests/golden/*.json`
+  controller with the AnimatorController API, plays its frames (parameters set, then one evaluation of `dt`) and
+  records every expected value and current state.
+  `tools/unity-batch.sh tools/unity-truth Goldens.Record -civbbCases <abs path>/crates/anim/tests/golden -civbbOut <abs path>/crates/anim/tests/unity/goldens.json`;
+  `crates/anim/tests/golden.rs` checks the cases' expectations against it. It needs no SDK, so it also runs in the SDK
+  host project (2022.3) unchanged.
 - `Assets/Editor/MuscleFrames.cs`: the muscle frames Unity's `AvatarBuilder` derives (#53, ADR 0064) on the generated
   humanoid reshaped one way at a time (rolled axes, sloped shoulders, A-pose, arms forward, bent elbows, curved spine,
   legs apart, bent hands, curled fingers, turned feet, tilted hips, turned head): each mapped bone's pre, post and

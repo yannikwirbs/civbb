@@ -255,6 +255,7 @@ Internal deps: none
 - `docs/adr/0062-hdr-colours-as-saved-and-reference-time-zero.md`: 0062: `[HDR]` colours as saved, and reference renders at shader time 0
 - `docs/adr/0063-humanoid-body-pose.md`: 0063: The humanoid body pose, clips' root-motion settings, and hips at rest without one
 - `docs/adr/0064-derived-muscle-frames.md`: 0064: Muscle frames derived from the rest pose for glTF and VRM humanoids
+- `docs/adr/0065-animator-goldens-from-unity.md`: 0065: Animator golden cases recorded in Unity
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

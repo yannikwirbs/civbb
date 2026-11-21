@@ -50,3 +50,7 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   `normalize(w * q.xyz, q.w)` (loop pose, ADR 0063), not slerp or nlerp: compare `2 atan(w tan(a/2))`.
 - Before modelling a missing-bone case, check which bones the corpus actually lacks (13 exports: UpperChest in 9,
   toes in 4, never neck or shoulders) and record exactly those skeletons.
+- Community Write Defaults rules are about empty *clips*: a WD-on state with no motion at all writes nothing in
+  Unity (2022.3 and 6000.3, ADR 0065). Record a rule in `Goldens.cs` (a JSON case, 5 s run) before building on it.
+- Changing when the first update advances shifts every frame-counting test by one frame: count from the recorded
+  time, not from "enter" frames, and rerun `collapse.rs` (the collapsed toggle layer mirrors first-frame semantics).

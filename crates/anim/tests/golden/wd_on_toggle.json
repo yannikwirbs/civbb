@@ -1,5 +1,5 @@
 {
-  "source": "Hand-derived. VRC School, Write Defaults: with WD on, returning to an empty state turns an off-by-default hat off again.",
+  "source": "Recorded in Unity (tests/unity/goldens.json, #54). VRC School says WD on resets when returning to an empty state; Unity does not: a state without a motion writes nothing, so the hat stays on (an empty clip does reset, wd_on_toggle_empty_clip).",
   "nodes": [{ "name": "Hat", "active": false }],
   "params": [{ "name": "p", "kind": "Bool", "default": 0 }],
   "clips": { "HatOn": { "length": 1, "curves": [["Hat.active", [[0, 1]]]] } },
@@ -14,6 +14,6 @@
   "frames": [
     { "expect": { "Toggle": "Off", "Hat.active": 0 } },
     { "set": { "p": 1 }, "expect": { "Toggle": "On", "Hat.active": 1 } },
-    { "set": { "p": 0 }, "expect": { "Toggle": "Off", "Hat.active": 0 } }
+    { "set": { "p": 0 }, "expect": { "Toggle": "Off", "Hat.active": 1 } }
   ]
 }

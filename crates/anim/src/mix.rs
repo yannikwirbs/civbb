@@ -4,7 +4,7 @@ use civbb_format::animator::{LayerBlending, State};
 use civbb_format::math::Quat;
 
 use crate::bind::Slot;
-use crate::controller::Controller;
+use crate::controller::{Controller, writes_defaults};
 use crate::machine::{From, LayerRun, Playing};
 use crate::motion::{self, Leaf};
 use civbb_core::math::{conj, mul, qnormalize};
@@ -73,8 +73,8 @@ impl Mixer {
             }
             let wd = match src {
                 // A snapshot keeps the Write Defaults of the state it was taken in.
-                Src::Snapshot => states[run.current as usize].write_defaults,
-                Src::State(p) => states[p.state as usize].write_defaults,
+                Src::Snapshot => writes_defaults(&states[run.current as usize]),
+                Src::State(p) => writes_defaults(&states[p.state as usize]),
             };
             let hold = if wd || additive { 0.0 } else { ws };
             match src {

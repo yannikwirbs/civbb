@@ -1,0 +1,21 @@
+{
+  "source": "Recorded in Unity (Goldens.cs): a 1D blend tree with thresholds -1, 0 and 2 over clips setting A.x to 1, B.x to 1 and C.x to 1, the parameter swept.",
+  "nodes": [{ "name": "A" }, { "name": "B" }, { "name": "C" }],
+  "params": [{ "name": "t", "kind": "Float", "default": 0 }],
+  "clips": {
+    "A1": { "length": 1, "curves": [["A.x", [[0, 1]]]] },
+    "B1": { "length": 1, "curves": [["B.x", [[0, 1]]]] },
+    "C1": { "length": 1, "curves": [["C.x", [[0, 1]]]] }
+  },
+  "layers": [{
+    "name": "L",
+    "states": [{ "name": "Tree", "motion": { "simple1d": ["t", [[-1, "A1"], [0, "B1"], [2, "C1"]]] }, "wd": true }]
+  }],
+  "dt": 0.1,
+  "frames": [
+    { "set": { "t": -2 }, "expect": { "A.x": 1, "B.x": 0, "C.x": 0 } },
+    { "set": { "t": -0.25 }, "expect": { "A.x": 0.25, "B.x": 0.75, "C.x": 0 } },
+    { "set": { "t": 0.5 }, "expect": { "A.x": 0, "B.x": 0.75, "C.x": 0.25 } },
+    { "set": { "t": 3 }, "expect": { "A.x": 0, "B.x": 0, "C.x": 1 } }
+  ]
+}

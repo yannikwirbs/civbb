@@ -1,5 +1,5 @@
 {
-  "source": "Hand-derived from ADR 0010: the same cross-fade with WD off: properties the other state lacks hold their incoming value, so A.x stays 1.",
+  "source": "Recorded in Unity (tests/unity/goldens.json, #54); first hand-derived from ADR 0010: the same cross-fade with WD off: properties the other state lacks hold their incoming value, so A.x stays 1.",
   "nodes": [
     {
       "name": "A"

@@ -1,0 +1,19 @@
+{
+  "source": "Recorded in Unity (Goldens.cs): wd_on_toggle with an empty clip in the off state instead of no motion.",
+  "nodes": [{ "name": "Hat", "active": false }],
+  "params": [{ "name": "p", "kind": "Bool", "default": 0 }],
+  "clips": { "Empty": { "length": 1, "curves": [] }, "HatOn": { "length": 1, "curves": [["Hat.active", [[0, 1]]]] } },
+  "layers": [{
+    "name": "Toggle",
+    "states": [
+      { "name": "Off", "motion": { "clip": "Empty" }, "wd": true, "transitions": [{ "to": "On", "if": ["p"] }] },
+      { "name": "On", "motion": { "clip": "HatOn" }, "wd": true, "transitions": [{ "to": "Off", "if_not": ["p"] }] }
+    ]
+  }],
+  "dt": 0.1,
+  "frames": [
+    { "expect": { "Toggle": "Off", "Hat.active": 0 } },
+    { "set": { "p": 1 }, "expect": { "Toggle": "On", "Hat.active": 1 } },
+    { "set": { "p": 0 }, "expect": { "Toggle": "Off", "Hat.active": 0 } }
+  ]
+}

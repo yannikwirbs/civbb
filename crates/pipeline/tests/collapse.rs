@@ -48,7 +48,7 @@ fn corpus_toggle_layers_collapse_into_one() {
         .map(|s| s.name.as_str())
         .collect();
     // Every state was a toggle's, with Write Defaults off: `Hold` keeps frames starting from the last pose.
-    assert_eq!(states, ["Start", "Toggles", "Hold"]);
+    assert_eq!(states, ["Toggles", "Hold"]);
     assert_eq!(an.parameters.last().unwrap().name, "civbb/One");
     let mut again = a.clone();
     assert_eq!(collapse(&mut again), 0);

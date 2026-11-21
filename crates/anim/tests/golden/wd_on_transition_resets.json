@@ -1,5 +1,5 @@
 {
-  "source": "Hand-derived from ADR 0010: a 1 s cross-fade from a state animating A.x = 1 to one animating B.x = 1. WD on: properties the other state lacks blend with their default 0.",
+  "source": "Recorded in Unity (tests/unity/goldens.json, #54); first hand-derived from ADR 0010: a 1 s cross-fade from a state animating A.x = 1 to one animating B.x = 1. WD on: properties the other state lacks blend with their default 0.",
   "nodes": [{ "name": "A" }, { "name": "B" }],
   "params": [{ "name": "p", "kind": "Bool", "default": 0 }],
   "clips": {

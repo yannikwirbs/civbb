@@ -1,5 +1,5 @@
 {
-  "source": "Hand-derived. VRC School, Write Defaults: a WD-off direct blend tree child at weight x, with siblings weighing S that do not animate the property, converges to x / (1 - S) of its value: P' = x * 1 + S * P.",
+  "source": "Recorded in Unity (tests/unity/goldens.json, #54); first hand-derived. VRC School, Write Defaults: a WD-off direct blend tree child at weight x, with siblings weighing S that do not animate the property, converges to x / (1 - S) of its value: P' = x * 1 + S * P.",
   "nodes": [{ "name": "A" }, { "name": "B" }],
   "params": [
     { "name": "x", "kind": "Float", "default": 0.5 },

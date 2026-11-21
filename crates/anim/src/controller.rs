@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
-use civbb_format::animator::{Animator, Behaviour, BodyPart, ParamIndex, TrackingMode};
+use civbb_format::animator::{Animator, Behaviour, BodyPart, ParamIndex, State, TrackingMode};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform};
 
@@ -111,7 +111,7 @@ impl Controller {
             .layers
             .iter()
             .flat_map(|l| &l.state_machine.states)
-            .any(|s| !s.write_defaults);
+            .any(|s| !writes_defaults(s));
         let muscles = (0..bound.bindings.targets.len())
             .filter(|&s| matches!(bound.bindings.targets[s], Target::Muscle(_)))
             .collect();
@@ -308,19 +308,25 @@ impl Instance {
                 clips: &c.bound.clips,
                 decls: &c.animator.parameters,
             };
-            let entered = match &mut self.runs[li] {
-                Some(run) => {
-                    run.advance(&ctx, &self.params, dt);
-                    run.select(&ctx, &self.params).map(|t| {
-                        let snapshot = run.active.is_some().then(|| {
-                            self.mixer.layer(c, li, run, &self.params, &self.pose);
-                            self.mixer.snapshot()
-                        });
-                        run.fire(&ctx, &mut self.params, t, snapshot)
-                    })
-                }
-                slot @ None => Some(slot.insert(LayerRun::start(&ctx, &mut self.params)).current),
-            };
+            // The first update enters the start state and then advances like any other (recorded, #54).
+            let started = self.runs[li].is_none().then(|| {
+                let run = LayerRun::start(&ctx, &mut self.params);
+                let s = run.current;
+                self.runs[li] = Some(run);
+                s
+            });
+            if let Some(s) = started {
+                self.behave(c, &layer.state_machine.states[s as usize].behaviours);
+            }
+            let run = self.runs[li].as_mut().expect("started above");
+            run.advance(&ctx, &self.params, dt);
+            let entered = run.select(&ctx, &self.params).map(|t| {
+                let snapshot = run.active.is_some().then(|| {
+                    self.mixer.layer(c, li, run, &self.params, &self.pose);
+                    self.mixer.snapshot()
+                });
+                run.fire(&ctx, &mut self.params, t, snapshot)
+            });
             if let Some(s) = entered {
                 self.behave(c, &layer.state_machine.states[s as usize].behaviours);
             }
@@ -403,4 +409,10 @@ impl Instance {
         }
         self.blends.retain(|b| b.elapsed < b.duration);
     }
+}
+
+/// Whether a state writes defaults: Write Defaults on and a motion. Unity's states without a motion write nothing,
+/// so they hold like Write Defaults off (recorded in Unity 2022.3 and 6000.3, #54).
+pub(crate) fn writes_defaults(s: &State) -> bool {
+    s.write_defaults && s.motion.is_some()
 }

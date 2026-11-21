@@ -1,5 +1,5 @@
 {
-  "source": "Hand-derived. VRCFury, Write Default Bugs, 'Mixed Write Defaults', and VRC School: one WD-off state makes the controller behave as WD off, so a WD-on empty state no longer resets the hat.",
+  "source": "Recorded in Unity (tests/unity/goldens.json, #54); first hand-derived. VRCFury, Write Default Bugs, 'Mixed Write Defaults', and VRC School: one WD-off state makes the controller behave as WD off, so a WD-on empty state no longer resets the hat.",
   "nodes": [{ "name": "Hat", "active": false }, { "name": "B" }],
   "params": [{ "name": "p", "kind": "Bool", "default": 0 }],
   "clips": {

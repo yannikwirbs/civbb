@@ -1,8 +1,9 @@
 //! Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 //!
-//! Cases are hand-derived for now, each citing its source (ADR 0002, 0010); Unity recordings replace them once
-//! the exporter exists. A case is a small controller (nodes, parameters, clips, layers) plus frames: parameter
-//! changes, then expected values (`"<node>.x|y|z|active"`) and current states (`"<layer>": "<state>"`).
+//! A case is a small controller (nodes, parameters, clips, layers) plus frames: parameter changes, then expected
+//! values (`"<node>.x|y|z|active"`) and current states (`"<layer>": "<state>"`). Every expectation is Unity's:
+//! `tools/unity-truth/Assets/Editor/Goldens.cs` plays the cases and records `tests/unity/goldens.json` (#54), which
+//! `golden_cases` checks them against.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -319,8 +320,11 @@ fn value(c: &Controller, a: &Avatar, i: &Instance, key: &str) -> f32 {
     }
 }
 
-fn run(path: &Path) {
+fn run(path: &Path, unity: &Value) {
     let name = path.file_name().unwrap().to_string_lossy();
+    let recorded = unity["cases"][path.file_stem().unwrap().to_string_lossy().as_ref()]
+        .as_array()
+        .unwrap_or_else(|| panic!("{name}: not recorded in Unity; run Goldens.Record"));
     let case: Case =
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap_or_else(|e| panic!("{name}: {e}"));
     assert!(!case.source.is_empty(), "{name}: cite a source");
@@ -330,7 +334,16 @@ fn run(path: &Path) {
     let c = Controller::new(&a).unwrap();
     assert!(c.bound.unbound.is_empty(), "{name}: {:?}", c.bound.unbound);
     let mut inst = Instance::new(&c, true);
+    assert_eq!(recorded.len(), case.frames.len(), "{name}: re-record in Unity");
     for (f, frame) in case.frames.iter().enumerate() {
+        for (key, want) in &frame.expect {
+            let got = &recorded[f][key];
+            let same = match (want.as_f64(), got.as_f64()) {
+                (Some(w), Some(g)) => (w - g).abs() < 1e-4,
+                _ => want == got,
+            };
+            assert!(same, "{name}: frame {f}: {key} expects {want}, Unity recorded {got}");
+        }
         for (p, v) in &frame.set {
             inst.params[case.param(p) as usize] = *v;
         }
@@ -363,7 +376,11 @@ fn golden_cases() {
     paths.retain(|p| p.extension().is_some_and(|e| e == "json"));
     paths.sort();
     assert!(paths.len() >= 6, "golden cases missing");
+    let unity: Value = serde_json::from_str(
+        &std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/unity/goldens.json")).unwrap(),
+    )
+    .unwrap();
     for p in &paths {
-        run(p);
+        run(p, &unity);
     }
 }

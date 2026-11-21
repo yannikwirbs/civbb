@@ -1,5 +1,5 @@
 {
-  "source": "Hand-derived. VRCFury, Write Default Bugs, 'WD On Blending Is Not Additive': default 0, layer 1 animates 5, a lower layer's blend tree animates 10 at weight 0.1: result 1; at weight 0 the result is 5.",
+  "source": "Recorded in Unity (tests/unity/goldens.json, #54); first hand-derived. VRCFury, Write Default Bugs, 'WD On Blending Is Not Additive': default 0, layer 1 animates 5, a lower layer's blend tree animates 10 at weight 0.1: result 1; at weight 0 the result is 5.",
   "nodes": [{ "name": "A" }, { "name": "B" }],
   "params": [{ "name": "w", "kind": "Float", "default": 0.1 }],
   "clips": {

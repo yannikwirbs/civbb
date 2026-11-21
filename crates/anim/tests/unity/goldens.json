@@ -1,0 +1,75 @@
+{
+  "unity": "6000.3.28f1",
+  "cases": {
+    "blend_1d_weights": [
+      {"A.x": 1, "B.x": 0, "C.x": 0},
+      {"A.x": 0.25, "B.x": 0.75, "C.x": 0},
+      {"A.x": 0, "B.x": 0.75, "C.x": 0.25},
+      {"A.x": 0, "B.x": 0, "C.x": 1}
+    ],
+    "exit_time_fade": [
+      {"L": "S1", "A.x": 0.2, "B.x": 0},
+      {"A.x": 0.4, "B.x": 0},
+      {"A.x": 0.6, "B.x": 0},
+      {"L": "S1", "A.x": 0.64, "B.x": 0.200000048},
+      {"L": "S2", "A.x": 0, "B.x": 1},
+      {"L": "S2", "A.x": 0, "B.x": 1}
+    ],
+    "exit_time_zero": [
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"L": "S2", "A.x": 0, "B.x": 1},
+      {"L": "S2", "A.x": 0, "B.x": 1},
+      {"L": "S2", "A.x": 0, "B.x": 1}
+    ],
+    "mixed_wd_sticks": [
+      {"Hat.active": 0, "B.x": 2},
+      {"Toggle": "On", "Hat.active": 1},
+      {"Toggle": "Off", "Hat.active": 1}
+    ],
+    "wd_off_direct_feedback": [
+      {"A.x": 0.5, "B.x": 0.25},
+      {"A.x": 0.625, "B.x": 0.375},
+      {"A.x": 0.65625, "B.x": 0.4375},
+      {"A.x": 0.6640625, "B.x": 0.46875}
+    ],
+    "wd_off_toggle": [
+      {"Toggle": "Off", "Hat.active": 0},
+      {"Toggle": "On", "Hat.active": 1},
+      {"Toggle": "Off", "Hat.active": 1}
+    ],
+    "wd_off_transition_holds": [
+      {"A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"A.x": 1, "B.x": 0.5},
+      {"L": "S2", "A.x": 1, "B.x": 1}
+    ],
+    "wd_on_partial_blend_overrides": [
+      {"A.x": 1, "B.x": 0.9},
+      {"A.x": 5, "B.x": 1}
+    ],
+    "wd_on_toggle": [
+      {"Toggle": "Off", "Hat.active": 0},
+      {"Toggle": "On", "Hat.active": 1},
+      {"Toggle": "Off", "Hat.active": 1}
+    ],
+    "wd_on_toggle_empty_clip": [
+      {"Toggle": "Off", "Hat.active": 0},
+      {"Toggle": "On", "Hat.active": 1},
+      {"Toggle": "Off", "Hat.active": 0}
+    ],
+    "wd_on_transition_resets": [
+      {"A.x": 1, "B.x": 0},
+      {"L": "S1", "A.x": 1, "B.x": 0},
+      {"A.x": 0.5, "B.x": 0.5},
+      {"L": "S2", "A.x": 0, "B.x": 1}
+    ]
+  }
+}

@@ -252,7 +252,6 @@ fn exit_time_fires_on_the_first_frame_that_reaches_it() {
     let mut s0 = state(0);
     s0.transitions = vec![exit_at(1, 0.75)];
     let (c, mut i) = single(vec![s0, state(1)], false);
-    i.update(&c, 0.1); // Enter at 0.
     for _ in 0..7 {
         i.update(&c, 0.1);
     }
@@ -262,13 +261,16 @@ fn exit_time_fires_on_the_first_frame_that_reaches_it() {
 }
 
 #[test]
-fn exit_time_zero_never_fires_on_the_first_frame() {
+fn exit_time_zero_fires_after_a_full_cycle() {
+    // Recorded (golden exit_time_zero): the start time does not count as reaching exit time 0.
     let mut s0 = state(0);
     s0.transitions = vec![exit_at(1, 0.0)];
     let (c, mut i) = single(vec![s0, state(1)], false);
-    i.update(&c, 0.1);
+    for _ in 0..3 {
+        i.update(&c, 0.25);
+    }
     assert_eq!(current(&i), 0);
-    i.update(&c, 0.1);
+    i.update(&c, 0.25);
     assert_eq!(current(&i), 1);
 }
 
@@ -286,7 +288,6 @@ fn exit_time_below_one_repeats_every_loop_whether_or_not_the_motion_loops() {
             ..exit_at(1, 0.5)
         }];
         let (c, mut i) = single(vec![s0, state(1)], looping);
-        i.update(&c, 0.25);
         for _ in 0..3 {
             i.update(&c, 0.25); // Through 0.75: the crossing at 0.5 had the condition false.
         }
@@ -305,7 +306,6 @@ fn exit_time_above_one_is_checked_once() {
     let mut s0 = state(0);
     s0.transitions = vec![exit_at(1, 1.5)];
     let (c, mut i) = single(vec![s0, state(1)], true);
-    i.update(&c, 0.25);
     for _ in 0..5 {
         i.update(&c, 0.25); // Through 1.25, past the 0.5 point.
     }
@@ -322,7 +322,6 @@ fn speed_and_speed_parameter_scale_normalised_time() {
     s0.transitions = vec![exit_at(1, 0.75)];
     let (c, mut i) = single(vec![s0, state(1)], false);
     i.params[5] = 2.0;
-    i.update(&c, 0.1);
     i.update(&c, 0.1); // 0.4
     assert_eq!(current(&i), 0);
     i.update(&c, 0.1); // 0.8

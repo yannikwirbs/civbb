@@ -80,7 +80,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   as the SDK does (ADR 0046), including its scale-offset power `n / total weight`.
 - Unity ground truth: `tools/unity-truth` runs in batch mode and records JSON into crate test dirs (ADR 0013,
   `tools/unity-truth/README.md`). Muscle space and constraints (44 cases, batch play mode) are verified against it;
-  animator goldens are still hand-derived (#54).
+  animator goldens are recorded too (`Goldens.cs`, ADR 0065; material curves and masks still to record, #54).
 
 ## Compiler (`civbb-pipeline`)
 
@@ -185,7 +185,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   and keeps its scratch per island (#66): lean 0.97 to 0.49 µs, bloated 12.7 to 9.45 µs per avatar on one worker.
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
-  human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056); instances start parameters at the expression defaults (`Controller::start`, #85) and built-ins
+  human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056), the start time does not reach one and a transition fired at its exit time starts with the overshoot elapsed; the first update advances like any other; a Write Defaults on state without a motion writes nothing (ADR 0065, recorded); instances start parameters at the expression defaults (`Controller::start`, #85) and built-ins
   standing on the ground (`Builtin::at_rest`, ADR 0055). Material slots swap per island
   (`Target::MaterialSlot`, `Island::submesh_materials`, a per-submesh override in `MeshData::draws`; ADR 0059).
   Mirrored states and blend tree children map muscles as Unity records (`muscle::mirror`, exclusive or; ADR 0060). `civbb-dynamics`: PhysBone chains as the SDK

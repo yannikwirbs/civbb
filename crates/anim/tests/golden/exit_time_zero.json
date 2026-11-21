@@ -1,0 +1,31 @@
+{
+  "source": "Recorded in Unity (Goldens.cs): a transition with exit time 0 and no fade out of the start state, dt 0.1: the start time does not count as reaching it; it fires at 1 s.",
+  "nodes": [{ "name": "A" }, { "name": "B" }],
+  "params": [],
+  "clips": {
+    "A1": { "length": 1, "curves": [["A.x", [[0, 1]]]] },
+    "B1": { "length": 1, "curves": [["B.x", [[0, 1]]]] }
+  },
+  "layers": [{
+    "name": "L",
+    "states": [
+      { "name": "S1", "motion": { "clip": "A1" }, "wd": true, "transitions": [{ "to": "S2", "exit_time": 0 }] },
+      { "name": "S2", "motion": { "clip": "B1" }, "wd": true }
+    ]
+  }],
+  "dt": 0.1,
+  "frames": [
+    { "expect": { "L": "S1", "A.x": 1, "B.x": 0 } },
+    { "expect": { "L": "S1", "A.x": 1, "B.x": 0 } },
+    { "expect": { "L": "S1", "A.x": 1, "B.x": 0 } },
+    { "expect": { "L": "S1", "A.x": 1, "B.x": 0 } },
+    { "expect": { "L": "S1", "A.x": 1, "B.x": 0 } },
+    { "expect": { "L": "S1", "A.x": 1, "B.x": 0 } },
+    { "expect": { "L": "S1", "A.x": 1, "B.x": 0 } },
+    { "expect": { "L": "S1", "A.x": 1, "B.x": 0 } },
+    { "expect": { "L": "S1", "A.x": 1, "B.x": 0 } },
+    { "expect": { "L": "S2", "A.x": 0, "B.x": 1 } },
+    { "expect": { "L": "S2", "A.x": 0, "B.x": 1 } },
+    { "expect": { "L": "S2", "A.x": 0, "B.x": 1 } }
+  ]
+}

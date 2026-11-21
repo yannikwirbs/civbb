@@ -1,0 +1,25 @@
+{
+  "source": "Recorded in Unity (Goldens.cs): a 1 s clip moving A.x from 0 to 1 leaves at exit time 0.75 with a fixed 0.25 s fade into a state holding B.x = 1, WD on: the fade starts at the exit time within the frame, so at 0.8 s it is 0.2 through.",
+  "nodes": [{ "name": "A" }, { "name": "B" }],
+  "params": [],
+  "clips": {
+    "Ramp": { "length": 1, "curves": [["A.x", [[0, 0], [1, 1]]]] },
+    "B1": { "length": 1, "curves": [["B.x", [[0, 1]]]] }
+  },
+  "layers": [{
+    "name": "L",
+    "states": [
+      { "name": "S1", "motion": { "clip": "Ramp" }, "wd": true, "transitions": [{ "to": "S2", "exit_time": 0.75, "duration": 0.25 }] },
+      { "name": "S2", "motion": { "clip": "B1" }, "wd": true }
+    ]
+  }],
+  "dt": 0.2,
+  "frames": [
+    { "expect": { "L": "S1", "A.x": 0.2, "B.x": 0 } },
+    { "expect": { "A.x": 0.4, "B.x": 0 } },
+    { "expect": { "A.x": 0.6, "B.x": 0 } },
+    { "expect": { "L": "S1", "A.x": 0.64, "B.x": 0.2 } },
+    { "expect": { "L": "S2", "A.x": 0, "B.x": 1 } },
+    { "expect": { "L": "S2", "A.x": 0, "B.x": 1 } }
+  ]
+}

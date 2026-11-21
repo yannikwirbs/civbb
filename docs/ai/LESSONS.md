@@ -63,3 +63,4 @@ Add a line to the matching file whenever something costs more than one attempt.
   owner may have an Editor open). Git Bash has no `setsid`.
 - `a && b >> file` in one Bash call skips the append when `a` fails (a `grep` with no match): check that an appended
   file changed. A background `cargo test` started before an edit compiles the old code; rerun after editing.
+- Don't restore a file with `git checkout --` after a mutation check of a file you changed this session: it reverts to the commit and drops your uncommitted edits. Revert the mutation with the inverse edit.

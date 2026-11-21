@@ -7,8 +7,8 @@ use std::collections::{HashMap, HashSet};
 use civbb_anim::Target;
 use civbb_format::Avatar;
 use civbb_format::animator::{
-    Animator, Behaviour, BlendTree, BlendTreeKind, Clip, ClipIndex, ConditionMode, DriverOp, InterruptionSource, Layer,
-    LayerBlending, Motion, ParamIndex, ParamKind, Parameter, State, StateMachine, Transition, TransitionDest,
+    Animator, Behaviour, BlendTree, BlendTreeKind, Clip, ClipIndex, ConditionMode, DriverOp, Layer, LayerBlending,
+    Motion, ParamIndex, ParamKind, Parameter, State, StateMachine, Transition, TransitionDest,
 };
 
 /// A layer that only switches between two constant clips on one bool parameter.
@@ -17,8 +17,6 @@ struct Toggle {
     param: ParamIndex,
     off: ClipIndex,
     on: ClipIndex,
-    /// The default state's clip.
-    start: ClipIndex,
 }
 
 /// Collapses toggle layers of a validated avatar's animator in place; returns how many layers went.
@@ -208,7 +206,6 @@ fn toggle(an: &Animator, clips: &[Clip], li: usize) -> Option<Toggle> {
         param: p0,
         off,
         on,
-        start: if sm.default_state == 0 { c0 } else { c1 },
     })
 }
 
@@ -223,10 +220,9 @@ fn constant(clip: &Clip) -> bool {
     })
 }
 
-/// The collapsed layer. `Start` plays each toggle's default clip for the first frame, as each toggle layer started
-/// in its default state whatever the parameter; from the second frame `Toggles` plays each toggle's clip for its
-/// bool through a 1D tree. Every child weighs 1 by the constant parameter `one`, and Write Defaults is on so each
-/// slot gets exactly its one clip's value (ADR 0010).
+/// The collapsed layer: `Toggles` plays each toggle's clip for its bool through a 1D tree, from the first frame, as
+/// each toggle layer takes its transition on its first update (ADR 0065). Every child weighs 1 by the constant
+/// parameter `one`, and Write Defaults is on so each slot gets exactly its one clip's value (ADR 0010).
 fn layer(group: u32, ts: &[Toggle], one: ParamIndex) -> Layer {
     let child = |motion, threshold, direct_param| civbb_format::animator::ChildMotion {
         motion,
@@ -244,10 +240,6 @@ fn layer(group: u32, ts: &[Toggle], one: ParamIndex) -> Layer {
             normalize: false,
         })))
     };
-    let starts = ts
-        .iter()
-        .map(|t| child(Motion::Clip(t.start), 0.0, Some(one)))
-        .collect();
     let toggles = ts
         .iter()
         .map(|t| {
@@ -262,18 +254,6 @@ fn layer(group: u32, ts: &[Toggle], one: ParamIndex) -> Layer {
             child(Motion::BlendTree(Box::new(tree)), 0.0, Some(one))
         })
         .collect();
-    let next = Transition {
-        dest: TransitionDest::State(1),
-        conditions: Vec::new(),
-        has_exit_time: true,
-        exit_time: 0.0,
-        fixed_duration: true,
-        duration: 0.0,
-        offset: 0.0,
-        interruption: InterruptionSource::None,
-        ordered_interruption: true,
-        can_transition_to_self: false,
-    };
     Layer {
         name: "Toggles".into(),
         group,
@@ -281,10 +261,7 @@ fn layer(group: u32, ts: &[Toggle], one: ParamIndex) -> Layer {
         blending: LayerBlending::Override,
         mask: None,
         state_machine: StateMachine {
-            states: vec![
-                state("Start", direct(starts), vec![next]),
-                state("Toggles", direct(toggles), Vec::new()),
-            ],
+            states: vec![state("Toggles", direct(toggles), Vec::new())],
             default_state: 0,
             entry_transitions: Vec::new(),
             any_state_transitions: Vec::new(),

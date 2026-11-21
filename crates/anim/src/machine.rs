@@ -17,9 +17,6 @@ pub struct Playing {
     /// Normalised time, without the cycle offset; keeps growing past 1.
     pub time: f32,
     prev: f32,
-    /// Not yet checked for exit time since it was entered; that first check includes its start time.
-    entered: bool,
-    inclusive: bool,
 }
 
 /// A transition, by where it is listed.
@@ -90,22 +87,29 @@ impl Ctx<'_> {
         motion::length(self.state(s).motion.as_ref(), self.clips, params)
     }
 
+    /// Seconds per unit of a state's normalised time; 0 when a parameter drives its time or it does not move.
+    fn seconds(&self, s: StateIndex, params: &[f32]) -> f32 {
+        let st = self.state(s);
+        let speed = st.speed * st.speed_param.map_or(1.0, |sp| params[sp as usize]);
+        if st.time_param.is_some() || speed <= 0.0 {
+            0.0
+        } else {
+            self.length(s, params) / speed
+        }
+    }
+
     fn enter(&self, s: StateIndex, offset: f32, params: &[f32]) -> Playing {
         let time = self.state(s).time_param.map_or(offset, |p| params[p as usize]);
         Playing {
             state: s,
             time,
             prev: time,
-            entered: true,
-            inclusive: false,
         }
     }
 
     fn advance(&self, p: &mut Playing, params: &[f32], dt: f32) {
         let s = self.state(p.state);
         p.prev = p.time;
-        p.inclusive = p.entered;
-        p.entered = false;
         p.time = match s.time_param {
             Some(tp) => params[tp as usize],
             None => {
@@ -150,18 +154,23 @@ fn holds(c: &Condition, params: &[f32]) -> bool {
 }
 
 /// Whether the exit time `e` was reached during the last advance of `p`: on the first frame that reaches it,
-/// every cycle for `e < 1`, once otherwise. Whether the motion loops does not matter: Unity's normalised time keeps
+/// every cycle for `e < 1`, once otherwise; the time a state starts at does not count (exit time 0 fires at 1, #54). Whether the motion loops does not matter: Unity's normalised time keeps
 /// counting past a non-looping clip's end, and an empty state's too (probed in the SDK host project).
 fn exit_reached(p: &Playing, e: f32) -> bool {
+    exit_point(p, e).is_some()
+}
+
+/// The normalised time at which the exit time `e` was reached during the last advance of `p`, if it was.
+fn exit_point(p: &Playing, e: f32) -> Option<f32> {
     let (prev, cur) = (p.prev, p.time);
     let mut point = if e < 1.0 { (prev - e).ceil().max(0.0) + e } else { e };
-    if !p.inclusive && point <= prev {
+    if point <= prev {
         if e >= 1.0 {
-            return false;
+            return None;
         }
         point += 1.0;
     }
-    point >= prev && point <= cur
+    (point >= prev && point <= cur).then_some(point)
 }
 
 /// Which playing state a candidate transition reads its exit time from.
@@ -299,11 +308,21 @@ impl LayerRun {
                 TransitionRef::Any(_) => old.to.state,
             };
         }
-        let to = ctx.enter(dest, tr.offset, params);
-        if duration > 0.0 {
+        // A transition taken at its exit time starts there: the rest of the frame already counts (recorded, #54).
+        let over = match (&self.from, t) {
+            (From::State(p), TransitionRef::State(s, _)) if tr.has_exit_time && p.state == s => {
+                exit_point(p, tr.exit_time).map_or(0.0, |at| (p.time - at) * ctx.seconds(s, params))
+            }
+            _ => 0.0,
+        };
+        let mut to = ctx.enter(dest, tr.offset, params);
+        if over > 0.0 {
+            ctx.advance(&mut to, params, over);
+        }
+        if duration > over {
             self.active = Some(Active {
                 to,
-                progress: 0.0,
+                progress: over / duration,
                 duration,
                 which: t,
             });
