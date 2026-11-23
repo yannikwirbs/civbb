@@ -175,6 +175,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   PBR, Toon, Unlit x blend x culling; draws batched into runs, one indirect multi-draw per run, vertices pulled by
   address). Shaders are Slang in `crates/render/shaders/` (`skin`, `mesh`), compiled by `cargo xtask shaders`
   (Vulkan SDK 1.4.363.0 at `C:/VulkanSDK/1.4.363.0`) to committed SPIR-V; `ci` fails on a stale one.
+- Culling (ADR 0077, #99): `civbb_client::cull` bounds each mesh instance by per-joint bind-space spheres moved by
+  the frame's skinning matrices (padded for blendshapes) and drops instances outside the view frustum before
+  skinning and drawing. The GPU culling pass with hierarchical Z is Phase 2 (#59).
 - Viewer (ADR 0024): `civbb-client view [<pkg> --key <key> | --avatar lean|bloated] [--copies N] [--frames F]
   [--warmup W] [--lod L]`; the title shows triangles per copy; `--frames` summarises the F frames after a 60-frame
   warm-up (ADR 0032).

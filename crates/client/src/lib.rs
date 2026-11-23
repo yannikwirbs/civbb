@@ -2,6 +2,7 @@
 //! shows them in a desktop viewer (ADR 0024) and scores parity renders (ADR 0033).
 
 pub mod bench;
+pub mod cull;
 pub mod frame;
 pub mod island;
 #[cfg(feature = "parity")]

@@ -9,6 +9,7 @@ use civbb_core::math::Pose;
 use civbb_format::Avatar;
 use civbb_format::material::{ColorSpace, ImageFormat, Material};
 use civbb_format::math::{Mat4, Vec3};
+use civbb_format::mesh::Mesh;
 use civbb_render::material::{MATERIAL_WORDS, pack};
 use civbb_render::skin::{Job, SkinnedMesh, Skinning};
 use civbb_render::{
@@ -22,6 +23,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::WindowId;
 
+use crate::cull::{Frustum, MeshBounds};
 use crate::frame;
 use crate::island::{Island, Model};
 
@@ -322,6 +324,21 @@ pub fn matrix(p: &Pose) -> Mat4 {
     ]
 }
 
+/// The matrices that skin `mesh` given the nodes' world placements, into `out`: joint world times inverse bind
+/// per skin joint, or the mesh node's placement for an unskinned mesh.
+pub fn skin_matrices(mesh: &Mesh, world: &[Pose], out: &mut Vec<Mat4>) {
+    out.clear();
+    match &mesh.skin {
+        Some(skin) if !skin.joints.is_empty() => out.extend(
+            skin.joints
+                .iter()
+                .zip(&skin.inverse_bind)
+                .map(|(&j, ib)| mul(&matrix(&world[j as usize]), ib)),
+        ),
+        _ => out.push(matrix(&world[mesh.node as usize])),
+    }
+}
+
 /// Column-major `a * b`.
 fn mul(a: &Mat4, b: &Mat4) -> Mat4 {
     std::array::from_fn(|i| {
@@ -347,6 +364,8 @@ pub(crate) fn bounds(avatar: &Avatar) -> (Vec3, Vec3) {
 pub(crate) struct Gpu {
     scene: Scene,
     meshes: Vec<MeshData>,
+    /// Per mesh, its bind-space spheres for culling (ADR 0077).
+    bounds: Vec<MeshBounds>,
     instances: Vec<Vec<SkinnedMesh>>,
     /// The avatar's materials, shared by every island.
     materials: Vec<MaterialId>,
@@ -430,6 +449,7 @@ impl Gpu {
             forward: Forward::new(ctx, &scene, renderer.color_format()?, max_draws)?,
             scene,
             meshes,
+            bounds: avatar.meshes.iter().map(MeshBounds::new).collect(),
             instances,
             materials,
             bindless,
@@ -695,6 +715,10 @@ pub(crate) fn draw(
     s.packed.resize_with(islands.len(), Vec::new);
     s.draws.clear();
     s.updates.clear();
+    let extent = renderer.extent().unwrap_or_default();
+    let aspect = extent.width.max(1) as f32 / extent.height.max(1) as f32;
+    let view = View::look_at(eye, target, fov_y, aspect, 0.05);
+    let frustum = Frustum::new(&view.view_proj);
     for (i, island) in islands.iter().enumerate() {
         island.shape_weights(&mut s.weights);
         std::mem::swap(&mut s.all_weights[i], &mut s.weights);
@@ -719,15 +743,12 @@ pub(crate) fn draw(
                 continue;
             }
             let out = joints[m].get_or_insert_with(Vec::new);
-            out.clear();
-            match &mesh.skin {
-                Some(skin) if !skin.joints.is_empty() => out.extend(
-                    skin.joints
-                        .iter()
-                        .zip(&skin.inverse_bind)
-                        .map(|(&j, ib)| mul(&matrix(&world[j as usize]), ib)),
-                ),
-                _ => out.push(matrix(&world[mesh.node as usize])),
+            skin_matrices(mesh, world, out);
+            // A mesh wholly outside the view is neither skinned nor drawn (ADR 0077).
+            let seen = gpu.bounds[m].world_box(out, &s.all_weights[i][m]);
+            if !seen.is_some_and(|(lo, hi)| frustum.sees(lo, hi)) {
+                joints[m] = None;
+                continue;
             }
             let materials = gpu.maps[i][m].as_deref().unwrap_or(&gpu.materials);
             island.submesh_materials(avatar, m as u32, &mut s.slots);
@@ -751,9 +772,6 @@ pub(crate) fn draw(
         .collect();
     batch(&mut s.draws, &mut s.batches);
     let (draws, skinned) = (s.draws.len(), jobs.len());
-    let extent = renderer.extent().unwrap_or_default();
-    let aspect = extent.width.max(1) as f32 / extent.height.max(1) as f32;
-    let view = View::look_at(eye, target, fov_y, aspect, 0.05);
     let (batches, updates) = (&s.batches, &s.updates);
     let status = renderer.frame(|graph, target| {
         let skinned = graph.import_buffer(gpu.scene.skinned().handle, &[Access::VertexRead]);

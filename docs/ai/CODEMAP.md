@@ -45,6 +45,7 @@ Client: wires the avatar systems into per-avatar islands and frames; a headless 
 Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-format, civbb-render
 
 - `src/bench.rs`: Headless CPU benchmark: N avatar islands stepped for a number of frames at each worker count (design doc §21).
+- `src/cull.rs`: Frustum culling of mesh instances before skinning (design doc §6, ADR 0077): conservative world bounds from
 - `src/frame.rs`: One simulation frame's avatar work: every island as its own parallel job, then the cross-avatar contact pass
 - `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
 - `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020),
@@ -52,6 +53,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
 - `src/view.rs`: Desktop viewer: N copies of an avatar in a grid with animator and dynamics running, drawn in a window with an
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
+- `tests/cull.rs`: Frustum culling of mesh instances (ADR 0077): the bounds hold every skinned vertex in every parity state, and
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 - `tests/measure.rs`: `civbb-client measure` (ADR 0032): debug builds refuse, release builds print CPU times and, with a device, GPU
 - `tests/parity.rs`: FLIP parity scoring without a device (ADR 0033): FLIP of an image against itself is 0, a known perturbation
@@ -267,6 +269,7 @@ Internal deps: none
 - `docs/adr/0074-physbone-output-between-steps.md`: 0074: PhysBone output between fixed steps, and step timing within a frame
 - `docs/adr/0075-phase-0-exporter-scope.md`: 0075: Phase 0 exporter without the non-destructive build and export-time renders
 - `docs/adr/0076-gltf-mesh-quantization-yes-compression-no.md`: 0076: glTF input accepts KHR_mesh_quantization and refuses required Draco and meshopt compression
+- `docs/adr/0077-cpu-instance-culling-before-gpu-culling.md`: 0077: Cull mesh instances on the CPU before skinning; the GPU culling pass waits for worlds
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
