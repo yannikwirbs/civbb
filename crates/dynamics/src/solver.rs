@@ -534,7 +534,8 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
         ps.pos[k] = x;
         ps.vel[k] = vel;
         ps.rest[k] = b;
-        turn[k] = from_to(dir_or(b), normalize(sub(x, parent)));
+        // The bone's turn composes on its parent's, as the nodes' rotations do (twist included; ADR 0071).
+        turn[k] = qnormalize(mul(from_to(dir_or(off), normalize(sub(x, parent))), turn[p]));
     }
     if let Some((g, target)) = ctx.grab {
         // The path from the first free ancestor down to the grabbed particle points straight at the hand.

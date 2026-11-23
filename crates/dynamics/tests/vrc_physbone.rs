@@ -256,9 +256,8 @@ fn the_sdk_keeps_bone_lengths_and_pins_the_root() {
 
 /// Every case's largest bone error (metres), file by file. Cases not listed must replay within [`EXACT`].
 const BOUNDS: &[(&str, &str, f32)] = &[
-    // Residuals at 60 Hz: the polar box's corners (#84), and spring 1, whose steps are exact against the SDK's
-    // stored state but keep f32 rounding undamped.
-    ("vrc_physbones.json", "limit_polar_diagonal", 0.008),
+    // Spring 1 at 60 Hz: each step is exact against the SDK's stored state, but the undamped velocity keeps f32
+    // rounding.
     ("vrc_physbones.json", "simplified_p10_s100", 0.00075),
     ("vrc_physbones.json", "simplified_p40_s100", 0.001),
     // A bone fatter than its inside capsule: the SDK puts the tip on the far side of the core (negative room, exact

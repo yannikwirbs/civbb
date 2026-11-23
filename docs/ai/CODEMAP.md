@@ -261,6 +261,7 @@ Internal deps: none
 - `docs/adr/0068-physbone-1-0-from-the-sdks-state.md`: 0068: PhysBone version 1.0 and gravity falloff fitted to the SDK's stored state
 - `docs/adr/0069-physbone-rest-snap.md`: 0069: A PhysBone bone near its rest direction snaps onto it
 - `docs/adr/0070-physbone-collision-friction.md`: 0070: PhysBone collider pushes slow the velocity by the SDK's friction and skip contact at a bone's start
+- `docs/adr/0071-physbone-turns-compose.md`: 0071: A PhysBone bone's turn composes on its parent's
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
