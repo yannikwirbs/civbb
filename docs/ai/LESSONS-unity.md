@@ -106,3 +106,12 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   curve's start, end and middle all differ, or terms like "relative to the start" cancel out.
 - `GetHumanPose` after a graph evaluation reads the body pose the clip actually applied (relative to the Animator's
   transform), which is the quantity to fit; with root motion discarded it differs from the clip's RootT/RootQ.
+- Unity builds a humanoid `Avatar` from `avatar.humanDescription.skeleton`, the pose at import (Enforce T-Pose and
+  the like), not the prefab's rest: on the corpus they differ at thumbs (10 to 32 degrees) and fingers. Compare
+  anything derived from the skeleton (muscle frames) with Unity on that pose (`BuildSkeleton.cs`, ADR 0072).
+- Material probes: an animator writes material curves into the renderer's `MaterialPropertyBlock` (`GetPropertyBlock`
+  without an index). In a linear project `GetVector` on it returns the shader-visible linear value and `GetColor` the
+  curve's (gamma) value; render to an `ARGBFloat` target (`Camera.Render`, `--graphics`) to see what a shader gets.
+- With DNS failing (`Curl error 6: Could not resolve host: cdp.cloud.unity3d.com` in the log) a batch run in the SDK
+  host project can idle for minutes before running the method or after writing its output. Check the log for the
+  method's lines, then stop only your own run by PID (Win32_Process command line).

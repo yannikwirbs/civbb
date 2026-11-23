@@ -144,7 +144,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). After #82, #86/#85, #87 and
   #88 (2026-11-20) rest means (front) run 0.06 (Inuinu) to 0.23 (Cokoro Quest); worst toggled states 0.12 to 0.37
   (Tessakuchan). Bone radii in world units (#90) took HAOLAN to 0.054 front, worst 0.072; `[HDR]` colours as saved and the reference at
-  shader time 0 (#91) Cokoro to 0.109, Ostgaroa to 0.134. Remaining: silhouette edges. Tables on #82, #86, #85, #87.
+  shader time 0 (#91) Cokoro to 0.109, Ostgaroa to 0.134. Fitted mass positions (ADR 0073, run `m96`) undid the
+  #52 rest regression: rest means (front) Cokoro 0.110, Tessakuchan 0.102, Yumeka 0.139, Inuinu 0.065. Remaining:
+  silhouette edges. Tables on #82, #86, #85, #87.
   `corpus/local/unity-ref/all.sh <name>` rescores all, re-renders those whose hand-off changed, rescores.
 
 ## Renderer and viewer

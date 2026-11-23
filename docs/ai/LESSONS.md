@@ -64,3 +64,7 @@ Add a line to the matching file whenever something costs more than one attempt.
 - `a && b >> file` in one Bash call skips the append when `a` fails (a `grep` with no match): check that an appended
   file changed. A background `cargo test` started before an edit compiles the old code; rerun after editing.
 - Don't restore a file with `git checkout --` after a mutation check of a file you changed this session: it reverts to the commit and drops your uncommitted edits. Revert the mutation with the inverse edit.
+- Before fitting an engine's behaviour from its outputs, read its own state and constants by reflection (field names
+  from an `ApiProbe` run, then values): the SDK's per-bone `prevVelocity`, its `COLLISION_FRICTION`, Unity's
+  `Avatar.GetAxisLength` and `humanDescription.skeleton` each turned an hour of ill-conditioned fitting into one
+  clean regression (2026-11-23: #83, #84, #95, #96).
