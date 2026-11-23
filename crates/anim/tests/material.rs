@@ -1,5 +1,5 @@
 //! Material curves (ADR 0025): Unity property names to native fields, Unity's units (sRGB colours, smoothness, V-up
-//! offsets), per-renderer slots defaulting from the renderer's first material with the field, unbound reports.
+//! offsets), per-renderer slots defaulting from the renderer's material 0, whole vectors, unbound reports.
 
 use civbb_anim::material::{self, Field, to_linear, to_srgb};
 use civbb_anim::{Target, bind};
@@ -132,6 +132,9 @@ fn values_are_in_unity_units() {
     close(&[to_srgb(to_linear(0.7))], &[0.7]);
     // HDR: Unity's `Mathf.GammaToLinearSpace` raises values above 1 to 2.2 (measured: 32 gives 2048).
     close(&[to_linear(32.0) / 2048.0, to_srgb(to_linear(5.0))], &[1.0, 5.0]);
+    // An animated colour reaches the shader converted so, `[HDR]` or not; alpha unconverted (rendered in Unity
+    // 2022.3, linear project, #54: 0.2 gave 0.033105, an `[HDR]` 5 gave 34.493, alpha 0.5 stayed 0.5).
+    assert!((to_linear(0.2) - 0.033_105).abs() < 1e-6 && (to_linear(5.0) - 34.493).abs() < 1e-3);
     // Smoothness is one minus roughness.
     close(&material::get(&m, Field::Smoothness).unwrap()[..1], &[0.75]);
     material::set(&mut m, Field::Smoothness, 0, 0.1);
@@ -167,16 +170,27 @@ fn curves_bind_per_renderer_with_the_first_materials_default() {
         curve("Body", "_MainTex_ST.w", 0.0),
     ]));
     assert!(b.unbound.is_empty(), "{:?}", b.unbound);
+    // Unity writes a vector property whole: the components no curve animates get slots too, at 0 (ADR 0067).
     assert_eq!(
         b.bindings.targets,
         [
             Target::Material(0, Field::BaseColor, 1),
             Target::Material(0, Field::Metallic, 0),
             Target::Material(0, Field::MainTexSt, 3),
+            Target::Material(0, Field::BaseColor, 0),
+            Target::Material(0, Field::BaseColor, 2),
+            Target::Material(0, Field::BaseColor, 3),
+            Target::Material(0, Field::MainTexSt, 0),
+            Target::Material(0, Field::MainTexSt, 1),
+            Target::Material(0, Field::MainTexSt, 2),
         ]
     );
-    // `_Color` from the Unlit (first) submesh, sRGB-encoded; the others only the PBR one has.
-    close(&b.bindings.defaults, &[to_srgb(0.5), 0.75, 0.375]);
+    // Defaults come from the renderer's first material (the Unlit one), sRGB-encoded; the PBR-only fields default
+    // to 0 because that material lacks them, as Unity reads material 0 (ADR 0067).
+    close(
+        &b.bindings.defaults,
+        &[to_srgb(0.5), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    );
 }
 
 #[test]

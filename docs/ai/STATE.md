@@ -81,7 +81,7 @@ What exists, by area. Read the section for the area you touch; update it when th
 - Unity ground truth: `tools/unity-truth` runs in batch mode and records JSON into crate test dirs (ADR 0013,
   `tools/unity-truth/README.md`). Muscle space and constraints (44 cases, batch play mode) are verified against it;
   animator goldens are recorded too (`Goldens.cs`, ADR 0065; transform masks and interruption sources recorded, ADR 0066;
-  material curves still to record, #54).
+  material curves on renderers with differing materials, ADR 0067).
 
 ## Compiler (`civbb-pipeline`)
 
@@ -175,7 +175,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   `_MainTex_ST`, `_Glossiness`, MToon/lilToon/Poiyomi/UTS2 names) to native fields in Unity's units (sRGB colours,
   smoothness, V-up offsets); `Target::Material(mesh, field, component)` per renderer. `Model::animated_materials`
   and `Island::materials` give each island its own records for animated renderers; the viewer rewrites changed
-  records through `Forward::add`'s upload pass.
+  records through `Forward::add`'s upload pass. As recorded (ADR 0067): defaults from the renderer's material 0 (0
+  when it lacks the field), vectors written whole (components no curve animates are 0), animated colours converted
+  from gamma even when `[HDR]` (an `[HDR]` default still round-trips, #93).
 - `civbb-core`: shared math, `jobs::islands` (one rayon job per avatar), per-system `Counters`. `civbb-client`:
   `Model`/`Island` (animator, constraints, IK stub, dynamics, world poses) and `frame::step` with the contact pass
   feeding next frame's parameters (ADR 0020); `civbb-client bench [--package <pkg> --key <key>]` prints JSON (#23,

@@ -1,18 +1,26 @@
 //! Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 //!
 //! A case is a small controller (nodes, parameters, clips, layers) plus frames: parameter changes, then expected
-//! values (`"<node>.x|y|z|active"`) and current states (`"<layer>": "<state>"`). Every expectation is Unity's:
+//! values (`"<node>.x|y|z|active"`, a material's property as its shader receives it in curve units
+//! `"<node>:<material>:<property>"`, `null` when the material lacks it) and current states (`"<layer>": "<state>"`).
+//! Material curves target `"<node>:<property>"`. Every expectation is Unity's:
 //! `tools/unity-truth/Assets/Editor/Goldens.cs` plays the cases and records `tests/unity/goldens.json` (#54), which
 //! `golden_cases` checks them against.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use civbb_anim::material::{self, to_linear};
 use civbb_anim::{Controller, Instance, Target};
 use civbb_format::Avatar;
 use civbb_format::animator::*;
+use civbb_format::blob::BlobId;
 use civbb_format::hierarchy::{Hierarchy, Node};
+use civbb_format::material::{
+    AlphaMode, ColorSpace, ImageFormat, Material, MaterialModel, Pbr, Texture, TextureSlot, Unlit,
+};
 use civbb_format::math::Transform;
+use civbb_format::mesh::{Mesh, Submesh};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -34,6 +42,10 @@ struct NodeSpec {
     name: String,
     #[serde(default = "yes")]
     active: bool,
+    /// A renderer's materials, each its saved Unity properties: `_Color` (RGBA, gamma) alone is Unity's
+    /// `Unlit/Color`; with `_Metallic`, `_Glossiness` or `_MainTex_ST` (scale xy, offset zw) it is `Standard`.
+    #[serde(default)]
+    materials: Vec<BTreeMap<String, Value>>,
 }
 
 #[derive(Deserialize)]
@@ -237,8 +249,40 @@ impl Case {
                 }
             })
             .collect();
+        let (mut meshes, mut materials) = (Vec::new(), Vec::new());
+        for (i, n) in self.nodes.iter().enumerate().filter(|(_, n)| !n.materials.is_empty()) {
+            let submeshes = (n.materials.iter())
+                .map(|spec| {
+                    materials.push(unity_material(spec));
+                    Submesh {
+                        first_index: 0,
+                        index_count: 0,
+                        material: materials.len() as u32 - 1,
+                    }
+                })
+                .collect();
+            meshes.push(Mesh {
+                name: n.name.clone(),
+                node: i as u32 + 1,
+                submeshes,
+                ..Mesh::default()
+            });
+        }
+        let textures = if materials.is_empty() {
+            Vec::new()
+        } else {
+            vec![Texture {
+                name: "white".into(),
+                format: ImageFormat::Png,
+                color_space: ColorSpace::Srgb,
+                blob: BlobId([0; 32]),
+            }]
+        };
         Avatar {
             hierarchy: Hierarchy { nodes },
+            meshes,
+            materials,
+            textures,
             animator: Some(Animator {
                 parameters: self.params.clone(),
                 groups: vec![LayerGroup {
@@ -276,16 +320,69 @@ impl Case {
     }
 }
 
+/// A saved Unity material as the importer maps it: `Standard` to PBR (its `_MainTex` always present, so a texture
+/// slot), `Unlit/Color` to Unlit; colours gamma to linear.
+fn unity_material(spec: &BTreeMap<String, Value>) -> Material {
+    let num = |k: &str, default: f32| spec.get(k).map_or(default, |v| v.as_f64().unwrap() as f32);
+    let vec4 = |k: &str, default: [f32; 4]| {
+        spec.get(k).map_or(default, |v| {
+            serde_json::from_value(v.clone()).unwrap_or_else(|e| panic!("{k}: {e}"))
+        })
+    };
+    for k in spec.keys() {
+        assert!(
+            ["_Color", "_Metallic", "_Glossiness", "_MainTex_ST"].contains(&k.as_str()),
+            "unsupported material property {k}"
+        );
+    }
+    let c = vec4("_Color", [1.0; 4]);
+    let color = [to_linear(c[0]), to_linear(c[1]), to_linear(c[2]), c[3]];
+    let model = if spec.keys().any(|k| k != "_Color") {
+        let st = vec4("_MainTex_ST", [1.0, 1.0, 0.0, 0.0]);
+        MaterialModel::Pbr(Pbr {
+            base_color: color,
+            base_color_tex: Some(TextureSlot {
+                texture: 0,
+                uv_set: 0,
+                scale_offset: [st[0], st[1], st[2], 1.0 - st[1] - st[3]],
+            }),
+            metallic: num("_Metallic", 0.0),
+            roughness: 1.0 - num("_Glossiness", 0.5),
+            metallic_roughness_tex: None,
+            normal_tex: None,
+            normal_scale: 1.0,
+            occlusion_tex: None,
+            emissive: [0.0; 3],
+            emissive_tex: None,
+        })
+    } else {
+        MaterialModel::Unlit(Unlit { color, color_tex: None })
+    };
+    Material {
+        name: "m".into(),
+        model,
+        alpha: AlphaMode::Opaque,
+        double_sided: false,
+        render_queue: 2000,
+    }
+}
+
 fn curve(target: &str, keys: &[(f32, f32)]) -> Curve {
-    let (path, prop) = target
-        .rsplit_once('.')
-        .unwrap_or_else(|| panic!("bad curve target {target}"));
-    let property = match prop {
-        "x" => Property::Position(0),
-        "y" => Property::Position(1),
-        "z" => Property::Position(2),
-        "active" => Property::Active,
-        _ => panic!("unknown property {prop}"),
+    let (path, property) = match target.split_once(':') {
+        Some((path, prop)) => (path, Property::Material(prop.into())),
+        None => {
+            let (path, prop) = target
+                .rsplit_once('.')
+                .unwrap_or_else(|| panic!("bad curve target {target}"));
+            let property = match prop {
+                "x" => Property::Position(0),
+                "y" => Property::Position(1),
+                "z" => Property::Position(2),
+                "active" => Property::Active,
+                _ => panic!("unknown property {prop}"),
+            };
+            (path, property)
+        }
     };
     let slope = |i: usize, j: usize| (keys[j].1 - keys[i].1) / (keys[j].0 - keys[i].0);
     Curve {
@@ -329,6 +426,26 @@ fn value(c: &Controller, a: &Avatar, i: &Instance, key: &str) -> f32 {
     }
 }
 
+/// What material `<index>` of the renderer at `<node>` receives for `<property>` after the step, in curve units: the
+/// avatar's material with every slot of the renderer set, as `Island::materials` applies them (ADR 0025).
+fn material_value(c: &Controller, a: &Avatar, i: &Instance, key: &str) -> Option<f32> {
+    let mut parts = key.splitn(3, ':');
+    let (path, index, prop) = (parts.next().unwrap(), parts.next().unwrap(), parts.next().unwrap());
+    let node = a.hierarchy.nodes.iter().position(|n| n.name == path).unwrap() as u32;
+    let mesh = a.meshes.iter().position(|m| m.node == node).unwrap();
+    let sub = &a.meshes[mesh].submeshes[index.parse::<usize>().unwrap()];
+    let mut m = a.materials[sub.material as usize].clone();
+    for (slot, t) in c.bound.bindings.targets.iter().enumerate() {
+        if let Target::Material(on, field, component) = *t
+            && on as usize == mesh
+        {
+            material::set(&mut m, field, component, i.pose()[slot]);
+        }
+    }
+    let (field, component) = material::parse(prop).unwrap_or_else(|| panic!("unknown property {prop}"));
+    material::get(&m, field).map(|v| v[component as usize])
+}
+
 fn run(path: &Path, unity: &Value) {
     let name = path.file_name().unwrap().to_string_lossy();
     let recorded = unity["cases"][path.file_stem().unwrap().to_string_lossy().as_ref()]
@@ -358,7 +475,15 @@ fn run(path: &Path, unity: &Value) {
         }
         inst.update(&c, case.dt);
         for (key, want) in &frame.expect {
-            if let Some(state) = want.as_str() {
+            if key.contains(':') {
+                let got = material_value(&c, &a, &inst, key);
+                let same = match (want.as_f64(), got) {
+                    (Some(w), Some(g)) => (w as f32 - g).abs() < 1e-4,
+                    (None, None) => want.is_null(),
+                    _ => false,
+                };
+                assert!(same, "{name}: frame {f}: {key} = {got:?}, expected {want}");
+            } else if let Some(state) = want.as_str() {
                 let li = case
                     .layers
                     .iter()

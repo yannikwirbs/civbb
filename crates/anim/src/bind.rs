@@ -128,6 +128,23 @@ pub fn bind(avatar: &Avatar) -> Bound {
             b.slot(Target::Muscle(m));
         }
     }
+    // Unity writes a renderer's vector property whole: components no curve animates are 0 (ADR 0067).
+    let vectors: Vec<(MeshIndex, Field)> = (b.targets.iter())
+        .filter_map(|t| match *t {
+            Target::Material(m, f, _) if f.is_vector() => Some((m, f)),
+            _ => None,
+        })
+        .collect();
+    for (m, f) in vectors {
+        for c in 0..4 {
+            let t = Target::Material(m, f, c);
+            if !b.slots.contains_key(&t) {
+                b.slots.insert(t, b.targets.len() as Slot);
+                b.targets.push(t);
+                b.defaults.push(0.0);
+            }
+        }
+    }
     Bound {
         bindings: Bindings {
             targets: b.targets,
@@ -466,13 +483,13 @@ impl<'a> Binder<'a> {
     }
 }
 
-/// A renderer's value of a material field: the first of its submeshes' materials that has the field, as Unity reads
-/// the default from the renderer's first material (ADR 0025).
+/// A renderer's default for a material field: its first material's value, or 0 when that material lacks the field,
+/// as Unity reads it from the renderer's material 0 (ADR 0067). `None` when no material of the renderer has it.
 fn renderer_default(avatar: &Avatar, mesh: MeshIndex, field: Field) -> Option<[f32; 4]> {
-    avatar.meshes[mesh as usize]
-        .submeshes
-        .iter()
-        .find_map(|s| material::get(&avatar.materials[s.material as usize], field))
+    let get = |s: &civbb_format::mesh::Submesh| material::get(&avatar.materials[s.material as usize], field);
+    let submeshes = &avatar.meshes[mesh as usize].submeshes;
+    submeshes.iter().find_map(get)?;
+    Some(submeshes.first().and_then(get).unwrap_or([0.0; 4]))
 }
 
 enum Resolved {

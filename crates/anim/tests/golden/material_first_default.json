@@ -1,0 +1,46 @@
+{
+  "source": "Recorded in Unity (Goldens.cs, #54). Material curves write the renderer's property block, shared by all its materials: the default is material 0's value (material 1's differing colour, metallic and offset are overridden from the first frame), components no curve animates are 0, and a WD-on empty clip resets to the defaults. Keys `<node>:<material>:<property>` read what each material's shader receives, in curve units.",
+  "nodes": [{
+    "name": "Body",
+    "materials": [
+      { "_Color": [1, 0.2, 0, 1], "_Metallic": 0.2, "_MainTex_ST": [1, 1, 0.1, 0.2] },
+      { "_Color": [0, 0.4, 1, 0.5], "_Metallic": 0.6, "_MainTex_ST": [2, 2, 0.5, 0.6] }
+    ]
+  }],
+  "params": [{ "name": "p", "kind": "Bool", "default": 0 }],
+  "clips": {
+    "Empty": { "length": 1, "curves": [] },
+    "Glow": { "length": 1, "curves": [
+      ["Body:_Color.g", [[0, 1]]],
+      ["Body:_Metallic", [[0, 0.9]]],
+      ["Body:_MainTex_ST.w", [[0, 0.3]]]
+    ] }
+  },
+  "layers": [{
+    "name": "L",
+    "states": [
+      { "name": "Idle", "motion": { "clip": "Empty" }, "wd": true, "transitions": [{ "to": "On", "if": ["p"] }] },
+      { "name": "On", "motion": { "clip": "Glow" }, "wd": true, "transitions": [{ "to": "Idle", "if_not": ["p"] }] }
+    ]
+  }],
+  "dt": 0.1,
+  "frames": [
+    { "expect": {
+      "L": "Idle",
+      "Body:0:_Color.r": 0, "Body:0:_Color.g": 0.2, "Body:0:_Color.a": 0,
+      "Body:1:_Color.g": 0.2, "Body:1:_Color.b": 0,
+      "Body:1:_Metallic": 0.2,
+      "Body:1:_MainTex_ST.x": 0, "Body:1:_MainTex_ST.z": 0, "Body:1:_MainTex_ST.w": 0.2
+    } },
+    { "set": { "p": 1 }, "expect": {
+      "L": "On",
+      "Body:0:_Color.g": 1, "Body:1:_Color.g": 1, "Body:1:_Color.a": 0,
+      "Body:0:_Metallic": 0.9, "Body:1:_Metallic": 0.9,
+      "Body:1:_MainTex_ST.w": 0.3
+    } },
+    { "set": { "p": 0 }, "expect": {
+      "L": "Idle",
+      "Body:1:_Color.g": 0.2, "Body:1:_Metallic": 0.2, "Body:1:_MainTex_ST.w": 0.2
+    } }
+  ]
+}

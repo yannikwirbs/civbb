@@ -51,6 +51,21 @@
       {"A.x": 2, "B.x": 1},
       {"A.x": 2, "B.x": 1}
     ],
+    "material_first_default": [
+      {"L": "Idle", "Body:0:_Color.r": 0, "Body:0:_Color.g": 0.2, "Body:0:_Color.a": 0, "Body:1:_Color.g": 0.2, "Body:1:_Color.b": 0, "Body:1:_Metallic": 0.2, "Body:1:_MainTex_ST.x": 0, "Body:1:_MainTex_ST.z": 0, "Body:1:_MainTex_ST.w": 0.2},
+      {"L": "On", "Body:0:_Color.g": 1, "Body:1:_Color.g": 1, "Body:1:_Color.a": 0, "Body:0:_Metallic": 0.9, "Body:1:_Metallic": 0.9, "Body:1:_MainTex_ST.w": 0.3},
+      {"L": "Idle", "Body:1:_Color.g": 0.2, "Body:1:_Metallic": 0.2, "Body:1:_MainTex_ST.w": 0.2}
+    ],
+    "material_first_lacks": [
+      {"L": "Idle", "Body:0:_Metallic": null, "Body:1:_Metallic": 0, "Body:0:_Color.r": 1, "Body:1:_Color.b": 1},
+      {"L": "On", "Body:1:_Metallic": 0.9},
+      {"L": "Idle", "Body:1:_Metallic": 0}
+    ],
+    "material_write_defaults": [
+      {"WdOn": "Idle", "WdOff": "Idle", "A:0:_Metallic": 0.2, "B:0:_Metallic": 0.4},
+      {"WdOn": "On", "WdOff": "On", "A:0:_Metallic": 0.9, "B:0:_Metallic": 0.8},
+      {"WdOn": "Idle", "WdOff": "Idle", "A:0:_Metallic": 0.9, "B:0:_Metallic": 0.8}
+    ],
     "mixed_wd_sticks": [
       {"Hat.active": 0, "B.x": 2},
       {"Toggle": "On", "Hat.active": 1},

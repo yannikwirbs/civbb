@@ -1,0 +1,35 @@
+{
+  "source": "Recorded in Unity (Goldens.cs, #54). Write Defaults on material properties as on transforms: returning to a WD-on state without a motion (layer A) or to a WD-off state (layer B) keeps the last animated value; only an empty clip under WD on resets (material_first_default).",
+  "nodes": [
+    { "name": "A", "materials": [{ "_Color": [1, 1, 1, 1], "_Metallic": 0.2 }] },
+    { "name": "B", "materials": [{ "_Color": [1, 1, 1, 1], "_Metallic": 0.4 }] }
+  ],
+  "params": [{ "name": "p", "kind": "Bool", "default": 0 }, { "name": "q", "kind": "Bool", "default": 0 }],
+  "clips": {
+    "Empty": { "length": 1, "curves": [] },
+    "ShinyA": { "length": 1, "curves": [["A:_Metallic", [[0, 0.9]]]] },
+    "ShinyB": { "length": 1, "curves": [["B:_Metallic", [[0, 0.8]]]] }
+  },
+  "layers": [
+    {
+      "name": "WdOn",
+      "states": [
+        { "name": "Idle", "motion": null, "wd": true, "transitions": [{ "to": "On", "if": ["p"] }] },
+        { "name": "On", "motion": { "clip": "ShinyA" }, "wd": true, "transitions": [{ "to": "Idle", "if_not": ["p"] }] }
+      ]
+    },
+    {
+      "name": "WdOff",
+      "states": [
+        { "name": "Idle", "motion": { "clip": "Empty" }, "wd": false, "transitions": [{ "to": "On", "if": ["q"] }] },
+        { "name": "On", "motion": { "clip": "ShinyB" }, "wd": false, "transitions": [{ "to": "Idle", "if_not": ["q"] }] }
+      ]
+    }
+  ],
+  "dt": 0.1,
+  "frames": [
+    { "expect": { "WdOn": "Idle", "WdOff": "Idle", "A:0:_Metallic": 0.2, "B:0:_Metallic": 0.4 } },
+    { "set": { "p": 1, "q": 1 }, "expect": { "WdOn": "On", "WdOff": "On", "A:0:_Metallic": 0.9, "B:0:_Metallic": 0.8 } },
+    { "set": { "p": 0, "q": 0 }, "expect": { "WdOn": "Idle", "WdOff": "Idle", "A:0:_Metallic": 0.9, "B:0:_Metallic": 0.8 } }
+  ]
+}

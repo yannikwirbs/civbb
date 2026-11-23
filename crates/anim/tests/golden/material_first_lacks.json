@@ -1,0 +1,28 @@
+{
+  "source": "Recorded in Unity (Goldens.cs, #54). When the renderer's material 0 lacks an animated property (Unlit/Color has no _Metallic), the default is 0, not the next material's value; a property no curve animates keeps each material's own value.",
+  "nodes": [{
+    "name": "Body",
+    "materials": [
+      { "_Color": [1, 0, 0, 1] },
+      { "_Color": [0, 0, 1, 1], "_Metallic": 0.6 }
+    ]
+  }],
+  "params": [{ "name": "p", "kind": "Bool", "default": 0 }],
+  "clips": {
+    "Empty": { "length": 1, "curves": [] },
+    "Shiny": { "length": 1, "curves": [["Body:_Metallic", [[0, 0.9]]]] }
+  },
+  "layers": [{
+    "name": "L",
+    "states": [
+      { "name": "Idle", "motion": { "clip": "Empty" }, "wd": true, "transitions": [{ "to": "On", "if": ["p"] }] },
+      { "name": "On", "motion": { "clip": "Shiny" }, "wd": true, "transitions": [{ "to": "Idle", "if_not": ["p"] }] }
+    ]
+  }],
+  "dt": 0.1,
+  "frames": [
+    { "expect": { "L": "Idle", "Body:0:_Metallic": null, "Body:1:_Metallic": 0, "Body:0:_Color.r": 1, "Body:1:_Color.b": 1 } },
+    { "set": { "p": 1 }, "expect": { "L": "On", "Body:1:_Metallic": 0.9 } },
+    { "set": { "p": 0 }, "expect": { "L": "Idle", "Body:1:_Metallic": 0 } }
+  ]
+}

@@ -1,6 +1,8 @@
 //! Plays the animator golden cases (`crates/anim/tests/golden/*.json`, #54) in Unity: builds each case's controller
 //! with the AnimatorController API, steps it frame by frame as `golden.rs` does (parameters set, then one update of
-//! `dt`) and records every expected value and current state, so the cases' expectations come from Unity.
+//! `dt`) and records every expected value and current state, so the cases' expectations come from Unity. Material
+//! keys (`<node>:<material>:<property>`) read what the material's shader receives, in curve units: the renderer's
+//! property block (which the animator writes) when it has the property, else the material's own value.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -12,6 +14,7 @@ using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
+using UnityEngine.Rendering;
 
 public static class Goldens
 {
@@ -59,6 +62,16 @@ public static class Goldens
             go.transform.SetParent(root.transform, false);
             go.SetActive(!(Get(n, "active") is bool b) || b);
             nodes[go.name] = go;
+            var specs = L(Get(n, "materials"));
+            if (specs.Count > 0)
+            {
+                // One small triangle per material.
+                var mesh = new Mesh { vertices = new Vector3[3 * specs.Count], subMeshCount = specs.Count };
+                for (int i = 0; i < specs.Count; i++)
+                    mesh.SetTriangles(new[] { 3 * i, 3 * i + 1, 3 * i + 2 }, i);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                go.AddComponent<MeshRenderer>().sharedMaterials = specs.Select(o => MaterialOf(D(o))).ToArray();
+            }
         }
         var ctrl = new AnimatorController();
         var kinds = new Dictionary<string, string>();
@@ -84,7 +97,8 @@ public static class Goldens
             foreach (List<object> curve in L(spec["curves"]))
             {
                 var target = (string)curve[0];
-                int dot = target.LastIndexOf('.');
+                int colon = target.IndexOf(':');
+                int dot = colon >= 0 ? colon : target.LastIndexOf('.');
                 var (path, prop) = (target.Substring(0, dot), target.Substring(dot + 1));
                 var keys = L(curve[1]).Select(k => (N(L(k)[0]), N(L(k)[1]))).ToList();
                 // Linear tangents, as golden.rs builds them; a flat key at the clip's length gives Unity its length.
@@ -96,7 +110,9 @@ public static class Goldens
                     float slope(int a, int b) => (keys[b].Item2 - keys[a].Item2) / (keys[b].Item1 - keys[a].Item1);
                     frames[i] = new Keyframe(keys[i].Item1, keys[i].Item2, i > 0 ? slope(i - 1, i) : 0f, i + 1 < keys.Count ? slope(i, i + 1) : 0f);
                 }
-                if (prop == "active")
+                if (colon >= 0)
+                    clip.SetCurve(path, typeof(MeshRenderer), "material." + prop, new AnimationCurve(frames));
+                else if (prop == "active")
                     clip.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(frames));
                 else
                     clip.SetCurve(path, typeof(Transform), "m_LocalPosition." + prop, new AnimationCurve(frames));
@@ -210,6 +226,12 @@ public static class Goldens
             var parts = new List<string>();
             foreach (var key in D(frame["expect"]).Keys)
             {
+                if (key.Contains(':'))
+                {
+                    var v = MaterialValue(nodes, key);
+                    parts.Add(Str(key) + ": " + (v.HasValue ? v.Value.ToString("R", CultureInfo.InvariantCulture) : "null"));
+                    continue;
+                }
                 int li = layerNames.IndexOf(key);
                 if (li >= 0)
                 {
@@ -228,6 +250,56 @@ public static class Goldens
         graph.Destroy();
         UnityEngine.Object.DestroyImmediate(root);
         return s.Append("\n    ]").ToString();
+    }
+
+    /// A saved material: `_Color` alone is `Unlit/Color`; with `_Metallic`, `_Glossiness` or `_MainTex_ST` it is
+    /// `Standard`. Colours are RGBA as saved (gamma), `_MainTex_ST` is scale xy and offset zw.
+    static Material MaterialOf(Dictionary<string, object> spec)
+    {
+        var m = new Material(Shader.Find(spec.Keys.Any(k => k != "_Color") ? "Standard" : "Unlit/Color"));
+        foreach (var kv in spec)
+        {
+            var v = L(kv.Value).Select(N).ToArray();
+            switch (kv.Key)
+            {
+                case "_Color": m.SetColor(kv.Key, new Color(v[0], v[1], v[2], v[3])); break;
+                case "_MainTex_ST":
+                    m.SetTextureScale("_MainTex", new Vector2(v[0], v[1]));
+                    m.SetTextureOffset("_MainTex", new Vector2(v[2], v[3]));
+                    break;
+                default: m.SetFloat(kv.Key, N(kv.Value)); break;
+            }
+        }
+        return m;
+    }
+
+    /// `<node>:<material>:<property>[.component]` as the material's shader receives it, in curve units; null when
+    /// the material lacks the property.
+    static float? MaterialValue(Dictionary<string, GameObject> nodes, string key)
+    {
+        var parts = key.Split(':');
+        var r = nodes[parts[0]].GetComponent<Renderer>();
+        var mat = r.sharedMaterials[int.Parse(parts[1])];
+        int dot = parts[2].LastIndexOf('.');
+        var name = dot < 0 ? parts[2] : parts[2].Substring(0, dot);
+        int c = dot < 0 ? 0 : "rgbaxyzw".IndexOf(parts[2][dot + 1]) % 4;
+        bool st = name.EndsWith("_ST");
+        if (!mat.HasProperty(st ? name.Substring(0, name.Length - 3) : name))
+            return null;
+        bool color = !st && mat.shader.GetPropertyType(mat.shader.FindPropertyIndex(name)) == ShaderPropertyType.Color;
+        var block = new MaterialPropertyBlock();
+        r.GetPropertyBlock(block, int.Parse(parts[1]));
+        if (!block.HasProperty(name))
+            r.GetPropertyBlock(block);
+        if (block.HasProperty(name))
+            return st ? block.GetVector(name)[c] : color ? block.GetColor(name)[c] : block.GetFloat(name);
+        if (st)
+        {
+            var tex = name.Substring(0, name.Length - 3);
+            var (scale, offset) = (mat.GetTextureScale(tex), mat.GetTextureOffset(tex));
+            return new Vector4(scale.x, scale.y, offset.x, offset.y)[c];
+        }
+        return color ? mat.GetColor(name)[c] : mat.GetFloat(name);
     }
 
     static string Str(string s) => "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";

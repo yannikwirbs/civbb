@@ -33,7 +33,9 @@ A minimal Unity project that records Unity's behaviour as JSON test data (ADR 00
   `crates/anim/tests/body_pose.rs` replays it.
 - `Assets/Editor/Goldens.cs`: the animator golden cases (#54, ADR 0065): builds each `crates/anim/tests/golden/*.json`
   controller with the AnimatorController API, plays its frames (parameters set, then one evaluation of `dt`) and
-  records every expected value and current state.
+  records every expected value and current state. Nodes with `materials` get a renderer (`Unlit/Color` or `Standard`);
+  `<node>:<material>:<property>` keys read what that material's shader receives (the renderer's property block, else
+  the material), ADR 0067.
   `tools/unity-batch.sh tools/unity-truth Goldens.Record -civbbCases <abs path>/crates/anim/tests/golden -civbbOut <abs path>/crates/anim/tests/unity/goldens.json`;
   `crates/anim/tests/golden.rs` checks the cases' expectations against it. It needs no SDK, so it also runs in the SDK
   host project (2022.3) unchanged.
