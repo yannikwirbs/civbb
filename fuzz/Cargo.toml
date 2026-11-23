@@ -43,6 +43,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "compile"
+path = "fuzz_targets/compile.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "ktx2_transcode"
 path = "fuzz_targets/ktx2_transcode.rs"
 test = false

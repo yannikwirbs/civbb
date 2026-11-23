@@ -58,6 +58,10 @@ fn main() {
     let toon = import(TOON.as_bytes(), &Limits::default(), |_| None).expect("the toon seed imports");
     assert_eq!(toon.avatar.materials.len(), 7, "every toon seed material maps");
     write("gltf_import", "toon-materials.gltf", TOON.as_bytes());
+    // The stages need what the importer accepts: the same seeds, the source GLB first (toggles, chains, contacts).
+    write("compile", "lean-source.glb", &civbb_corpus::gltf::to_source_glb(&lean));
+    write("compile", "lean.glb", &glb);
+    write("compile", "toon-materials.gltf", TOON.as_bytes());
     write("avatar_validate", "lean.cbor", &cbor::to_vec(&lean));
     let imported = import(&glb, &Limits::default(), |_| None).expect("lean imports");
     let signed = package(imported, Platform::Desktop).encode_signed(&SigningKey::from_bytes(&[7; 32]));
