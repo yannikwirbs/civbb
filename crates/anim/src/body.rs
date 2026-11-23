@@ -187,50 +187,60 @@ impl RootMotion {
     }
 }
 
-/// Each bone's own mass and the bone its mass centre lies halfway to (none: at the bone). Unity's
-/// `HumanTrait.GetBoneDefaultHierarchyMass` gives a subtree's mass; a bone's own is that minus its children's.
-const MASSES: [(HumanBone, Option<HumanBone>, f32); 22] = [
-    (Hips, None, 12.0),
-    (Spine, Some(Chest), 2.5),
-    (Chest, Some(UpperChest), 12.0),
-    (UpperChest, Some(Neck), UPPER_CHEST_MASS),
-    (Neck, Some(Head), 1.0),
-    (Head, None, 4.0),
-    (LeftUpperLeg, Some(LeftLowerLeg), 10.0),
-    (LeftLowerLeg, Some(LeftFoot), 4.0),
-    (LeftFoot, Some(LeftToes), 0.8),
-    (LeftToes, None, 0.2),
-    (RightUpperLeg, Some(RightLowerLeg), 10.0),
-    (RightLowerLeg, Some(RightFoot), 4.0),
-    (RightFoot, Some(RightToes), 0.8),
-    (RightToes, None, 0.2),
-    (LeftShoulder, Some(LeftUpperArm), 0.5),
-    (LeftUpperArm, Some(LeftLowerArm), 2.0),
-    (LeftLowerArm, Some(LeftHand), 1.5),
-    (LeftHand, None, 0.5),
-    (RightShoulder, Some(RightUpperArm), 0.5),
-    (RightUpperArm, Some(RightLowerArm), 2.0),
-    (RightLowerArm, Some(RightHand), 1.5),
-    (RightHand, None, 0.5),
+/// Each bone's own mass, the bone its mass centre lies towards (none: at the bone) and how far. Unity's
+/// `HumanTrait.GetBoneDefaultHierarchyMass` gives a subtree's mass; a bone's own is that minus its children's. The
+/// fractions are fitted to `BodyPose.cs`'s recordings (#96, ADR 0073): halfway along most segments, feet at the joint,
+/// the upper chest 7/12 of the way to the neck, and the left upper arm (not the right) 1/8 of the way to the elbow.
+const MASSES: [(HumanBone, Option<HumanBone>, f32, f32); 22] = [
+    (Hips, None, 12.0, 0.0),
+    (Spine, Some(Chest), 2.5, 0.5),
+    (Chest, Some(UpperChest), 12.0, 0.5),
+    (UpperChest, Some(Neck), UPPER_CHEST_MASS, 7.0 / 12.0),
+    (Neck, Some(Head), 1.0, 0.5),
+    (Head, None, 4.0, 0.0),
+    (LeftUpperLeg, Some(LeftLowerLeg), 10.0, 0.5),
+    (LeftLowerLeg, Some(LeftFoot), 4.0, 0.5),
+    (LeftFoot, None, 0.8, 0.0),
+    (LeftToes, None, TOES_MASS, 0.0),
+    (RightUpperLeg, Some(RightLowerLeg), 10.0, 0.5),
+    (RightLowerLeg, Some(RightFoot), 4.0, 0.5),
+    (RightFoot, None, 0.8, 0.0),
+    (RightToes, None, TOES_MASS, 0.0),
+    (LeftShoulder, Some(LeftUpperArm), 0.5, 0.5),
+    (LeftUpperArm, Some(LeftLowerArm), 2.0, 0.125),
+    (LeftLowerArm, Some(LeftHand), 1.5, 0.5),
+    (LeftHand, None, 0.5, 0.0),
+    (RightShoulder, Some(RightUpperArm), 0.5, 0.5),
+    (RightUpperArm, Some(RightLowerArm), 2.0, 0.5),
+    (RightLowerArm, Some(RightHand), 1.5, 0.5),
+    (RightHand, None, 0.5, 0.0),
 ];
 
 /// The mass-weighted centre of the bones `pos` places. A missing bone adds no mass and a missing child puts the
-/// mass at the bone, except a missing upper chest (9 of 13 corpus avatars): the chest's segment then runs to the
-/// neck and the upper chest's mass sits three quarters of the way up it. Recorded without upper chest, and without
-/// upper chest and toes: within 7 mm, as against 5 mm with every bone.
+/// mass at the bone, except where Unity keeps the mass in the parent: missing toes weigh at their foot, and a missing
+/// upper chest (9 of 13 corpus avatars) runs the chest's segment to the neck and puts the upper chest's mass 5/6 of
+/// the way up it. Within 0.6 mm on the recordings with every bone, 1.3 mm without upper chest (and toes).
 pub fn center_of_mass(pos: impl Fn(HumanBone) -> Option<Vec3>) -> Vec3 {
     let (mut sum, mut total) = ([0.0; 3], 0.0);
     let no_upper_chest = pos(UpperChest).is_none();
-    for (bone, child, mass) in MASSES {
+    for (bone, child, mut mass, f) in MASSES {
         if let Some(p) = pos(bone) {
             let child = child.map(|c| if c == UpperChest && no_upper_chest { Neck } else { c });
-            let at = child.and_then(&pos).map_or(p, |c| scale(add(p, c), 0.5));
+            let at = child.and_then(&pos).map_or(p, |c| add(p, scale(sub(c, p), f)));
+            let toes = match bone {
+                LeftFoot => Some(LeftToes),
+                RightFoot => Some(RightToes),
+                _ => None,
+            };
+            if toes.is_some_and(|t| pos(t).is_none()) {
+                mass += TOES_MASS;
+            }
             sum = add(sum, scale(at, mass));
             total += mass;
         }
     }
     if let (true, Some(chest), Some(neck)) = (no_upper_chest, pos(Chest), pos(Neck)) {
-        let at = add(chest, scale(sub(neck, chest), 0.75));
+        let at = add(chest, scale(sub(neck, chest), 5.0 / 6.0));
         sum = add(sum, scale(at, UPPER_CHEST_MASS));
         total += UPPER_CHEST_MASS;
     }
@@ -239,6 +249,8 @@ pub fn center_of_mass(pos: impl Fn(HumanBone) -> Option<Vec3>) -> Vec3 {
 
 /// The upper chest's own mass in [`MASSES`].
 const UPPER_CHEST_MASS: f32 = 12.0;
+/// A toe's own mass in [`MASSES`].
+const TOES_MASS: f32 = 0.2;
 
 /// The body's axes as a rotation: Y from the upper legs' midpoint to the upper arms', X the sum of the upper arms'
 /// and upper legs' left-to-right vectors made perpendicular to Y. Unity's body rotation is this relative to the

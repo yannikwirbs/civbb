@@ -263,6 +263,7 @@ Internal deps: none
 - `docs/adr/0070-physbone-collision-friction.md`: 0070: PhysBone collider pushes slow the velocity by the SDK's friction and skip contact at a bone's start
 - `docs/adr/0071-physbone-turns-compose.md`: 0071: A PhysBone bone's turn composes on its parent's
 - `docs/adr/0072-muscle-frames-from-the-build-skeleton.md`: 0072: Unity's muscle frames follow the skeleton the Avatar was built from; thumbs need no extra rule
+- `docs/adr/0073-centre-of-mass-fitted.md`: 0073: The centre of mass with Unity's per-bone mass positions, fitted
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

@@ -46,12 +46,13 @@ What exists, by area. Read the section for the area you touch; update it when th
   own node's world scale (an endpoint's with its leaf), recorded with scaled bones against unscaled colliders (#90).
 - The body pose (#52, ADR 0063, format v22): the exporter writes `Animator.humanScale` and every humanoid clip's
   root-motion settings (`Clip::root`). `civbb_anim::body` has Unity's body pose as recorded (`BodyPose.cs`): centre of
-  mass from Unity's mass table at segment midpoints (within 5 mm; 7 mm without upper chest, whose mass then sits
-  three quarters up the chest-to-neck segment), orientation from the upper legs' and arms' midpoints and left-to-right
+  mass from Unity's mass table (within 0.6 mm; 1.3 mm without upper chest, whose mass then sits 5/6 up the
+  chest-to-neck segment), orientation from the upper legs' and arms' midpoints and left-to-right
   vectors (0.33 degrees); `RootMotion` applies the bake/original/loop-pose/offset settings with root motion discarded
-  (exact against `RootMotion.cs`'s 516 cases); `BodyRig::place` puts the hips (within 5 mm) when a layer wrote a body
-  slot, which follows the mask's Root part; otherwise the hips stay at rest. The mass model is anchored to Unity's rest
-  centre of mass (`Humanoid::center_of_mass`, exported): hips within 2 to 4 mm of Unity's on recorded clips (#96).
+  (exact against `RootMotion.cs`'s 516 cases); `BodyRig::place` puts the hips when a layer wrote a body slot, which
+  follows the mask's Root part; otherwise the hips stay at rest. Mass positions per bone fitted (ADR 0073: halfway, at
+  the joint for hips, head, hands and feet, upper chest 7/12, left upper arm 1/8), anchored to Unity's rest centre of
+  mass (`Humanoid::center_of_mass`, exported): hips within 1 mm of Unity's on recorded clips.
 - Muscle frames for glTF/VRM humanoids (#53, ADR 0064): `civbb_anim::frames::derive` builds Unity's frames from the
   rest pose (post X along the bone, roll from a fixed avatar axis, pre = a fixed avatar-space turn of the post frame;
   `MuscleFrames.cs` variants, hand geometry included, within 0.05 degrees); the importer derives them when a humanoid

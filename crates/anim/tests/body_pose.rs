@@ -95,7 +95,7 @@ fn body_pose_matches_unity() {
                 c.name
             );
             assert!(
-                d < 0.007,
+                d < 0.0015,
                 "rolled {} unmapped {:?} {}: centre of mass off by {d} m",
                 s.rolled,
                 s.unmapped,
@@ -104,9 +104,9 @@ fn body_pose_matches_unity() {
             worst_angle = worst_angle.max(a);
             worst_com = worst_com.max(d);
         }
-        // The residuals are real (no point-mass model fits better than 1.7 mm): keep the bounds honest.
+        // The residuals are real (Unity's own axis lengths would fit closer, ADR 0073): keep the bounds honest.
         assert!(
-            worst_angle > 0.15 && worst_com > 0.004,
+            worst_angle > 0.15 && worst_com > 0.0004,
             "{worst_angle} {worst_com}: tighten the bounds"
         );
     }

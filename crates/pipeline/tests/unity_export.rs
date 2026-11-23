@@ -279,7 +279,15 @@ fn exported_avatars_match_unity() {
                     w.hips_rotation.0, w.hips_position.0, w.hips_position.1
                 );
             }
-            if w.compared == 0 || w.rotation.0 > 0.1 || w.position.0 > 1e-4 || w.scale.0 > 1e-4 || w.shape.0 > 0.01 {
+            // Hips placed from the body pose with the fitted mass model (ADR 0073): within 1.5 mm.
+            let hips = w.hips_position.0 > 0.0015 || w.hips_rotation.0 > 0.1;
+            if w.compared == 0
+                || w.rotation.0 > 0.1
+                || w.position.0 > 1e-4
+                || w.scale.0 > 1e-4
+                || w.shape.0 > 0.01
+                || hips
+            {
                 failures.push(format!("{name} {what}"));
             }
         };
