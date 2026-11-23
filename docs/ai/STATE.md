@@ -54,8 +54,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   centre of mass (`Humanoid::center_of_mass`, exported): hips within 2 to 4 mm of Unity's on recorded clips (#96).
 - Muscle frames for glTF/VRM humanoids (#53, ADR 0064): `civbb_anim::frames::derive` builds Unity's frames from the
   rest pose (post X along the bone, roll from a fixed avatar axis, pre = a fixed avatar-space turn of the post frame;
-  `MuscleFrames.cs` variants within 0.0002 degrees); the importer derives them when a humanoid has none. On the
-  T-posed exports body and limbs match, fingers within 8 degrees, thumbs 10 to 28 off (#95).
+  `MuscleFrames.cs` variants, hand geometry included, within 0.05 degrees); the importer derives them when a humanoid
+  has none. Derived from the skeleton each export's `Avatar` was built from (`BuildSkeleton.cs`; its thumbs and
+  fingers differ from the prefab's rest), every export's frames match within 0.15 degrees, Blackbird's shoulders 1.75
+  (ADR 0072).
 - Reference renders (#79, ADR 0048): the host project has lilToon 2.4.1 (embedded package), Poiyomi 7.3.050 and
   UTS2 2.0.9 (unpacked into `Assets/`, GUIDs kept), so all 13 exports render with their shaders.
   `Civbb.Exporter.Reference.Render` (`tools/unity-exporter/Editor/Reference.cs`, `tools/unity-batch.sh --graphics`)

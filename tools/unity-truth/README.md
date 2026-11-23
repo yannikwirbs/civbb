@@ -41,9 +41,15 @@ A minimal Unity project that records Unity's behaviour as JSON test data (ADR 00
   host project (2022.3) unchanged.
 - `Assets/Editor/MuscleFrames.cs`: the muscle frames Unity's `AvatarBuilder` derives (#53, ADR 0064) on the generated
   humanoid reshaped one way at a time (rolled axes, sloped shoulders, A-pose, arms forward, bent elbows, curved spine,
-  legs apart, bent hands, curled fingers, turned feet, tilted hips, turned head): each mapped bone's pre, post and
+  legs apart, bent hands, curled fingers, turned feet, tilted hips, turned head; thumb roots moved, thumbs turned and
+  twisted, fingers fanned and moved, hand rolled, #95): each mapped bone's pre, post and
   limit sign. `tools/unity-batch.sh tools/unity-truth MuscleFrames.Record -civbbOut <abs path>/crates/anim/tests/unity/muscle_frames.json`;
   `crates/anim/tests/muscle_frames.rs` replays it.
+- `Assets/Editor/BuildSkeleton.cs`: the skeleton each export's `Avatar` was built from (`humanDescription.skeleton`,
+  #95, ADR 0072), which Unity's muscle frames follow and whose thumbs and fingers often differ from the prefab's rest.
+  Third-party data: copy it into the exporter host project and write to `corpus/local/unity-truth`:
+  `tools/unity-batch.sh corpus/local/unity-export-vrc BuildSkeleton.Record -civbbList <abs path>/corpus/local/unity-glb/exports.txt -civbbOut <abs path>/corpus/local/unity-truth`;
+  `crates/pipeline/tests/unity_export.rs` derives frames from it.
 - `Assets/Editor/RootMotion.cs`: a humanoid clip's root-motion settings (#52, ADR 0063): one clip whose body pose moves
   and turns, played with `applyRootMotion` off under every combination of the bake, keep-original, feet and loop-pose
   flags, with and without orientation and level offsets, plus non-looping and cycle-offset cases; per sample the hips

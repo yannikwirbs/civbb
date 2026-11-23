@@ -64,6 +64,14 @@ fn dist(a: [f32; 3], b: [f32; 3]) -> f32 {
 }
 
 /// Largest errors of one comparison, with where they happened.
+/// One bone of the skeleton Unity built an `Avatar` from, in Unity's axes.
+#[derive(Deserialize)]
+struct SkeletonBone {
+    name: String,
+    position: [f32; 3],
+    rotation: [f32; 4],
+}
+
 #[derive(Default)]
 struct Worst {
     rotation: (f32, String),
@@ -340,10 +348,11 @@ fn exported_standard_senders_sit_on_their_bones() {
     eprintln!("{checked} standard senders on their bones");
 }
 
-/// Muscle frames derived from the rest pose (ADR 0064) against the ones Unity built for each export: body and limbs
-/// within 2.5 degrees (exact on most), fingers within 8 (their spread follows the hand). Thumbs (#95) and eyes
-/// are reported, not checked, as are avatars whose Unity `Avatar` came from another pose than the prefab's rest
-/// (KohzieBoi, Megumi, Taro).
+/// Muscle frames derived (ADR 0064) against the ones Unity built for each export, from the skeleton Unity built the
+/// `Avatar` from (`corpus/local/unity-truth/<name>.skeleton.json` by `BuildSkeleton.cs`: thumbs and fingers often
+/// differ from the prefab's rest, ADR 0072): every bone within 0.15 degrees (Blackbird's shoulders 1.75). Without
+/// that file the prefab's rest is used: body and limbs within 2.5 degrees, fingers 8, thumbs and eyes reported, and
+/// avatars built from another pose (KohzieBoi, Megumi, Taro) only reported.
 #[test]
 fn derived_muscle_frames_match_unity_exports() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/local/unity-glb");
@@ -358,7 +367,18 @@ fn derived_muscle_frames_match_unity_exports() {
         }
         let name = path.file_stem().unwrap().to_string_lossy().into_owned();
         let bytes = std::fs::read(&path).unwrap();
-        let avatar = import(&bytes, &Limits::default(), |_| None).unwrap().avatar;
+        let mut avatar = import(&bytes, &Limits::default(), |_| None).unwrap().avatar;
+        let skeleton = dir.join(format!("../unity-truth/{name}.skeleton.json"));
+        let built = std::fs::read_to_string(&skeleton).ok().map(|text| {
+            let bones: Vec<SkeletonBone> = serde_json::from_str(&text).unwrap();
+            for b in bones {
+                if let Some(n) = avatar.hierarchy.nodes.iter_mut().find(|n| n.name == b.name) {
+                    let (p, q) = (b.position, b.rotation);
+                    n.rest.translation = [-p[0], p[1], p[2]];
+                    n.rest.rotation = [q[0], -q[1], -q[2], q[3]];
+                }
+            }
+        });
         let Some(h) = &avatar.humanoid else { continue };
         let derived = civbb_anim::frames::derive(&avatar.hierarchy, h);
         let (mut worst, mut at) = (0.0f32, String::new());
@@ -370,9 +390,9 @@ fn derived_muscle_frames_match_unity_exports() {
             let e = angle(d.pre, f.pre).max(angle(d.post, f.post));
             let bone = format!("{:?}", f.bone);
             let finger = ["Proximal", "Intermediate", "Distal"].iter().any(|j| bone.ends_with(j));
-            let checked = !bone.contains("Thumb") && !bone.ends_with("Eye");
-            // Fingers get a wider bound: their spread follows the hand.
-            let e = if finger { e * 2.5 / 8.0 } else { e };
+            let checked = built.is_some() || (!bone.contains("Thumb") && !bone.ends_with("Eye"));
+            // From the prefab's rest, fingers get a wider bound: Unity built them from another pose.
+            let e = if finger && built.is_none() { e * 2.5 / 8.0 } else { e };
             if e > 0.1 && std::env::var_os("CIVBB_FRAMES").is_some() {
                 eprintln!(
                     "  {name} {:?}: pre {:.2} post {:.2}",
@@ -392,7 +412,12 @@ fn derived_muscle_frames_match_unity_exports() {
             "{name}: {} frames, worst {worst:.3} degrees ({at})",
             h.muscle_frames.len()
         );
-        if worst > 2.5 && !["KohzieBoi", "Megumi", "Taro"].contains(&name.as_str()) {
+        let bound = match (&built, name.starts_with("Blackbird")) {
+            (Some(()), false) => 0.15,
+            (Some(()), true) => 1.8,
+            (None, _) => 2.5,
+        };
+        if worst > bound && (built.is_some() || !["KohzieBoi", "Megumi", "Taro"].contains(&name.as_str())) {
             failures.push(format!("{name}: {at} off by {worst} degrees"));
         }
     }

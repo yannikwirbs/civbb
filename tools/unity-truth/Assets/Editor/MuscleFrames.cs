@@ -40,6 +40,18 @@ public static class MuscleFrames
                 ("feet_turned", false, new[] { ("LeftFoot", Vector3.up, 20f), ("LeftToes", Vector3.right, 15f) }),
                 ("hips_tilted", false, new[] { ("Hips", Vector3.right, 12f) }),
                 ("head_turned", false, new[] { ("Head", Vector3.up, 25f), ("Head", Vector3.right, 10f) }),
+                // The hand's geometry (#95): `~` moves a bone and everything below it by axis x value (metres).
+                ("thumb_root_low", false, new[] { ("~LeftThumbProximal", Vector3.down, 0.02f) }),
+                ("thumb_root_wrist", false, new[] { ("~LeftThumbProximal", Vector3.right, 0.03f) }),
+                ("thumb_root_forward", false, new[] { ("~LeftThumbProximal", Vector3.forward, 0.02f) }),
+                ("thumb_turned_down", false, new[] { ("LeftThumbProximal", Vector3.forward, 25f) }),
+                ("thumb_turned_out", false, new[] { ("LeftThumbProximal", Vector3.up, -30f) }),
+                ("thumb_twisted", false, new[] { ("LeftThumbProximal", Vector3.right, 40f) }),
+                ("fingers_fanned", false, new[] { ("LeftIndexProximal", Vector3.up, 15f), ("LeftLittleProximal", Vector3.up, -15f) }),
+                ("index_forward", false, new[] { ("~LeftIndexProximal", Vector3.forward, 0.02f) }),
+                ("little_low", false, new[] { ("~LeftLittleProximal", Vector3.down, 0.015f) }),
+                ("middle_high", false, new[] { ("~LeftMiddleProximal", Vector3.up, 0.01f) }),
+                ("hand_rolled", false, new[] { ("LeftHand", Vector3.right, 30f) }),
             };
             var s = new StringBuilder("{\n  \"unity\": \"" + Application.unityVersion + "\",\n  \"variants\": [");
             for (int v = 0; v < variants.Length; v++)
@@ -66,9 +78,19 @@ public static class MuscleFrames
         {
             foreach (var (bone, axis, degrees) in turns)
             {
-                foreach (var side in bone.StartsWith("Left") ? new[] { "Left", "Right" } : new[] { "" })
+                bool move = bone.StartsWith("~");
+                var name = move ? bone.Substring(1) : bone;
+                foreach (var side in name.StartsWith("Left") ? new[] { "Left", "Right" } : new[] { "" })
                 {
-                    var t = named[side == "" ? bone : bone.Replace("Left", side)];
+                    var t = named[side == "" ? name : name.Replace("Left", side)];
+                    if (move)
+                    {
+                        var by = axis * degrees;
+                        if (side == "Right")
+                            by.x = -by.x;
+                        t.position += by;
+                        continue;
+                    }
                     // Mirroring X keeps rotations about X and negates those about Y and Z.
                     float sign = side == "Right" && axis.x == 0f ? -1f : 1f;
                     var below = t.GetComponentsInChildren<Transform>();
