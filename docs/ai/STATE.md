@@ -67,7 +67,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   run as our runtime runs them (SDK proxy clips empty, humanoid only with muscle clips, hips at rest when no playing clip has body curves (ADR 0063),
   descriptor masks applied, shader time pinned to 0, ADR 0062). It logs every state's layers (mixer and clip weights) and muscles (`CIVBB <state>`), and runs the SDK's
   parameter drivers and layer controls through their client hooks (ADR 0056). Not yet part of an
-  export or `civbb build --report` (`unity_parity`).
+  export or `civbb build --report` (`unity_parity`): #98, Phase 3 (ADR 0075).
+- No NDMF / Modular Avatar / VRCFury build before export (ADR 0075, #97, Phase 3): none of the 13 local packages
+  uses them (survey on #36).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
   `.unitypackage` or Unity YAML.
 - Exporter (ADR 0038): UPM package `tools/unity-exporter` in this repo (not a separate repo), excluded from the

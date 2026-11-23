@@ -265,6 +265,7 @@ Internal deps: none
 - `docs/adr/0072-muscle-frames-from-the-build-skeleton.md`: 0072: Unity's muscle frames follow the skeleton the Avatar was built from; thumbs need no extra rule
 - `docs/adr/0073-centre-of-mass-fitted.md`: 0073: The centre of mass with Unity's per-bone mass positions, fitted
 - `docs/adr/0074-physbone-output-between-steps.md`: 0074: PhysBone output between fixed steps, and step timing within a frame
+- `docs/adr/0075-phase-0-exporter-scope.md`: 0075: Phase 0 exporter without the non-destructive build and export-time renders
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
