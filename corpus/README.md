@@ -6,6 +6,8 @@ third-party stays in `corpus/local/` (gitignored, design doc §21).
 Layout of `corpus/local/` as the tests expect it:
 
 - `khronos/`: Khronos glTF samples (fetch list on #9).
+- `khronos-quantized/<Name>/{glTF,glTF-Quantized}/`: AnimatedMorphCube, Avocado, Duck and Lantern from
+  glTF-Sample-Assets `Models/<Name>/`, both folders whole (#45).
 - `vrm/`: VRM files.
 - `glb/`: Booth avatars converted from FBX.
 - `booth/<name>/`: extracted Booth archives and loose `.unitypackage` downloads; `tools/blender/`: portable Blender.

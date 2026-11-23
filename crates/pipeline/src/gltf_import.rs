@@ -87,7 +87,7 @@ pub fn import(
     if bytes.starts_with(b"glTF") && glb_length.is_some_and(|l| l < 12) {
         return Err(ImportError("GLB length shorter than its header".into()));
     }
-    let gltf = parse(bytes).map_err(|e| ImportError(e.to_string()))?;
+    let gltf = parse(bytes).map_err(ImportError)?;
     let mut im = Importer {
         doc: &gltf.document,
         resolve: &resolve,
@@ -182,9 +182,24 @@ pub fn import(
 
 /// Parses and validates the document. gltf-json's validation indexes each primitive's POSITION accessor before
 /// checking that index (fuzz crash 703dba39), so that check runs first.
-fn parse(bytes: &[u8]) -> Result<gltf::Gltf, gltf::Error> {
-    let unchecked = gltf::Gltf::from_slice_without_validation(bytes)?;
-    let json = unchecked.document.into_json();
+///
+/// `KHR_mesh_quantization` is accepted (gltf-json refuses it as required): the accessor reader already converts
+/// every component type. Required Draco or meshopt compression is refused (ADR 0076); when only used, both carry
+/// uncompressed fallback data, which is read.
+fn parse(bytes: &[u8]) -> Result<gltf::Gltf, String> {
+    let unchecked = gltf::Gltf::from_slice_without_validation(bytes).map_err(|e| e.to_string())?;
+    let mut json = unchecked.document.into_json();
+    let compressed = ["KHR_draco_mesh_compression", "EXT_meshopt_compression"];
+    if let Some(ext) = json
+        .extensions_required
+        .iter()
+        .find(|e| compressed.contains(&e.as_str()))
+    {
+        return Err(format!(
+            "{ext} is not supported: export the file without mesh compression"
+        ));
+    }
+    json.extensions_required.retain(|e| e != "KHR_mesh_quantization");
     let positions = Checked::Valid(gltf::json::mesh::Semantic::Positions);
     let bad = json
         .meshes
@@ -194,13 +209,12 @@ fn parse(bytes: &[u8]) -> Result<gltf::Gltf, gltf::Error> {
         .any(|i| i.value() >= json.accessors.len());
     if bad {
         let error = gltf::json::validation::Error::IndexOutOfBounds;
-        return Err(gltf::Error::Validation(vec![(
-            gltf::json::Path::new().field("POSITION accessor"),
-            error,
-        )]));
+        return Err(
+            gltf::Error::Validation(vec![(gltf::json::Path::new().field("POSITION accessor"), error)]).to_string(),
+        );
     }
     Ok(gltf::Gltf {
-        document: Document::from_json(json)?,
+        document: Document::from_json(json).map_err(|e| e.to_string())?,
         blob: unchecked.blob,
     })
 }

@@ -210,6 +210,87 @@ fn edge_cases_import() {
     assert_eq!((ry.binding.path.as_str(), ry.keys[0].out_tangent), ("Twin", 0.1));
 }
 
+/// `KHR_mesh_quantization` (#45): integer positions, normals, morph deltas and morph weight keys, dequantised by
+/// the node's scale and glTF normalisation.
+#[test]
+fn quantized_attributes_import() {
+    let le = |v: &[u16]| v.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>();
+    let mut bin = le(&[0, 0, 0, 0, 200, 0, 0, 0, 0, 300, 0, 0]); // 0: u16 positions, stride 8
+    bin.extend([0u8, 0, 127, 0, 0, 0, 127, 0, 0, 0, 127, 0]); // 24: i8 normalised normals, stride 4
+    bin.extend(le(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0xffff, 0, 0])); // 36: i16 morph deltas (0, -1, 0) on vertex 2
+    bin.extend(f32s(&[0.0, 1.0])); // 60: times
+    bin.extend([0u8, 51, 0, 0]); // 68: u8 normalised weights 0 and 0.2
+    let view = |offset: usize, len: usize, stride: Option<usize>| {
+        let mut v = json!({"buffer": 0, "byteOffset": offset, "byteLength": len});
+        if let Some(s) = stride {
+            v["byteStride"] = json!(s);
+        }
+        v
+    };
+    let doc = json!({
+        "extensionsUsed": ["KHR_mesh_quantization"],
+        "extensionsRequired": ["KHR_mesh_quantization"],
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"mesh": 0, "scale": [0.01, 0.01, 0.01]}],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1}, "targets": [{"POSITION": 2}]}]}],
+        "bufferViews": [view(0, 24, Some(8)), view(24, 12, Some(4)), view(36, 24, Some(8)), view(60, 8, None), view(68, 2, None)],
+        "accessors": [
+            {"bufferView": 0, "componentType": 5123, "count": 3, "type": "VEC3", "min": [0, 0, 0], "max": [200, 300, 0]},
+            {"bufferView": 1, "componentType": 5120, "normalized": true, "count": 3, "type": "VEC3"},
+            {"bufferView": 2, "componentType": 5122, "count": 3, "type": "VEC3"},
+            {"bufferView": 3, "componentType": 5126, "count": 2, "type": "SCALAR"},
+            {"bufferView": 4, "componentType": 5121, "normalized": true, "count": 2, "type": "SCALAR"},
+        ],
+        "animations": [{
+            "samplers": [{"input": 3, "output": 4}],
+            "channels": [{"sampler": 0, "target": {"node": 0, "path": "weights"}}],
+        }],
+    });
+    let a = import(&gltf(doc, &bin), &Limits::default(), no_files).unwrap().avatar;
+    let m = &a.meshes[0];
+    assert_eq!(m.positions, [[0.0, 0.0, 0.0], [200.0, 0.0, 0.0], [0.0, 300.0, 0.0]]);
+    assert_eq!(m.normals, [[0.0, 0.0, 1.0]; 3]);
+    let d = &m.blend_shapes[0].deltas;
+    assert_eq!((d.len(), d[0].vertex, d[0].position), (1, 2, [0.0, -1.0, 0.0]));
+    let mesh_node = a.hierarchy.nodes.iter().find(|n| n.rest.scale == [0.01; 3]);
+    assert!(mesh_node.is_some(), "the node's dequantisation scale is kept");
+    let keys = &a.clips[0].curves[0].keys;
+    assert!(
+        (keys[1].value - 20.0).abs() < 1e-4,
+        "normalised u8 weight: {}",
+        keys[1].value
+    );
+}
+
+/// The Khronos `glTF-Quantized` samples in `corpus/local/khronos-quantized/<Name>/` (gitignored; fetched from
+/// glTF-Sample-Assets with their `glTF` originals, #45) rest within 0.1 % of the originals' world bounds.
+#[test]
+fn khronos_quantized_samples_match_originals() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/local/khronos-quantized");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        eprintln!("skipped: {} not present", dir.display());
+        return;
+    };
+    let load = |model: &std::path::Path, variant: &str| {
+        let d = model.join(variant);
+        let name = model.file_name().unwrap().to_str().unwrap();
+        let bytes = std::fs::read(d.join(format!("{name}.gltf"))).unwrap();
+        let a = import(&bytes, &Limits::default(), dir_resolver(&d, Limits::default().bytes))
+            .unwrap_or_else(|e| panic!("{name} {variant}: {e}"))
+            .avatar;
+        civbb_client::parity::rest_bounds(&a)
+    };
+    for model in entries.flatten().map(|e| e.path()) {
+        let (q, o) = (load(&model, "glTF-Quantized"), load(&model, "glTF"));
+        let extent = (0..3).map(|k| o.1[k] - o.0[k]).fold(0.0f32, f32::max);
+        let off = (0..3)
+            .map(|k| (q.0[k] - o.0[k]).abs().max((q.1[k] - o.1[k]).abs()))
+            .fold(0.0f32, f32::max);
+        eprintln!("{}: bounds differ by {off:.2e} of extent {extent:.3}", model.display());
+        assert!(off <= 1e-3 * extent, "{}: {q:?} vs {o:?}", model.display());
+    }
+}
+
 /// `X_*` node indices are glTF indices and clip indices count the extension's own clips: with a synthetic root
 /// and one glTF animation both move.
 #[test]
@@ -355,9 +436,15 @@ fn hostile_input_is_rejected_without_panicking() {
         d["meshes"][0]["primitives"][0]["indices"] = json!(0)
     });
     reject("Unsupported extension", &|d| {
-        d["extensionsRequired"] = json!(["KHR_draco_mesh_compression"]);
-        d["extensionsUsed"] = json!(["KHR_draco_mesh_compression"]);
+        d["extensionsRequired"] = json!(["KHR_lights_punctual"]);
+        d["extensionsUsed"] = json!(["KHR_lights_punctual"]);
     });
+    for ext in ["KHR_draco_mesh_compression", "EXT_meshopt_compression"] {
+        reject("export the file without mesh compression", &|d| {
+            d["extensionsRequired"] = json!(["KHR_mesh_quantization", ext]);
+            d["extensionsUsed"] = json!(["KHR_mesh_quantization", ext]);
+        });
+    }
     reject("cannot load", &|d| {
         d["buffers"] = json!([{"byteLength": 36, "uri": "../secret.bin"}])
     });

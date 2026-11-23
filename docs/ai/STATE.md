@@ -94,6 +94,8 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 ## Compiler (`civbb-pipeline`)
 
+- glTF input (ADR 0076): `KHR_mesh_quantization` accepted (integer attributes, morph deltas and animation outputs
+  through the normalising accessor reader); required Draco or meshopt compression refused with an export hint.
 - Per-avatar report (ADR 0032): `civbb build <src> --key <k> --report r.json [--measure]` writes `r.json` and `r.md`:
   stats after import and after each stage (`civbb_pipeline::compile` runs them), package size, and with
   `--measure` the output of `civbb-client measure` (run as a process from next to `civbb`; release only): `bench`
@@ -213,4 +215,4 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 ## Test data
 
-- Test avatars: `civbb-corpus` (`lean()`, `bloated()`, `generate`, `gltf::to_glb`), and locally `corpus/local/khronos/` (23 Khronos samples) `corpus/local/vrm/` (AliciaSolid 0.x, Seed-san and the twist sample 1.0) and `corpus/local/glb/` (Booth FBX conversions: HAOLAN, Taro, Tessakuchan, Yumeka, Little Blackbird, Ostgaroa, Cokoro), `corpus/local/unity-glb/` (13 exporter outputs, listed with their prefabs in its `exports.txt`) and `corpus/local/unity-truth/` (Unity recordings); see `corpus/README.md`. `civbb inspect <file>` prints what an avatar contains.
+- Test avatars: `civbb-corpus` (`lean()`, `bloated()`, `generate`, `gltf::to_glb`), and locally `corpus/local/khronos/` (23 Khronos samples), `corpus/local/khronos-quantized/` (4 `KHR_mesh_quantization` samples with their originals, #45) `corpus/local/vrm/` (AliciaSolid 0.x, Seed-san and the twist sample 1.0) and `corpus/local/glb/` (Booth FBX conversions: HAOLAN, Taro, Tessakuchan, Yumeka, Little Blackbird, Ostgaroa, Cokoro), `corpus/local/unity-glb/` (13 exporter outputs, listed with their prefabs in its `exports.txt`) and `corpus/local/unity-truth/` (Unity recordings); see `corpus/README.md`. `civbb inspect <file>` prints what an avatar contains.

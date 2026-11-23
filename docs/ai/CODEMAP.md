@@ -266,6 +266,7 @@ Internal deps: none
 - `docs/adr/0073-centre-of-mass-fitted.md`: 0073: The centre of mass with Unity's per-bone mass positions, fitted
 - `docs/adr/0074-physbone-output-between-steps.md`: 0074: PhysBone output between fixed steps, and step timing within a frame
 - `docs/adr/0075-phase-0-exporter-scope.md`: 0075: Phase 0 exporter without the non-destructive build and export-time renders
+- `docs/adr/0076-gltf-mesh-quantization-yes-compression-no.md`: 0076: glTF input accepts KHR_mesh_quantization and refuses required Draco and meshopt compression
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
