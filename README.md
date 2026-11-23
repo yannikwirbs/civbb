@@ -2,7 +2,7 @@
 
 *Chatting in VR but Better* (codename). An open-source social VR platform on a custom Rust + Vulkan engine where every per-avatar system runs as parallel jobs, and existing avatar projects are compiled into an optimised native format instead of emulated.
 
-Status: **Phase 0, pre-alpha.** Nothing to play yet. Phase 0 proves the core idea: popular, heavy avatars can be compiled into a much cheaper form that looks and behaves the same.
+Status: **pre-alpha.** Nothing to play yet. Phase 0 sets out to prove the core idea: popular, heavy avatars can be compiled into a much cheaper form that looks and behaves the same. Behaviour is proven against Unity and the VRChat SDK; the comparison with Unity's CPU cost and visual parity against Unity's renders are still open ([M0.11](https://github.com/yannikwirbs/civbb/milestone/15), ADR 0078).
 
 - Progress: [milestones](https://github.com/yannikwirbs/civbb/milestones) · [current status](docs/ai/STATUS.md)
 - Spec: [design doc](docs/design-doc.md) · [architecture](docs/ARCHITECTURE.md) · [decisions (ADRs)](docs/adr/)

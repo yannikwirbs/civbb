@@ -68,3 +68,5 @@ Add a line to the matching file whenever something costs more than one attempt.
   from an `ApiProbe` run, then values): the SDK's per-bone `prevVelocity`, its `COLLISION_FRICTION`, Unity's
   `Avatar.GetAxisLength` and `humanDescription.skeleton` each turned an hour of ill-conditioned fitting into one
   clean regression (2026-11-23: #83, #84, #95, #96).
+- `cargo xtask ci 2>&1 | tail -3 && git commit ...` commits even when CI fails: the pipeline's status is `tail`'s.
+  Start such Bash calls with `set -o pipefail` (a red commit had to be rewritten on 2026-11-24).

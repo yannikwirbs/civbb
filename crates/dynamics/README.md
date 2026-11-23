@@ -11,6 +11,8 @@ on `civbb-format` and `civbb-core` (whose `math` it uses).
   broadphase over every avatar's contacts on this client, updating each receiver's value for the next frame's
   animator parameters.
 
-The model and its unverified constants are in ADR 0015; colliders and limits in ADR 0016; contacts in ADR 0017.
+Chains step as the VRChat SDK's runtime does, fitted to its recordings: ADR 0049 (which supersedes ADR 0015's
+XPBD model) and ADRs 0068 to 0071 and 0074; colliders and limits in ADR 0016; contacts in ADRs 0017 and 0047.
+Grab and pose are still ADR 0015's and unverified against the SDK.
 
 Input is an avatar that passed `civbb_format::validate`; indices are not re-checked, parameter ranges are clamped.

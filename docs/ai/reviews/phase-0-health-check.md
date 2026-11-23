@@ -99,7 +99,7 @@ shouldn't until their first issue.
 | Crates `format`, `core`, `anim`, `dynamics`, `render`, `client`, `pipeline`; `tools/corpus`, `xtask`, `unity-exporter`, `unity-truth`; `fuzz` | In scope (§21 deliverables 1 to 5, ADRs 0013, 0038) | Keep |
 | `client` viewer, `bench`, `measure`, `parity`, `rig` | In scope (deliverables 4, 5) | Keep |
 | `client::cull` (ADR 0077) | Early (Phase 1 performance) but small, isolated, tested | Keep |
-| `format::cost::CostProfile` and the manifest's `cost` field | Early (§8 governor, Phase 1): never written by the compiler, never read; field names guess a cost model nobody designed | Remove, issue for Phase 1 |
+| `format::cost::CostProfile` and the manifest's `cost` field | Early (§8 governor, Phase 1): never written, never read. ADR 0032 keeps it empty on purpose until the governor (#63) exists; 60 lines, isolated | Keep (ADR-backed); #63 defines it |
 | `dynamics` grab and pose | In scope (PhysBones convert one to one, §10) but unverified against the SDK | Keep, noted |
 | `Island` IK stub and `System::Ik` | Placeholder for Phase 1 IK (ADR 0020 fixes its slot), two lines | Keep |
 | `format::package::ContentKind::World`, `Platform::Quest` | One variant each; Quest caps are used by `compress` | Keep |
@@ -107,7 +107,9 @@ shouldn't until their first issue.
 | Locomotion extras #70, audio #51, MSAA #60, pipeline cache #61, lights #62, LOD switching #63 | Already Phase 1 issues, no code yet | Nothing to do |
 
 No crate, tool or dependency without a design-doc or ADR basis was found. All 20 direct dependencies are used and
-each has a recorded reason.
+each has a recorded reason. In the small: the workspace defines no traits at all, has no `dead_code` allows and no
+configuration options without a caller; the only placeholders (the IK stub, `CostProfile`) are fixed by ADRs 0020
+and 0032. Nothing is removed.
 
 ## 4. Code quality
 
@@ -146,8 +148,7 @@ each has a recorded reason.
       in it); #38 moved to M0.11 with a concrete plan. Close the empty M0.1, M0.2, M0.3, M0.8.
 2. **Correctness and safety**
    1. Fuzz target `compile`: import, then prune, atlas, merge, lod and collapse; seeded, in the CI matrix.
-3. **Scope removal**
-   1. Remove `CostProfile` and `Header::cost`; issue for the Phase 1 cost model.
+3. **Scope removal**: nothing qualifies (section 3).
 4. **Structure**
    1. Math helpers onto `civbb_core::math` (vrm, cull, Mat4 multiply).
    2. Split `validate::V::avatar` into one method per avatar part.
@@ -157,3 +158,50 @@ each has a recorded reason.
 5. **Cosmetics and docs**: the raw newline; dynamics description and README; README, STATUS, ARCHITECTURE.
 6. **Guardrails**: `clippy::undocumented_unsafe_blocks` as a workspace lint (after adding the 14 comments);
    `xtask ci` fails on `.unwrap()` in non-test library and binary code and on any `.rs` file over 1,000 lines.
+
+## Progress (session 1, stopped early at the owner's request)
+
+Done on `health/phase-0` (each commit gated by `cargo xtask ci`):
+
+- `4301fdd`, `c5a8e41`: three bugs in `lod` reachable from hostile input, found by a mutation probe and the new
+  fuzz target. (1) A level's target could exceed its input (the level above overshot): meshoptimizer's C++
+  assertion aborted debug builds, and release builds broke its precondition. (2) An all-degenerate mesh repeated
+  its empty level. (3) A few vertices near 2e37 made the error infinite. (2) and (3) produced packages that
+  validation, and so every client, rejects. Regression tests in `pipeline/tests/lod.rs`.
+- `848ff7d`: fuzz target `compile` (import, then prune, atlas, merge, lod, collapse; the result must validate), in
+  the CI matrix. Locally 78,362 runs clean after the fixes. The digit-mutation probe: 10,000 cases, 4,029 through
+  the stages, no failure left.
+- `ce31bda`: `civbb-client parity` could not score a *compiled* package against Unity at all: collapsing adds
+  `civbb/One`, and the states came from the test avatar. Every Unity number so far was for the uncompiled import.
+  Parity now skips `COMPILER_PARAMETER_PREFIX` parameters.
+- ADR 0078, milestone M0.11 (#38 with a plan, new #101), epic #39 commented; empty milestones M0.1, M0.2, M0.3 and
+  M0.8 closed.
+- `corpus/scorecard.py`: before/after CPU and GPU per export and compiled-vs-Unity FLIP. First run, before the
+  parity fix (it stopped at Cokoro):
+
+| export | draws | shapes | CPU µs/avatar | GPU µs/avatar | Unity FLIP rest | Unity FLIP worst |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Tessakuchan | 1 → 1 | 114 → 23 | 16.5 → 16.4 | 1.7 → 1.7 | 0.109 | 0.320 |
+
+  Tessakuchan's CPU cost barely moves with compiling: the cost of an avatar is mostly its animator and PhysBones,
+  which the stages keep. The answer to "cheaper" therefore rests on the Unity comparison (#38).
+
+Still to do, in order:
+
+1. Run `python corpus/scorecard.py` alone (about 40 minutes, nothing compiling) and put the full table here and on
+   #101.
+2. Structure: math helpers onto `civbb_core::math` (`gltf_import/vrm.rs` has its own `add`, `dot`, `cross`,
+   `qmul`, `conj`, `rotate`, `from_to`; `client::cull` `sub`, `length`; the `Mat4` multiply in `render::forward`
+   and `client::view`). Split `validate::V::avatar` (406 lines) into one method per avatar part. Split `vrm.rs`
+   (1,265) and `gltf_import.rs` (1,062) along their seams. Pin behaviour first: record the import result (errors,
+   or a hash of the avatar's CBOR plus warnings) for every file in `corpus/local/{vrm,glb,unity-glb,khronos}` and
+   for a few thousand digit-mutated lean/bloated source GLBs, VRMs and byte-mutated CBOR avatars (validation
+   alone), before and after; the outputs must be identical.
+3. Cosmetics: `pipeline/src/main.rs` writes the report with a raw newline inside a string literal; `civbb-dynamics`'
+   Cargo description still says "XPBD".
+4. Guardrails: apply `docs/ai/reviews/phase-0-xtask-rules.patch` (`cargo xtask rules`: no Rust file over 1,000
+   lines, no `unwrap()` before a crate's first `#[cfg(test)]` in `src/`) once the splits are done, then delete
+   the patch. Add `undocumented_unsafe_blocks = "warn"` to `[workspace.lints.clippy]` after adding `// SAFETY:`
+   comments to the 13 unsafe blocks in `render/tests/draw.rs` and `render/tests/skin.rs`. Note both in CLAUDE.md.
+5. Finish: before/after metrics in this report, STATUS/STATE/ARCHITECTURE, final `cargo xtask ci`, merge into
+   `main`.

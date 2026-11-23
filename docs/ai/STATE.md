@@ -123,7 +123,10 @@ What exists, by area. Read the section for the area you touch; update it when th
     above. A level is an index list over a vertex prefix (vertices reordered), so it skins and applies shapes to
     fewer vertices; skin anchor and shape motion are simplification attributes, submesh borders locked
     (`LockBorder`). Non-manifold edges (3+ faces) may open. AliciaSolid 31.8k, 16.4k, 9.2k, 7.8k triangles;
-    HAOLAN 146k to 21k. `Mesh::level(n)` gives a level as a mesh. Runtime switching is #63 (Phase 1).
+    HAOLAN 146k to 21k. `Mesh::level(n)` gives a level as a mesh. Runtime switching is #63 (Phase 1). Each level's target is capped at
+    the level above's indices (a meshoptimizer precondition); the chain ends at a repeated empty level or a
+    non-finite error (hostile input, `tests/lod.rs`). The `compile` fuzz target runs import and every stage but
+    `compress` and requires a valid result.
   - `compress` (ADRs 0029, 0035): every texture to KTX2 with `basisu_c_sys` (C++ Basis Universal, bindgen needs
     libclang): the first of UASTC, XUASTC 90, XUASTC 75 no larger than the source blob, else the smallest (JPEG
     sources grow). Mips from `civbb_core::mips` (the renderer uses the same for RGBA8), single-threaded per texture
@@ -155,6 +158,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   #52 rest regression: rest means (front) Cokoro 0.110, Tessakuchan 0.102, Yumeka 0.139, Inuinu 0.065. Remaining:
   silhouette edges. Tables on #82, #86, #85, #87.
   `corpus/local/unity-ref/all.sh <name>` rescores all, re-renders those whose hand-off changed, rescores.
+  Those numbers score the uncompiled import. Since the health check, parity skips parameters named
+  `civbb/...` (`COMPILER_PARAMETER_PREFIX`), so compiled packages score against Unity too; `python
+  corpus/scorecard.py` (committed) gives per export the CPU and GPU µs before and after compiling and the compiled
+  package's Unity FLIP (ADR 0078, M0.11).
 
 ## Renderer and viewer
 

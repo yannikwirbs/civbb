@@ -25,3 +25,8 @@ Read before working on parsers of untrusted input, fuzz targets or native (`-sys
 - gltf-json refuses every `extensionsRequired` entry its enabled features do not list, `KHR_mesh_quantization`
   included (no feature exists for it). To accept one the importer handles itself, drop it from
   `extensions_required` in `gltf_import::parse` before `Document::from_json` validates.
+- On Windows a panicking fuzz target aborts with `0xc0000409` before libFuzzer writes the crash artifact, and
+  `cargo fuzz tmin` can't minimise it. To capture an input, have the target write `data` to a file just before the
+  panic (temporarily), or run a scratch test that writes each case before running it.
+- meshoptimizer asserts its preconditions in C++ (`target_index_count <= index_count`): debug builds abort the
+  whole process (not catchable with `catch_unwind`), release builds compile the assert out. Clamp every argument.
