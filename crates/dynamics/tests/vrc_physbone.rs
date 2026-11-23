@@ -256,9 +256,8 @@ fn the_sdk_keeps_bone_lengths_and_pins_the_root() {
 
 /// Every case's largest bone error (metres), file by file. Cases not listed must replay within [`EXACT`].
 const BOUNDS: &[(&str, &str, f32)] = &[
-    // Version 1.1 residuals at 60 Hz: stiffness 0.8 with momentum, the polar box's corners, velocity after a
-    // collider push, spring 1 (#84).
-    ("vrc_physbones.json", "stiff_v11_advanced", 0.0031),
+    // Residuals at 60 Hz: the polar box's corners, velocity after a collider push (#84), and spring 1, whose steps
+    // are exact against the SDK's stored state but keep f32 rounding undamped.
     ("vrc_physbones.json", "limit_polar_diagonal", 0.008),
     ("vrc_physbones.json", "collider_sway", 0.016),
     ("vrc_physbones.json", "simplified_p10_s100", 0.00075),
@@ -285,7 +284,6 @@ const BOUNDS: &[(&str, &str, f32)] = &[
     ("vrc_physbones_90hz.json", "advanced_p20_m50_k50", 0.0025),
     ("vrc_physbones_90hz.json", "gravity_v11_sway", 0.0016),
     ("vrc_physbones_90hz.json", "falloff_v11_50", 0.0021),
-    ("vrc_physbones_30hz.json", "stiff_v11_advanced", 0.0028),
     ("vrc_physbones_30hz.json", "collider_sway", 0.0164),
 ];
 

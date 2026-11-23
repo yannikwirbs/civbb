@@ -17,6 +17,9 @@ pub const MAX_FRAME: f32 = 0.1;
 /// Simplified integration keeps this fraction of `spring` as velocity.
 const SPRING_KEEP: f32 = 0.99;
 const DOWN: Vec3 = [0.0, -1.0, 0.0];
+/// A bone within this angle of its rest direction snaps onto it: the SDK's `dot > 0.999999f` (0.0816 degrees,
+/// recorded; ADR 0069), as the squared sine, which f32 resolves at this size.
+const REST_SNAP: f32 = 2.0266e-6;
 
 /// What a chain reports to the animator under its parameter prefix (`_IsGrabbed`, `_IsPosed`, `_Angle`,
 /// `_Stretch`, `_Squish`).
@@ -508,6 +511,11 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
             x = add(parent, scale(d, length(reach)));
         }
         x = add(parent, scale(normalize(sub(x, parent)), len));
+        // A bone that ends this close to its (turned) rest direction snaps onto it; the velocity keeps its value.
+        let now = normalize(sub(x, parent));
+        if dot(now, dir) > 0.0 && dot(cross(now, dir), cross(now, dir)) < REST_SNAP {
+            x = add(parent, scale(dir, len));
+        }
         // Colliders push the bone (the segment from its parent) out, then the bone keeps its length. The bone's
         // radius scales with its node (an endpoint's with its leaf), as recorded (#90).
         let radius = rig.radius[k] * world[rig.node[k].or(rig.node[p]).expect("tips hang off nodes") as usize].scale;
