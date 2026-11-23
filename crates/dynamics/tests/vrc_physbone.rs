@@ -256,38 +256,19 @@ fn the_sdk_keeps_bone_lengths_and_pins_the_root() {
 
 /// Every case's largest bone error (metres), file by file. Cases not listed must replay within [`EXACT`].
 const BOUNDS: &[(&str, &str, f32)] = &[
-    // Version 1.0 gravity and stiffness: equilibria exact, transients not fitted yet (#83).
-    ("vrc_physbones.json", "sag_v10_simplified", 0.0482),
-    ("vrc_physbones.json", "turn_v10_simplified", 0.0185),
-    ("vrc_physbones.json", "sag_v10_advanced", 0.0584),
-    ("vrc_physbones.json", "sway_v10_advanced", 0.0167),
-    ("vrc_physbones.json", "turn_v10_advanced", 0.0495),
-    ("vrc_physbones.json", "stiff_v10_advanced", 0.1618),
-    ("vrc_physbones.json", "scaled_v10_advanced", 0.1656),
-    ("vrc_physbones.json", "gravity_v10_p20_g25", 0.0238),
-    ("vrc_physbones.json", "gravity_v10_p20_g100", 0.0791),
-    ("vrc_physbones.json", "gravity_v10_p20_gm50", 0.0482),
-    ("vrc_physbones.json", "gravity_v10_p60_g25", 0.014),
-    ("vrc_physbones.json", "gravity_v10_p60_g100", 0.0765),
-    ("vrc_physbones.json", "gravity_v10_p60_gm50", 0.0436),
-    ("vrc_physbones.json", "gravity_v10_sway", 0.0663),
-    ("vrc_physbones.json", "gravity_v10_advanced", 0.1304),
-    ("vrc_physbones.json", "falloff_v10_50", 0.0492),
-    // Version 1.1 residuals at 60 Hz: falloff transients, stiffness 0.8 with momentum, the polar box's corners,
-    // velocity after a collider push, spring 1 (#84).
+    // Version 1.1 residuals at 60 Hz: stiffness 0.8 with momentum, the polar box's corners, velocity after a
+    // collider push, spring 1 (#84).
     ("vrc_physbones.json", "stiff_v11_advanced", 0.0031),
-    ("vrc_physbones.json", "falloff", 0.0011),
     ("vrc_physbones.json", "limit_polar_diagonal", 0.008),
     ("vrc_physbones.json", "collider_sway", 0.016),
     ("vrc_physbones.json", "simplified_p10_s100", 0.00075),
     ("vrc_physbones.json", "simplified_p40_s100", 0.001),
-    ("vrc_physbones.json", "falloff_v11_50", 0.0011),
     // A bone fatter than its inside capsule: the SDK puts the tip on the far side of the core (negative room, exact
     // for the first frames), then the tip sits near the axis and flips sides on float noise (#90).
     ("vrc_physbones.json", "collider_inside_capsule_fat", 0.0194),
     ("vrc_physbones.json", "collider_inside_capsule_short_fat", 0.0211),
     // Other frame rates: the output's partial step is an approximation (#84); full steps (30 Hz) are exact.
-    ("vrc_physbones_90hz.json", "sag_v10_simplified", 0.0472),
+    ("vrc_physbones_90hz.json", "sag_v10_simplified", 0.002),
     ("vrc_physbones_90hz.json", "sag_v11_simplified", 0.0014),
     ("vrc_physbones_90hz.json", "sway_v11_simplified", 0.0023),
     ("vrc_physbones_90hz.json", "sway_v11_advanced", 0.0011),
@@ -303,11 +284,9 @@ const BOUNDS: &[(&str, &str, f32)] = &[
     ("vrc_physbones_90hz.json", "simplified_p40_s70", 0.0036),
     ("vrc_physbones_90hz.json", "advanced_p20_m50_k50", 0.0025),
     ("vrc_physbones_90hz.json", "gravity_v11_sway", 0.0016),
-    ("vrc_physbones_90hz.json", "falloff_v11_50", 0.0031),
-    ("vrc_physbones_30hz.json", "sag_v10_simplified", 0.0472),
+    ("vrc_physbones_90hz.json", "falloff_v11_50", 0.0021),
     ("vrc_physbones_30hz.json", "stiff_v11_advanced", 0.0028),
     ("vrc_physbones_30hz.json", "collider_sway", 0.0164),
-    ("vrc_physbones_30hz.json", "falloff_v11_50", 0.0011),
 ];
 
 /// What "exact" means here: the goldens hold positions to the micrometre and Unity steps in single precision.

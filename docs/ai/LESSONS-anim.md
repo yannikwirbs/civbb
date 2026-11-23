@@ -57,3 +57,12 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   parameter once the fade starts when a case or test wants the fade to progress.
 - Changing when the first update advances shifts every frame-counting test by one frame: count from the recorded
   time, not from "enter" frames, and rerun `collapse.rs` (the collapsed toggle layer mirrors first-frame semantics).
+- Fitting a PhysBone rule from positions alone is ill-conditioned (one direction per bone per frame, and any term along
+  the bone keeps the equilibrium): #83 spent an hour on that. The SDK's per-bone state is readable by reflection
+  (`PhysBoneManager.Inst.boneBuffer.bones`: `endPoint`, `prevEndPoint`, `prevVector`, `prevVelocity`; field names from
+  an `ApiProbe` run): log it per frame from a scratch copy of `VrcPhysBones.cs` and regress the step against the
+  observed displacement. `prevVelocity` is the pre-length displacement in simplified integration, the post-length
+  one in advanced.
+- A rule that fits bone 1 (pinned parent) exactly but drifts on deeper bones usually reads a parent quantity at the
+  wrong time: tabulate the needed value next to every bone's per-step change (falloff's cosine was off by exactly the
+  parent's turn in that step, ADR 0068).

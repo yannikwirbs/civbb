@@ -258,6 +258,7 @@ Internal deps: none
 - `docs/adr/0065-animator-goldens-from-unity.md`: 0065: Animator golden cases recorded in Unity
 - `docs/adr/0066-interruption-as-recorded.md`: 0066: Transition interruption as recorded in Unity
 - `docs/adr/0067-material-curves-as-recorded.md`: 0067: Material curves as recorded in Unity
+- `docs/adr/0068-physbone-1-0-from-the-sdks-state.md`: 0068: PhysBone version 1.0 and gravity falloff fitted to the SDK's stored state
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

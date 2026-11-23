@@ -453,7 +453,15 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
         let dir = normalize(off);
         let mut g = rig.gravity[k];
         if g != 0.0 && rig.gravity_falloff[k] > 0.0 {
-            let at_rest = dot(normalize(ps.off[k]), normalize(b)).max(0.0);
+            // The bone's last offset, carried with its parent bone's turn in this step, against its animated rest.
+            let last = match rig.parent[p] {
+                NO_PARENT => ps.off[k],
+                pp => rotate(
+                    from_to(dir_or(ps.off[p]), dir_or(sub(parent, ps.pos[pp as usize]))),
+                    ps.off[k],
+                ),
+            };
+            let at_rest = dot(normalize(last), normalize(b)).max(0.0);
             g *= 1.0 - rig.gravity_falloff[k] * at_rest;
         }
         let rest_dir = if g != 0.0 && !ch.version_1_0 {
@@ -465,24 +473,34 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
         let target = add(parent, scale(rest_dir, len));
         let pos = ps.pos[k];
         let pull = rig.pull[k] * r;
+        // Version 1.0's gravity is a force of `gravity` bone lengths per step (ADR 0068).
+        let force = if ch.version_1_0 { g * len * r } else { 0.0 };
         let mut x = if ch.advanced {
             let mut x = add(pos, scale(sub(pos, ps.prev[k]), rig.spring[k] * r));
             x = add(x, scale(sub(target, x), pull));
+            let mut stiffness = rig.stiffness[k];
+            if ch.version_1_0 {
+                // Version 1.0: straight down, then stiffness as `k / (1 + k)`.
+                x = add(x, scale(DOWN, force));
+                stiffness /= 1.0 + stiffness;
+            }
             // Stiffness keeps the bone's last offset from its parent.
             let stiff = add(parent, ps.off[k]);
-            add(x, scale(sub(stiff, x), rig.stiffness[k]))
+            add(x, scale(sub(stiff, x), stiffness))
         } else {
+            // Version 1.0 (simplified): across the bone's last offset only, and damped like the pull.
+            let d = dir_or(ps.off[k]);
+            let across = scale(sub(DOWN, scale(d, dot(DOWN, d))), force);
             let keep = rig.spring[k] * SPRING_KEEP * r;
             add(
                 pos,
-                add(scale(ps.vel[k], keep), scale(sub(target, pos), pull * (1.0 - keep))),
+                add(
+                    scale(ps.vel[k], keep),
+                    scale(add(scale(sub(target, pos), pull), across), 1.0 - keep),
+                ),
             )
         };
         let mut vel = sub(x, pos);
-        if g != 0.0 && ch.version_1_0 {
-            // Version 1.0: gravity is a force of `gravity` bone lengths per step.
-            x = add(x, scale(DOWN, g * len));
-        }
         if ch.limit != LimitKind::None {
             let reach = sub(x, parent);
             let (axis, across) = limit_axes(rig, world, turn[p], ch.limit_rotation, k, p);
