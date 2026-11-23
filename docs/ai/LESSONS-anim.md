@@ -66,3 +66,13 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
 - A rule that fits bone 1 (pinned parent) exactly but drifts on deeper bones usually reads a parent quantity at the
   wrong time: tabulate the needed value next to every bone's per-step change (falloff's cosine was off by exactly the
   parent's turn in that step, ADR 0068).
+- Fitting how an engine combines two vectors (#84): for each candidate pair (normalised or raw, from which parent,
+  before or after limits/colliders), solve per sample for the one blend parameter that pair would need. The right pair
+  gives the same parameter on every frame and bone; near misses drift with the motion (a parameter falling as
+  `|P - parent|` grew showed the "from" vector was raw, not normalised). A free linear regression over the same
+  vectors stayed ill-conditioned for an hour.
+- Frame-rate behaviour depends on the engine's own float bookkeeping: the SDK skips a step when its f32 time sum lands
+  at 0.99999976 of one. Compare the step count per frame with its recorded `executions` before fitting outputs; a
+  `+1e-6` tolerance looked harmless and moved the falloff state on 90 of 135 frames.
+- "Last" in an SDK rule can mean last shown, not last stepped: at 60 Hz the two coincide, so 60 Hz fits cannot tell
+  them apart. Check rules against a 90 Hz recording (`PbState.cs -civbbDt 0.0111111114`).

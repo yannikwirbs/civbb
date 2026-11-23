@@ -75,7 +75,9 @@ What exists, by area. Read the section for the area you touch; update it when th
 - Source extensions (ADR 0041, 0042, 0043): `X_*` payloads are the format types' serde JSON with glTF node indices
   (`gltf_import/source.rs`), except `X_avatar` (`{humanoid, viewpoint, muscle_frames, face}`) and per-material
   `X_toon_material`; `extras.active: false` marks inactive nodes; a `null` key tangent is a step.
-  `civbb_corpus::gltf::to_source_glb` writes them (round-trip test).
+  `civbb_corpus::gltf::to_source_glb` writes them (round-trip test) except `X_toon_material` (a Unity property dump;
+  hostile and mapping tests in `tests/unity_material.rs`). Fuzz seeds: `lean-source.glb` and `toon-materials.gltf`
+  (every shader family, #71 closed).
 - Curves (ADR 0039): the format stays Hermite; the exporter will bake weighted tangents, split equal key times and
   mirror position x, Euler and quaternion y/z. No Booth clip uses either (28,693 keys).
 - Constraint fields (ADR 0040, 0046, format v10): `Property::Constraint { kind, field }` binds weight, active, source

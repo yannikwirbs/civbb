@@ -18,3 +18,7 @@ Read before working on parsers of untrusted input, fuzz targets or native (`-sys
 - C/C++ `-sys` crates may bundle the same third-party code with external linkage: `nv-flip-sys` and
   `basisu_c_sys` both compile tinyexr, so any binary linking both fails with LNK2005. `cargo clippy` does not
   link; build a test binary that pulls in both before settling on a native dependency.
+- Local fuzzing on this machine: the MSVC ASan runtime is under Visual Studio 2026 at
+  `D:/zProgramm/Visual Studio/2026/VC/Tools/MSVC/<ver>/bin/Hostx64/x64` (find it with `vswhere -latest -property
+  installationPath`); prepend that to `PATH` before `cargo +nightly fuzz run`. Seeds that must reach deep paths:
+  assert in `fuzz/src/bin/seeds.rs` that they import.
