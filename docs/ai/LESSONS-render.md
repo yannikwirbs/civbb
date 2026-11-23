@@ -64,3 +64,5 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
 - Split a brightness gap term by term on both sides: render ours and Unity with the same property changed (emission
   black, emission 1, textures swapped) and compare a few pixels. Ostgaroa's panel matched at emission 1 and not at
   5.99, which pointed at the colour conversion after compression, mips and gradient precision were ruled out.
+- Frustum and box tests are conservative at the edges: a box touching a plane at one corner counts as seen. Keep
+  "outside" test cases clear of the plane by more than the box's extent (a 45 degree side at z = -6 passes x = 6).

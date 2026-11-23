@@ -115,3 +115,7 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
 - With DNS failing (`Curl error 6: Could not resolve host: cdp.cloud.unity3d.com` in the log) a batch run in the SDK
   host project can idle for minutes before running the method or after writing its output. Check the log for the
   method's lines, then stop only your own run by PID (Win32_Process command line).
+- Surveying the corpus for a VRChat component: grepping the SDK DLL or the packages for guessed serialized field
+  names (`SourcePath`, `PlaybackOrder`) found nothing because the names were wrong, which proves nothing. Walk the
+  real objects instead: a scratch `BehaviourSurvey.cs` (every `AnimatorController` under `Assets/`, behaviours by
+  type name, about 60 s) answered it. Give any text scan a positive control (a marker known to be present).

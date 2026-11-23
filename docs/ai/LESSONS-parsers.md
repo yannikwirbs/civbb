@@ -22,3 +22,6 @@ Read before working on parsers of untrusted input, fuzz targets or native (`-sys
   `D:/zProgramm/Visual Studio/2026/VC/Tools/MSVC/<ver>/bin/Hostx64/x64` (find it with `vswhere -latest -property
   installationPath`); prepend that to `PATH` before `cargo +nightly fuzz run`. Seeds that must reach deep paths:
   assert in `fuzz/src/bin/seeds.rs` that they import.
+- gltf-json refuses every `extensionsRequired` entry its enabled features do not list, `KHR_mesh_quantization`
+  included (no feature exists for it). To accept one the importer handles itself, drop it from
+  `extensions_required` in `gltf_import::parse` before `Document::from_json` validates.
