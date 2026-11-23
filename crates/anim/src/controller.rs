@@ -319,14 +319,16 @@ impl Instance {
                 self.behave(c, &layer.state_machine.states[s as usize].behaviours);
             }
             let run = self.runs[li].as_mut().expect("started above");
-            run.advance(&ctx, &self.params, dt);
-            let entered = run.select(&ctx, &self.params).map(|t| {
-                let snapshot = run.active.is_some().then(|| {
-                    self.mixer.layer(c, li, run, &self.params, &self.pose);
-                    self.mixer.snapshot()
-                });
-                run.fire(&ctx, &mut self.params, t, snapshot)
+            // An interrupted cross-fade continues from the pose last output, before this frame's advance
+            // (recorded in Unity, interruption_source).
+            let snapshot = run.active.is_some().then(|| {
+                self.mixer.layer(c, li, run, &self.params, &self.pose);
+                self.mixer.snapshot()
             });
+            run.advance(&ctx, &self.params, dt);
+            let entered = run
+                .select(&ctx, &self.params)
+                .map(|t| run.fire(&ctx, &mut self.params, t, snapshot));
             if let Some(s) = entered {
                 self.behave(c, &layer.state_machine.states[s as usize].behaviours);
             }

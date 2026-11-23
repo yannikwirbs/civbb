@@ -156,13 +156,27 @@ public static class Goldens
                     tr.hasFixedDuration = true;
                     tr.duration = Get(t, "duration") == null ? 0f : N(t["duration"]);
                     tr.offset = 0f;
-                    tr.interruptionSource = TransitionInterruptionSource.None;
-                    tr.orderedInterruption = true;
+                    tr.interruptionSource = Get(t, "interruption") == null ? TransitionInterruptionSource.None
+                        : (TransitionInterruptionSource)Enum.Parse(typeof(TransitionInterruptionSource), (string)t["interruption"]);
+                    tr.orderedInterruption = !(Get(t, "ordered") is bool o) || o;
                     tr.canTransitionToSelf = false;
+                }
+            }
+            AvatarMask mask = null;
+            if (Get(l, "mask") != null)
+            {
+                // Only the listed transform paths are written; nodes are the root's children, so a path is a name.
+                var paths = L(l["mask"]).Cast<string>().ToList();
+                mask = new AvatarMask { transformCount = paths.Count };
+                for (int i = 0; i < paths.Count; i++)
+                {
+                    mask.SetTransformPath(i, paths[i]);
+                    mask.SetTransformActive(i, true);
                 }
             }
             ctrl.AddLayer(new AnimatorControllerLayer
             {
+                avatarMask = mask,
                 name = (string)l["name"],
                 defaultWeight = Get(l, "weight") == null ? 1f : N(l["weight"]),
                 blendingMode = Get(l, "additive") is bool add && add ? AnimatorLayerBlendingMode.Additive : AnimatorLayerBlendingMode.Override,

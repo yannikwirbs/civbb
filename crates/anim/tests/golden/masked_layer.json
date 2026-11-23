@@ -1,0 +1,18 @@
+{
+  "source": "Recorded in Unity (Goldens.cs, #54): an override layer whose avatar mask lists only A writes A and leaves B to the base layer.",
+  "nodes": [{ "name": "A" }, { "name": "B" }],
+  "params": [],
+  "clips": {
+    "Base": { "length": 1, "curves": [["A.x", [[0, 1]]], ["B.x", [[0, 1]]]] },
+    "Top": { "length": 1, "curves": [["A.x", [[0, 2]]], ["B.x", [[0, 2]]]] }
+  },
+  "layers": [
+    { "name": "Base", "states": [{ "name": "S", "motion": { "clip": "Base" }, "wd": true }] },
+    { "name": "Top", "mask": ["A"], "states": [{ "name": "S", "motion": { "clip": "Top" }, "wd": true }] }
+  ],
+  "dt": 0.1,
+  "frames": [
+    { "expect": { "A.x": 2, "B.x": 1 } },
+    { "expect": { "A.x": 2, "B.x": 1 } }
+  ]
+}

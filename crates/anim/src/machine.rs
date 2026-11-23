@@ -237,8 +237,9 @@ impl LayerRun {
         for (t, clock) in queue {
             let valid = self.valid(ctx, params, t, clock);
             if t == a.which {
-                // Only an any-state transition may interrupt itself.
-                if matches!(t, TransitionRef::Any(_)) && valid {
+                // An any-state transition may interrupt itself; a state's only when unordered, and then it
+                // restarts every frame its conditions hold (recorded in Unity, interruption_self_restart).
+                if valid && (matches!(t, TransitionRef::Any(_)) || !tr.ordered_interruption) {
                     return Some(t);
                 }
                 if tr.ordered_interruption {

@@ -1,0 +1,41 @@
+{
+  "source": "Recorded in Unity (Goldens.cs, #54): with interruption source Source and unordered interruption (layer Src), S1 to S2 interrupts itself every frame while p holds, so the fade never progresses; with None (layer Off) it finishes into S2.",
+  "nodes": [{ "name": "A" }, { "name": "B" }],
+  "params": [{ "name": "p", "kind": "Bool", "default": 0 }, { "name": "q", "kind": "Bool", "default": 0 }],
+  "clips": {
+    "A1": { "length": 1, "curves": [["A.x", [[0, 1]]]] },
+    "A2": { "length": 1, "curves": [["A.x", [[0, 2]]]] },
+    "A3": { "length": 1, "curves": [["A.x", [[0, 3]]]] },
+    "B1": { "length": 1, "curves": [["B.x", [[0, 1]]]] },
+    "B2": { "length": 1, "curves": [["B.x", [[0, 2]]]] },
+    "B3": { "length": 1, "curves": [["B.x", [[0, 3]]]] }
+  },
+  "layers": [
+    { "name": "Src", "states": [
+      { "name": "S1", "motion": { "clip": "A1" }, "wd": true, "transitions": [
+        { "to": "S2", "if": ["p"], "duration": 0.4, "interruption": "Source", "ordered": false },
+        { "to": "S3", "if": ["q"], "duration": 0.2 }
+      ] },
+      { "name": "S2", "motion": { "clip": "A2" }, "wd": true },
+      { "name": "S3", "motion": { "clip": "A3" }, "wd": true }
+    ] },
+    { "name": "Off", "states": [
+      { "name": "S1", "motion": { "clip": "B1" }, "wd": true, "transitions": [
+        { "to": "S2", "if": ["p"], "duration": 0.4 },
+        { "to": "S3", "if": ["q"], "duration": 0.2 }
+      ] },
+      { "name": "S2", "motion": { "clip": "B2" }, "wd": true },
+      { "name": "S3", "motion": { "clip": "B3" }, "wd": true }
+    ] }
+  ],
+  "dt": 0.1,
+  "frames": [
+    { "expect": { "Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1 } },
+    { "set": { "p": 1 }, "expect": { "Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1 } },
+    { "set": { "q": 1 }, "expect": { "Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1.25 } },
+    { "expect": { "Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1.5 } },
+    { "expect": { "Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1.75 } },
+    { "expect": { "Src": "S1", "A.x": 1, "Off": "S2", "B.x": 2 } },
+    { "expect": { "Src": "S1", "A.x": 1, "Off": "S2", "B.x": 2 } }
+  ]
+}

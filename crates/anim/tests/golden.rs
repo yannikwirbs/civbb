@@ -54,6 +54,8 @@ struct LayerSpec {
     weight: f32,
     #[serde(default)]
     additive: bool,
+    /// Transform paths the layer may write (an avatar mask); absent writes all.
+    mask: Option<Vec<String>>,
     states: Vec<StateSpec>,
 }
 
@@ -88,6 +90,10 @@ struct TransitionSpec {
     #[serde(default)]
     duration: f32,
     exit_time: Option<f32>,
+    /// Which transitions may interrupt this one (Unity's names); absent is `None`.
+    interruption: Option<InterruptionSource>,
+    #[serde(default = "yes")]
+    ordered: bool,
 }
 
 #[derive(Deserialize)]
@@ -218,7 +224,10 @@ impl Case {
                     } else {
                         LayerBlending::Override
                     },
-                    mask: None,
+                    mask: l.mask.as_ref().map(|t| AvatarMask {
+                        body_parts: Vec::new(),
+                        transforms: Some(t.clone()),
+                    }),
                     state_machine: StateMachine {
                         states,
                         default_state: 0,
@@ -260,8 +269,8 @@ impl Case {
             fixed_duration: true,
             duration: t.duration,
             offset: 0.0,
-            interruption: InterruptionSource::None,
-            ordered_interruption: true,
+            interruption: t.interruption.unwrap_or(InterruptionSource::None),
+            ordered_interruption: t.ordered,
             can_transition_to_self: false,
         }
     }

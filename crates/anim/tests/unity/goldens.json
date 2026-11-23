@@ -29,6 +29,28 @@
       {"L": "S2", "A.x": 0, "B.x": 1},
       {"L": "S2", "A.x": 0, "B.x": 1}
     ],
+    "interruption_self_restart": [
+      {"Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1},
+      {"Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1},
+      {"Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1.25},
+      {"Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1.5},
+      {"Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1.75},
+      {"Src": "S1", "A.x": 1, "Off": "S2", "B.x": 2},
+      {"Src": "S1", "A.x": 1, "Off": "S2", "B.x": 2}
+    ],
+    "interruption_source": [
+      {"Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1},
+      {"Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1},
+      {"Src": "S1", "A.x": 1, "Off": "S1", "B.x": 1.25},
+      {"Src": "S1", "A.x": 2, "Off": "S1", "B.x": 1.5},
+      {"Src": "S3", "A.x": 3, "Off": "S1", "B.x": 1.75},
+      {"Src": "S3", "A.x": 3, "Off": "S2", "B.x": 2},
+      {"Src": "S3", "A.x": 3, "Off": "S2", "B.x": 2}
+    ],
+    "masked_layer": [
+      {"A.x": 2, "B.x": 1},
+      {"A.x": 2, "B.x": 1}
+    ],
     "mixed_wd_sticks": [
       {"Hat.active": 0, "B.x": 2},
       {"Toggle": "On", "Hat.active": 1},

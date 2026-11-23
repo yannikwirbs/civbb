@@ -422,9 +422,10 @@ fn interruptible(source: InterruptionSource, ordered: bool) -> (Controller, Inst
     i.update(&c, 0.1);
     i.params[1] = 1.0;
     i.update(&c, 0.1);
+    // Cleared once the fade runs: an unordered transition whose condition holds restarts itself (interruption_self_restart).
+    i.params[1] = 0.0;
     i.update(&c, 0.5); // Halfway: 1 * 0.5 + 2 * 0.5.
     close(x(&i), 1.5);
-    i.params[1] = 0.0;
     (c, i)
 }
 
@@ -493,10 +494,10 @@ fn an_interruption_blends_from_a_static_snapshot() {
     i.update(&c, 0.1); // Progress 0.6: 1.6.
     close(x(&i), 1.6);
     i.params[0] = 1.0;
-    i.update(&c, 0.1); // Progress 0.7 (1.7) is snapshotted; S2 (3) starts at 0.
-    close(x(&i), 1.7);
+    i.update(&c, 0.1); // The pose last output (1.6) is snapshotted, not this frame's (interruption_source).
+    close(x(&i), 1.6);
     i.update(&c, 0.25);
-    close(x(&i), 0.75 * 1.7 + 0.25 * 3.0);
+    close(x(&i), 0.75 * 1.6 + 0.25 * 3.0);
     i.update(&c, 0.75);
     assert_eq!((current(&i), x(&i)), (2, 3.0));
 }
