@@ -40,8 +40,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   `VrcPhysBones.cs` (88 cases at 60 Hz, 18 at 90 and 30 Hz, `crates/dynamics/tests/unity/vrc_physbones*.json`);
   `tests/vrc_physbone.rs` replays them: within 0.5 mm in 84 of 88 cases at 60 Hz (every version 1.0 case and falloff
   since ADR 0068, fitted to the SDK's per-bone state read by reflection; bones near rest snap onto it, ADR 0069; a collider push slows the velocity by the SDK's friction 0.25 and skips contact at a bone's start, ADR 0070; turns compose down the chain, ADR 0071), the rest
-  pinned as bounds (90 Hz output #84; spring 1 keeps f32 rounding; a bone fatter
-  than its inside capsule flips sides on float noise, #90). Inside capsules keep the tip within capsule radius minus
+  pinned as bounds (spring 1 keeps f32 rounding; a bone fatter than its inside capsule flips sides on float noise,
+  #90). All 18 cases at 90 Hz within 0.2 mm since ADR 0074 (output between steps, step timing; `collider_sway` 1.1 mm at
+  one touching contact), 30 Hz exact. Inside capsules keep the tip within capsule radius minus
   bone radius, unclamped (negative puts it on the far side of the core). A bone's collision radius scales with its
   own node's world scale (an endpoint's with its leaf), recorded with scaled bones against unscaled colliders (#90).
 - The body pose (#52, ADR 0063, format v22): the exporter writes `Animator.humanScale` and every humanoid clip's
@@ -198,7 +199,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   standing on the ground (`Builtin::at_rest`, ADR 0055). Material slots swap per island
   (`Target::MaterialSlot`, `Island::submesh_materials`, a per-submesh override in `MeshData::draws`; ADR 0059).
   Mirrored states and blend tree children map muscles as Unity records (`muscle::mirror`, exclusive or; ADR 0060). `civbb-dynamics`: PhysBone chains as the SDK
-  steps them (ADR 0049, 0068: fixed 1/60 s steps plus a partial output step, versions 1.0/1.1, simplified and advanced
+  steps them (ADR 0049, 0068: fixed 1/60 s steps counted in f32, between them the shown direction blended from the
+  last step towards the frame's by `r / (1 - pull (1 - r))`, steps against the pose interpolated from the last step's,
+  colliders from the last frame's, ADR 0074; versions 1.0/1.1, simplified and advanced
   integration, immobile, limits, segment colliders) with grab/pose (ADR 0015's, unverified), and contacts with the
   cross-avatar grid broadphase (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the
   component's node apart from the root transform, Proximity from a sender's second frame (ADR 0047). Format v13

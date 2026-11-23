@@ -58,6 +58,8 @@ struct Particles {
     vel: Vec<Vec3>,
     /// Offset from the parent after the last step, before immobile moved anything.
     off: Vec<Vec3>,
+    /// Offset from the parent as last shown: after the last full step, or the output between steps if later.
+    shown: Vec<Vec3>,
     /// Animated (or posed) offset from the parent at the last step, world space.
     rest: Vec<Vec3>,
 }
@@ -70,6 +72,7 @@ impl Particles {
             prev: v.clone(),
             vel: v.clone(),
             off: v.clone(),
+            shown: v.clone(),
             rest: v,
         }
     }
@@ -80,6 +83,7 @@ impl Particles {
             (&mut self.prev, &from.prev),
             (&mut self.vel, &from.vel),
             (&mut self.off, &from.off),
+            (&mut self.shown, &from.shown),
             (&mut self.rest, &from.rest),
         ] {
             a[r.clone()].copy_from_slice(&b[r.clone()]);
@@ -102,8 +106,10 @@ pub struct State {
     posed: Vec<Option<Vec<Vec3>>>,
     /// Per chain: the frame's placement at the last full step.
     frame: Vec<Option<Pose>>,
-    /// The animated world pose at the last frame; `None` before the first.
+    /// The animated world pose at the last full step, as interpolated for it; `None` before the first frame.
     last: Option<Vec<Pose>>,
+    /// The animated world pose at the last frame (colliders interpolate from it); `None` before the first.
+    previous: Option<Vec<Pose>>,
     /// Seconds since the last full step.
     time: f32,
 }
@@ -120,6 +126,7 @@ impl State {
             posed: vec![None; chains],
             frame: vec![None; chains],
             last: None,
+            previous: None,
             time: 0.0,
         }
     }
@@ -142,24 +149,27 @@ impl State {
             }
         };
         let dt = dt.clamp(0.0, MAX_FRAME);
-        // Full steps at their time within the frame, against the animated pose interpolated to that time.
+        // Whole steps come off the accumulated time in single precision, as the SDK counts them: at 90 Hz every
+        // third frame ends a hair short of a step and takes none. Step `j` runs against the animated pose
+        // interpolated from the last step's to this frame's by `j / executions` (executions = accumulated time in
+        // steps); colliders interpolate from the last frame's placement instead (all recorded, ADR 0074).
         let total = self.time + dt;
-        let steps = ((total + 1e-6) / STEP).floor() as u32;
+        let mut left = total;
+        let mut steps = 0u32;
+        while left >= STEP {
+            left -= STEP;
+            steps += 1;
+        }
+        let previous = self.previous.take().unwrap_or_else(|| world.clone());
         let mut between = world.clone();
+        let mut colliders = world.clone();
         for j in 1..=steps {
-            let t = if dt > 0.0 {
-                ((j as f32 * STEP - self.time) / dt).clamp(0.0, 1.0)
-            } else {
-                1.0
-            };
-            for (b, (s, w)) in between.iter_mut().zip(start.iter().zip(&world)) {
-                *b = Pose {
-                    pos: add(s.pos, scale(sub(w.pos, s.pos), t)),
-                    rot: nlerp(s.rot, w.rot, t),
-                    scale: s.scale + (w.scale - s.scale) * t,
-                };
+            let t = (j as f32 * STEP / total).min(1.0);
+            blend(&mut between, &start, &world, t);
+            if !rig.colliders.is_empty() {
+                blend(&mut colliders, &previous, &world, t);
             }
-            let placed = place(rig, &between);
+            let placed = place(rig, &colliders);
             for c in 0..rig.chains.len() {
                 let frame = frame_of(rig, c, origin, &between);
                 let last = self.frame[c].replace(frame);
@@ -175,14 +185,14 @@ impl State {
                 advance(rig, c, &ctx, &mut self.p, &mut self.turn);
             }
         }
-        self.time = (total - steps as f32 * STEP).max(0.0);
-        // The output: the leftover time as a partial step that is not kept.
+        self.time = left;
+        // The output between steps, for the leftover time; not kept (ADR 0074).
         let r = self.time / STEP;
         let placed = place(rig, &world);
         for c in 0..rig.chains.len() {
             let ch = &rig.chains[c];
             let range = ch.first as usize..(ch.first + ch.count) as usize;
-            self.out.copy_range(&self.p, range);
+            self.out.copy_range(&self.p, range.clone());
             if r > 1e-4 {
                 let ctx = Ctx {
                     world: &world,
@@ -195,12 +205,14 @@ impl State {
                 };
                 advance(rig, c, &ctx, &mut self.out, &mut self.turn);
             }
+            // The next step's falloff reads the bones as shown (recorded, ADR 0074).
+            self.p.shown[range.clone()].copy_from_slice(&self.out.shown[range]);
         }
-        let animated = world.clone();
+        self.previous = Some(world.clone());
         for c in 0..rig.chains.len() {
             self.write(rig, c, origin, &mut world, locals);
         }
-        self.last = Some(animated);
+        self.last = Some(if steps > 0 { between } else { start });
     }
 
     /// Puts chain `c` at the animated pose, at rest.
@@ -217,6 +229,7 @@ impl State {
                 ps.prev[k] = a;
                 ps.vel[k] = [0.0; 3];
                 ps.off[k] = off;
+                ps.shown[k] = off;
                 ps.rest[k] = off;
             }
         }
@@ -365,6 +378,17 @@ fn frame_of(rig: &Rig, c: usize, origin: Pose, world: &[Pose]) -> Pose {
     rig.chains[c].frame.map_or(origin, |f| world[f as usize])
 }
 
+/// Every pose of `out` a fraction `t` of the way from `a` to `b`.
+fn blend(out: &mut [Pose], a: &[Pose], b: &[Pose], t: f32) {
+    for (o, (a, b)) in out.iter_mut().zip(a.iter().zip(b)) {
+        *o = Pose {
+            pos: add(a.pos, scale(sub(b.pos, a.pos), t)),
+            rot: nlerp(a.rot, b.rot, t),
+            scale: a.scale + (b.scale - a.scale) * t,
+        };
+    }
+}
+
 /// Particle `k`'s animated position.
 fn anim(rig: &Rig, world: &[Pose], k: usize) -> Vec3 {
     match rig.node[k] {
@@ -458,12 +482,13 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
         let dir = normalize(off);
         let mut g = rig.gravity[k];
         if g != 0.0 && rig.gravity_falloff[k] > 0.0 {
-            // The bone's last offset, carried with its parent bone's turn in this step, against its animated rest.
+            // The bone's offset as last shown, carried with its parent bone's turn since, against its animated rest
+            // (ADR 0068; between fixed steps the output is shown, ADR 0074).
             let last = match rig.parent[p] {
-                NO_PARENT => ps.off[k],
+                NO_PARENT => ps.shown[k],
                 pp => rotate(
-                    from_to(dir_or(ps.off[p]), dir_or(sub(parent, ps.pos[pp as usize]))),
-                    ps.off[k],
+                    from_to(dir_or(ps.shown[p]), dir_or(sub(parent, ps.pos[pp as usize]))),
+                    ps.shown[k],
                 ),
             };
             let at_rest = dot(normalize(last), normalize(b)).max(0.0);
@@ -477,11 +502,11 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
         };
         let target = add(parent, scale(rest_dir, len));
         let pos = ps.pos[k];
-        let pull = rig.pull[k] * r;
+        let pull = rig.pull[k];
         // Version 1.0's gravity is a force of `gravity` bone lengths per step (ADR 0068).
-        let force = if ch.version_1_0 { g * len * r } else { 0.0 };
+        let force = if ch.version_1_0 { g * len } else { 0.0 };
         let mut x = if ch.advanced {
-            let mut x = add(pos, scale(sub(pos, ps.prev[k]), rig.spring[k] * r));
+            let mut x = add(pos, scale(sub(pos, ps.prev[k]), rig.spring[k]));
             x = add(x, scale(sub(target, x), pull));
             let mut stiffness = rig.stiffness[k];
             if ch.version_1_0 {
@@ -496,7 +521,7 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
             // Version 1.0 (simplified): across the bone's last offset only, and damped like the pull.
             let d = dir_or(ps.off[k]);
             let across = scale(sub(DOWN, scale(d, dot(DOWN, d))), force);
-            let keep = rig.spring[k] * SPRING_KEEP * r;
+            let keep = rig.spring[k] * SPRING_KEEP;
             add(
                 pos,
                 add(
@@ -506,6 +531,34 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
             )
         };
         let mut vel = sub(x, pos);
+        // Colliders push the bone (the segment from its parent) out, then the bone keeps its length; true if they
+        // moved it. The bone's radius scales with its node (an endpoint's with its leaf), as recorded (#90).
+        let radius = rig.radius[k] * world[rig.node[k].or(rig.node[p]).expect("tips hang off nodes") as usize].scale;
+        let push = |x: &mut Vec3| {
+            let mut hit = false;
+            for &ci in &ch.colliders {
+                let (shape, inside) = ctx.placed[ci as usize];
+                let pushed = collide(shape, inside, radius, parent, *x);
+                if pushed != *x {
+                    hit = true;
+                    *x = add(parent, scale(normalize(sub(pushed, parent)), len));
+                }
+            }
+            hit
+        };
+        if r < 1.0 {
+            // Between fixed steps the SDK takes this (full) step and its collisions, then blends from the bone's last
+            // full-step end (in bone lengths from the parent, not normalised) towards the result by
+            // `r / (1 - pull (1 - r))` and normalises; limits apply after (fitted to its stored state, ADR 0074).
+            let t = r / (1.0 - pull * (1.0 - r));
+            let mut full = add(parent, scale(dir_or(sub(x, parent)), len));
+            push(&mut full);
+            let d = add(
+                scale(sub(pos, parent), (1.0 - t) / len),
+                scale(dir_or(sub(full, parent)), t),
+            );
+            x = add(parent, scale(dir_or(d), len));
+        }
         if ch.limit != LimitKind::None {
             let reach = sub(x, parent);
             let (axis, across) = limit_axes(rig, world, turn[p], ch.limit_rotation, k, p);
@@ -518,17 +571,9 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
         if dot(now, dir) > 0.0 && dot(cross(now, dir), cross(now, dir)) < REST_SNAP {
             x = add(parent, scale(dir, len));
         }
-        // Colliders push the bone (the segment from its parent) out, then the bone keeps its length. The bone's
-        // radius scales with its node (an endpoint's with its leaf), as recorded (#90).
-        let radius = rig.radius[k] * world[rig.node[k].or(rig.node[p]).expect("tips hang off nodes") as usize].scale;
-        for &ci in &ch.colliders {
-            let (shape, inside) = ctx.placed[ci as usize];
-            let pushed = collide(shape, inside, radius, parent, x);
-            if pushed != x {
-                // A push slows the step's velocity by the collision friction (recorded, ADR 0070).
-                vel = scale(vel, 1.0 - COLLISION_FRICTION);
-                x = add(parent, scale(normalize(sub(pushed, parent)), len));
-            }
+        // A push slows the step's velocity by the collision friction (recorded, ADR 0070).
+        if r >= 1.0 && push(&mut x) {
+            vel = scale(vel, 1.0 - COLLISION_FRICTION);
         }
         ps.prev[k] = pos;
         ps.pos[k] = x;
@@ -562,6 +607,7 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
     for k in range {
         if rig.parent[k] != NO_PARENT {
             ps.off[k] = sub(ps.pos[k], ps.pos[rig.parent[k] as usize]);
+            ps.shown[k] = ps.off[k];
         }
     }
 }

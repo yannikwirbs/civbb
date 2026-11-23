@@ -264,24 +264,8 @@ const BOUNDS: &[(&str, &str, f32)] = &[
     // for the first frames), then the tip sits near the axis and flips sides on float noise (#90).
     ("vrc_physbones.json", "collider_inside_capsule_fat", 0.0194),
     ("vrc_physbones.json", "collider_inside_capsule_short_fat", 0.0211),
-    // Other frame rates: the output's partial step is an approximation (#84); full steps (30 Hz) are exact.
-    ("vrc_physbones_90hz.json", "sag_v10_simplified", 0.002),
-    ("vrc_physbones_90hz.json", "sag_v11_simplified", 0.0014),
-    ("vrc_physbones_90hz.json", "sway_v11_simplified", 0.0023),
-    ("vrc_physbones_90hz.json", "sway_v11_advanced", 0.0011),
-    ("vrc_physbones_90hz.json", "turn_v11_advanced", 0.0007),
-    ("vrc_physbones_90hz.json", "stiff_v11_advanced", 0.0063),
-    ("vrc_physbones_90hz.json", "immobile_all", 0.0009),
-    ("vrc_physbones_90hz.json", "immobile_advanced", 0.0008),
-    ("vrc_physbones_90hz.json", "scaled", 0.0024),
-    ("vrc_physbones_90hz.json", "limit_angle", 0.0035),
-    ("vrc_physbones_90hz.json", "limit_angle_sway", 0.0018),
-    ("vrc_physbones_90hz.json", "collider_sphere", 0.0151),
-    ("vrc_physbones_90hz.json", "collider_sway", 0.046),
-    ("vrc_physbones_90hz.json", "simplified_p40_s70", 0.0036),
-    ("vrc_physbones_90hz.json", "advanced_p20_m50_k50", 0.0025),
-    ("vrc_physbones_90hz.json", "gravity_v11_sway", 0.0016),
-    ("vrc_physbones_90hz.json", "falloff_v11_50", 0.0021),
+    // 90 Hz, a contact where a bone's start touches the sphere: float noise decides whether it pushes (frame 41).
+    ("vrc_physbones_90hz.json", "collider_sway", 0.0012),
 ];
 
 /// What "exact" means here: the goldens hold positions to the micrometre and Unity steps in single precision.
