@@ -157,6 +157,21 @@ fn grid_keeps_borders_seams_and_splits() {
     assert!(again == a, "not deterministic");
 }
 
+/// Mostly degenerate triangles (a hostile import read a u32 index accessor as u8): meshoptimizer drops them at the
+/// first level, far below its target, so the next level's target exceeded its input and meshoptimizer's C++
+/// assertion aborted the process.
+#[test]
+fn degenerate_triangles_do_not_abort() {
+    let mut a = grid();
+    let m = &mut a.meshes[0];
+    m.indices.extend(std::iter::repeat_n(0, 3 * 4000));
+    m.submeshes[1].index_count = m.indices.len() as u32 - m.submeshes[1].first_index;
+    valid(&a);
+    let l = lod(&mut a);
+    valid(&a);
+    assert!(l.triangles[1] < l.triangles[0], "{l:?}");
+}
+
 #[test]
 fn corpus_avatars_keep_their_look() {
     for spec in [civbb_corpus::lean(), civbb_corpus::bloated()] {

@@ -77,7 +77,9 @@ fn build(m: &mut Mesh) -> f32 {
     for (share, cap) in LEVELS {
         let mut next = Vec::with_capacity(current.len());
         for (s, idx) in current.iter().enumerate() {
-            let target = (full[s].len() as f32 * share) as usize / 3 * 3;
+            // At most the level above's count: meshoptimizer requires it (a C++ assertion), and a level can overshoot
+            // its target far, e.g. when most triangles are degenerate.
+            let target = ((full[s].len() as f32 * share) as usize / 3 * 3).min(idx.len());
             let mut e = 0.0;
             next.push(simplify_with_attributes_and_locks(
                 idx,
