@@ -80,7 +80,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   as the SDK does (ADR 0046), including its scale-offset power `n / total weight`.
 - Unity ground truth: `tools/unity-truth` runs in batch mode and records JSON into crate test dirs (ADR 0013,
   `tools/unity-truth/README.md`). Muscle space and constraints (44 cases, batch play mode) are verified against it;
-  animator goldens are recorded too (`Goldens.cs`, ADR 0065; material curves and masks still to record, #54).
+  animator goldens are recorded too (`Goldens.cs`, ADR 0065; transform masks and interruption sources recorded, ADR 0066;
+  material curves still to record, #54).
 
 ## Compiler (`civbb-pipeline`)
 

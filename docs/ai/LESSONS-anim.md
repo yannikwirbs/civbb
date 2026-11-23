@@ -52,5 +52,8 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   toes in 4, never neck or shoulders) and record exactly those skeletons.
 - Community Write Defaults rules are about empty *clips*: a WD-on state with no motion at all writes nothing in
   Unity (2022.3 and 6000.3, ADR 0065). Record a rule in `Goldens.cs` (a JSON case, 5 s run) before building on it.
+- Interruption cases: ordered interruption hides any source transition listed after the running one, and an unordered
+  running transition whose condition still holds restarts itself every frame (recorded, ADR 0066). Clear its
+  parameter once the fade starts when a case or test wants the fade to progress.
 - Changing when the first update advances shifts every frame-counting test by one frame: count from the recorded
   time, not from "enter" frames, and rerun `collapse.rs` (the collapsed toggle layer mirrors first-frame semantics).
