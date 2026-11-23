@@ -7,8 +7,8 @@ use std::collections::{HashMap, HashSet};
 use civbb_anim::Target;
 use civbb_format::Avatar;
 use civbb_format::animator::{
-    Animator, Behaviour, BlendTree, BlendTreeKind, Clip, ClipIndex, ConditionMode, DriverOp, Layer, LayerBlending,
-    Motion, ParamIndex, ParamKind, Parameter, State, StateMachine, Transition, TransitionDest,
+    Animator, Behaviour, BlendTree, BlendTreeKind, COMPILER_PARAMETER_PREFIX, Clip, ClipIndex, ConditionMode, DriverOp,
+    Layer, LayerBlending, Motion, ParamIndex, ParamKind, Parameter, State, StateMachine, Transition, TransitionDest,
 };
 
 /// A layer that only switches between two constant clips on one bool parameter.
@@ -107,7 +107,7 @@ pub fn collapse(a: &mut Avatar) -> usize {
 
     let wd_off = any_wd_off(an);
     let an = a.animator.as_mut().expect("checked above");
-    let mut name = String::from("civbb/One");
+    let mut name = format!("{COMPILER_PARAMETER_PREFIX}One");
     while an.parameters.iter().any(|p| p.name == name) {
         name.push('_');
     }

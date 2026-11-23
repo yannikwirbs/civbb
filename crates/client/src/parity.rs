@@ -7,6 +7,7 @@ use std::sync::Arc;
 use civbb_anim::{Controller, Instance};
 use civbb_core::math::Pose;
 use civbb_format::Avatar;
+use civbb_format::animator::COMPILER_PARAMETER_PREFIX;
 use civbb_format::cost::{Light, Parity, Rig, RigView, StateParity, Thresholds, ViewScore};
 use civbb_format::math::{Mat4, Vec3};
 use civbb_render::Renderer;
@@ -168,10 +169,12 @@ fn start(avatar: &Avatar) -> Vec<(String, f32)> {
         .collect()
 }
 
-/// Each parameter of the avatar's animator with the value away from its start it takes in [`states`].
+/// Each parameter of the avatar's animator with the value away from its start it takes in [`states`]. Parameters the
+/// compiler added are left out, so a compiled avatar has its import's states.
 fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
     start(avatar)
         .into_iter()
+        .filter(|(p, _)| !p.starts_with(COMPILER_PARAMETER_PREFIX))
         .map(|(p, v)| (p, if v == 0.0 { 1.0 } else { 0.0 }))
         .collect()
 }

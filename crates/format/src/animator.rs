@@ -26,6 +26,9 @@ pub struct Animator {
     pub layers: Vec<Layer>,
 }
 
+/// Prefix of the parameters the compiler adds (`civbb/One`, ADR 0028); no creator state toggles them.
+pub const COMPILER_PARAMETER_PREFIX: &str = "civbb/";
+
 /// An animator parameter.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Parameter {

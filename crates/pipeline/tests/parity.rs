@@ -59,6 +59,21 @@ fn lean_compiled_matches_its_import_in_every_state() {
     assert_eq!(p.reference, "source");
 }
 
+/// A compiled avatar steps through its import's states, so it can be scored against Unity's renders of the import
+/// (ADR 0048): the constant parameter that collapsing adds is never toggled.
+#[test]
+fn compiled_states_match_the_import() {
+    let (source, compiled) = compiled(&civbb_corpus::bloated());
+    let names = |a: &Avatar| {
+        let mut names = Vec::new();
+        parity::states(&[a], |_, name, _| names.push(name.to_owned()));
+        names
+    };
+    let params = |a: &Avatar| a.animator.as_ref().unwrap().parameters.len();
+    assert!(params(&compiled) > params(&source), "collapsing added a parameter");
+    assert_eq!(names(&compiled), names(&source));
+}
+
 #[test]
 fn a_wrong_skin_colour_is_red() {
     let (source, mut compiled) = compiled(&civbb_corpus::lean());
