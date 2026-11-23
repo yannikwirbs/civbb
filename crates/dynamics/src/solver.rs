@@ -17,6 +17,8 @@ pub const MAX_FRAME: f32 = 0.1;
 /// Simplified integration keeps this fraction of `spring` as velocity.
 const SPRING_KEEP: f32 = 0.99;
 const DOWN: Vec3 = [0.0, -1.0, 0.0];
+/// The fraction of a step's velocity a collider push takes away (the SDK's value, ADR 0070).
+const COLLISION_FRICTION: f32 = 0.25;
 /// A bone within this angle of its rest direction snaps onto it: the SDK's `dot > 0.999999f` (0.0816 degrees,
 /// recorded; ADR 0069), as the squared sine, which f32 resolves at this size.
 const REST_SNAP: f32 = 2.0266e-6;
@@ -523,13 +525,8 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
             let (shape, inside) = ctx.placed[ci as usize];
             let pushed = collide(shape, inside, radius, parent, x);
             if pushed != x {
-                if let Some(n) = unit(sub(pushed, x)) {
-                    // The push stops motion into the collider.
-                    let into = dot(vel, n);
-                    if into < 0.0 {
-                        vel = sub(vel, scale(n, into));
-                    }
-                }
+                // A push slows the step's velocity by the collision friction (recorded, ADR 0070).
+                vel = scale(vel, 1.0 - COLLISION_FRICTION);
                 x = add(parent, scale(normalize(sub(pushed, parent)), len));
             }
         }
@@ -649,7 +646,8 @@ fn collide(shape: Placed, inside: bool, r: f32, a: Vec3, x: Vec3) -> Vec3 {
             let (on_bone, on_core) = closest_between(a, x, p, q);
             let d = sub(on_bone, on_core);
             let l = length(d);
-            if l >= radius + r {
+            // Contact at the bone's start (its parent's end) does not push it (recorded, ADR 0070).
+            if l >= radius + r || on_bone == a {
                 return x;
             }
             add(x, scale(dir_or(d), radius + r - l))

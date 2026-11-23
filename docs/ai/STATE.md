@@ -38,9 +38,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   by reflection and write committed goldens (`crates/anim/tests/unity/vrc_constraints.json`,
   `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. PhysBones too (ADR 0049):
   `VrcPhysBones.cs` (88 cases at 60 Hz, 18 at 90 and 30 Hz, `crates/dynamics/tests/unity/vrc_physbones*.json`);
-  `tests/vrc_physbone.rs` replays them: within 0.5 mm in 82 of 88 cases at 60 Hz (every version 1.0 case and falloff
-  since ADR 0068, fitted to the SDK's per-bone state read by reflection; bones near rest snap onto it, ADR 0069), the rest
-  pinned as bounds (90 Hz output, collider velocity, polar corners #84; spring 1 keeps f32 rounding; a bone fatter
+  `tests/vrc_physbone.rs` replays them: within 0.5 mm in 83 of 88 cases at 60 Hz (every version 1.0 case and falloff
+  since ADR 0068, fitted to the SDK's per-bone state read by reflection; bones near rest snap onto it, ADR 0069; a collider push slows the velocity by the SDK's friction 0.25 and skips contact at a bone's start, ADR 0070), the rest
+  pinned as bounds (90 Hz output, polar corners #84; spring 1 keeps f32 rounding; a bone fatter
   than its inside capsule flips sides on float noise, #90). Inside capsules keep the tip within capsule radius minus
   bone radius, unclamped (negative puts it on the far side of the core). A bone's collision radius scales with its
   own node's world scale (an endpoint's with its leaf), recorded with scaled bones against unscaled colliders (#90).

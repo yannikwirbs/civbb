@@ -256,10 +256,9 @@ fn the_sdk_keeps_bone_lengths_and_pins_the_root() {
 
 /// Every case's largest bone error (metres), file by file. Cases not listed must replay within [`EXACT`].
 const BOUNDS: &[(&str, &str, f32)] = &[
-    // Residuals at 60 Hz: the polar box's corners, velocity after a collider push (#84), and spring 1, whose steps
-    // are exact against the SDK's stored state but keep f32 rounding undamped.
+    // Residuals at 60 Hz: the polar box's corners (#84), and spring 1, whose steps are exact against the SDK's
+    // stored state but keep f32 rounding undamped.
     ("vrc_physbones.json", "limit_polar_diagonal", 0.008),
-    ("vrc_physbones.json", "collider_sway", 0.016),
     ("vrc_physbones.json", "simplified_p10_s100", 0.00075),
     ("vrc_physbones.json", "simplified_p40_s100", 0.001),
     // A bone fatter than its inside capsule: the SDK puts the tip on the far side of the core (negative room, exact
@@ -279,12 +278,11 @@ const BOUNDS: &[(&str, &str, f32)] = &[
     ("vrc_physbones_90hz.json", "limit_angle", 0.0035),
     ("vrc_physbones_90hz.json", "limit_angle_sway", 0.0018),
     ("vrc_physbones_90hz.json", "collider_sphere", 0.0151),
-    ("vrc_physbones_90hz.json", "collider_sway", 0.0639),
+    ("vrc_physbones_90hz.json", "collider_sway", 0.046),
     ("vrc_physbones_90hz.json", "simplified_p40_s70", 0.0036),
     ("vrc_physbones_90hz.json", "advanced_p20_m50_k50", 0.0025),
     ("vrc_physbones_90hz.json", "gravity_v11_sway", 0.0016),
     ("vrc_physbones_90hz.json", "falloff_v11_50", 0.0021),
-    ("vrc_physbones_30hz.json", "collider_sway", 0.0164),
 ];
 
 /// What "exact" means here: the goldens hold positions to the micrometre and Unity steps in single precision.
