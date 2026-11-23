@@ -96,7 +96,9 @@ fn build(m: &mut Mesh) -> f32 {
             error[s] += e;
         }
         let count: usize = next.iter().map(Vec::len).sum();
-        if count as f32 > KEEP * above as f32 {
+        // `count >= above` only adds the empty level above an empty one (validation wants every level smaller), and
+        // meshoptimizer's error overflows to infinity on huge but finite coordinates.
+        if count as f32 > KEEP * above as f32 || count >= above || !error.iter().all(|e| e.is_finite()) {
             break;
         }
         let mut lod = Lod {

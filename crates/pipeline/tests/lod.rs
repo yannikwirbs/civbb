@@ -170,6 +170,56 @@ fn degenerate_triangles_do_not_abort() {
     let l = lod(&mut a);
     valid(&a);
     assert!(l.triangles[1] < l.triangles[0], "{l:?}");
+    // Every triangle degenerate (that import's mesh): level 1 is empty, and the chain ends there instead of
+    // repeating it (validation wants each level smaller than the one above).
+    let mut a = grid();
+    let m = &mut a.meshes[0];
+    m.indices = (0..200).flat_map(|v| [v, v, v + 1]).collect();
+    m.submeshes.truncate(1);
+    m.submeshes[0].index_count = m.indices.len() as u32;
+    valid(&a);
+    lod(&mut a);
+    valid(&a);
+    assert_eq!(
+        a.meshes[0].lods.iter().map(|l| l.indices.len()).collect::<Vec<_>>(),
+        [0]
+    );
+}
+
+/// A mesh the `compile` fuzz target made (a lean source GLB with its buffer scrambled; positions, normals, UV0 and
+/// indices, little-endian): 181 of 2040 coordinates near 2e37 among ordinary ones, normals and UVs as large.
+/// meshoptimizer's error for its first level overflows to infinity, and a level with an infinite error ends the
+/// chain.
+#[test]
+fn overflowing_errors_end_the_chain() {
+    let bytes = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fuzz/lod-overflow.bin")).unwrap();
+    let words: Vec<[u8; 4]> = bytes.as_chunks::<4>().0.to_vec();
+    let (n, k) = (
+        u32::from_le_bytes(words[0]) as usize,
+        u32::from_le_bytes(words[1]) as usize,
+    );
+    let floats: Vec<f32> = words[2..2 + 8 * n].iter().map(|&w| f32::from_le_bytes(w)).collect();
+    let (vectors, uv) = floats.split_at(6 * n);
+    let vectors: Vec<[f32; 3]> = vectors.as_chunks::<3>().0.to_vec();
+    let mut a = grid();
+    let m = &mut a.meshes[0];
+    *m = Mesh {
+        name: "Overflow".into(),
+        positions: vectors[..n].to_vec(),
+        normals: vectors[n..].to_vec(),
+        uv0: uv.as_chunks::<2>().0.to_vec(),
+        indices: words[2 + 8 * n..].iter().map(|&w| u32::from_le_bytes(w)).collect(),
+        submeshes: vec![Submesh {
+            first_index: 0,
+            index_count: k as u32,
+            material: 0,
+        }],
+        ..Mesh::default()
+    };
+    valid(&a);
+    lod(&mut a);
+    valid(&a);
+    assert!(a.meshes[0].lods.is_empty());
 }
 
 #[test]
