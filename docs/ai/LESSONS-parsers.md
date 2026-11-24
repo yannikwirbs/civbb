@@ -30,3 +30,7 @@ Read before working on parsers of untrusted input, fuzz targets or native (`-sys
   panic (temporarily), or run a scratch test that writes each case before running it.
 - meshoptimizer asserts its preconditions in C++ (`target_index_count <= index_count`): debug builds abort the
   whole process (not catchable with `catch_unwind`), release builds compile the assert out. Clamp every argument.
+- Validation must check every float of an untrusted shape, not only placements: PhysBone colliders' radius and
+  height went unchecked (contact volumes were) until 2026-11-24. A structure-aware mutator (avatar to JSON value,
+  set a random leaf to 1e39/-1/u32::MAX, cut or empty a random array, back through `validate`) reaches such gaps
+  far more often than CBOR byte flips (about 1,800 of 12,000 cases fail validation, against 129 of 4,000).

@@ -70,3 +70,13 @@ Add a line to the matching file whenever something costs more than one attempt.
   clean regression (2026-11-23: #83, #84, #95, #96).
 - `cargo xtask ci 2>&1 | tail -3 && git commit ...` commits even when CI fails: the pipeline's status is `tail`'s.
   Start such Bash calls with `set -o pipefail` (a red commit had to be rewritten on 2026-11-24).
+- One-worker timings on the hybrid i5-12600K land on a P- or an E-core at random (up to 1.8x apart, a thread can
+  migrate mid-run): pin them (`cmd //c "start /affinity 4 /wait /b <exe> ..."` from Git Bash, logical CPU 2 is a
+  P-core; `taskset -c 2` on Linux) and run twice before believing a before/after difference (#103).
+- Behaviour pins for refactors: a standalone scratch crate in the scratchpad with path dependencies on the repo's
+  crates (plus a copy pointing at a `git worktree` of the start commit for the baseline) stays out of git, the code
+  map and `xtask ci`. Compare with `cmp` and a line count, never by counting `diff` lines: a harness whose setup
+  panics under a silenced panic hook writes an empty file that "has no differing lines". Mutation-check the pin.
+- After splitting a file, `cargo fix --allow-dirty -p <crate> --lib --tests` prunes the copied imports; it changes
+  nothing while any compile error remains. Clippy may flag moved code it ignored inside a very long function
+  (`manual_is_multiple_of` on 2026-11-24).

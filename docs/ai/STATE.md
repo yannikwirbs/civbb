@@ -96,13 +96,21 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 - glTF input (ADR 0076): `KHR_mesh_quantization` accepted (integer attributes, morph deltas and animation outputs
   through the normalising accessor reader); required Draco or meshopt compression refused with an export hint.
+- Importer layout (health check): `gltf_import.rs` (entry, parsing, URI resolver, buffers, hierarchy) with
+  `gltf_import/{material,mesh,animation,source,unity_material}.rs` and `vrm.rs` (entry, humanoid, node constraints,
+  first person) with `vrm/{springs,mtoon,expressions,meta}.rs`. vrm keeps its own `qmul`/`rotate`/`from_to` (core's
+  round differently); the rest of its math is `civbb_core::math`. Validation (`civbb_format::validate`) checks one
+  avatar part per method, animator checks in `validate/animator.rs`; PhysBone collider radius and height must be
+  finite.
 - Per-avatar report (ADR 0032): `civbb build <src> --key <k> --report r.json [--measure]` writes `r.json` and `r.md`:
   stats after import and after each stage (`civbb_pipeline::compile` runs them), package size, and with
   `--measure` the output of `civbb-client measure` (run as a process from next to `civbb`; release only): `bench`
   on one worker and the viewer's frames on an offscreen target (`Renderer::headless`), GPU null without a device.
   Golden for lean counts: `crates/pipeline/tests/golden/report-lean.json` (`CIVBB_BLESS=1` rewrites it). All 31
   files in corpus/local build with measured reports (summary on #34): e.g. Yumeka draws 23 to 7, 563 shapes to 0,
-  7.6 µs CPU and 17.9 µs GPU per avatar; HAOLAN textures 19.0 to 3.3 MB, 33.5 µs GPU.
+  7.6 µs CPU and 17.9 µs GPU per avatar; HAOLAN textures 19.0 to 3.3 MB, 33.5 µs GPU. `measure`'s one worker is
+  not pinned: on the hybrid reference CPU it lands on a P- or an E-core at random (up to 1.8x apart), so single
+  `--measure` CPU numbers are noisy until #103.
 - Compiler stages in `civbb-pipeline`, run by `civbb build` between import and packaging, each proven
   behaviour-identical by tests that step islands before and after:
   - Order in `civbb build`: `prune`, `atlas`, `merge`, `lod`, `collapse`, `compress`.
@@ -161,7 +169,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   Those numbers score the uncompiled import. Since the health check, parity skips parameters named
   `civbb/...` (`COMPILER_PARAMETER_PREFIX`), so compiled packages score against Unity too; `python
   corpus/scorecard.py` (committed) gives per export the CPU and GPU µs before and after compiling and the compiled
-  package's Unity FLIP (ADR 0078, M0.11).
+  package's Unity FLIP (ADR 0078, M0.11), measuring pinned to a P-core. Run 2026-11-24 (table in the health check
+  report and on #101): compiled against Unity rest means 0.057 (HAOLAN_PC) to 0.194 (Cokoro_Quest), worst states
+  up to 0.487, none green; GPU per avatar down where draws or shapes go (Yumeka 59.9 to 33.6 µs), CPU unchanged
+  (Yumeka 191 to 186 µs) except Blackbird 22 to 29 µs (#102).
 
 ## Renderer and viewer
 

@@ -1,8 +1,8 @@
 # Phase 0 health check
 
-Date: 2026-11-24. Branch `health/phase-0`. Scope: the whole repository against the design doc, ADRs 0001 to 0077
-and the Phase 0 milestones, before Phase 1 starts. Results and metrics are at the end; this first part is the
-findings and the plan, written before any change.
+Date: 2026-11-24 (two sessions). Branch `health/phase-0`, merged into `main`. Scope: the whole repository against
+the design doc, ADRs 0001 to 0077 and the Phase 0 milestones, before Phase 1 starts. Results and metrics are at
+the end ("Result"); the first part is the findings and the plan, written before any change.
 
 ## Baseline (measured)
 
@@ -186,22 +186,100 @@ Done on `health/phase-0` (each commit gated by `cargo xtask ci`):
   Tessakuchan's CPU cost barely moves with compiling: the cost of an avatar is mostly its animator and PhysBones,
   which the stages keep. The answer to "cheaper" therefore rests on the Unity comparison (#38).
 
-Still to do, in order:
+## Progress (session 2)
 
-1. Run `python corpus/scorecard.py` alone (about 40 minutes, nothing compiling) and put the full table here and on
-   #101.
-2. Structure: math helpers onto `civbb_core::math` (`gltf_import/vrm.rs` has its own `add`, `dot`, `cross`,
-   `qmul`, `conj`, `rotate`, `from_to`; `client::cull` `sub`, `length`; the `Mat4` multiply in `render::forward`
-   and `client::view`). Split `validate::V::avatar` (406 lines) into one method per avatar part. Split `vrm.rs`
-   (1,265) and `gltf_import.rs` (1,062) along their seams. Pin behaviour first: record the import result (errors,
-   or a hash of the avatar's CBOR plus warnings) for every file in `corpus/local/{vrm,glb,unity-glb,khronos}` and
-   for a few thousand digit-mutated lean/bloated source GLBs, VRMs and byte-mutated CBOR avatars (validation
-   alone), before and after; the outputs must be identical.
-3. Cosmetics: `pipeline/src/main.rs` writes the report with a raw newline inside a string literal; `civbb-dynamics`'
-   Cargo description still says "XPBD".
-4. Guardrails: apply `docs/ai/reviews/phase-0-xtask-rules.patch` (`cargo xtask rules`: no Rust file over 1,000
-   lines, no `unwrap()` before a crate's first `#[cfg(test)]` in `src/`) once the splits are done, then delete
-   the patch. Add `undocumented_unsafe_blocks = "warn"` to `[workspace.lints.clippy]` after adding `// SAFETY:`
-   comments to the 13 unsafe blocks in `render/tests/draw.rs` and `render/tests/skin.rs`. Note both in CLAUDE.md.
-5. Finish: before/after metrics in this report, STATUS/STATE/ARCHITECTURE, final `cargo xtask ci`, merge into
-   `main`.
+Done on `health/phase-0`, one logical change per commit, each gated by `cargo xtask ci`:
+
+- `0507e40`: the scorecard ran in full (40 minutes, nothing else compiling). Its CPU column turned out to be noise:
+  one `measure` worker lands on a performance or an efficiency core at random on the hybrid i5-12600K (Yumeka's
+  import 196 µs pinned to a P-core, 364 µs on an E-core; unpinned runs 185, 316, 358). The script now pins
+  `measure` to logical CPU 2; pinned runs repeat within about 5 %. The same holds for `civbb-client measure` itself
+  and every `--measure` report: #103.
+- `f6f92cc`: cosmetics (the raw newline; civbb-dynamics' description).
+- `6b3c1f1`, `6786981`: `validate::V::avatar` (406 lines) became one method per avatar part, called in the old
+  order; the animator checks moved to `validate/animator.rs` when the file passed 1,000 lines.
+- `76ce31a`, `4f4d0ad`: `mat4_mul` in `civbb_core::math` replaces the copies in `render::forward` and
+  `client::view`; `client::cull` and `vrm.rs` take `sub`, `length`, `add`, `dot`, `cross`, `conj` from core. vrm's
+  `qmul`, `rotate` and `from_to` stay (commented): core's round differently (439 of the pin's results changed in the
+  last bit) and core's `from_to` maps a non-finite input to the identity where vrm's yields NaN and validation
+  rejects the collider.
+- `33df448`, `bc0f88a`: `vrm.rs` split into `vrm/{springs,mtoon,expressions,meta}.rs`, `gltf_import.rs` into
+  `gltf_import/{material,mesh,animation}.rs`, code moved unchanged.
+- `7a69245`: found while pinning: validation checked contact volumes' sizes but not PhysBone collider shapes, so a
+  hostile package could hand the solver a NaN or infinite radius or height. Now rejected (test added).
+- `d4a870d`, `00c5eda`: guardrails (below), ADR 0079.
+
+Behaviour pin, a scratch harness kept out of the repository: the import result (CBOR hash of avatar and blobs,
+warnings, validation) of all 52 files in `corpus/local/{vrm,glb,unity-glb,khronos}`; 3,200 digit-mutated JSON
+chunks of the lean and bloated source GLBs and the four VRMs (half aimed at the extension JSON); 4,000
+byte-mutated and 12,000 structurally mutated avatars (indices to edge values, floats to huge or infinite, arrays
+cut, emptied or grown, strings too long) through validate: 19,252 results. Every refactor commit was identical to
+the baseline built from a worktree at the session's start, the collider fix differed in exactly the 4 mutated
+avatars it now rejects. Mutation check: a wrong argument to the new skin check changed 6,318 results. Limit: no
+case has errors in two avatar parts at once, so the pin cannot see a reordering of parts; that order was checked
+in the diff (moved code shown as moved, only plumbing changed).
+
+## Scorecard: Phase 0's claim against Unity
+
+All 13 local Unity exports (`python corpus/scorecard.py`; CPU and GPU from re-measuring the same packages pinned
+to a performance core, mean of two runs; FLIP of the compiled package against Unity's reference renders; every
+reference current). Posted on #101.
+
+| export | draws | shapes | CPU µs/avatar | GPU µs/avatar | Unity FLIP rest | Unity FLIP worst |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Blackbird | 4 → 4 | 6 → 5 | 22.1 → 29.4 | 3.6 → 3.7 | 0.108 | 0.348 |
+| Blackbird_Quest | 3 → 3 | 6 → 5 | 7.2 → 7.2 | 1.7 → 1.7 | 0.086 | 0.164 |
+| Cokoro | 13 → 13 | 313 → 227 | 43.6 → 43.4 | 16.1 → 14.3 | 0.132 | 0.472 |
+| Cokoro_Quest | 2 → 2 | 311 → 236 | 40.5 → 38.6 | 9.0 → 8.8 | 0.194 | 0.487 |
+| HAOLAN_PC | 15 → 14 | 127 → 94 | 88.8 → 80.4 | 43.7 → 36.5 | 0.057 | 0.076 |
+| HAOLAN_Quest | 13 → 10 | 114 → 86 | 34.6 → 35.1 | 12.6 → 6.6 | 0.150 | 0.179 |
+| Inuinu | 1 → 1 | 53 → 25 | 26.2 → 26.3 | 2.6 → 2.6 | 0.119 | 0.122 |
+| KohzieBoi | 1 → 1 | 4 → 1 | 4.7 → 4.8 | 4.2 → 4.2 | 0.140 | 0.140 |
+| Megumi | 23 → 16 | 1 → 0 | 5.8 → 3.8 | 15.9 → 10.8 | 0.160 | 0.160 |
+| Ostgaroa | 6 → 6 | 2 → 2 | 42.5 → 43.1 | 24.1 → 24.9 | 0.099 | 0.099 |
+| Taro | 9 → 9 | 43 → 27 | 24.9 → 23.9 | 10.8 → 9.5 | 0.165 | 0.166 |
+| Tessakuchan | 1 → 1 | 114 → 23 | 16.8 → 16.9 | 1.7 → 1.7 | 0.109 | 0.320 |
+| Yumeka | 23 → 19 | 563 → 282 | 190.8 → 186.4 | 59.9 → 33.6 | 0.146 | 0.431 |
+
+- **Visually identical to Unity: not shown.** No export reaches ADR 0033's green (mean ≤ 0.02), at rest or in any
+  state; rest means 0.057 to 0.194, worst states up to 0.487. #101.
+- **Cheaper:** compiling cuts GPU cost where it removes draws or shapes (Yumeka 44 %, HAOLAN_Quest 48 %, Megumi
+  32 %) and leaves CPU cost where it was, because an avatar's CPU cost is its animator and PhysBones, which the
+  stages keep. Blackbird's compiled package costs 33 % more CPU (#102). Whether our runtime is cheaper than Unity's
+  is the #38 baseline, still unmeasured.
+
+## Result
+
+**Goal alignment: Phase 0's claim is half proven, unchanged.** Behaviour parity with Unity and the VRChat SDK is
+strong and replayed in CI; visual parity with Unity and lower cost than the Unity baselines are not shown. Both are
+milestone M0.11 (ADR 0078): #38 (Unity CPU baselines), #101 (parity within a threshold), and from this session #102
+(Blackbird) and #103 (pinned measuring). Phase 1 should not start before M0.11 closes; epic #39 stays unsplit.
+The architecture supports Phase 1 (section 1).
+
+**Scope:** nothing out of scope found or removed (table in section 3).
+
+**Fixed** (sessions 1 and 2): three `lod` bugs on hostile input; compiled packages could not be scored against
+Unity; PhysBone collider shapes unvalidated; scorecard CPU numbers were core-class noise; the compile stages are
+fuzzed (`compile` target in CI).
+
+**Deferred, with issues:** #101 Unity-reference parity, #38 Unity CPU baselines, #102 Blackbird's CPU after
+compiling, #103 pinned `measure`; Blackbird's 0.35 wing pose and the silhouette errors belong to #101. vrm's own
+`qmul`/`rotate`/`from_to` stay by decision (above), no issue.
+
+**ADRs:** 0078 (Phase 0 gate not passed, M0.11), 0079 (source guardrails in the gate).
+
+**Guardrails** (CLAUDE.md, ADR 0079): clippy `undocumented_unsafe_blocks`; `cargo xtask rules` in ci: no Rust file
+over 1,000 lines, no `unwrap()` in `src/` before the first `#[cfg(test)]`. Each was mutation-checked (a missing
+SAFETY comment and an `unwrap()` fail the gate).
+
+| metric | before (baseline) | after |
+| --- | --- | --- |
+| `cargo xtask ci` | green, 19 s warm, 273 passed, 1 ignored | green, 21 s warm, 276 passed, 1 ignored; adds `rules` and the unsafe lint |
+| CI on GitHub | ci, docs, fuzz (4 targets) | ci, docs, fuzz (5 targets: + `compile`) |
+| Lines of Rust | 36,307 | 36,617 |
+| Files over 1,000 lines | 2 (`vrm.rs` 1,265, `gltf_import.rs` 1,062) | 0 (largest: `format/src/validate.rs` 900, `pipeline/tests/gltf_import.rs` 896, `client/src/view.rs` 852) |
+| Longest non-test function | `validate::V::avatar` 406 | `corpus::generate` 389 (test data); then `unity_material` 200, `solver::advance` 177; longest in validation 70 (`animator`) |
+| Duplicated math | vrm (7 functions), cull (2), `Mat4` multiply (2 copies) | vrm's `qmul`/`rotate`/`from_to` by decision |
+| Unsafe blocks without `SAFETY:` | 13 (tests) | 0, enforced |
+| `unwrap()` outside tests | 0 by convention | 0, enforced |
+| Direct external dependencies / `Cargo.lock` packages | 20 / 288 | 20 / 288 |

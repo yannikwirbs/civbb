@@ -279,6 +279,7 @@ Internal deps: none
 - `docs/adr/0076-gltf-mesh-quantization-yes-compression-no.md`: 0076: glTF input accepts KHR_mesh_quantization and refuses required Draco and meshopt compression
 - `docs/adr/0077-cpu-instance-culling-before-gpu-culling.md`: 0077: Cull mesh instances on the CPU before skinning; the GPU culling pass waits for worlds
 - `docs/adr/0078-phase-0-gate-not-yet-passed.md`: 0078: Phase 0's gate is not yet passed; its evidence comes before Phase 1
+- `docs/adr/0079-source-guardrails-in-the-gate.md`: 0079: Source guardrails in the gate
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
