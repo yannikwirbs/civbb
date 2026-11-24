@@ -76,3 +76,12 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   `+1e-6` tolerance looked harmless and moved the falloff state on 90 of 135 frames.
 - "Last" in an SDK rule can mean last shown, not last stepped: at 60 Hz the two coincide, so 60 Hz fits cannot tell
   them apart. Check rules against a 90 Hz recording (`PbState.cs -civbbDt 0.0111111114`).
+- PhysBone limit rotations compose as `qz qy qx` (X first), not in Unity's Euler order; recordings that rotate
+  about one axis cannot tell the orders apart. Record a rule with every input non-zero (#108: all three angles).
+- Finding why a PhysBone chain rests elsewhere than in Unity (#108): dump bone world positions on both sides
+  (`Reference.Render -civbbBones`, and a scratch crate stepping an `Island`), render Unity once with the PhysBones
+  disabled (the animated pose: ours matched it exactly), then override one PhysBone field on every chain per run
+  until the offset goes. Radius 0 removed Yumeka's skirt flare: `allowCollision` chains collide with the avatar's
+  own hand colliders in play mode (#92), although the chain lists no colliders.
+- `VrcPhysBones.cs` cases take `boneAxis` and `rootRotation` settings (not PhysBone fields) for chains that hang
+  like a real avatar's; append new cases at the end of the list.

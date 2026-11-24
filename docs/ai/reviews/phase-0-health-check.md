@@ -319,3 +319,12 @@ Thresholds for a Unity reference (ADR 0083): green mean ≤ 0.06 and p99 ≤ 0.2
 with only texture filtering and edge pixels), red mean > 0.12 or p99 > 0.9. Compiling costs 0.001 to 0.003 against
 Unity. Red states after rest are itemised in ADR 0083 (poses #109, Blackbird's wings #107, Cokoro's material
 toggles #110). The visual half stays open on #105, #106 and #108 (M0.11).
+
+## Update (gate passed, 2026-11-24)
+
+The three red rest states were mapped from their sources: VRChat Toon Standard's ramp and albedo-coloured shadow
+(#105, Cokoro_Quest 0.206 to 0.074), Poiyomi's matcap replace, emission and second matcap with UV1 slots (#106,
+KohzieBoi 0.140 to 0.071), PhysBone limit rotations composed as the SDK does (#108, Yumeka's worst view 0.121 to
+0.1197). Rerun over all 13 exports: no rest state red (5 green, 8 yellow); every red state after rest is a pose
+difference (#109), Blackbird's wings (#107) or Cokoro's material toggles (#110). ADR 0084 states the gate's result:
+passed (CPU half ADR 0082, visual half ADR 0083's thresholds, table in ADR 0084).

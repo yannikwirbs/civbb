@@ -75,3 +75,10 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   pose difference in one state carries into every later state.
 - Unity's texture import max size (2048) does not matter at the 640 px rig: shrinking 4096 sources to it moved
   Megumi by 0.003 and Taro by nothing.
+- A state's light against Unity is its worst view's (ADR 0083), not the mean's: #106 was closed at mean 0.117 with
+  two views above 0.12. Check every view before closing a parity issue.
+- On near-black materials a faint layer matters: Poiyomi's `_MatcapReplace` 0.02 of a white matcap is a visible
+  sheen on KohzieBoi's black cloth (luminance ratio ours/Unity 0.9). Test which term it is by an experiment build
+  before modelling a light model from the source (a "ramp lighting" model of it made the score worse).
+- Unity feeds a shader's UV1 from UV0 when the mesh has no second UV set (KohzieBoi: main texture on `_MainTextureUV`
+  1, rendered as on UV0); the renderer does the same (`scene.rs`).

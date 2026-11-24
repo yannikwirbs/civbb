@@ -21,9 +21,11 @@ What exists, by area. Read the section for the area you touch; update it when th
   fingerprints GUID (lilToon variant table), name, markers, and maps lilToon, Poiyomi, UTS2, MToon, Standard,
   VRChat Mobile, TSF and unlit to Toon/PBR/Unlit (`gltf_import/unity_material.rs`). Toon materials name their light
   model (ADR 0050): lilToon, Poiyomi, UTS2 clamp light plus ambient (lilToon between `_LightMinLimit` and
-  `_LightMaxLimit`, animatable, ADR 0054); MToon, VRM and VRChat Mobile add the ambient. Matcaps add or multiply
-  (MatCap Lit multiplies, ADR 0051) with a tint and a mask (lilToon `_MatCapColor`/`_MatCapBlendMask`, Poiyomi's
-  add/multiply weights, ADR 0053); lilToon rim shade, the emission gradient's start and `_EmissionMainStrength`
+  `_LightMaxLimit`, animatable, ADR 0054); MToon, VRM and VRChat Mobile add the ambient (Toon Standard clamps unless
+  `_LimitBrightness` is off, and shades by its `_Ramp` with an albedo-coloured shadow, #105). Matcaps add, multiply
+  or replace (MatCap Lit multiplies, ADR 0051) with a tint and a mask (lilToon `_MatCapColor`/`_MatCapBlendMask`,
+  Poiyomi's add/multiply/replace weights and emission, both its matcaps, slots on their `_<Slot>UV`, #106, ADR
+  0053); lilToon rim shade, the emission gradient's start and `_EmissionMainStrength`
   (ADRs 0052, 0053). Plain colours linearise as Unity does (`pow(x, 2.2)` above 1); `[HDR]` ones (lilToon, Poiyomi
   emission, UTS2 emissive) are taken as saved (ADR 0062). lilToon's shadow ramp in
   half-Lambert terms, shadow bands (strength, second shadow, main strength, border colour), rim ramp and masks, and
@@ -191,16 +193,19 @@ What exists, by area. Read the section for the area you touch; update it when th
 - Against Unity (#101, ADR 0083): each view's score also splits into `interior` (covered in both images, more than
   1 px from either edge) and `silhouette` (`ViewScore`, report keys added, version kept), and a Unity reference is
   lit with `UNITY_THRESHOLDS` (green mean <= 0.06 and p99 <= 0.25, red mean > 0.12 or p99 > 0.9; the report's
-  `thresholds` say which). Rest means after the #101 mapping fixes: 0.027 (Inuinu) to 0.206 (Cokoro_Quest); green
-  Inuinu, Blackbird, HAOLAN_Quest, Blackbird_Quest, Megumi; red Yumeka (#108), KohzieBoi (#106), Cokoro_Quest
-  (#105). Pose states (#109), Blackbird's wings (#107) and Cokoro's material toggles (#110) are red after rest.
+  `thresholds` say which). Rest means after #101, #105, #106, #108: 0.027 (Inuinu) to 0.107 (Yumeka, worst view
+  0.1197); green Inuinu, Blackbird, HAOLAN_Quest, Blackbird_Quest, Megumi, the other 8 yellow, none red (table in
+  ADR 0084, the gate passed). Pose states (#109), Blackbird's wings (#107) and Cokoro's material toggles (#110) are
+  red after rest. Bone-by-bone rest comparison: `Reference.Render -civbbBones <file>` (Unity, our handedness).
 
 ## Renderer and viewer
 
 - Toon outlines (ADR 0034): inverted hulls, a second indirect draw per outlined toon submesh (`Shader::Outline`,
   front faces culled), width in metres times the width texture's G channel sampled in the vertex shader, unlit
-  outline colour times the outline texture. Material records are 140 words (toon: light model and bounds, matcap blend, tint and mask, rim
-  shade, shadow bands, rim ramp, tone correction; ADRs 0050 to 0054, 0057, 0058).
+  outline colour times the outline texture. Material records are 164 words (toon: light model and bounds, matcap blend, tint and mask, rim
+  shade, shadow bands, rim ramp, tone correction; ADRs 0050 to 0054, 0057, 0058). Matcaps add, multiply or replace
+  (Poiyomi: towards the matcap lit as the colour is), each with an unlit emission weight; a toon has up to two
+  (`Toon::second_matcap`, format v25, #106). A mesh without UV1 reads UV0 there, as Unity does (`scene.rs`).
 - The viewer's title and `--frames` summary report draws and skinned meshes of the last frame. KTX2 textures are
   checked (header, level index, one 2D image) and transcoded to BC7 by the pure-Rust `basisu` crate (ETC1S, UASTC
   and XUASTC); the renderer uploads BC7 levels and device selection requires BC textures. RGBA8 textures get CPU
@@ -250,7 +255,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   steps them (ADR 0049, 0068: fixed 1/60 s steps counted in f32, between them the shown direction blended from the
   last step towards the frame's by `r / (1 - pull (1 - r))`, steps against the pose interpolated from the last step's,
   colliders from the last frame's, ADR 0074; versions 1.0/1.1, simplified and advanced
-  integration, immobile, limits, segment colliders) with grab/pose (ADR 0015's, unverified), and contacts with the
+  integration, immobile, limits with their rotation composed `qz qy qx` as the SDK does (#108), segment colliders;
+  not the hand and finger colliders that `allowCollision` chains meet, #92) with grab/pose (ADR 0015's, unverified), and contacts with the
   cross-avatar grid broadphase (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the
   component's node apart from the root transform, Proximity from a sender's second frame (ADR 0047). Format v13
   (`rebake` ADR 0046, contact shapes ADR 0047, PhysBone `version` ADR 0049, `Toon::light` ADR 0050).
