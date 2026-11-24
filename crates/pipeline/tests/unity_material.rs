@@ -391,6 +391,40 @@ fn poiyomi_without_a_ramp_texture_is_unshaded() {
 }
 
 #[test]
+fn toon_standard_shades_by_its_ramp_with_an_albedo_coloured_shadow() {
+    // A 4x1 linear ramp, dark then bright: it rises between the second and third texel centres in half-Lambert terms.
+    let mut png = Vec::new();
+    let img =
+        image::RgbaImage::from_raw(4, 1, [51, 51, 255, 255].iter().flat_map(|&v| [v, v, v, 255]).collect()).unwrap();
+    img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .unwrap();
+    let standard = |floats: Value, ramp: bool| {
+        let textures = if ramp {
+            json!({"_MainTex": tex([1.0, 1.0, 0.0, 0.0]), "_Ramp": tex([1.0, 1.0, 0.0, 0.0])})
+        } else {
+            json!({"_MainTex": tex([1.0, 1.0, 0.0, 0.0])})
+        };
+        let x = json!({"shader": "VRChat/Mobile/Toon Standard", "floats": floats, "textures": textures});
+        let imported = import(&gltf_png(x, &png), &Limits::default(), |_| None).unwrap();
+        toon(&imported.avatar.materials[0]).clone()
+    };
+    let t = standard(json!({"_ShadowAlbedo": 0.25, "_ShadowBoost": 0.1}), true);
+    // `lerp(albedo * _ShadowAlbedo, 1, min(1, ramp + boost))` times the albedo: the shade colour times the main
+    // texture times the albedo again, mixed in by one minus the darkest brightness (0.2 + 0.1).
+    assert_eq!((t.shade_color, t.shade_tex), ([0.25; 3], t.base_color_tex));
+    let b = t.shade_bands.expect("ramp");
+    assert!(close(b.main_strength, 1.0) && close(b.strength, 0.7), "{b:?}");
+    assert_eq!((b.second_strength, b.border_color), (0.0, [0.0; 3]));
+    // Dark up to half-Lambert 0.375, bright from 0.625: MToon's shift 0 and toony 0.75.
+    assert!(close(t.shade_shift, 0.0) && close(t.shade_toony, 0.75), "{t:?}");
+    assert_eq!(t.light, ToonLight::Clamped, "_LimitBrightness defaults to on");
+    // Without a ramp (the shader's default is white) or with a flat one, the surface is unshaded.
+    let t = standard(json!({"_LimitBrightness": 0}), false);
+    assert!(close(t.shade_bands.expect("ramp").strength, 0.0));
+    assert_eq!(t.light, ToonLight::Additive, "unlimited: light plus ambient, unclamped");
+}
+
+#[test]
 fn tsf_is_an_unlit_matcap_times_the_texture() {
     let m = material(json!({
         "shader": "TSF/BaseOutline1", "keywords": ["_TEX_ON"],

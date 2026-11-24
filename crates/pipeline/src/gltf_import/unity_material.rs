@@ -338,6 +338,34 @@ impl Importer<'_> {
     /// What a repeating bilinear sampler returns at `u = 0` on the middle row of a colour texture property (the
     /// first and last texels averaged), linear; `None` when unset or undecodable.
     fn unity_texel_at_zero(&mut self, x: &XToonMaterial, key: &str) -> Option<Vec3> {
+        let row = self.unity_middle_row(x, key)?;
+        let (a, b) = (row[0], row[row.len() - 1]);
+        Some(std::array::from_fn(|c| {
+            (to_linear(f32::from(a[c]) / 255.0) + to_linear(f32::from(b[c]) / 255.0)) * 0.5
+        }))
+    }
+
+    /// A linear ramp texture property sampled along its middle row: where it leaves its darkest value and where it
+    /// reaches its brightest (texel centres, 0 to 1), and the darkest value (channels averaged); `None` when unset or
+    /// undecodable.
+    fn unity_ramp(&mut self, x: &XToonMaterial, key: &str) -> Option<(f32, f32, f32)> {
+        let row = self.unity_middle_row(x, key)?;
+        let v: Vec<f32> = row
+            .iter()
+            .map(|t| (f32::from(t[0]) + f32::from(t[1]) + f32::from(t[2])) / (3.0 * 255.0))
+            .collect();
+        let (dark, bright) = v.iter().fold((1.0f32, 0.0f32), |(d, b), &x| (d.min(x), b.max(x)));
+        let centre = |i: usize| (i as f32 + 0.5) / v.len() as f32;
+        let lo = v.iter().position(|&x| x > dark).map_or(0, |i| i.saturating_sub(1));
+        let hi = v.iter().position(|&x| x >= bright).unwrap_or(0).max(lo);
+        if dark == bright {
+            return Some((0.0, 1.0, dark));
+        }
+        Some((centre(lo), centre(hi), dark))
+    }
+
+    /// The middle row of a texture property's image as RGBA8; `None` when unset or undecodable (with a warning).
+    fn unity_middle_row(&mut self, x: &XToonMaterial, key: &str) -> Option<Vec<[u8; 4]>> {
         let index = x.textures.get(key)?.index? as usize;
         let image = self.doc.textures().nth(index)?.source().index();
         let decoded = self
@@ -351,10 +379,8 @@ impl Importer<'_> {
             }
         };
         let y = img.height() / 2;
-        let (a, b) = (img.get_pixel(0, y).0, img.get_pixel(img.width() - 1, y).0);
-        Some(std::array::from_fn(|c| {
-            (to_linear(f32::from(a[c]) / 255.0) + to_linear(f32::from(b[c]) / 255.0)) * 0.5
-        }))
+        let row: Vec<_> = (0..img.width()).map(|i| img.get_pixel(i, y).0).collect();
+        (!row.is_empty()).then_some(row)
     }
 
     fn unity_material(&mut self, x: &XToonMaterial) -> Material {
@@ -509,13 +535,38 @@ impl Importer<'_> {
                 (MaterialModel::Toon(t), queue_alpha.unwrap_or(Alpha::Opaque), 2.0)
             }
             Family::MobileToonStandard => {
-                let mut t = plain_toon(p.color("_Color", WHITE), main);
-                // VRChat's mobile shaders score closer to Unity unclamped (ADR 0050).
-                t.light = ToonLight::Additive;
-                // Emission is always on: map times colour times strength (`VertexFragment.cginc`); the ramp, the
-                // albedo-coloured shadow and the rest are #105.
+                let base = p.color("_Color", WHITE);
+                let mut t = plain_toon(base, main);
+                // `albedo * maybe_saturate(lerp(albedo * _ShadowAlbedo, 1, brightness) * light + ambient)`, brightness
+                // `min(1, _Ramp(n.l * 0.5 + 0.5) + _ShadowBoost)` (`Helpers.cginc`, `GetDiffuseBRDFBase`): the shadow is
+                // the albedo times itself times the tint, mixed in by one minus the darkest brightness, and the ramp's
+                // rise is MToon's step. The light model is exact where brightness is 1 (a flat ramp); in shadow the
+                // ambient is darkened with the rest.
+                let (lo, hi, dark) = self.unity_ramp(x, "_Ramp").unwrap_or((0.0, 1.0, 1.0));
+                t.shade_color = scale([base[0], base[1], base[2]], p.f("_ShadowAlbedo", 0.5));
+                t.shade_shift = 1.0 - (lo + hi);
+                t.shade_toony = 1.0 - (hi - lo);
+                t.shade_bands = Some(ShadeBands {
+                    strength: 1.0 - (dark + p.f("_ShadowBoost", 0.0)).min(1.0),
+                    main_strength: 1.0,
+                    second_color: [0.0; 3],
+                    second_strength: 0.0,
+                    second_border: 0.0,
+                    second_blur: 0.0,
+                    border_color: [0.0; 3],
+                    border_range: 0.0,
+                });
+                if p.f("_LimitBrightness", 1.0) == 0.0 {
+                    t.light = ToonLight::Additive;
+                }
+                // Emission is always on: map times colour times strength (`VertexFragment.cginc`).
                 t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
                 t.emissive = scale(p.rgb("_EmissionColor", BLACK), p.f("_EmissionStrength", 1.0));
+                if p.f("_MinBrightness", 0.0) != 0.0 {
+                    self.warnings.push(
+                        "X_toon_material: Toon Standard _MinBrightness (albedo added as emission) dropped".into(),
+                    );
+                }
                 (MaterialModel::Toon(t), queue_alpha.unwrap_or(Alpha::Opaque), 2.0)
             }
             Family::Tsf => {
