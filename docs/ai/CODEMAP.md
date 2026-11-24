@@ -109,6 +109,7 @@ Internal deps: none
 - `src/mesh.rs`: Meshes: vertex streams, skinning, submeshes and sparse blendshapes.
 - `src/meta.rs`: Creator and licence metadata (VRM `meta`): who made an avatar and what others may do with it (ADR 0012).
 - `src/package.rs`: Runtime packages: a signed CBOR manifest followed by the BLAKE3-addressed blobs it lists.
+- `src/validate/animator.rs`: Validation of clips and animator controllers: curves and keys, layers, states, transitions, blend trees and
 - `src/validate.rs`: Structural validation and hard caps for untrusted avatars. After [`validate`] passes, every index is in range.
 
 ## `crates/pipeline` (civbb-pipeline)
