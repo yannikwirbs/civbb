@@ -117,6 +117,8 @@ pub struct Toon {
     pub matcap_mask_tex: Option<TextureSlot>,
     /// The matcap times this (and the mask) adds after lighting, whatever the blend (Poiyomi's matcap emission).
     pub matcap_emission: f32,
+    /// A second matcap, blended after the first (Poiyomi's second); `None` for one.
+    pub second_matcap: Option<Matcap>,
     /// Emission colour.
     pub emissive: Vec3,
     /// Emission texture.
@@ -191,6 +193,23 @@ pub struct ShadeBands {
     pub second_blur: f32,
     pub border_color: Vec3,
     pub border_range: f32,
+}
+
+/// A further toon matcap, with the first one's fields (`Toon::matcap_*`).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Matcap {
+    /// Matcap texture, sampled by the view-space normal; `None` disables it.
+    pub tex: Option<TextureSlot>,
+    /// Blend strength.
+    pub strength: f32,
+    /// How it combines with the colour.
+    pub blend: MatcapBlend,
+    /// Tints the texture.
+    pub color: Vec3,
+    /// Scales the strength and the emission per texel by its red channel.
+    pub mask_tex: Option<TextureSlot>,
+    /// The matcap times this adds after lighting.
+    pub emission: f32,
 }
 
 /// How a toon material's matcap combines with the lit colour.

@@ -50,16 +50,22 @@ fn slots(m: &mut MaterialModel) -> Vec<(&mut Option<TextureSlot>, bool)> {
             (&mut p.occlusion_tex, true),
             (&mut p.emissive_tex, true),
         ],
-        MaterialModel::Toon(t) => vec![
-            (&mut t.base_color_tex, true),
-            (&mut t.normal_tex, true),
-            (&mut t.shade_tex, true),
-            (&mut t.matcap_tex, false),
-            (&mut t.matcap_mask_tex, true),
-            (&mut t.emissive_tex, true),
-            (&mut t.outline_width_tex, true),
-            (&mut t.outline_tex, true),
-        ],
+        MaterialModel::Toon(t) => {
+            let mut slots = vec![
+                (&mut t.base_color_tex, true),
+                (&mut t.normal_tex, true),
+                (&mut t.shade_tex, true),
+                (&mut t.matcap_tex, false),
+                (&mut t.matcap_mask_tex, true),
+                (&mut t.emissive_tex, true),
+                (&mut t.outline_width_tex, true),
+                (&mut t.outline_tex, true),
+            ];
+            if let Some(m) = &mut t.second_matcap {
+                slots.extend([(&mut m.tex, false), (&mut m.mask_tex, true)]);
+            }
+            slots
+        }
         MaterialModel::Unlit(u) => vec![(&mut u.color_tex, true)],
     }
 }

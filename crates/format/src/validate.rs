@@ -458,16 +458,22 @@ impl V {
                     &x.occlusion_tex,
                     &x.emissive_tex,
                 ],
-                MaterialModel::Toon(x) => vec![
-                    &x.base_color_tex,
-                    &x.normal_tex,
-                    &x.shade_tex,
-                    &x.matcap_tex,
-                    &x.matcap_mask_tex,
-                    &x.emissive_tex,
-                    &x.outline_width_tex,
-                    &x.outline_tex,
-                ],
+                MaterialModel::Toon(x) => {
+                    let mut slots = vec![
+                        &x.base_color_tex,
+                        &x.normal_tex,
+                        &x.shade_tex,
+                        &x.matcap_tex,
+                        &x.matcap_mask_tex,
+                        &x.emissive_tex,
+                        &x.outline_width_tex,
+                        &x.outline_tex,
+                    ];
+                    if let Some(m) = &x.second_matcap {
+                        slots.extend([&m.tex, &m.mask_tex]);
+                    }
+                    slots
+                }
                 MaterialModel::Unlit(x) => vec![&x.color_tex],
             };
             for s in slots.into_iter().flatten() {

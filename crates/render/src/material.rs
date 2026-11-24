@@ -4,7 +4,7 @@
 use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, TextureSlot, ToonLight};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
-pub const MATERIAL_WORDS: usize = 140;
+pub const MATERIAL_WORDS: usize = 164;
 /// A texture slot without a texture.
 pub const NONE: u32 = u32::MAX;
 
@@ -94,8 +94,9 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut params = [0.0, 1.0, 1.0, 0.0];
     // Shade shift, shade toony, rim power, matcap strength.
     let mut toon = [0.0; 4];
-    // Base, normal, metallic-roughness or shade, occlusion, emissive, matcap, outline width, matcap mask, outline.
-    let mut slots: [Option<TextureSlot>; 9] = [None; 9];
+    // Base, normal, metallic-roughness or shade, occlusion, emissive, matcap, outline width, matcap mask, outline,
+    // second matcap, its mask.
+    let mut slots: [Option<TextureSlot>; 11] = [None; 11];
     // Outline colour and width.
     let mut outline = [0.0; 4];
     // Rim shade colour and strength (0: off); its ramp's start and end and its fresnel power.
@@ -117,6 +118,9 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut rim_ramp = [0.0, 1.0, 0.0, 0.0];
     // The base texture's tone correction: hue shift, saturation, value, gamma.
     let mut tone = [0.0, 1.0, 1.0, 1.0];
+    // The second matcap's tint and strength; its blend (as in `rim`) and emission weight.
+    let mut matcap2 = [1.0, 1.0, 1.0, 0.0];
+    let mut matcap2_mode = [0.0; 4];
     match &m.model {
         MaterialModel::Pbr(p) => {
             base_color = p.base_color;
@@ -132,6 +136,8 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 None,
                 None,
                 None,
+                None,
+                None,
             ];
         }
         MaterialModel::Toon(t) => {
@@ -139,12 +145,12 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
             emissive = t.emissive;
             let clamped = if t.light == ToonLight::Clamped { 1.0 } else { 0.0 };
             shade = [t.shade_color[0], t.shade_color[1], t.shade_color[2], clamped];
-            let blend = match t.matcap_blend {
-                MatcapBlend::Add => 0.0,
-                MatcapBlend::Multiply => 1.0,
-                MatcapBlend::Replace => 2.0,
-            };
-            rim = [t.rim_color[0], t.rim_color[1], t.rim_color[2], blend];
+            rim = [
+                t.rim_color[0],
+                t.rim_color[1],
+                t.rim_color[2],
+                blend_code(t.matcap_blend),
+            ];
             params[2] = t.normal_scale;
             if let Some(r) = t.rim_shade {
                 rim_shade = [r.color[0], r.color[1], r.color[2], r.strength];
@@ -189,7 +195,13 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 t.outline_width_tex,
                 t.matcap_mask_tex,
                 t.outline_tex,
+                t.second_matcap.and_then(|m| m.tex),
+                t.second_matcap.and_then(|m| m.mask_tex),
             ];
+            if let Some(m) = t.second_matcap {
+                matcap2 = [m.color[0], m.color[1], m.color[2], m.strength];
+                matcap2_mode = [blend_code(m.blend), m.emission, 0.0, 0.0];
+            }
             matcap = [
                 t.matcap_color[0],
                 t.matcap_color[1],
@@ -215,7 +227,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     vec4(rim);
     vec4(params);
     vec4(toon);
-    let mut slot_words = Vec::with_capacity(72);
+    let mut slot_words = Vec::with_capacity(88);
     for slot in slots {
         let (st, tex) = match slot.and_then(|s| Some((s, *textures.get(s.texture as usize)?))) {
             Some((s, index)) => (s.scale_offset, [index, u32::from(s.uv_set), 0, 0]),
@@ -236,8 +248,20 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     for v in [shade_mix, shade_second, shade_ramps, shade_border, rim_ramp, tone] {
         words.extend(v.map(f32::to_bits));
     }
-    words.extend(&slot_words[64..]);
+    words.extend(&slot_words[64..72]);
+    words.extend(matcap2.map(f32::to_bits));
+    words.extend(matcap2_mode.map(f32::to_bits));
+    words.extend(&slot_words[72..]);
     words.try_into().expect("a material record is MATERIAL_WORDS long")
+}
+
+/// A matcap blend as the shader reads it.
+fn blend_code(blend: MatcapBlend) -> f32 {
+    match blend {
+        MatcapBlend::Add => 0.0,
+        MatcapBlend::Multiply => 1.0,
+        MatcapBlend::Replace => 2.0,
+    }
 }
 
 /// lilToon's ramp from `border - blur / 2` to `border + blur / 2`, both clamped to 0 to 1.

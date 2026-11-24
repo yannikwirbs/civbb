@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 
 use civbb_anim::material::to_linear;
 use civbb_format::material::{
-    AlphaMode, ColorSpace, MatcapBlend, Material, MaterialModel, Pbr, RimRamp, RimShade, ShadeBands, TextureSlot, Toon,
-    ToonLight, Unlit,
+    AlphaMode, ColorSpace, Matcap, MatcapBlend, Material, MaterialModel, Pbr, RimRamp, RimShade, ShadeBands,
+    TextureSlot, Toon, ToonLight, Unlit,
 };
 use civbb_format::math::Vec3;
 use serde::Deserialize;
@@ -292,6 +292,7 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         matcap_color: [1.0; 3],
         matcap_mask_tex: None,
         matcap_emission: 0.0,
+        second_matcap: None,
         emissive: [0.0; 3],
         emissive_tex: None,
         emissive_main_strength: 0.0,
@@ -334,6 +335,40 @@ impl Importer<'_> {
             return None;
         };
         self.slot(&texture, 0, Some(st_to_gltf(t.scale_offset)), space)
+    }
+
+    /// One of Poiyomi's matcaps (`n` is "" or "2"). Each blends into the colour before lighting by separate replace,
+    /// multiply and add weights, and its emission adds after (`CGI_PoiMatcap.cginc`, 7.3): the largest weight picks
+    /// the blend, and an added matcap takes its emission into the strength.
+    fn poiyomi_matcap(&mut self, x: &XToonMaterial, n: &str) -> Matcap {
+        let p = Props(x);
+        let w = |k: &str| p.f(&format!("_Matcap{n}{k}"), 0.0);
+        let weights = [
+            (MatcapBlend::Replace, w("Replace")),
+            (MatcapBlend::Multiply, w("Multiply")),
+            (MatcapBlend::Add, w("Add")),
+        ];
+        // Ties go to the later entry: add, then multiply.
+        let (blend, weight) = weights.into_iter().max_by(|a, b| a.1.total_cmp(&b.1)).expect("three");
+        let (strength, emission) = match blend {
+            MatcapBlend::Add => (weight + w("EmissionStrength"), 0.0),
+            _ => (weight, w("EmissionStrength")),
+        };
+        let tint = p.color(&format!("_Matcap{n}Color"), WHITE);
+        let mask_tex = if p.on(&format!("_Matcap{n}MaskInvert")) {
+            None
+        } else {
+            let (mask, uv) = (format!("_Matcap{n}Mask"), format!("_Matcap{n}MaskUV"));
+            self.poiyomi_slot(x, &mask, &uv, ColorSpace::Linear)
+        };
+        Matcap {
+            tex: self.unity_slot(x, &format!("_Matcap{n}"), ColorSpace::Srgb),
+            strength: strength * tint[3],
+            blend,
+            color: scale([tint[0], tint[1], tint[2]], p.f(&format!("_Matcap{n}Intensity"), 1.0)),
+            mask_tex,
+            emission: emission * tint[3],
+        }
     }
 
     /// A Poiyomi texture property on the UV set its `uv` property names (`poiMesh.uv[...]`: 0 and 1 are the mesh's
@@ -451,44 +486,18 @@ impl Importer<'_> {
                     t.normal_tex = Some(normal);
                     t.normal_scale = p.f("_BumpScale", 1.0);
                 }
-                // Each matcap blends into the colour before lighting by separate replace, multiply and add weights,
-                // and its emission adds after (`CGI_PoiMatcap.cginc`, 7.3). One has a counterpart: the stronger of
-                // the two (the second needs `COLOR_GRADING_HDR_3D`), blended by its largest weight; an added matcap
-                // takes its emission into the strength.
-                let strongest = |n: &str| {
-                    let w = |k: &str| p.f(&format!("_Matcap{n}{k}"), 0.0);
-                    let weights = [
-                        (MatcapBlend::Replace, w("Replace")),
-                        (MatcapBlend::Multiply, w("Multiply")),
-                        (MatcapBlend::Add, w("Add")),
-                    ];
-                    // Ties go to the later entry: add, then multiply.
-                    let (blend, weight) = weights.into_iter().max_by(|a, b| a.1.total_cmp(&b.1)).expect("three");
-                    let emission = w("EmissionStrength");
-                    match blend {
-                        MatcapBlend::Add => (n.to_owned(), blend, weight + emission, 0.0),
-                        _ => (n.to_owned(), blend, weight, emission),
-                    }
-                };
-                let second = x.keywords.iter().any(|k| k == "COLOR_GRADING_HDR_3D") && p.on("_Matcap2Enable");
-                let chosen = [
-                    p.on("_MatcapEnable").then(|| strongest("")),
-                    second.then(|| strongest("2")),
-                ]
-                .into_iter()
-                .flatten()
-                .reduce(|a, b| if b.2 + b.3 > a.2 + a.3 { b } else { a });
-                if let Some((n, blend, weight, emission)) = chosen {
-                    t.matcap_tex = self.unity_slot(x, &format!("_Matcap{n}"), srgb);
-                    let tint = p.color(&format!("_Matcap{n}Color"), WHITE);
-                    t.matcap_color = scale([tint[0], tint[1], tint[2]], p.f(&format!("_Matcap{n}Intensity"), 1.0));
-                    t.matcap_blend = blend;
-                    t.matcap_strength = weight * tint[3];
-                    t.matcap_emission = emission * tint[3];
-                    if !p.on(&format!("_Matcap{n}MaskInvert")) {
-                        let (mask, uv) = (format!("_Matcap{n}Mask"), format!("_Matcap{n}MaskUV"));
-                        t.matcap_mask_tex = self.poiyomi_slot(x, &mask, &uv, ColorSpace::Linear);
-                    }
+                if p.on("_MatcapEnable") {
+                    let m = self.poiyomi_matcap(x, "");
+                    t.matcap_tex = m.tex;
+                    t.matcap_strength = m.strength;
+                    t.matcap_blend = m.blend;
+                    t.matcap_color = m.color;
+                    t.matcap_mask_tex = m.mask_tex;
+                    t.matcap_emission = m.emission;
+                }
+                // The second matcap is compiled in by `COLOR_GRADING_HDR_3D`.
+                if x.keywords.iter().any(|k| k == "COLOR_GRADING_HDR_3D") && p.on("_Matcap2Enable") {
+                    t.second_matcap = Some(self.poiyomi_matcap(x, "2"));
                 }
                 if p.on("_EnableRimLighting") {
                     t.rim_color = scale(p.rgb("_RimLightColor", WHITE), p.color("_RimLightColor", WHITE)[3]);

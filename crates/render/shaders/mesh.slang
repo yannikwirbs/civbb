@@ -54,6 +54,10 @@ struct Material
     float4 rim_ramp;       // rim ramp start and end, shadow mask, main strength
     float4 tone;           // the base texture's hue shift, saturation, value, gamma (0, 1, 1, 1: none)
     Slot outline_tex;      // multiplies the outline colour (lilToon's _OutlineTex)
+    float4 matcap2;        // the second toon matcap's tint in xyz, strength in w
+    float4 matcap2_mode;   // its blend (as rim.w) and emission weight
+    Slot matcap2_tex;
+    Slot matcap2_mask;
 };
 
 // A linear ramp from `lo` to `hi`, clamped to 0 to 1 (lilToon's tooning scale without anti-aliasing).
@@ -219,6 +223,25 @@ float4 pbr(Varyings i, bool front: SV_IsFrontFace) : SV_Target
     return float4(color, c.a);
 }
 
+// `color` with a matcap (`tex` at matcap coordinates `uv`, tinted) blended in by `strength` times the mask's red
+// channel: 0 adds, 1 multiplies, 2 replaces the colour by the matcap lit by `light`; then `emission` times the masked
+// matcap adds (Poiyomi's matcap emission). Without a texture, the colour as it is.
+float3 matcap(float3 color, float3 light, float2 uv, float4 uvs, Slot tex, float3 tint, float strength, Slot mask,
+    float blend, float emission)
+{
+    if (tex.tex.x == NONE)
+        return color;
+    float3 mc = sample(tex, float4(uv, uv)).rgb * tint;
+    float w = sample(mask, uvs).r;
+    if (blend > 1.5)
+        color = lerp(color, mc * light, strength * w); // Poiyomi replace (of the colour before lighting)
+    else if (blend > 0.5)
+        color = lerp(color, color * mc, strength * w); // VRChat MatCap Lit, lilToon multiply
+    else
+        color += strength * w * mc;
+    return color + emission * w * mc;
+}
+
 [shader("fragment")]
 float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
 {
@@ -267,22 +290,15 @@ float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
         f = lerp(f, f * s, m.rim_ramp.z);
         color += m.rim.xyz * lerp(1, lit.rgb, m.rim_ramp.w) * f;
     }
-    if (m.slots[5].tex.x != NONE)
+    if (m.slots[5].tex.x != NONE || m.matcap2_tex.tex.x != NONE)
     {
         // MToon's matcap frame: view x and y around the view direction, world up kept upright.
         float3 x = normalize(float3(e.z, 0, -e.x));
         float3 y = cross(e, x);
         float2 uv = float2(dot(x, n), -dot(y, n)) * 0.495 + 0.5;
-        float3 mc = sample(m.slots[5], float4(uv, uv)).rgb * m.matcap.xyz;
-        float mask = sample(m.matcap_mask, i.uv).r;
-        float strength = m.toon.w * mask;
-        if (m.rim.w > 1.5)
-            color = lerp(color, mc * light, strength); // Poiyomi replace (of the colour before lighting)
-        else if (m.rim.w > 0.5)
-            color = lerp(color, color * mc, strength); // VRChat MatCap Lit, lilToon multiply
-        else
-            color += strength * mc;
-        color += m.matcap.w * mask * mc; // Poiyomi's matcap emission
+        color = matcap(color, light, uv, i.uv, m.slots[5], m.matcap.xyz, m.toon.w, m.matcap_mask, m.rim.w, m.matcap.w);
+        color = matcap(color, light, uv, i.uv, m.matcap2_tex, m.matcap2.xyz, m.matcap2.w, m.matcap2_mask,
+            m.matcap2_mode.x, m.matcap2_mode.y);
     }
     color += m.emissive.xyz * sample(m.slots[4], i.uv).rgb * lerp(1, lit.rgb, m.shade_border.w);
     return float4(color, lit.a);

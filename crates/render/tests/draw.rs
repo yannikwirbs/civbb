@@ -5,8 +5,8 @@
 
 use civbb_format::Avatar;
 use civbb_format::material::{
-    AlphaMode, MatcapBlend, Material, MaterialModel, Pbr, RimRamp, RimShade, ShadeBands, TextureSlot, Toon, ToonLight,
-    Unlit,
+    AlphaMode, Matcap, MatcapBlend, Material, MaterialModel, Pbr, RimRamp, RimShade, ShadeBands, TextureSlot, Toon,
+    ToonLight, Unlit,
 };
 use civbb_format::math::Mat4;
 use civbb_format::mesh::{Mesh, Submesh};
@@ -88,6 +88,7 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         matcap_color: [1.0; 3],
         matcap_mask_tex: None,
         matcap_emission: 0.0,
+        second_matcap: None,
         emissive: [0.0; 3],
         emissive_tex: None,
         emissive_main_strength: 0.0,
@@ -469,7 +470,8 @@ fn matcaps_add_or_multiply() {
 
 #[test]
 fn matcaps_replace_lit_and_emit_unlit() {
-    // Poiyomi (#106): replace turns the colour before lighting towards the matcap; the matcap emission adds after.
+    // Poiyomi (#106): replace turns the colour before lighting towards the matcap; the matcap emission adds after. The
+    // emitting one is a second matcap after a first that does nothing.
     let Some(ctx) = context() else { return };
     let capacity = Capacity {
         vertices: 8,
@@ -480,22 +482,35 @@ fn matcaps_replace_lit_and_emit_unlit() {
     };
     let mut scene = Scene::new(&ctx, capacity).unwrap();
     let half = scene.add_texture(&ctx, 1, 1, &[128, 128, 128, 255], false).unwrap();
-    let grey = |strength, emission| {
+    let tex = Some(TextureSlot {
+        texture: 0,
+        uv_set: 0,
+        scale_offset: [1.0, 1.0, 0.0, 0.0],
+    });
+    let grey = |strength, emission, second: bool| {
         let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
         if let MaterialModel::Toon(t) = &mut m {
             t.light = ToonLight::Clamped;
-            t.matcap_tex = Some(TextureSlot {
-                texture: 0,
-                uv_set: 0,
-                scale_offset: [1.0, 1.0, 0.0, 0.0],
-            });
-            (t.matcap_blend, t.matcap_strength, t.matcap_emission) = (MatcapBlend::Replace, strength, emission);
-            t.matcap_color = [1.0, 0.0, 0.0];
+            t.matcap_tex = tex;
+            let red = Matcap {
+                tex,
+                strength,
+                blend: MatcapBlend::Replace,
+                color: [1.0, 0.0, 0.0],
+                mask_tex: None,
+                emission,
+            };
+            if second {
+                t.second_matcap = Some(red);
+            } else {
+                (t.matcap_blend, t.matcap_strength, t.matcap_emission) = (red.blend, strength, emission);
+                t.matcap_color = red.color;
+            }
         }
         material(m, AlphaMode::Opaque)
     };
-    let emitting = scene.add_material(&ctx, &grey(1.0, 0.5), &[half]).unwrap();
-    let halfway = scene.add_material(&ctx, &grey(0.5, 0.0), &[half]).unwrap();
+    let emitting = scene.add_material(&ctx, &grey(1.0, 0.5, true), &[half]).unwrap();
+    let halfway = scene.add_material(&ctx, &grey(0.5, 0.0, false), &[half]).unwrap();
     let meshes = [
         quad([-3.0, 0.0], [-3.0, 3.0], 0.0, 0),
         quad([0.0, 3.0], [-3.0, 3.0], 0.0, 1),
