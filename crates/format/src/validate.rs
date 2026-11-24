@@ -466,6 +466,7 @@ impl V {
                     &x.matcap_mask_tex,
                     &x.emissive_tex,
                     &x.outline_width_tex,
+                    &x.outline_tex,
                 ],
                 MaterialModel::Unlit(x) => vec![&x.color_tex],
             };

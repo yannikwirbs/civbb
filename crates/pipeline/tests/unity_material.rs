@@ -73,7 +73,8 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
         "colors": {"_Color": [0.5, 0.5, 0.5, 1], "_ShadowColor": [0.5, 0.5, 0.5, 1], "_OutlineColor": [1, 0, 0, 1],
             "_RimColor": [1, 1, 1, 1], "_EmissionColor": [1, 1, 1, 1], "_MatCapColor": [0.5, 0.5, 0.5, 0.5]},
         "textures": {"_MainTex": tex([2.0, 3.0, 0.25, 0.5]), "_MatCapTex": tex([1.0, 1.0, 0.0, 0.0]),
-            "_BumpMap": tex([1.0, 1.0, 0.0, 0.0]), "_MatCapBlendMask": tex([1.0, 1.0, 0.0, 0.0])},
+            "_BumpMap": tex([1.0, 1.0, 0.0, 0.0]), "_MatCapBlendMask": tex([1.0, 1.0, 0.0, 0.0]),
+            "_OutlineTex": tex([1.0, 1.0, 0.0, 0.0])},
     }));
     assert_eq!(m.name, "m");
     assert_eq!(
@@ -114,6 +115,7 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
     );
     assert!(t.normal_tex.is_none(), "normal map off");
     assert!(close(t.outline_width, 0.001) && t.outline_color == [1.0, 0.0, 0.0]);
+    assert!(t.outline_tex.is_some(), "the outline colour times _OutlineTex");
 }
 
 #[test]

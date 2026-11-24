@@ -292,6 +292,7 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         outline_width: 0.0,
         outline_color: [0.0; 3],
         outline_width_tex: None,
+        outline_tex: None,
         light: ToonLight::Clamped,
         light_min: 0.0,
         light_max: 1.0,
@@ -665,6 +666,8 @@ impl Importer<'_> {
             t.outline_width = p.f("_OutlineWidth", 0.08) * 0.01;
             t.outline_color = p.rgb("_OutlineColor", [0.6, 0.56, 0.73, 1.0]);
             t.outline_width_tex = self.unity_slot(x, "_OutlineWidthMask", ColorSpace::Linear);
+            // The outline colour times `_OutlineTex` (lilToon's `LIL_GET_OUTLINE_TEX`).
+            t.outline_tex = self.unity_slot(x, "_OutlineTex", srgb);
         }
         t
     }

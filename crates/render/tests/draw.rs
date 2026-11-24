@@ -93,6 +93,7 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         outline_width: 0.0,
         outline_color: [0.0; 3],
         outline_width_tex: None,
+        outline_tex: None,
         light: ToonLight::Additive,
         light_min: 0.0,
         light_max: 1.0,
@@ -710,18 +711,22 @@ fn draws_toon_outlines_around_the_silhouette() {
     .unwrap();
     // A white width texture: sampled in the vertex shader, it keeps the full width.
     let white = scene.add_texture(&ctx, 1, 1, &[255; 4], false).unwrap();
+    // The outline texture multiplies the outline colour: yellow times magenta is red.
+    let magenta = scene.add_texture(&ctx, 1, 1, &[255, 0, 255, 255], false).unwrap();
     let mut model = toon([1.0, 1.0, 0.0, 1.0], [1.0, 1.0, 0.0], 0.0);
     if let MaterialModel::Toon(t) = &mut model {
         t.outline_width = 0.3;
-        t.outline_color = [1.0, 0.0, 0.0];
-        t.outline_width_tex = Some(TextureSlot {
-            texture: 0,
+        t.outline_color = [1.0, 1.0, 0.0];
+        let slot = |texture| TextureSlot {
+            texture,
             uv_set: 0,
             scale_offset: [1.0, 1.0, 0.0, 0.0],
-        });
+        };
+        t.outline_width_tex = Some(slot(0));
+        t.outline_tex = Some(slot(1));
     }
     let outlined = scene
-        .add_material(&ctx, &material(model, AlphaMode::Opaque), &[white])
+        .add_material(&ctx, &material(model, AlphaMode::Opaque), &[white, magenta])
         .unwrap();
     assert!(outlined.outline.is_some());
     let mut view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);

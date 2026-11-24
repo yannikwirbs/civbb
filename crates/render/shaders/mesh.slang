@@ -53,6 +53,7 @@ struct Material
     float4 shade_border;   // shadow border colour in xyz; the emission's main strength in w
     float4 rim_ramp;       // rim ramp start and end, shadow mask, main strength
     float4 tone;           // the base texture's hue shift, saturation, value, gamma (0, 1, 1, 1: none)
+    Slot outline_tex;      // multiplies the outline colour (lilToon's _OutlineTex)
 };
 
 // A linear ramp from `lo` to `hi`, clamped to 0 to 1 (lilToon's tooning scale without anti-aliasing).
@@ -286,10 +287,10 @@ float4 unlit(Varyings i) : SV_Target
     return base(m, i.uv);
 }
 
-// The outline colour, unlit, with the base colour's alpha and cutoff.
+// The outline colour times its texture, unlit, with the base colour's alpha and cutoff.
 [shader("fragment")]
 float4 outline(Varyings i) : SV_Target
 {
     Material m = pc.materials[i.material];
-    return float4(m.outline.xyz, base(m, i.uv).a);
+    return float4(m.outline.xyz * sample(m.outline_tex, i.uv).rgb, base(m, i.uv).a);
 }

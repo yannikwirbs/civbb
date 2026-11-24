@@ -127,6 +127,8 @@ pub struct Toon {
     pub outline_color: Vec3,
     /// Per-vertex outline width mask.
     pub outline_width_tex: Option<TextureSlot>,
+    /// Multiplies the outline colour (lilToon's `_OutlineTex`, usually the main texture).
+    pub outline_tex: Option<TextureSlot>,
     /// How the main light and the ambient light the surface.
     pub light: ToonLight,
     /// The clamped model's lower bound on light plus ambient, per channel (lilToon's `_LightMinLimit`; 0 for the other

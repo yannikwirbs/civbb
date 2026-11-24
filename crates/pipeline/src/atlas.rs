@@ -58,6 +58,7 @@ fn slots(m: &mut MaterialModel) -> Vec<(&mut Option<TextureSlot>, bool)> {
             (&mut t.matcap_mask_tex, true),
             (&mut t.emissive_tex, true),
             (&mut t.outline_width_tex, true),
+            (&mut t.outline_tex, true),
         ],
         MaterialModel::Unlit(u) => vec![(&mut u.color_tex, true)],
     }

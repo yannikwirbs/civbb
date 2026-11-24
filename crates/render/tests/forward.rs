@@ -116,6 +116,7 @@ fn material_records() {
             outline_width: 0.0,
             outline_color: [0.0; 3],
             outline_width_tex: None,
+            outline_tex: None,
             light: ToonLight::Additive,
             light_min: 0.0,
             light_max: 1.0,
@@ -139,6 +140,7 @@ fn material_records() {
     assert_eq!(f(&r[..4]), [0.5, 0.25, 1.0, 0.75]);
     assert!((0..6).all(|i| slot(&r, i).1[0] == NONE));
     assert_eq!(r[80], NONE, "no outline width texture");
+    assert_eq!(r[136], NONE, "no outline texture");
 }
 
 #[test]
@@ -174,6 +176,11 @@ fn outlined_toon_materials_add_an_outline_draw() {
             uv_set: 1,
             scale_offset: [2.0, 3.0, 0.25, 0.5],
         }),
+        outline_tex: Some(TextureSlot {
+            texture: 0,
+            uv_set: 0,
+            scale_offset: [1.0, 1.0, 0.0, 0.0],
+        }),
         light: ToonLight::Additive,
         light_min: 0.0,
         light_max: 1.0,
@@ -181,6 +188,11 @@ fn outlined_toon_materials_add_an_outline_draw() {
     let r = pack(&m, &[10, 11]);
     assert_eq!(f(&r[72..76]), [0.1, 0.2, 0.3, 0.002]);
     assert_eq!((f(&r[76..80]), [r[80], r[81]]), (vec![2.0, 3.0, 0.25, 0.5], [11, 1]));
+    assert_eq!(
+        (f(&r[132..136]), [r[136], r[137]]),
+        (vec![1.0, 1.0, 0.0, 0.0], [10, 0]),
+        "the outline texture last"
+    );
     // Blended like its material, always front faces culled whatever the material's sides.
     let outline = PipelineKey {
         shader: Shader::Outline,
