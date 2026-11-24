@@ -120,6 +120,9 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/accessor.rs`: Bounded glTF accessor reading: every offset, stride, count and sparse index is checked before use.
 - `src/atlas.rs`: Compiler stage 4 texture atlasing: textures of one material model share an atlas, so materials that differ only
 - `src/collapse.rs`: Compiler stage 5 toggle collapsing: layers that only switch between two constant clips on one bool collapse
+- `src/gltf_import/animation.rs`: glTF animations to clips: translation, rotation, scale and morph weight channels as Hermite keys, within the caps.
+- `src/gltf_import/material.rs`: glTF materials and textures: metallic-roughness and unlit materials, texture slots and their images.
+- `src/gltf_import/mesh.rs`: glTF meshes: one format mesh per node (its primitives become submeshes), vertex streams, skins and morph targets.
 - `src/gltf_import/source.rs`: The source package's `X_*` extensions (ADR 0041): humanoid map, viewpoint and face, animator and clips,
 - `src/gltf_import/unity_material.rs`: Unity materials from the source package's `X_toon_material` (ADR 0043): the shader family fingerprinted by shader
 - `src/gltf_import/vrm/expressions.rs`: VRM expressions to visemes, blink and a Direct blend tree of toggles, and look-at to eye look.
