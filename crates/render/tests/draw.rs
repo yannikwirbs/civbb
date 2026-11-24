@@ -467,6 +467,46 @@ fn matcaps_add_or_multiply() {
 }
 
 #[test]
+fn a_mesh_without_uv1_reads_uv0_in_its_place() {
+    // As Unity does (KohzieBoi's Poiyomi slots on UV1 over a mesh with one UV set, #106).
+    let Some(ctx) = context() else { return };
+    let capacity = Capacity {
+        vertices: 4,
+        indices: 6,
+        deltas: 0,
+        skinned: 4,
+        materials: 1,
+    };
+    let mut scene = Scene::new(&ctx, capacity).unwrap();
+    let red_green = scene
+        .add_texture(&ctx, 2, 1, &[255, 0, 0, 255, 0, 255, 0, 255], false)
+        .unwrap();
+    let tex = Some(TextureSlot {
+        texture: 0,
+        uv_set: 1,
+        scale_offset: [1.0, 1.0, 0.0, 0.0],
+    });
+    let m = scene
+        .add_material(&ctx, &material(unlit([1.0; 4], tex), AlphaMode::Opaque), &[red_green])
+        .unwrap();
+    let view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+    let pixels = render(
+        &ctx,
+        &mut scene,
+        &[quad([-2.0, 2.0], [-2.0, 2.0], 0.0, 0)],
+        &[m],
+        &[],
+        &view,
+    );
+    // u runs 0 to 1 across the screen: the first texel's centre a quarter in, the second's three quarters.
+    assert_near(pixel(&pixels, 16, 32), [255, 0, 0], 8, "left texel");
+    assert_near(pixel(&pixels, 48, 32), [0, 255, 0], 8, "right texel");
+    // SAFETY: `render` waited for the GPU to finish with the scene.
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+#[test]
 fn rim_shade_darkens_away_from_the_view_direction() {
     let Some(ctx) = context() else { return };
     let mut scene = Scene::new(

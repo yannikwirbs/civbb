@@ -373,6 +373,27 @@ fn poiyomi_matcap_takes_its_add_or_multiply_weight_and_tint() {
 }
 
 #[test]
+fn poiyomi_slots_read_the_uv_set_their_uv_property_names() {
+    let t = tex([1.0, 1.0, 0.0, 0.0]);
+    let imported = import_material(json!({
+        "shader": "Hidden/.poiyomi/• Poiyomi Toon •/Body",
+        "floats": {"_MainTextureUV": 1, "_EmissionMapUV": 1, "_MatcapMaskUV": 1, "_BumpMapUV": 2,
+            "_EnableEmission": 1, "_MatcapEnable": 1, "_MatcapAdd": 1},
+        "textures": {"_MainTex": t, "_EmissionMap": t, "_Matcap": t, "_MatcapMask": t, "_BumpMap": t},
+    }));
+    let t = toon(&imported.avatar.materials[0]);
+    let uv = |s: Option<civbb_format::material::TextureSlot>| s.expect("slot").uv_set;
+    assert_eq!([t.base_color_tex, t.emissive_tex, t.matcap_mask_tex].map(uv), [1, 1, 1]);
+    assert_eq!(uv(t.shade_tex), 1, "the shade takes the main texture");
+    assert_eq!(uv(t.normal_tex), 0, "UV2 has no counterpart");
+    assert!(
+        imported.warnings.iter().any(|w| w.contains("_BumpMapUV")),
+        "{:?}",
+        imported.warnings
+    );
+}
+
+#[test]
 fn poiyomi_without_a_ramp_texture_is_unshaded() {
     // Poiyomi 7.3 lights through `_ToonRamp`, white by default: without one, the shade is the lit colour.
     let shade = |floats: Value, textures: Value| {

@@ -335,6 +335,20 @@ impl Importer<'_> {
         self.slot(&texture, 0, Some(st_to_gltf(t.scale_offset)), space)
     }
 
+    /// A Poiyomi texture property on the UV set its `uv` property names (`poiMesh.uv[...]`: 0 and 1 are the mesh's
+    /// first two sets; the others read UV0, with a warning).
+    fn poiyomi_slot(&mut self, x: &XToonMaterial, key: &str, uv: &str, space: ColorSpace) -> Option<TextureSlot> {
+        let mut slot = self.unity_slot(x, key, space)?;
+        match Props(x).f(uv, 0.0) as i32 {
+            0 => {}
+            1 => slot.uv_set = 1,
+            n => self
+                .warnings
+                .push(format!("X_toon_material: Poiyomi {uv} {n} has no counterpart; UV0")),
+        }
+        Some(slot)
+    }
+
     /// What a repeating bilinear sampler returns at `u = 0` on the middle row of a colour texture property (the
     /// first and last texels averaged), linear; `None` when unset or undecodable.
     fn unity_texel_at_zero(&mut self, x: &XToonMaterial, key: &str) -> Option<Vec3> {
@@ -424,6 +438,7 @@ impl Importer<'_> {
             }
             Family::Poiyomi => {
                 let base = p.color("_Color", WHITE);
+                let main = self.poiyomi_slot(x, "_MainTex", "_MainTextureUV", srgb);
                 let mut t = plain_toon(base, main);
                 let ramp = x.textures.get("_ToonRamp").is_some_and(|t| t.index.is_some());
                 if p.f("_LightingRampType", 0.0) == 0.0 && !ramp {
@@ -431,7 +446,7 @@ impl Importer<'_> {
                     // so without one every side is fully lit (`CGI_PoiLighting.cginc`, 7.3).
                     t.shade_color = [base[0], base[1], base[2]];
                 }
-                if let Some(normal) = self.unity_slot(x, "_BumpMap", ColorSpace::Linear) {
+                if let Some(normal) = self.poiyomi_slot(x, "_BumpMap", "_BumpMapUV", ColorSpace::Linear) {
                     t.normal_tex = Some(normal);
                     t.normal_scale = p.f("_BumpScale", 1.0);
                 }
@@ -448,7 +463,7 @@ impl Importer<'_> {
                     }
                     t.matcap_strength = add.max(multiply) * tint[3];
                     if !p.on("_MatcapMaskInvert") {
-                        t.matcap_mask_tex = self.unity_slot(x, "_MatcapMask", ColorSpace::Linear);
+                        t.matcap_mask_tex = self.poiyomi_slot(x, "_MatcapMask", "_MatcapMaskUV", ColorSpace::Linear);
                     }
                 }
                 if p.on("_EnableRimLighting") {
@@ -456,7 +471,7 @@ impl Importer<'_> {
                 }
                 if p.on("_EnableEmission") {
                     t.emissive = scale(p.hdr_rgb("_EmissionColor", BLACK), p.f("_EmissionStrength", 1.0));
-                    t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
+                    t.emissive_tex = self.poiyomi_slot(x, "_EmissionMap", "_EmissionMapUV", srgb);
                 }
                 let alpha = queue_alpha.unwrap_or_else(|| mode_alpha(p.f("_Mode", 0.0)));
                 (MaterialModel::Toon(t), alpha, p.f("_Cull", 2.0))

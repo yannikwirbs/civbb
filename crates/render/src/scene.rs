@@ -176,7 +176,12 @@ impl Scene {
             rest.extend(j.map(u32::from));
             rest.extend(w.map(f32::to_bits));
             let uv0 = mesh.uv0.get(v).copied().unwrap_or_default();
-            let uv1 = mesh.uv1.get(v).copied().unwrap_or_default();
+            // A mesh without a second UV set reads the first in its place, as Unity does.
+            let uv1 = if mesh.uv1.is_empty() {
+                uv0
+            } else {
+                mesh.uv1.get(v).copied().unwrap_or_default()
+            };
             attrs.extend([uv0[0], uv0[1], uv1[0], uv1[1]].map(f32::to_bits));
         }
         assert!(
