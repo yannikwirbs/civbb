@@ -148,8 +148,9 @@ public static class VrcPhysBones
 
     // ---- Cases ----
 
-    /// A case at its own place in the scene: Root, then `Bones` bones of `BoneLength` along +X, the PhysBone on the
-    /// first; settings are field name to value (enum values by name) on top of the defaults below.
+    /// A case at its own place in the scene: Root, then `Bones` bones of `BoneLength` along +X (or the `boneAxis`
+    /// setting, which is not a PhysBone field), the PhysBone on the first; settings are field name to value (enum
+    /// values by name) on top of the defaults below.
     static Case Add(string name, Func<float, (Vector3, Quaternion)> path, params (string field, object value)[] settings)
     {
         var c = new Case { Name = name, Path = path, Rates = RateCases.Contains(name) };
@@ -158,12 +159,13 @@ public static class VrcPhysBones
         c.Host.SetActive(false);
         c.Root = c.Host.transform;
         c.Bones = new Transform[Bones + 1];
+        var axis = settings.Where(s => s.field == "boneAxis").Select(s => (Vector3)s.value).DefaultIfEmpty(Vector3.right).First();
         var parent = c.Root;
         for (int i = 0; i <= Bones; i++)
         {
             c.Bones[i] = new GameObject(name + "/B" + i).transform;
             c.Bones[i].SetParent(parent, false);
-            c.Bones[i].localPosition = i == 0 ? Vector3.zero : new Vector3(BoneLength, 0f, 0f);
+            c.Bones[i].localPosition = i == 0 ? Vector3.zero : axis * BoneLength;
             parent = c.Bones[i];
         }
         var k = c.Bones[0].gameObject.AddComponent(Type("VRCPhysBone"));
@@ -177,7 +179,10 @@ public static class VrcPhysBones
         foreach (var (field, value) in defaults.Concat(settings))
         {
             c.Settings[field] = value;
-            Set(k, field, value);
+            if (field != "boneAxis")
+            {
+                Set(k, field, value);
+            }
         }
         Set(k, "rootTransform", c.Bones[0]);
         c.Chain = k;
@@ -321,6 +326,22 @@ public static class VrcPhysBones
         c = Add("collider_inside_sphere_leaf_triple", Still, ("pull", 0.2f), ("spring", 0f), ("gravity", 1f), ("radius", 0.05f));
         Collide(c, "Sphere", 0.4f, 0f, new Vector3(0.1f, 0f, 0f), Vector3.zero, inside: true);
         c.Bones[4].localScale = Vector3.one * 3f;
+        // Polar limits on a chain along its bones' own +Y, rotated about X and Z (Yumeka's skirt and hair ribbons, #108).
+        Add("limit_polar_up_rotx", Still, ("boneAxis", Vector3.up), ("pull", 0.2f), ("spring", 0f), ("gravity", 1f), ("limitType", "Polar"),
+            ("maxAngleX", 40f), ("maxAngleZ", 0f), ("limitRotation", new Vector3(-40f, 0f, 0f)));
+        Add("limit_polar_up_rotx_sway", Sway, ("boneAxis", Vector3.up), ("pull", 0.2f), ("spring", 0.3f), ("gravity", 0.1f),
+            ("limitType", "Polar"), ("maxAngleX", 40f), ("maxAngleZ", 10f), ("limitRotation", new Vector3(-40f, 0f, 0f)));
+        Add("limit_polar_up_rotxz", Sway, ("boneAxis", Vector3.up), ("pull", 0.2f), ("spring", 0.5f), ("gravity", 0.3f),
+            ("limitType", "Polar"), ("maxAngleX", 60f), ("maxAngleZ", 90f), ("limitRotation", new Vector3(-54.3f, 0f, -69.3f)));
+        Add("limit_polar_x_rotx", Still, ("pull", 0.2f), ("spring", 0f), ("gravity", 1f), ("limitType", "Polar"),
+            ("maxAngleX", 40f), ("maxAngleZ", 0f), ("limitRotation", new Vector3(-40f, 0f, 0f)));
+        // All three limit rotation angles, so the composition order shows.
+        Add("limit_polar_up_rotxyz", Sway, ("boneAxis", Vector3.up), ("pull", 0.2f), ("spring", 0.5f), ("gravity", 0.3f),
+            ("limitType", "Polar"), ("maxAngleX", 30f), ("maxAngleZ", 50f), ("limitRotation", new Vector3(-30f, 25f, 50f)));
+        Add("limit_angle_up_rotxyz", Sway, ("boneAxis", Vector3.up), ("pull", 0.2f), ("spring", 0.5f), ("gravity", 0.3f),
+            ("limitType", "Angle"), ("maxAngleX", 20f), ("limitRotation", new Vector3(-30f, 25f, 50f)));
+        Add("limit_hinge_up_rotxyz", Sway, ("boneAxis", Vector3.up), ("pull", 0.2f), ("spring", 0.5f), ("gravity", 0.3f),
+            ("limitType", "Hinge"), ("maxAngleX", 30f), ("limitRotation", new Vector3(-30f, 25f, 50f)));
     }
 
     static string Pct(float x) => Mathf.RoundToInt(x * 100f).ToString(CultureInfo.InvariantCulture);

@@ -5,7 +5,14 @@ use civbb_format::dynamics::{Chain, Collider, Graded, ImmobileType, Integration,
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Vec3};
 
-use civbb_core::math::euler_to_quat;
+use civbb_core::math::{euler_to_quat, mul};
+
+/// A limit's rotation from its `[x, y, z]` degrees as the SDK turns it: about X, then Y, then Z (`q = qz qy qx`),
+/// not in Unity's Euler order (recorded with all three angles set, #108).
+fn limit_rotation(deg: Vec3) -> Quat {
+    let about = |axis: usize| euler_to_quat(std::array::from_fn(|i| if i == axis { deg[i] } else { 0.0 }));
+    mul(mul(about(2), about(1)), about(0))
+}
 
 /// Particles per chain at most, as PhysBones limit one component to 256 transforms; deeper nodes are not simulated.
 pub const MAX_PARTICLES: usize = 256;
@@ -207,7 +214,7 @@ impl Rig {
             allow_posing: c.allow_posing,
             colliders: c.colliders.clone(),
             limit,
-            limit_rotation: euler_to_quat(rotation),
+            limit_rotation: limit_rotation(rotation),
         });
     }
 }
