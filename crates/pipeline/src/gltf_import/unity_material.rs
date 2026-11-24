@@ -70,6 +70,8 @@ pub enum Family {
     MobileMatcap,
     /// Unlit shaders and VRChat Mobile particles.
     Unlit,
+    /// TSF (`TSF/Base1`, `TSF/BaseOutline1`): unlit, a matcap times the texture.
+    Tsf,
     /// Anything else: a plain toon from the base colour.
     Unknown,
 }
@@ -183,6 +185,9 @@ pub fn family(x: &XToonMaterial) -> Family {
         }
         if name.starts_with("vrchat/mobile/particles") || name.starts_with("unlit/") || name.ends_with("/unlit") {
             return Family::Unlit;
+        }
+        if name.starts_with("tsf/") {
+            return Family::Tsf;
         }
         if name.contains("poiyomi") {
             return Family::Poiyomi;
@@ -510,6 +515,33 @@ impl Importer<'_> {
                 if let Some(e) = self.unity_slot(x, "_EmissionMap", srgb) {
                     t.emissive_tex = Some(e);
                     t.emissive = p.rgb("_EmissionColor", WHITE);
+                }
+                (MaterialModel::Toon(t), queue_alpha.unwrap_or(Alpha::Opaque), 2.0)
+            }
+            Family::Tsf => {
+                // `matcap(view normal) * [_Color] * [_MainTex] * _Brightness`, no lighting; the tint and the texture
+                // by keyword (`TSF.shader`). A light clamped to exactly 1 and a multiplying matcap give that.
+                let keyword = |k: &str| x.keywords.iter().any(|w| w == k);
+                let tint = if keyword("_COLOR_ON") {
+                    p.color("_Color", WHITE)
+                } else {
+                    WHITE
+                };
+                let base = scale([tint[0], tint[1], tint[2]], p.f("_Brightness", 1.0));
+                let mut t = plain_toon(
+                    [base[0], base[1], base[2], tint[3]],
+                    main.filter(|_| keyword("_TEX_ON")),
+                );
+                t.shade_color = base;
+                t.light_min = 1.0;
+                t.light_max = 1.0;
+                t.matcap_tex = self.unity_slot(x, "_ToonShade", srgb);
+                t.matcap_strength = 1.0;
+                t.matcap_blend = MatcapBlend::Multiply;
+                if x.shader.to_ascii_lowercase().contains("outline") {
+                    // Object-space normal offset by `_Outline * 0.01`.
+                    t.outline_width = p.f("_Outline", 0.01) * 0.01;
+                    t.outline_color = p.rgb("_OutlineColor", [0.5, 0.5, 0.5, 1.0]);
                 }
                 (MaterialModel::Toon(t), queue_alpha.unwrap_or(Alpha::Opaque), 2.0)
             }

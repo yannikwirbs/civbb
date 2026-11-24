@@ -281,11 +281,11 @@ fn standard_vrchat_mobile_unlit_and_unknown_shaders() {
     let m = material(json!({"shader": "VRChat/Mobile/Particles/Additive"}));
     assert!(matches!(m.model, MaterialModel::Unlit(_)) && m.alpha == AlphaMode::Blend);
 
-    let imported = import_material(json!({"shader": "TSF/Base1", "floats": {"_Cull": 0}}));
+    let imported = import_material(json!({"shader": "Toony/Unknown", "floats": {"_Cull": 0}}));
     let m = &imported.avatar.materials[0];
     assert!(m.double_sided && toon(m).shade_color == [0.75; 3]);
     assert!(
-        imported.warnings.iter().any(|w| w.contains("TSF/Base1")),
+        imported.warnings.iter().any(|w| w.contains("Toony/Unknown")),
         "{:?}",
         imported.warnings
     );
@@ -385,4 +385,30 @@ fn poiyomi_without_a_ramp_texture_is_unshaded() {
     assert!(s[0] < b[0], "a ramp texture keeps the plain toon shade");
     let (s, b) = shade(json!({"_LightingRampType": 1}), json!({}));
     assert!(s[0] < b[0], "the math gradient keeps the plain toon shade");
+}
+
+#[test]
+fn tsf_is_an_unlit_matcap_times_the_texture() {
+    let m = material(json!({
+        "shader": "TSF/BaseOutline1", "keywords": ["_TEX_ON"],
+        "floats": {"_Brightness": 2, "_Outline": 0.12},
+        "colors": {"_Color": [0, 0, 0, 1], "_OutlineColor": [0, 0, 0, 1]},
+        "textures": {"_MainTex": tex([1.0, 1.0, 0.0, 0.0]), "_ToonShade": tex([1.0, 1.0, 0.0, 0.0])},
+    }));
+    let t = toon(&m);
+    // `_Color` tints only with `_COLOR_ON`; the light is exactly 1, so the shade is the lit colour.
+    assert_eq!((t.base_color, t.shade_color), ([2.0, 2.0, 2.0, 1.0], [2.0; 3]));
+    assert_eq!((t.light, t.light_min, t.light_max), (ToonLight::Clamped, 1.0, 1.0));
+    assert!(t.base_color_tex.is_some() && t.matcap_tex.is_some());
+    assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Multiply, 1.0));
+    assert!(close(t.outline_width, 0.0012) && t.outline_color == [0.0; 3]);
+
+    let m = material(json!({
+        "shader": "TSF/Base1", "keywords": ["_COLOR_ON"], "colors": {"_Color": [0, 0, 0, 1]},
+        "textures": {"_MainTex": tex([1.0, 1.0, 0.0, 0.0])},
+    }));
+    let t = toon(&m);
+    assert_eq!(t.base_color, [0.0, 0.0, 0.0, 1.0], "tinted");
+    assert!(t.base_color_tex.is_none(), "no texture without _TEX_ON");
+    assert_eq!(t.outline_width, 0.0);
 }
