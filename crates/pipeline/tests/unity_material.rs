@@ -351,25 +351,53 @@ fn hdr_emission_colours_stay_as_saved_and_plain_ones_linearise() {
 }
 
 #[test]
-fn poiyomi_matcap_takes_its_add_or_multiply_weight_and_tint() {
-    let matcap = |floats: Value| {
+fn poiyomi_matcap_takes_its_largest_weight_and_tint_from_the_stronger_matcap() {
+    let matcap = |floats: Value, keywords: Value| {
         let mut f = json!({"_MatcapEnable": 1, "_MatcapIntensity": 2});
         f.as_object_mut().unwrap().extend(floats.as_object().unwrap().clone());
+        let t = tex([1.0, 1.0, 0.0, 0.0]);
         toon(&material(json!({
-            "shader": "Hidden/.poiyomi/• Poiyomi Toon •/Body", "floats": f,
-            "colors": {"_MatcapColor": [0.5, 0.5, 0.5, 1]},
-            "textures": {"_Matcap": tex([1.0, 1.0, 0.0, 0.0]), "_MatcapMask": tex([1.0, 1.0, 0.0, 0.0])},
+            "shader": "Hidden/.poiyomi/• Poiyomi Toon •/Body", "floats": f, "keywords": keywords,
+            "colors": {"_MatcapColor": [0.5, 0.5, 0.5, 1], "_Matcap2Color": [1, 0, 0, 1]},
+            "textures": {"_Matcap": t, "_MatcapMask": t, "_Matcap2": t, "_Matcap2Mask": t},
         })))
         .clone()
     };
-    // Mostly replaced (no counterpart): next to nothing is added.
-    let t = matcap(json!({"_MatcapReplace": 0.02}));
-    assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Add, 0.0));
+    let t = matcap(
+        json!({"_MatcapReplace": 0.02, "_MatcapEmissionStrength": 0.01}),
+        json!([]),
+    );
+    assert_eq!(
+        (t.matcap_blend, t.matcap_strength, t.matcap_emission),
+        (MatcapBlend::Replace, 0.02, 0.01)
+    );
     assert!(close(t.matcap_color[0], 0.21404114 * 2.0) && t.matcap_mask_tex.is_some());
-    let t = matcap(json!({"_MatcapMultiply": 0.5}));
+    let t = matcap(json!({"_MatcapMultiply": 0.5}), json!([]));
     assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Multiply, 0.5));
-    let t = matcap(json!({"_MatcapAdd": 0.25, "_MatcapEmissionStrength": 0.5}));
-    assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Add, 0.75));
+    let t = matcap(json!({"_MatcapAdd": 0.25, "_MatcapEmissionStrength": 0.5}), json!([]));
+    assert_eq!(
+        (t.matcap_blend, t.matcap_strength, t.matcap_emission),
+        (MatcapBlend::Add, 0.75, 0.0)
+    );
+    // KohzieBoi: a faint first matcap and a second that replaces and emits, both under the keyword.
+    let kohzie = json!({"_MatcapReplace": 0.02, "_Matcap2Enable": 1, "_Matcap2Replace": 1,
+        "_Matcap2EmissionStrength": 1, "_Matcap2MaskUV": 1});
+    let t = matcap(kohzie.clone(), json!(["COLOR_GRADING_HDR_3D"]));
+    assert_eq!(
+        (t.matcap_blend, t.matcap_strength, t.matcap_emission),
+        (MatcapBlend::Replace, 1.0, 1.0)
+    );
+    assert_eq!(
+        t.matcap_color,
+        [1.0, 0.0, 0.0],
+        "the second matcap's tint and intensity"
+    );
+    assert_eq!(t.matcap_mask_tex.map(|s| s.uv_set), Some(1));
+    let t = matcap(kohzie, json!([]));
+    assert_eq!(
+        t.matcap_strength, 0.02,
+        "without the keyword the second matcap is compiled out"
+    );
 }
 
 #[test]

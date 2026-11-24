@@ -87,6 +87,7 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
         matcap_blend: MatcapBlend::Add,
         matcap_color: [1.0; 3],
         matcap_mask_tex: None,
+        matcap_emission: 0.0,
         emissive: [0.0; 3],
         emissive_tex: None,
         emissive_main_strength: 0.0,
@@ -461,6 +462,53 @@ fn matcaps_add_or_multiply() {
         1,
         "multiply (VRChat MatCap Lit), tinted",
     );
+    // SAFETY: `render` waited for the GPU to finish with the scene.
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+#[test]
+fn matcaps_replace_lit_and_emit_unlit() {
+    // Poiyomi (#106): replace turns the colour before lighting towards the matcap; the matcap emission adds after.
+    let Some(ctx) = context() else { return };
+    let capacity = Capacity {
+        vertices: 8,
+        indices: 12,
+        deltas: 0,
+        skinned: 8,
+        materials: 2,
+    };
+    let mut scene = Scene::new(&ctx, capacity).unwrap();
+    let half = scene.add_texture(&ctx, 1, 1, &[128, 128, 128, 255], false).unwrap();
+    let grey = |strength, emission| {
+        let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
+        if let MaterialModel::Toon(t) = &mut m {
+            t.light = ToonLight::Clamped;
+            t.matcap_tex = Some(TextureSlot {
+                texture: 0,
+                uv_set: 0,
+                scale_offset: [1.0, 1.0, 0.0, 0.0],
+            });
+            (t.matcap_blend, t.matcap_strength, t.matcap_emission) = (MatcapBlend::Replace, strength, emission);
+            t.matcap_color = [1.0, 0.0, 0.0];
+        }
+        material(m, AlphaMode::Opaque)
+    };
+    let emitting = scene.add_material(&ctx, &grey(1.0, 0.5), &[half]).unwrap();
+    let halfway = scene.add_material(&ctx, &grey(0.5, 0.0), &[half]).unwrap();
+    let meshes = [
+        quad([-3.0, 0.0], [-3.0, 3.0], 0.0, 0),
+        quad([0.0, 3.0], [-3.0, 3.0], 0.0, 1),
+    ];
+    let mut view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+    view.light_dir = [0.0, 0.0, 1.0];
+    view.light_color = [0.5; 3];
+    view.ambient = [0.0; 3];
+    let pixels = render(&ctx, &mut scene, &meshes, &[emitting, halfway], &[], &view);
+    // The red matcap 0.502 lit by 0.5, plus half of it unlit: 0.251 + 0.251. Halfway from the lit grey 0.25 to the
+    // lit matcap (0.251, 0, 0): (0.2505, 0.125, 0.125).
+    assert_near(pixel(&pixels, 16, 32), [128, 0, 0], 1, "replaced and emitting");
+    assert_near(pixel(&pixels, 48, 32), [64, 32, 32], 1, "half replaced");
     // SAFETY: `render` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");

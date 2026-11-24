@@ -291,6 +291,7 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
         matcap_blend: MatcapBlend::Add,
         matcap_color: [1.0; 3],
         matcap_mask_tex: None,
+        matcap_emission: 0.0,
         emissive: [0.0; 3],
         emissive_tex: None,
         emissive_main_strength: 0.0,
@@ -450,20 +451,43 @@ impl Importer<'_> {
                     t.normal_tex = Some(normal);
                     t.normal_scale = p.f("_BumpScale", 1.0);
                 }
-                if p.on("_MatcapEnable") {
-                    // Poiyomi blends the tinted matcap by separate replace, multiply and add weights (the matcap
-                    // emission adds too); replace has no counterpart.
-                    t.matcap_tex = self.unity_slot(x, "_Matcap", srgb);
-                    let tint = p.color("_MatcapColor", WHITE);
-                    t.matcap_color = scale([tint[0], tint[1], tint[2]], p.f("_MatcapIntensity", 1.0));
-                    let add = p.f("_MatcapAdd", 0.0) + p.f("_MatcapEmissionStrength", 0.0);
-                    let multiply = p.f("_MatcapMultiply", 0.0);
-                    if multiply > add {
-                        t.matcap_blend = MatcapBlend::Multiply;
+                // Each matcap blends into the colour before lighting by separate replace, multiply and add weights,
+                // and its emission adds after (`CGI_PoiMatcap.cginc`, 7.3). One has a counterpart: the stronger of
+                // the two (the second needs `COLOR_GRADING_HDR_3D`), blended by its largest weight; an added matcap
+                // takes its emission into the strength.
+                let strongest = |n: &str| {
+                    let w = |k: &str| p.f(&format!("_Matcap{n}{k}"), 0.0);
+                    let weights = [
+                        (MatcapBlend::Replace, w("Replace")),
+                        (MatcapBlend::Multiply, w("Multiply")),
+                        (MatcapBlend::Add, w("Add")),
+                    ];
+                    // Ties go to the later entry: add, then multiply.
+                    let (blend, weight) = weights.into_iter().max_by(|a, b| a.1.total_cmp(&b.1)).expect("three");
+                    let emission = w("EmissionStrength");
+                    match blend {
+                        MatcapBlend::Add => (n.to_owned(), blend, weight + emission, 0.0),
+                        _ => (n.to_owned(), blend, weight, emission),
                     }
-                    t.matcap_strength = add.max(multiply) * tint[3];
-                    if !p.on("_MatcapMaskInvert") {
-                        t.matcap_mask_tex = self.poiyomi_slot(x, "_MatcapMask", "_MatcapMaskUV", ColorSpace::Linear);
+                };
+                let second = x.keywords.iter().any(|k| k == "COLOR_GRADING_HDR_3D") && p.on("_Matcap2Enable");
+                let chosen = [
+                    p.on("_MatcapEnable").then(|| strongest("")),
+                    second.then(|| strongest("2")),
+                ]
+                .into_iter()
+                .flatten()
+                .reduce(|a, b| if b.2 + b.3 > a.2 + a.3 { b } else { a });
+                if let Some((n, blend, weight, emission)) = chosen {
+                    t.matcap_tex = self.unity_slot(x, &format!("_Matcap{n}"), srgb);
+                    let tint = p.color(&format!("_Matcap{n}Color"), WHITE);
+                    t.matcap_color = scale([tint[0], tint[1], tint[2]], p.f(&format!("_Matcap{n}Intensity"), 1.0));
+                    t.matcap_blend = blend;
+                    t.matcap_strength = weight * tint[3];
+                    t.matcap_emission = emission * tint[3];
+                    if !p.on(&format!("_Matcap{n}MaskInvert")) {
+                        let (mask, uv) = (format!("_Matcap{n}Mask"), format!("_Matcap{n}MaskUV"));
+                        t.matcap_mask_tex = self.poiyomi_slot(x, &mask, &uv, ColorSpace::Linear);
                     }
                 }
                 if p.on("_EnableRimLighting") {

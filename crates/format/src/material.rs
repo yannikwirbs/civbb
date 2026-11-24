@@ -115,6 +115,8 @@ pub struct Toon {
     pub matcap_color: Vec3,
     /// Scales the matcap strength per texel by its red channel.
     pub matcap_mask_tex: Option<TextureSlot>,
+    /// The matcap times this (and the mask) adds after lighting, whatever the blend (Poiyomi's matcap emission).
+    pub matcap_emission: f32,
     /// Emission colour.
     pub emissive: Vec3,
     /// Emission texture.
@@ -198,6 +200,8 @@ pub enum MatcapBlend {
     Add,
     /// VRChat's MatCap Lit, lilToon's multiply mode: the colour times the matcap, faded in by the strength.
     Multiply,
+    /// Poiyomi's replace: the colour turns towards the matcap, lit as the colour is, by the strength.
+    Replace,
 }
 
 /// Unlit colour or texture.

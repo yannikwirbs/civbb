@@ -88,7 +88,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut emissive = [0.0; 3];
     // Toon shadow colour, and 1 in w for the clamped light model.
     let mut shade = [0.0; 4];
-    // Toon rim colour, and 1 in w for a multiplying matcap.
+    // Toon rim colour; the matcap blend in w (0 add, 1 multiply, 2 replace).
     let mut rim = [0.0; 4];
     // Metallic, roughness, normal scale, alpha cutoff.
     let mut params = [0.0, 1.0, 1.0, 0.0];
@@ -101,7 +101,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     // Rim shade colour and strength (0: off); its ramp's start and end and its fresnel power.
     let mut rim_shade = [0.0; 4];
     let mut rim_shade_ramp = [0.0, 1.0, 1.0, 0.0];
-    // Matcap tint.
+    // Matcap tint; its emission weight in w.
     let mut matcap = [1.0, 1.0, 1.0, 0.0];
     // The clamped light's bounds.
     let mut light = [0.0, 1.0, 0.0, 0.0];
@@ -139,12 +139,12 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
             emissive = t.emissive;
             let clamped = if t.light == ToonLight::Clamped { 1.0 } else { 0.0 };
             shade = [t.shade_color[0], t.shade_color[1], t.shade_color[2], clamped];
-            let multiply = if t.matcap_blend == MatcapBlend::Multiply {
-                1.0
-            } else {
-                0.0
+            let blend = match t.matcap_blend {
+                MatcapBlend::Add => 0.0,
+                MatcapBlend::Multiply => 1.0,
+                MatcapBlend::Replace => 2.0,
             };
-            rim = [t.rim_color[0], t.rim_color[1], t.rim_color[2], multiply];
+            rim = [t.rim_color[0], t.rim_color[1], t.rim_color[2], blend];
             params[2] = t.normal_scale;
             if let Some(r) = t.rim_shade {
                 rim_shade = [r.color[0], r.color[1], r.color[2], r.strength];
@@ -190,7 +190,12 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 t.matcap_mask_tex,
                 t.outline_tex,
             ];
-            matcap = [t.matcap_color[0], t.matcap_color[1], t.matcap_color[2], 0.0];
+            matcap = [
+                t.matcap_color[0],
+                t.matcap_color[1],
+                t.matcap_color[2],
+                t.matcap_emission,
+            ];
             light = [t.light_min, t.light_max, 0.0, 0.0];
         }
         MaterialModel::Unlit(u) => {

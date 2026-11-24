@@ -350,6 +350,7 @@ fn toon(name: &str, color: [f32; 4]) -> Material {
             matcap_blend: MatcapBlend::Add,
             matcap_color: [1.0; 3],
             matcap_mask_tex: None,
+            matcap_emission: 0.0,
             emissive: [0.0; 3],
             emissive_tex: None,
             emissive_main_strength: 0.0,
