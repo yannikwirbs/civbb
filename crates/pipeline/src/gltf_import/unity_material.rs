@@ -62,8 +62,10 @@ pub enum Family {
     Uts2,
     MToon,
     Standard,
-    /// VRChat Mobile Toon Lit and Toon Standard.
+    /// VRChat Mobile Toon Lit: unshaded, albedo times (light + ambient).
     MobileToon,
+    /// VRChat Mobile Toon Standard.
+    MobileToonStandard,
     /// VRChat Mobile MatCap Lit.
     MobileMatcap,
     /// Unlit shaders and VRChat Mobile particles.
@@ -172,6 +174,9 @@ pub fn family(x: &XToonMaterial) -> Family {
     if !missing {
         if name.starts_with("vrchat/mobile/matcap") {
             return Family::MobileMatcap;
+        }
+        if name.starts_with("vrchat/mobile/toon standard") {
+            return Family::MobileToonStandard;
         }
         if name.starts_with("vrchat/mobile/toon") {
             return Family::MobileToon;
@@ -478,15 +483,23 @@ impl Importer<'_> {
                 (MaterialModel::Pbr(pbr), alpha, 2.0)
             }
             Family::MobileToon | Family::MobileMatcap => {
-                let mut t = plain_toon(p.color("_Color", WHITE), main);
-                // VRChat's mobile shaders score closer to Unity unclamped (ADR 0050).
+                // Toon Lit and MatCap Lit have neither a colour, a Lambert term nor emission: the texture (times
+                // the matcap) times light plus ambient, unclamped. A shade equal to the lit colour gives that
+                // under the additive light model (ADR 0050; the SDK's `VRChat-Mobile-ToonLit.shader`).
+                let mut t = plain_toon(WHITE, main);
                 t.light = ToonLight::Additive;
+                t.shade_color = [1.0; 3];
                 if family == Family::MobileMatcap {
-                    // MatCap Lit multiplies the albedo by the matcap.
                     t.matcap_tex = self.unity_slot(x, "_MatCap", srgb);
                     t.matcap_strength = if t.matcap_tex.is_some() { 1.0 } else { 0.0 };
                     t.matcap_blend = MatcapBlend::Multiply;
                 }
+                (MaterialModel::Toon(t), queue_alpha.unwrap_or(Alpha::Opaque), 2.0)
+            }
+            Family::MobileToonStandard => {
+                let mut t = plain_toon(p.color("_Color", WHITE), main);
+                // VRChat's mobile shaders score closer to Unity unclamped (ADR 0050).
+                t.light = ToonLight::Additive;
                 if let Some(e) = self.unity_slot(x, "_EmissionMap", srgb) {
                     t.emissive_tex = Some(e);
                     t.emissive = p.rgb("_EmissionColor", WHITE);

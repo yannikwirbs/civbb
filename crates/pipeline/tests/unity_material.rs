@@ -253,6 +253,21 @@ fn standard_vrchat_mobile_unlit_and_unknown_shaders() {
     assert!(toon(&m).matcap_tex.is_some() && toon(&m).matcap_strength == 1.0);
     assert_eq!(toon(&m).matcap_blend, MatcapBlend::Multiply, "MatCap Lit multiplies");
 
+    // Toon Lit and MatCap Lit are unshaded and have no colour or emission: leftovers of earlier
+    // shaders are ignored (#101). Toon Standard keeps its emission.
+    let leftovers = json!({"_Color": [0.5, 0.5, 0.5, 1], "_EmissionColor": [1, 0, 0, 1]});
+    let emission = json!({"_MainTex": tex([1.0, 1.0, 0.0, 0.0]), "_EmissionMap": tex([1.0, 1.0, 0.0, 0.0])});
+    for shader in ["VRChat/Mobile/Toon Lit", "VRChat/Mobile/MatCap Lit"] {
+        let m = material(json!({"shader": shader, "colors": leftovers, "textures": emission}));
+        let t = toon(&m);
+        assert_eq!((t.base_color, t.shade_color), ([1.0; 4], [1.0; 3]), "{shader}");
+        assert_eq!(t.shade_tex, t.base_color_tex, "{shader}");
+        assert_eq!((t.emissive, t.emissive_tex), ([0.0; 3], None), "{shader}");
+    }
+    let m = material(json!({"shader": "VRChat/Mobile/Toon Standard", "colors": leftovers, "textures": emission}));
+    assert_eq!(toon(&m).emissive, [1.0, 0.0, 0.0]);
+    assert!(toon(&m).emissive_tex.is_some());
+
     let m = material(json!({"shader": "VRChat/Mobile/Particles/Additive"}));
     assert!(matches!(m.model, MaterialModel::Unlit(_)) && m.alpha == AlphaMode::Blend);
 
