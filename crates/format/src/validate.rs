@@ -9,12 +9,15 @@ use crate::animator::{
     Animator, Behaviour, BlendTreeKind, Clip, DriverOp, Motion, Property, Transition, TransitionDest,
 };
 use crate::avatar::Avatar;
-use crate::constraint::{ConstraintKind, WorldUp};
-use crate::dynamics::{ContactShape, ContactVolume, Graded, Limit};
-use crate::expressions::{ControlKind, Menu};
-use crate::face::{EyeDriver, ShapeBind};
+use crate::constraint::{Constraint, ConstraintKind, WorldUp};
+use crate::dynamics::{ContactShape, ContactVolume, Contacts, Dynamics, Graded, Limit};
+use crate::expressions::{ControlKind, Expressions, Menu};
+use crate::face::{EyeDriver, Face, ShapeBind};
+use crate::hierarchy::{Hierarchy, Humanoid};
 use crate::material::{MaterialModel, TextureSlot};
 use crate::math::Transform;
+use crate::mesh::{Mesh, Skin};
+use crate::meta::Meta;
 
 /// Hard limits for one avatar.
 #[allow(missing_docs)] // Each field caps the count its name says.
@@ -111,6 +114,15 @@ struct V {
     caps: Caps,
 }
 
+/// Counts summed over every mesh, capped once all are seen.
+#[derive(Default)]
+struct Totals {
+    vertices: usize,
+    indices: usize,
+    shapes: usize,
+    deltas: usize,
+}
+
 impl V {
     fn fail(&mut self, path: impl FnOnce() -> String, problem: impl Into<String>) {
         if self.errors.len() < MAX_ERRORS {
@@ -149,13 +161,50 @@ impl V {
         self.finite(&all, path);
     }
 
+    /// Every part of the avatar, in this order: errors come out in it and stop at [`MAX_ERRORS`].
     fn avatar(&mut self, a: &Avatar, has_blob: &impl Fn(BlobId) -> bool) {
         let c = self.caps;
         let nodes = a.hierarchy.nodes.len();
         self.string(&a.name, || "name".into());
-        self.cap(nodes, c.nodes, "hierarchy.nodes");
+        self.hierarchy(&a.hierarchy);
+        if let Some(h) = &a.humanoid {
+            self.humanoid(h, nodes);
+        }
+        self.cap(a.meshes.len(), c.meshes, "meshes");
+        self.cap(a.materials.len(), c.materials, "materials");
+        self.cap(a.textures.len(), c.textures, "textures");
+        let mut totals = Totals::default();
+        for (mi, m) in a.meshes.iter().enumerate() {
+            self.mesh(mi, m, nodes, a.materials.len(), &mut totals);
+        }
+        if let Some(f) = &a.face {
+            self.face(f, &a.meshes, nodes);
+        }
+        if let Some(m) = &a.meta {
+            self.meta(m);
+        }
+        self.cap(totals.vertices, c.vertices, "total vertices");
+        self.cap(totals.indices, c.indices, "total indices");
+        self.cap(totals.shapes, c.blend_shapes, "total blend shapes");
+        self.cap(totals.deltas, c.shape_deltas, "total blend shape deltas");
+        self.materials(a, has_blob);
+        self.clips(&a.clips);
+        if let Some(anim) = &a.animator {
+            self.animator(anim, a.clips.len());
+        }
+        if let Some(e) = &a.expressions {
+            self.expressions(e, a.textures.len());
+        }
+        self.dynamics(&a.dynamics, nodes);
+        self.contacts(&a.contacts, nodes);
+        self.constraints(&a.constraints, nodes);
+    }
+
+    fn hierarchy(&mut self, h: &Hierarchy) {
+        let nodes = h.nodes.len();
+        self.cap(nodes, self.caps.nodes, "hierarchy.nodes");
         self.ensure(nodes > 0, || "hierarchy".into(), "no root node");
-        for (i, n) in a.hierarchy.nodes.iter().enumerate() {
+        for (i, n) in h.nodes.iter().enumerate() {
             let p = || format!("hierarchy.nodes[{i}]");
             self.string(&n.name, p);
             self.transform(&n.rest, p);
@@ -166,225 +215,239 @@ impl V {
                 (_, Some(parent)) => self.ensure((parent as usize) < i, p, "parent must precede child"),
             }
         }
+    }
 
-        if let Some(h) = &a.humanoid {
-            let mut seen = HashSet::new();
-            for (bone, node) in &h.bones {
-                self.index(*node as usize, nodes, || format!("humanoid.{bone:?}"), "node");
-                self.ensure(seen.insert(*bone), || format!("humanoid.{bone:?}"), "mapped twice");
-            }
-            self.finite(&h.viewpoint, || "humanoid.viewpoint".into());
-            self.ensure(
-                h.human_scale.is_finite() && h.human_scale >= 0.0,
-                || "humanoid.human_scale".into(),
-                "must be finite and 0 or more",
-            );
-            if let Some(c) = &h.center_of_mass {
-                self.finite(c, || "humanoid.center_of_mass".into());
-            }
-            let mut framed = HashSet::new();
-            for (i, f) in h.muscle_frames.iter().enumerate() {
-                let p = || format!("humanoid.muscle_frames[{i}]");
-                self.ensure(h.node(f.bone).is_some(), p, "bone not mapped");
-                self.ensure(framed.insert(f.bone), p, "bone framed twice");
-                let all = [f.pre.as_slice(), &f.post, &f.sign, &f.min, &f.max, &[f.twist]].concat();
-                self.finite(&all, p);
-                let unit = |q: &[f32; 4]| (q.iter().map(|c| c * c).sum::<f32>() - 1.0).abs() < 1e-3;
-                self.ensure(
-                    unit(&f.pre) && unit(&f.post),
-                    p,
-                    "pre and post must be unit quaternions",
-                );
-                self.ensure(f.sign.iter().all(|s| s.abs() == 1.0), p, "signs must be 1 or -1");
-                self.ensure(
-                    f.min.iter().all(|m| *m <= 0.0) && f.max.iter().all(|m| *m >= 0.0),
-                    p,
-                    "min above 0 or max below 0",
-                );
-                let twist_ok = if f.bone.twist_child().is_some() {
-                    (0.0..=1.0).contains(&f.twist)
-                } else {
-                    f.twist == 1.0
-                };
-                self.ensure(twist_ok, p, "twist must be in 0..=1 on limb bones and 1 elsewhere");
-            }
+    fn humanoid(&mut self, h: &Humanoid, nodes: usize) {
+        let mut seen = HashSet::new();
+        for (bone, node) in &h.bones {
+            self.index(*node as usize, nodes, || format!("humanoid.{bone:?}"), "node");
+            self.ensure(seen.insert(*bone), || format!("humanoid.{bone:?}"), "mapped twice");
         }
-
-        self.cap(a.meshes.len(), c.meshes, "meshes");
-        self.cap(a.materials.len(), c.materials, "materials");
-        self.cap(a.textures.len(), c.textures, "textures");
-        let (mut verts, mut indices, mut shapes, mut deltas) = (0, 0, 0, 0);
-        for (mi, m) in a.meshes.iter().enumerate() {
-            let p = |s: &str| format!("meshes[{mi}]{s}");
-            let n = m.positions.len();
-            verts += n;
-            indices += m.indices.len();
-            shapes += m.blend_shapes.len();
-            self.string(&m.name, || p(".name"));
-            self.index(m.node as usize, nodes, || p(".node"), "node");
-            self.ensure(m.normals.len() == n, || p(".normals"), "length differs from positions");
-            for (name, len) in [
-                ("tangents", m.tangents.len()),
-                ("uv0", m.uv0.len()),
-                ("uv1", m.uv1.len()),
-            ] {
-                self.ensure(
-                    len == 0 || len == n,
-                    || p(&format!(".{name}")),
-                    "length differs from positions",
-                );
-            }
-            self.finite(m.positions.as_flattened(), || p(".positions"));
-            self.finite(m.normals.as_flattened(), || p(".normals"));
-            if let Some(s) = &m.skin {
-                for j in &s.joints {
-                    self.index(*j as usize, nodes, || p(".skin.joints"), "node");
-                }
-                self.ensure(
-                    s.inverse_bind.len() == s.joints.len(),
-                    || p(".skin.inverse_bind"),
-                    "one per joint",
-                );
-                self.ensure(
-                    s.vertex_joints.len() == n,
-                    || p(".skin.vertex_joints"),
-                    "one per vertex",
-                );
-                self.ensure(
-                    s.vertex_weights.len() == n,
-                    || p(".skin.vertex_weights"),
-                    "one per vertex",
-                );
-                let joints = s.joints.len();
-                self.ensure(
-                    s.vertex_joints.as_flattened().iter().all(|&j| (j as usize) < joints),
-                    || p(".skin.vertex_joints"),
-                    "joint index out of range",
-                );
-                self.finite(s.vertex_weights.as_flattened(), || p(".skin.vertex_weights"));
-                self.finite(s.inverse_bind.as_flattened(), || p(".skin.inverse_bind"));
-            }
-            self.ensure(m.indices.len() % 3 == 0, || p(".indices"), "not a triangle list");
+        self.finite(&h.viewpoint, || "humanoid.viewpoint".into());
+        self.ensure(
+            h.human_scale.is_finite() && h.human_scale >= 0.0,
+            || "humanoid.human_scale".into(),
+            "must be finite and 0 or more",
+        );
+        if let Some(c) = &h.center_of_mass {
+            self.finite(c, || "humanoid.center_of_mass".into());
+        }
+        let mut framed = HashSet::new();
+        for (i, f) in h.muscle_frames.iter().enumerate() {
+            let p = || format!("humanoid.muscle_frames[{i}]");
+            self.ensure(h.node(f.bone).is_some(), p, "bone not mapped");
+            self.ensure(framed.insert(f.bone), p, "bone framed twice");
+            let all = [f.pre.as_slice(), &f.post, &f.sign, &f.min, &f.max, &[f.twist]].concat();
+            self.finite(&all, p);
+            let unit = |q: &[f32; 4]| (q.iter().map(|c| c * c).sum::<f32>() - 1.0).abs() < 1e-3;
             self.ensure(
-                m.indices.iter().all(|&i| (i as usize) < n),
-                || p(".indices"),
+                unit(&f.pre) && unit(&f.post),
+                p,
+                "pre and post must be unit quaternions",
+            );
+            self.ensure(f.sign.iter().all(|s| s.abs() == 1.0), p, "signs must be 1 or -1");
+            self.ensure(
+                f.min.iter().all(|m| *m <= 0.0) && f.max.iter().all(|m| *m >= 0.0),
+                p,
+                "min above 0 or max below 0",
+            );
+            let twist_ok = if f.bone.twist_child().is_some() {
+                (0.0..=1.0).contains(&f.twist)
+            } else {
+                f.twist == 1.0
+            };
+            self.ensure(twist_ok, p, "twist must be in 0..=1 on limb bones and 1 elsewhere");
+        }
+    }
+
+    /// Mesh `mi`: streams, skin, submeshes, levels of detail and blend shapes. Adds its counts to `totals`.
+    fn mesh(&mut self, mi: usize, m: &Mesh, nodes: usize, materials: usize, totals: &mut Totals) {
+        let p = |s: &str| format!("meshes[{mi}]{s}");
+        let n = m.positions.len();
+        totals.vertices += n;
+        totals.indices += m.indices.len();
+        totals.shapes += m.blend_shapes.len();
+        self.string(&m.name, || p(".name"));
+        self.index(m.node as usize, nodes, || p(".node"), "node");
+        self.ensure(m.normals.len() == n, || p(".normals"), "length differs from positions");
+        for (name, len) in [
+            ("tangents", m.tangents.len()),
+            ("uv0", m.uv0.len()),
+            ("uv1", m.uv1.len()),
+        ] {
+            self.ensure(
+                len == 0 || len == n,
+                || p(&format!(".{name}")),
+                "length differs from positions",
+            );
+        }
+        self.finite(m.positions.as_flattened(), || p(".positions"));
+        self.finite(m.normals.as_flattened(), || p(".normals"));
+        if let Some(s) = &m.skin {
+            self.skin(mi, s, n, nodes);
+        }
+        self.ensure(
+            m.indices.len().is_multiple_of(3),
+            || p(".indices"),
+            "not a triangle list",
+        );
+        self.ensure(
+            m.indices.iter().all(|&i| (i as usize) < n),
+            || p(".indices"),
+            "vertex index out of range",
+        );
+        for (si, s) in m.submeshes.iter().enumerate() {
+            let sp = || p(&format!(".submeshes[{si}]"));
+            let end = s.first_index as u64 + s.index_count as u64;
+            self.ensure(end <= m.indices.len() as u64, sp, "index range out of bounds");
+            self.ensure(s.index_count % 3 == 0, sp, "index count not a multiple of 3");
+            self.index(s.material as usize, materials, sp, "material");
+        }
+        self.lods(mi, m, totals);
+        for (bi, b) in m.blend_shapes.iter().enumerate() {
+            let bp = || p(&format!(".blend_shapes[{bi}]"));
+            totals.deltas += b.deltas.len();
+            self.string(&b.name, bp);
+            self.ensure(
+                b.deltas.windows(2).all(|w| w[0].vertex < w[1].vertex),
+                bp,
+                "deltas not in strictly ascending vertex order",
+            );
+            self.ensure(
+                b.deltas.last().is_none_or(|d| (d.vertex as usize) < n),
+                bp,
+                "vertex out of range",
+            );
+            self.ensure(
+                b.deltas
+                    .iter()
+                    .all(|d| d.position.iter().chain(&d.normal).all(|x| x.is_finite())),
+                bp,
+                "non-finite delta",
+            );
+        }
+    }
+
+    /// The skin of mesh `mi`, which has `n` vertices.
+    fn skin(&mut self, mi: usize, s: &Skin, n: usize, nodes: usize) {
+        let p = |field: &str| format!("meshes[{mi}]{field}");
+        for j in &s.joints {
+            self.index(*j as usize, nodes, || p(".skin.joints"), "node");
+        }
+        self.ensure(
+            s.inverse_bind.len() == s.joints.len(),
+            || p(".skin.inverse_bind"),
+            "one per joint",
+        );
+        self.ensure(
+            s.vertex_joints.len() == n,
+            || p(".skin.vertex_joints"),
+            "one per vertex",
+        );
+        self.ensure(
+            s.vertex_weights.len() == n,
+            || p(".skin.vertex_weights"),
+            "one per vertex",
+        );
+        let joints = s.joints.len();
+        self.ensure(
+            s.vertex_joints.as_flattened().iter().all(|&j| (j as usize) < joints),
+            || p(".skin.vertex_joints"),
+            "joint index out of range",
+        );
+        self.finite(s.vertex_weights.as_flattened(), || p(".skin.vertex_weights"));
+        self.finite(s.inverse_bind.as_flattened(), || p(".skin.inverse_bind"));
+    }
+
+    /// The levels of detail of mesh `mi`: each a subset of the level above with the same submeshes.
+    fn lods(&mut self, mi: usize, m: &Mesh, totals: &mut Totals) {
+        let p = |s: &str| format!("meshes[{mi}]{s}");
+        self.ensure(m.lods.len() <= MAX_LODS, || p(".lods"), "too many levels");
+        let (mut above_v, mut above_i) = (m.positions.len(), m.indices.len());
+        for (li, l) in m.lods.iter().enumerate() {
+            let lp = || p(&format!(".lods[{li}]"));
+            let v = l.vertices as usize;
+            totals.indices += l.indices.len();
+            self.ensure(v <= above_v, lp, "more vertices than the level above");
+            self.ensure(l.indices.len() < above_i, lp, "not fewer indices than the level above");
+            self.ensure(l.indices.len() % 3 == 0, lp, "not a triangle list");
+            self.ensure(
+                l.indices.iter().all(|&i| (i as usize) < v),
+                lp,
                 "vertex index out of range",
             );
-            for (si, s) in m.submeshes.iter().enumerate() {
-                let sp = || p(&format!(".submeshes[{si}]"));
-                let end = s.first_index as u64 + s.index_count as u64;
-                self.ensure(end <= m.indices.len() as u64, sp, "index range out of bounds");
-                self.ensure(s.index_count % 3 == 0, sp, "index count not a multiple of 3");
-                self.index(s.material as usize, a.materials.len(), sp, "material");
-            }
-            self.ensure(m.lods.len() <= MAX_LODS, || p(".lods"), "too many levels");
-            let (mut above_v, mut above_i) = (n, m.indices.len());
-            for (li, l) in m.lods.iter().enumerate() {
-                let lp = || p(&format!(".lods[{li}]"));
-                let v = l.vertices as usize;
-                indices += l.indices.len();
-                self.ensure(v <= above_v, lp, "more vertices than the level above");
-                self.ensure(l.indices.len() < above_i, lp, "not fewer indices than the level above");
-                self.ensure(l.indices.len() % 3 == 0, lp, "not a triangle list");
-                self.ensure(
-                    l.indices.iter().all(|&i| (i as usize) < v),
-                    lp,
-                    "vertex index out of range",
-                );
-                self.ensure(
-                    l.submeshes.len() == m.submeshes.len()
-                        && l.submeshes
-                            .iter()
-                            .zip(&m.submeshes)
-                            .all(|(s, t)| s.material == t.material),
-                    lp,
-                    "submeshes differ from the mesh's",
-                );
-                self.ensure(
-                    l.submeshes.iter().all(|s| {
-                        s.index_count % 3 == 0 && s.first_index as u64 + s.index_count as u64 <= l.indices.len() as u64
-                    }),
-                    lp,
-                    "submesh index range out of bounds",
-                );
-                self.ensure(
-                    l.error.is_finite() && l.error >= 0.0,
-                    lp,
-                    "error not finite and non-negative",
-                );
-                (above_v, above_i) = (v.min(above_v), l.indices.len());
-            }
-            for (bi, b) in m.blend_shapes.iter().enumerate() {
-                let bp = || p(&format!(".blend_shapes[{bi}]"));
-                deltas += b.deltas.len();
-                self.string(&b.name, bp);
-                self.ensure(
-                    b.deltas.windows(2).all(|w| w[0].vertex < w[1].vertex),
-                    bp,
-                    "deltas not in strictly ascending vertex order",
-                );
-                self.ensure(
-                    b.deltas.last().is_none_or(|d| (d.vertex as usize) < n),
-                    bp,
-                    "vertex out of range",
-                );
-                self.ensure(
-                    b.deltas
-                        .iter()
-                        .all(|d| d.position.iter().chain(&d.normal).all(|x| x.is_finite())),
-                    bp,
-                    "non-finite delta",
-                );
-            }
-        }
-        if let Some(f) = &a.face {
-            let mut seen = HashSet::new();
-            for (v, _) in &f.visemes {
-                self.ensure(seen.insert(*v), || format!("face.{v:?}"), "mapped twice");
-            }
-            let mut binds: Vec<&ShapeBind> = f.visemes.iter().flat_map(|(_, b)| b).chain(&f.blink).collect();
-            if let Some(e) = &f.eyes {
-                let maps = [e.horizontal_inner, e.horizontal_outer, e.vertical_down, e.vertical_up];
-                self.finite(&maps.map(|m| [m.input_max, m.output_scale]).concat(), || {
-                    "face.eyes".into()
-                });
-                match &e.driver {
-                    EyeDriver::Bones { left, right } => {
-                        for n in left.iter().chain(right) {
-                            self.index(*n as usize, nodes, || "face.eyes".into(), "eye node");
-                        }
-                    }
-                    EyeDriver::Shapes { up, down, left, right } => {
-                        binds.extend(up.iter().chain(down).chain(left).chain(right))
-                    }
-                }
-            }
-            for (i, b) in binds.into_iter().enumerate() {
-                let p = || format!("face.binds[{i}]");
-                match a.meshes.get(b.mesh as usize) {
-                    Some(m) => self.index(b.shape as usize, m.blend_shapes.len(), p, "blend shape"),
-                    None => self.fail(p, format!("mesh index {} out of range", b.mesh)),
-                }
-                self.finite(&[b.weight], p);
-            }
-        }
-        if let Some(m) = &a.meta {
-            let l = &m.licence;
-            let strings = m.authors.iter().chain(&m.references);
             self.ensure(
-                m.authors.len() + m.references.len() <= META_LISTS,
-                || "meta".into(),
-                "too many authors or references",
+                l.submeshes.len() == m.submeshes.len()
+                    && l.submeshes
+                        .iter()
+                        .zip(&m.submeshes)
+                        .all(|(s, t)| s.material == t.material),
+                lp,
+                "submeshes differ from the mesh's",
             );
-            for s in strings.chain([&m.version, &m.copyright, &m.contact, &l.url, &l.other_terms_url]) {
-                self.string(s, || "meta".into());
+            self.ensure(
+                l.submeshes.iter().all(|s| {
+                    s.index_count % 3 == 0 && s.first_index as u64 + s.index_count as u64 <= l.indices.len() as u64
+                }),
+                lp,
+                "submesh index range out of bounds",
+            );
+            self.ensure(
+                l.error.is_finite() && l.error >= 0.0,
+                lp,
+                "error not finite and non-negative",
+            );
+            (above_v, above_i) = (v.min(above_v), l.indices.len());
+        }
+    }
+
+    fn face(&mut self, f: &Face, meshes: &[Mesh], nodes: usize) {
+        let mut seen = HashSet::new();
+        for (v, _) in &f.visemes {
+            self.ensure(seen.insert(*v), || format!("face.{v:?}"), "mapped twice");
+        }
+        let mut binds: Vec<&ShapeBind> = f.visemes.iter().flat_map(|(_, b)| b).chain(&f.blink).collect();
+        if let Some(e) = &f.eyes {
+            let maps = [e.horizontal_inner, e.horizontal_outer, e.vertical_down, e.vertical_up];
+            self.finite(&maps.map(|m| [m.input_max, m.output_scale]).concat(), || {
+                "face.eyes".into()
+            });
+            match &e.driver {
+                EyeDriver::Bones { left, right } => {
+                    for n in left.iter().chain(right) {
+                        self.index(*n as usize, nodes, || "face.eyes".into(), "eye node");
+                    }
+                }
+                EyeDriver::Shapes { up, down, left, right } => {
+                    binds.extend(up.iter().chain(down).chain(left).chain(right))
+                }
             }
         }
-        self.cap(verts, c.vertices, "total vertices");
-        self.cap(indices, c.indices, "total indices");
-        self.cap(shapes, c.blend_shapes, "total blend shapes");
-        self.cap(deltas, c.shape_deltas, "total blend shape deltas");
+        for (i, b) in binds.into_iter().enumerate() {
+            let p = || format!("face.binds[{i}]");
+            match meshes.get(b.mesh as usize) {
+                Some(m) => self.index(b.shape as usize, m.blend_shapes.len(), p, "blend shape"),
+                None => self.fail(p, format!("mesh index {} out of range", b.mesh)),
+            }
+            self.finite(&[b.weight], p);
+        }
+    }
 
+    fn meta(&mut self, m: &Meta) {
+        let l = &m.licence;
+        let strings = m.authors.iter().chain(&m.references);
+        self.ensure(
+            m.authors.len() + m.references.len() <= META_LISTS,
+            || "meta".into(),
+            "too many authors or references",
+        );
+        for s in strings.chain([&m.version, &m.copyright, &m.contact, &l.url, &l.other_terms_url]) {
+            self.string(s, || "meta".into());
+        }
+    }
+
+    /// Materials' texture slots, then each texture's blob.
+    fn materials(&mut self, a: &Avatar, has_blob: &impl Fn(BlobId) -> bool) {
         for (i, m) in a.materials.iter().enumerate() {
             let p = || format!("materials[{i}]");
             self.string(&m.name, p);
@@ -420,31 +483,30 @@ impl V {
                 format!("blob {} missing", t.blob),
             );
         }
+    }
 
-        self.clips(&a.clips);
-        if let Some(anim) = &a.animator {
-            self.animator(anim, a.clips.len());
+    fn expressions(&mut self, e: &Expressions, textures: usize) {
+        let c = self.caps;
+        let bits: u32 = e.parameters.iter().filter(|p| p.synced).map(|p| p.kind.bits()).sum();
+        self.ensure(
+            bits <= c.synced_bits,
+            || "expressions".into(),
+            format!("{bits} synced bits over cap"),
+        );
+        self.cap(e.parameters.len(), c.parameters, "expressions.parameters");
+        for (i, p) in e.parameters.iter().enumerate() {
+            self.string(&p.name, || format!("expressions.parameters[{i}]"));
         }
-        if let Some(e) = &a.expressions {
-            let bits: u32 = e.parameters.iter().filter(|p| p.synced).map(|p| p.kind.bits()).sum();
-            self.ensure(
-                bits <= c.synced_bits,
-                || "expressions".into(),
-                format!("{bits} synced bits over cap"),
-            );
-            self.cap(e.parameters.len(), c.parameters, "expressions.parameters");
-            for (i, p) in e.parameters.iter().enumerate() {
-                self.string(&p.name, || format!("expressions.parameters[{i}]"));
-            }
-            let mut controls = 0;
-            self.menu(&e.menu, 0, a.textures.len(), &mut controls);
-            self.cap(controls, c.menu_controls, "expressions.menu controls");
-        }
+        let mut controls = 0;
+        self.menu(&e.menu, 0, textures, &mut controls);
+        self.cap(controls, c.menu_controls, "expressions.menu controls");
+    }
 
-        let colliders = a.dynamics.colliders.len();
-        self.cap(a.dynamics.chains.len(), c.chains, "dynamics.chains");
-        self.cap(colliders, c.colliders, "dynamics.colliders");
-        for (i, ch) in a.dynamics.chains.iter().enumerate() {
+    fn dynamics(&mut self, d: &Dynamics, nodes: usize) {
+        let colliders = d.colliders.len();
+        self.cap(d.chains.len(), self.caps.chains, "dynamics.chains");
+        self.cap(colliders, self.caps.colliders, "dynamics.colliders");
+        for (i, ch) in d.chains.iter().enumerate() {
             let p = || format!("dynamics.chains[{i}]");
             self.index(ch.root as usize, nodes, p, "root node");
             for n in &ch.ignore {
@@ -487,20 +549,17 @@ impl V {
                 self.string(s, p);
             }
         }
-        for (i, col) in a.dynamics.colliders.iter().enumerate() {
+        for (i, col) in d.colliders.iter().enumerate() {
             let p = || format!("dynamics.colliders[{i}]");
             self.index(col.node as usize, nodes, p, "node");
             self.finite(&[col.position.as_slice(), &col.rotation].concat(), p);
         }
+    }
 
-        let contacts = a.contacts.senders.len() + a.contacts.receivers.len();
-        self.cap(contacts, c.contacts, "contacts");
-        let senders = a.contacts.senders.iter().map(|s| (&s.volume, &s.tags, None));
-        let receivers = a
-            .contacts
-            .receivers
-            .iter()
-            .map(|r| (&r.volume, &r.tags, Some(&r.parameter)));
+    fn contacts(&mut self, c: &Contacts, nodes: usize) {
+        self.cap(c.senders.len() + c.receivers.len(), self.caps.contacts, "contacts");
+        let senders = c.senders.iter().map(|s| (&s.volume, &s.tags, None));
+        let receivers = c.receivers.iter().map(|r| (&r.volume, &r.tags, Some(&r.parameter)));
         for (i, (vol, tags, param)) in senders.chain(receivers).enumerate() {
             let p = || format!("contacts[{i}]");
             self.volume(vol, nodes, p);
@@ -511,9 +570,11 @@ impl V {
                 self.string(s, p);
             }
         }
+    }
 
-        self.cap(a.constraints.len(), c.constraints, "constraints");
-        for (i, k) in a.constraints.iter().enumerate() {
+    fn constraints(&mut self, constraints: &[Constraint], nodes: usize) {
+        self.cap(constraints.len(), self.caps.constraints, "constraints");
+        for (i, k) in constraints.iter().enumerate() {
             let p = || format!("constraints[{i}]");
             self.index(k.target as usize, nodes, p, "target node");
             for s in &k.sources {
