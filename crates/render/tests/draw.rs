@@ -151,6 +151,8 @@ fn render(
         .unwrap();
     let mut pool = Transients::default();
     let scene = &*scene;
+    // SAFETY: `cmd` is recording on `ctx`'s device; the imported target, scene buffers and pool all belong to `ctx`,
+    // and the target starts undefined.
     ctx.one_shot(|d, cmd| unsafe {
         let mut graph = Graph::new();
         let extent = vk::Extent2D {
@@ -199,6 +201,7 @@ fn render(
     .unwrap();
     let pixels = readback.mapped().unwrap()[..(SIZE * SIZE * 4) as usize].to_vec();
     assert_eq!(pool.len(), 1, "one transient depth buffer");
+    // SAFETY: `one_shot` waited for the GPU to finish; nothing uses these any more.
     unsafe {
         pool.destroy(ctx);
         ctx.destroy_buffer(readback);
@@ -301,6 +304,7 @@ fn draws_quads_with_each_shader_depth_textures_and_blending() {
         2,
         "blended over textured, top left",
     );
+    // SAFETY: `render` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }
@@ -341,6 +345,7 @@ fn toon_light_limits_bound_the_clamped_light() {
     // Light plus ambient 1.3 bounded to 0.5 (lilToon's `_LightMaxLimit` lowered) and raised to 2.
     assert_near(pixel(&pixels, 16, 32), [64, 64, 64], 1, "upper bound");
     assert_near(pixel(&pixels, 48, 32), [255, 255, 255], 1, "lower bound");
+    // SAFETY: `render` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }
@@ -386,6 +391,7 @@ fn toon_light_models_add_or_clamp_the_ambient() {
         1,
         "clamped (lilToon and others)",
     );
+    // SAFETY: `render` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }
@@ -454,6 +460,7 @@ fn matcaps_add_or_multiply() {
         1,
         "multiply (VRChat MatCap Lit), tinted",
     );
+    // SAFETY: `render` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }
@@ -501,6 +508,7 @@ fn rim_shade_darkens_away_from_the_view_direction() {
     let pixels = render(&ctx, &mut scene, &meshes, &[shaded, plain], &[], &view);
     assert_near(pixel(&pixels, 16, 32), [64, 64, 64], 1, "rim shaded");
     assert_near(pixel(&pixels, 48, 32), [128, 128, 128], 1, "no rim shade");
+    // SAFETY: `render` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }
@@ -538,6 +546,7 @@ fn two_grey_toons(edit: [&dyn Fn(&mut Toon); 2], light_dir: [f32; 3]) -> Option<
     view.ambient = [0.0; 3];
     let pixels = render(&ctx, &mut scene, &meshes, &ids, &[], &view);
     let got = (pixel(&pixels, 16, 32), pixel(&pixels, 48, 32));
+    // SAFETY: `render` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
     Some(got)
@@ -644,6 +653,7 @@ fn draws_the_bloated_avatar() {
     let pixels = render(&ctx, &mut scene, &avatar.meshes, &materials, &[], &view);
     let covered = pixels.chunks(4).filter(|p| p[..3] != [0, 0, 0]).count();
     assert!(covered > 100, "only {covered} pixels drawn");
+    // SAFETY: `render` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }
@@ -723,6 +733,7 @@ fn draws_toon_outlines_around_the_silhouette() {
     assert_near(pixel(&pixels, 46, 32), [255, 0, 0], 0, "outline right of the face");
     assert_near(pixel(&pixels, 32, 18), [255, 0, 0], 0, "outline above the face");
     assert_near(pixel(&pixels, 56, 32), [0, 0, 0], 0, "background past the outline");
+    // SAFETY: `render` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }

@@ -16,6 +16,8 @@ unsafe_op_in_unsafe_fn = "deny"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+# Every unsafe block states why it is sound (`// SAFETY:` above it); ci denies warnings.
+undocumented_unsafe_blocks = "warn"
 
 [workspace.dependencies]
 civbb-anim = { path = "crates/anim" }

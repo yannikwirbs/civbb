@@ -151,6 +151,8 @@ fn run(ctx: &Context, scene: &Scene, skinning: &Skinning, jobs: &[Job]) -> Vec<V
             .unwrap()
         })
         .collect();
+    // SAFETY: `cmd` is recording on the device the pipelines, meshes and buffers were created on, outside a
+    // rendering scope.
     ctx.one_shot(|d, cmd| unsafe {
         skinning.record(d, cmd, jobs);
         let b = vk::MemoryBarrier2::default()
@@ -185,6 +187,7 @@ fn run(ctx: &Context, scene: &Scene, skinning: &Skinning, jobs: &[Job]) -> Vec<V
                 .iter()
                 .map(|&c| f32::from_le_bytes(c))
                 .collect();
+            // SAFETY: `one_shot` waited for the copy into `r` to finish.
             unsafe { ctx.destroy_buffer(r) };
             floats
                 .as_chunks::<12>()
@@ -263,6 +266,7 @@ fn matches_the_dense_reference_on_the_bloated_avatar() {
             assert_close(&m.name, out, &reference(m, j, w));
         }
     }
+    // SAFETY: every `run` waited for its GPU work; nothing uses these any more.
     unsafe {
         for m in meshes {
             m.destroy(&ctx);

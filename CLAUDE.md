@@ -13,7 +13,8 @@ CIVBB is a social VR platform on a custom Rust + Vulkan engine. The product spec
 
 - Take the lowest-numbered open issue in the current milestone unless STATUS.md says otherwise. Comment on the issue when you start if the work spans sessions.
 - Trunk-based: small commits straight to `main`, message `area: what (#N)`; use `Closes #N` in the commit that finishes an issue.
-- Gate before every commit: `cargo fmt --all && cargo xtask ci` (fmt, clippy `-D warnings`, tests, arch rules, code map freshness). Never commit red.
+- Gate before every commit: `cargo fmt --all && cargo xtask ci` (fmt, clippy `-D warnings`, tests, arch rules, source rules, code map freshness). Never commit red.
+- Enforced by that gate: every `unsafe` block has a `// SAFETY:` comment above it (clippy `undocumented_unsafe_blocks`); no Rust file over 1,000 lines (split along a real seam); no `unwrap()` in a crate's `src/` before its first `#[cfg(test)]` (use `?` or an `expect` saying why it cannot fail; keep test modules last).
 - New file: start it with a `//!` line saying its one job (the code map uses it). New crate: `description` in Cargo.toml, a `README.md`, and a layer in `tools/xtask/src/main.rs`.
 - A decision the design doc doesn't make, or a deviation from it: write an ADR in `docs/adr/` (copy `0000-template.md`). ADRs are not edited after acceptance; supersede them.
 - Found work outside the current issue: open an issue with labels and milestone, don't do it now.
