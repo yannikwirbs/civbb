@@ -26,12 +26,20 @@ pub const HEIGHT: u32 = 640;
 pub const FOV_Y: f32 = 0.6;
 /// FLIP's default: a 0.7 m viewing distance from a 3840-pixel-wide 0.7 m display.
 pub const PIXELS_PER_DEGREE: f32 = flip_rs::DEFAULT_PPD;
-/// The traffic light's bounds (ADR 0033).
+/// The traffic light's bounds against our own renderer (ADR 0033).
 pub const THRESHOLDS: Thresholds = Thresholds {
     green_mean: 0.02,
     green_p99: 0.2,
     red_mean: 0.1,
     red_p99: 0.5,
+};
+/// The traffic light's bounds against Unity's renders (ADR 0083): green is the translation floor of exports with no
+/// difference left but texture filtering and edge pixels, red a different look.
+pub const UNITY_THRESHOLDS: Thresholds = Thresholds {
+    green_mean: 0.06,
+    green_p99: 0.25,
+    red_mean: 0.12,
+    red_p99: 0.9,
 };
 /// Simulation frames stepped per state.
 pub const FRAMES_PER_STATE: u32 = 60;
@@ -313,9 +321,9 @@ fn transform(m: &Mat4, p: Vec3) -> Vec3 {
 /// reported on stderr. Fails with [`civbb_render::Error::NoDevice`] or [`civbb_render::Error::Load`] where there is
 /// no device.
 pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Parity, Error> {
-    let (rig, source, sides) = match &reference {
-        Reference::Package(r) => (rig(r.avatar), "source", vec![r, &test]),
-        Reference::Unity { handoff, .. } => (handoff.rig.clone(), "unity", vec![&test]),
+    let (rig, source, sides, thresholds) = match &reference {
+        Reference::Package(r) => (rig(r.avatar), "source", vec![r, &test], THRESHOLDS),
+        Reference::Unity { handoff, .. } => (handoff.rig.clone(), "unity", vec![&test], UNITY_THRESHOLDS),
     };
     let mut renderer = Renderer::headless(cfg!(debug_assertions), WIDTH, HEIGHT)?;
     let mut gpus = Vec::with_capacity(2);
@@ -379,7 +387,7 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
             views.push(score);
             shots.push((pair, error));
         }
-        let light = views.iter().map(|s| light(s, &THRESHOLDS)).max().unwrap_or_default();
+        let light = views.iter().map(|s| light(s, &thresholds)).max().unwrap_or_default();
         if let Some(dir) = images
             && (state == 0 || light != Light::Green)
         {
@@ -407,7 +415,7 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
         reference: source.into(),
         rig,
         pixels_per_degree: PIXELS_PER_DEGREE,
-        thresholds: THRESHOLDS,
+        thresholds,
         light: scored.iter().map(|s| s.light).max().unwrap_or_default(),
         states: scored,
     })

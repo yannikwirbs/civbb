@@ -2,7 +2,7 @@
 //! matches NVIDIA's reference evaluator, scores cover only the avatar's pixels, the traffic light's bounds, and the
 //! rig's views.
 
-use civbb_client::parity::{self, HEIGHT, PIXELS_PER_DEGREE, THRESHOLDS, WIDTH};
+use civbb_client::parity::{self, HEIGHT, PIXELS_PER_DEGREE, THRESHOLDS, UNITY_THRESHOLDS, WIDTH};
 use civbb_format::cost::{Light, ViewScore};
 
 const W: u32 = 64;
@@ -219,4 +219,33 @@ fn the_rig_frames_what_shows_at_rest_in_world_space() {
     assert!((mlo[0] - lo[0] - 2.0).abs() < 1e-4 && (mhi[0] - hi[0] - 2.0).abs() < 1e-4);
     let shift = parity::rig(&moved).views[0].target[0] - parity::rig(&avatar).views[0].target[0];
     assert!((shift - 2.0).abs() < 1e-4, "the rig follows: {shift}");
+}
+
+/// ADR 0083's bounds against Unity, on views measured in #101: the translation floor is green there and yellow against
+/// our own renderer; a localised difference is yellow; a different look or a misplaced part is red.
+#[test]
+fn unity_thresholds_sit_above_the_translation_floor() {
+    let at = |mean, p99, t| {
+        parity::light(
+            &ViewScore {
+                mean,
+                p99,
+                max: p99,
+                pixels: 1,
+                ..ViewScore::default()
+            },
+            t,
+        )
+    };
+    let u = &UNITY_THRESHOLDS;
+    assert_eq!(at(0.054, 0.216, u), Light::Green, "Megumi, the worst floor view");
+    assert_eq!(at(0.054, 0.216, &THRESHOLDS), Light::Yellow);
+    assert_eq!(
+        at(0.082, 0.445, u),
+        Light::Yellow,
+        "Tessakuchan: PhysBone rest and outline detail"
+    );
+    assert_eq!(at(0.121, 0.586, u), Light::Red, "Yumeka's right view");
+    assert_eq!(at(0.05, 0.973, u), Light::Red, "a misplaced part: p99 near 1");
+    assert!(u.green_mean > THRESHOLDS.green_mean && u.red_mean > THRESHOLDS.red_mean);
 }

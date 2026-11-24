@@ -284,6 +284,7 @@ Internal deps: none
 - `docs/adr/0080-measure-pins-to-a-performance-core.md`: 0080: `measure` pins its worker to a performance core
 - `docs/adr/0081-unity-cpu-baseline-method.md`: 0081: How the Unity CPU baselines are measured
 - `docs/adr/0082-phase-0-cpu-half-of-the-gate.md`: 0082: Phase 0's gate, CPU half: compiled avatars are clearly cheaper than Unity's animator
+- `docs/adr/0083-parity-thresholds-against-unity.md`: 0083: Parity thresholds against Unity's renders, from the translation floor
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
