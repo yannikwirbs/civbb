@@ -149,8 +149,8 @@ public static class VrcPhysBones
     // ---- Cases ----
 
     /// A case at its own place in the scene: Root, then `Bones` bones of `BoneLength` along +X (or the `boneAxis`
-    /// setting, which is not a PhysBone field), the PhysBone on the first; settings are field name to value (enum
-    /// values by name) on top of the defaults below.
+    /// setting), the PhysBone on the first, turned by the `rootRotation` setting (Euler); settings are field name to
+    /// value (enum values by name) on top of the defaults below, those two not PhysBone fields.
     static Case Add(string name, Func<float, (Vector3, Quaternion)> path, params (string field, object value)[] settings)
     {
         var c = new Case { Name = name, Path = path, Rates = RateCases.Contains(name) };
@@ -168,6 +168,8 @@ public static class VrcPhysBones
             c.Bones[i].localPosition = i == 0 ? Vector3.zero : axis * BoneLength;
             parent = c.Bones[i];
         }
+        c.Bones[0].localRotation = Quaternion.Euler(settings.Where(s => s.field == "rootRotation").Select(s => (Vector3)s.value)
+            .DefaultIfEmpty(Vector3.zero).First());
         var k = c.Bones[0].gameObject.AddComponent(Type("VRCPhysBone"));
         var defaults = new (string, object)[]
         {
@@ -179,7 +181,7 @@ public static class VrcPhysBones
         foreach (var (field, value) in defaults.Concat(settings))
         {
             c.Settings[field] = value;
-            if (field != "boneAxis")
+            if (field != "boneAxis" && field != "rootRotation")
             {
                 Set(k, field, value);
             }
@@ -342,6 +344,10 @@ public static class VrcPhysBones
             ("limitType", "Angle"), ("maxAngleX", 20f), ("limitRotation", new Vector3(-30f, 25f, 50f)));
         Add("limit_hinge_up_rotxyz", Sway, ("boneAxis", Vector3.up), ("pull", 0.2f), ("spring", 0.5f), ("gravity", 0.3f),
             ("limitType", "Hinge"), ("maxAngleX", 30f), ("limitRotation", new Vector3(-30f, 25f, 50f)));
+        // Yumeka's front skirt: hanging 9 degrees forward, the limit's rotation and its edge at the rest direction.
+        Add("yumeka_skirt", Still, ("boneAxis", Vector3.up), ("rootRotation", new Vector3(9.143f, -180f, -180f)), ("pull", 0.146f),
+            ("spring", 0.165f), ("stiffness", 0.2f), ("gravity", 0.08f), ("immobile", 0.85f), ("radius", 0.049f), ("limitType", "Polar"),
+            ("maxAngleX", 40f), ("maxAngleZ", 0f), ("limitRotation", new Vector3(-40f, 0f, 0f)));
     }
 
     static string Pct(float x) => Mathf.RoundToInt(x * 100f).ToString(CultureInfo.InvariantCulture);

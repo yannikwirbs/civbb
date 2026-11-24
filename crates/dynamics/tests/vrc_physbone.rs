@@ -85,7 +85,8 @@ impl Case {
         std::array::from_fn(|i| a[i].as_f64().unwrap() as f32)
     }
 
-    /// Root, B0 on it (the chain root), then the bones along Unity's +X (or the `boneAxis` setting).
+    /// Root, B0 on it (the chain root, turned by the `rootRotation` setting), then the bones along Unity's +X (or the
+    /// `boneAxis` setting).
     fn avatar(&self, bone: f32) -> Avatar {
         let node = |name: &str, parent: Option<u32>, t: Vec3| Node {
             name: name.into(),
@@ -104,6 +105,10 @@ impl Case {
         let mut nodes = vec![node("Root", None, [0.0; 3]), node("B0", Some(0), [0.0; 3])];
         for i in 1..=4 {
             nodes.push(node(&format!("B{i}"), Some(i), mirror(axis.map(|a| a * bone))));
+        }
+        if self.settings.contains_key("rootRotation") {
+            let r = self.v("rootRotation");
+            nodes[1].rest.rotation = civbb_core::math::euler_to_quat([r[0], -r[1], -r[2]]);
         }
         for (b, &s) in self.bone_scales.iter().enumerate() {
             nodes[b + 1].rest.scale = [s; 3];
