@@ -132,12 +132,7 @@ fn run(args: &[String]) -> Result<(), Error> {
                     report.parity = parity?;
                 }
                 let json = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
-                fs::write(
-                    &path,
-                    json + "
-",
-                )
-                .map_err(|e| format!("{}: {e}", path.display()))?;
+                fs::write(&path, json + "\n").map_err(|e| format!("{}: {e}", path.display()))?;
                 let md = path.with_extension("md");
                 fs::write(&md, report.markdown()).map_err(|e| format!("{}: {e}", md.display()))?;
                 println!("wrote {} and {}", path.display(), md.display());

@@ -74,7 +74,7 @@ Internal deps: civbb-format
 
 ## `crates/dynamics` (civbb-dynamics)
 
-Bone dynamics: a PhysBone-compatible XPBD chain solver with grab and pose, and contacts.
+Bone dynamics: PhysBone chains stepped as the VRChat SDK does (ADR 0049), with grab and pose, and contacts.
 
 Internal deps: civbb-core, civbb-format
 
