@@ -20,19 +20,24 @@ LOCAL = ROOT / "corpus" / "local"
 BIN = ROOT / "target" / "release"
 OUT = LOCAL / "scorecard"
 KEY = LOCAL / "unity-ref" / "key"
+# `measure` times one worker. Unpinned on a hybrid CPU it lands on a performance or an efficiency core at random
+# (Yumeka 196 against 364 µs on the i5-12600K), so pin it to logical CPU 2: a performance core there (0 to 11 are;
+# 0 takes most interrupts).
+PIN = ["cmd", "/c", "start", "/affinity", "4", "/wait", "/b"] if sys.platform == "win32" else ["taskset", "-c", "2"]
 
 
-def run(*args):
+def run(*args, pinned=False):
     """Runs a release binary and returns its stdout; raises with its stderr on failure."""
     exe = str(BIN / args[0])
-    p = subprocess.run([exe, *map(str, args[1:])], capture_output=True, text=True, encoding="utf-8")
+    cmd = [exe, *map(str, args[1:])]
+    p = subprocess.run(PIN + cmd if pinned else cmd, capture_output=True, text=True, encoding="utf-8")
     if p.returncode != 0:
         raise RuntimeError(f"{' '.join(map(str, args))}: {p.stderr.strip()[-400:]}")
     return p.stdout
 
 
 def measure(pkg):
-    m = json.loads(run("civbb-client", "measure", pkg, "--key", KEY))
+    m = json.loads(run("civbb-client", "measure", pkg, "--key", KEY, pinned=True))
     gpu = m["gpu"]["gpu_ms_per_avatar"] * 1000 if m["gpu"] else float("nan")
     return m["cpu"]["ms_per_avatar"] * 1000, gpu
 
@@ -43,7 +48,7 @@ def views_mean(state):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
-    flt =re.compile(sys.argv[1] if len(sys.argv) > 1 else ".")
+    flt = re.compile(sys.argv[1] if len(sys.argv) > 1 else ".")
     rows = []
     for line in (LOCAL / "unity-glb" / "exports.txt").read_text(encoding="utf-8").splitlines():
         name = line.split("|")[0].strip()
