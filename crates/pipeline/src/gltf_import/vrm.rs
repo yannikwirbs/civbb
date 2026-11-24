@@ -4,6 +4,7 @@
 //! Runs after the glTF import and reads the extension JSON tolerantly: a missing or malformed field takes the
 //! VRM default, an unresolvable reference is skipped with a warning. Validation still checks the result.
 
+use civbb_core::math::{add, conj, cross, dot};
 use civbb_format::animator::*;
 use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
 use civbb_format::dynamics::{
@@ -1168,21 +1169,9 @@ fn srgb(c: [f32; 4]) -> [f32; 4] {
     [f(c[0]), f(c[1]), f(c[2]), c[3]]
 }
 
-fn add(a: Vec3, b: Vec3) -> Vec3 {
-    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-}
-
-fn dot(a: Vec3, b: Vec3) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn cross(a: Vec3, b: Vec3) -> Vec3 {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
+// `qmul`, `rotate` and `from_to` stay apart from `civbb_core::math`: core's round differently (imported VRM values
+// change in the last bit) and core's `from_to` turns a non-finite input into the identity where this one stays NaN
+// and validation rejects the collider. Switching is a deliberate change with re-baselined imports.
 
 fn qmul(a: Quat, b: Quat) -> Quat {
     let (av, bv) = ([a[0], a[1], a[2]], [b[0], b[1], b[2]]);
@@ -1193,10 +1182,6 @@ fn qmul(a: Quat, b: Quat) -> Quat {
         a[3] * b[2] + b[3] * a[2] + c[2],
         a[3] * b[3] - dot(av, bv),
     ]
-}
-
-fn conj(q: Quat) -> Quat {
-    [-q[0], -q[1], -q[2], q[3]]
 }
 
 fn rotate(q: Quat, v: Vec3) -> Vec3 {
