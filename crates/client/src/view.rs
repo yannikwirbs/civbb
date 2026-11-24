@@ -5,7 +5,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Instant;
 
-use civbb_core::math::Pose;
+use civbb_core::math::{Pose, mat4_mul};
 use civbb_format::Avatar;
 use civbb_format::material::{ColorSpace, ImageFormat, Material};
 use civbb_format::math::{Mat4, Vec3};
@@ -333,18 +333,10 @@ pub fn skin_matrices(mesh: &Mesh, world: &[Pose], out: &mut Vec<Mat4>) {
             skin.joints
                 .iter()
                 .zip(&skin.inverse_bind)
-                .map(|(&j, ib)| mul(&matrix(&world[j as usize]), ib)),
+                .map(|(&j, ib)| mat4_mul(&matrix(&world[j as usize]), ib)),
         ),
         _ => out.push(matrix(&world[mesh.node as usize])),
     }
-}
-
-/// Column-major `a * b`.
-fn mul(a: &Mat4, b: &Mat4) -> Mat4 {
-    std::array::from_fn(|i| {
-        let (col, row) = (i / 4, i % 4);
-        (0..4).map(|k| a[k * 4 + row] * b[col * 4 + k]).sum()
-    })
 }
 
 /// The avatar's bind-pose bounds: lowest and highest corner over every mesh's vertices.

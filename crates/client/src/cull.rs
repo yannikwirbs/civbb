@@ -1,6 +1,7 @@
 //! Frustum culling of mesh instances before skinning (design doc §6, ADR 0077): conservative world bounds from
 //! per-joint spheres and the frame's skinning matrices.
 
+use civbb_core::math::{length, sub};
 use civbb_format::math::{Mat4, Vec3};
 use civbb_format::mesh::Mesh;
 
@@ -120,12 +121,4 @@ impl Frustum {
             far + p[3] >= 0.0
         })
     }
-}
-
-fn sub(a: Vec3, b: Vec3) -> Vec3 {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-fn length(a: Vec3) -> f32 {
-    (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt()
 }

@@ -2,6 +2,7 @@
 //! scene's shared buffers and textures from the bindless array (design doc §6 "GPU-driven path", ADR 0023).
 
 use ash::vk;
+use civbb_core::math::mat4_mul;
 use civbb_format::math::{Mat4, Vec3};
 
 use crate::graph::{Access, BufferId, Graph, ImageDesc, ImageId, Load, Pass};
@@ -106,7 +107,7 @@ impl View {
             0.0,
         ];
         View {
-            view_proj: mul(&proj, &view),
+            view_proj: mat4_mul(&proj, &view),
             eye,
             light_dir: unit(LIGHT_TOWARDS),
             light_color: LIGHT_COLOR,
@@ -125,14 +126,6 @@ impl View {
         }
         w.map(f32::to_bits)
     }
-}
-
-/// Column-major `a * b`.
-fn mul(a: &Mat4, b: &Mat4) -> Mat4 {
-    std::array::from_fn(|i| {
-        let (col, row) = (i / 4, i % 4);
-        (0..4).map(|k| a[k * 4 + row] * b[col * 4 + k]).sum()
-    })
 }
 
 /// One submesh of one mesh instance to draw.

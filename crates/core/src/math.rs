@@ -1,7 +1,7 @@
 //! Vector and quaternion helpers on the format's array types, and world placements of a node hierarchy.
 
 use civbb_format::hierarchy::NodeIndex;
-use civbb_format::math::{Quat, Transform, Vec3};
+use civbb_format::math::{Mat4, Quat, Transform, Vec3};
 
 /// The identity rotation.
 pub const IDENTITY: Quat = [0.0, 0.0, 0.0, 1.0];
@@ -152,6 +152,14 @@ pub fn quat_to_euler(q: Quat) -> Vec3 {
         ((-r20).atan2(r00), 0.0)
     };
     [ax, ay, az].map(f32::to_degrees)
+}
+
+/// Column-major 4x4 matrix product `a * b`.
+pub fn mat4_mul(a: &Mat4, b: &Mat4) -> Mat4 {
+    std::array::from_fn(|i| {
+        let (col, row) = (i / 4, i % 4);
+        (0..4).map(|k| a[k * 4 + row] * b[col * 4 + k]).sum()
+    })
 }
 
 /// `v` turned by `angle` radians about unit `axis`.
