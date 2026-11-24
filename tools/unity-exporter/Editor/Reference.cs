@@ -156,6 +156,10 @@ namespace Civbb.Exporter
                     Shoot(handoff.rig.views[v], Path.Combine(outDir, $"{state:D3}-{handoff.rig.views[v].name}.png"));
                 }
                 LogState();
+                if (state == 0 && Arg("-civbbBones") is string bones)
+                {
+                    WriteBones(bones);
+                }
                 state++;
                 done = state == handoff.states.Length;
                 if (!done)
@@ -529,6 +533,23 @@ namespace Civbb.Exporter
         /// Per rendered state, one line per playable layer (its mixer weight, its controller layers' weights, current
         /// clips and, mid-transition, the next state's clips after `->`) and the human pose's muscles, to tell a pose
         /// difference's source (#86). Lines start `CIVBB <state name>`.
+        /// `-civbbBones <absolute file>`: every transform's path under the avatar and its world position at rest, as
+        /// `path|x|y|z` in our handedness (x mirrored), to compare PhysBone rest with ours.
+        static void WriteBones(string file)
+        {
+            var lines = avatar.GetComponentsInChildren<Transform>(true).Where(t => t != avatar.transform).Select(t =>
+            {
+                var path = t.name;
+                for (var p = t.parent; p != avatar.transform; p = p.parent)
+                {
+                    path = $"{p.name}/{path}";
+                }
+                var w = t.position;
+                return FormattableString.Invariant($"{path}|{-w.x:0.00000}|{w.y:0.00000}|{w.z:0.00000}");
+            });
+            File.WriteAllLines(file, lines);
+        }
+
         static void LogState()
         {
             if (!graph.IsValid())
