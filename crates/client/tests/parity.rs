@@ -123,6 +123,41 @@ fn scores_cover_only_the_avatars_pixels() {
     assert_eq!((s.pixels, s.mean, s.max), (100, 0.0, 0.0));
 }
 
+/// Interior pixels are covered in both images and more than 1 px from either image's edge; the rest of the covered
+/// pixels are silhouette.
+#[test]
+fn scores_split_interior_from_silhouette() {
+    let paint = |image: &mut [u8], x0: u32, x1: u32, colour: [u8; 3]| {
+        for y in 300..310 {
+            for x in x0..x1 {
+                let i = 4 * (y * WIDTH + x) as usize;
+                image[i..i + 3].copy_from_slice(&colour);
+            }
+        }
+    };
+    let empty = background();
+    // Both 10x10 at (300, 300): the interior is the inner 8x8 (the outer ring touches the background).
+    let (mut reference, mut test) = (empty.clone(), empty.clone());
+    paint(&mut reference, 300, 310, [200, 200, 200]);
+    paint(&mut test, 300, 310, [200, 200, 200]);
+    let (s, _) = parity::compare(&reference, &test, WIDTH, HEIGHT);
+    assert_eq!((s.interior.pixels, s.silhouette.pixels), (64, 36));
+
+    // The test's square shifted 2 px right: 12x10 covered. Away from each image's edge: the reference's x 301..=308,
+    // the test's x 303..=310, rows 301..=308; both leaves x 303..=308, 6 columns of 8 rows.
+    let mut shifted = empty.clone();
+    paint(&mut shifted, 302, 312, [200, 200, 200]);
+    let (s, _) = parity::compare(&reference, &shifted, WIDTH, HEIGHT);
+    assert_eq!((s.pixels, s.interior.pixels, s.silhouette.pixels), (120, 48, 72));
+    assert!(s.silhouette.mean > s.interior.mean, "{s:?}");
+
+    // A colour change inside: interior error, nothing at the silhouette beyond FLIP's spread.
+    paint(&mut test, 304, 306, [20, 200, 20]);
+    let (s, _) = parity::compare(&reference, &test, WIDTH, HEIGHT);
+    assert!(s.interior.mean > 0.05 && s.interior.p99 > 0.3, "{s:?}");
+    assert!(s.interior.mean > s.silhouette.mean, "{s:?}");
+}
+
 #[test]
 fn score_takes_mean_p99_and_max() {
     let mut errors: Vec<f32> = (0..=100).rev().map(|i| i as f32 / 100.0).collect();
@@ -142,6 +177,7 @@ fn the_light_is_green_within_both_bounds_and_red_past_either() {
                 p99,
                 max: p99,
                 pixels: 1,
+                ..ViewScore::default()
             },
             &t,
         )

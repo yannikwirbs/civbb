@@ -213,6 +213,23 @@ pub struct ViewScore {
     pub max: f32,
     /// Pixels covered by the avatar in either image.
     pub pixels: u32,
+    /// The covered pixels inside both images' avatar, more than 1 px from either image's edge (#101).
+    #[serde(default)]
+    pub interior: Region,
+    /// The other covered pixels: covered in one image only, or within 1 px of either image's edge.
+    #[serde(default)]
+    pub silhouette: Region,
+}
+
+/// FLIP error over part of a view's covered pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Region {
+    /// Mean error, 0 (identical) to 1.
+    pub mean: f32,
+    /// 99th percentile.
+    pub p99: f32,
+    /// Pixels in the region.
+    pub pixels: u32,
 }
 
 /// A parity traffic light (design doc §10): green publishes, yellow publishes with a note, red needs a fix.

@@ -8,7 +8,7 @@ use civbb_anim::{Controller, Instance};
 use civbb_core::math::Pose;
 use civbb_format::Avatar;
 use civbb_format::animator::COMPILER_PARAMETER_PREFIX;
-use civbb_format::cost::{Light, Parity, Rig, RigView, StateParity, Thresholds, ViewScore};
+use civbb_format::cost::{Light, Parity, Region, Rig, RigView, StateParity, Thresholds, ViewScore};
 use civbb_format::math::{Mat4, Vec3};
 use civbb_render::Renderer;
 use civbb_render::forward::{AMBIENT, LIGHT_COLOR, LIGHT_TOWARDS};
@@ -443,25 +443,49 @@ fn destroy(renderer: &Renderer, gpus: Vec<Gpu>) {
 }
 
 /// FLIP of two `width` by `height` images of [`civbb_render::HEADLESS_FORMAT`] texels (BGRA8, sRGB-encoded): the
-/// score over the pixels that are not the rig's background in either image, and the full error map.
+/// score over the pixels that are not the rig's background in either image, split into interior and silhouette
+/// (`ViewScore::interior`), and the full error map.
 pub fn compare(reference: &[u8], test: &[u8], width: u32, height: u32) -> (ViewScore, Vec<f32>) {
     let background = background_texel();
-    let near = |px: &[u8]| (0..3).all(|k| px[k].abs_diff(background[k]) <= 1);
-    let covered: Vec<bool> = reference
-        .as_chunks::<4>()
-        .0
-        .iter()
-        .zip(test.as_chunks::<4>().0.iter())
-        .map(|(r, t)| !near(r) || !near(t))
-        .collect();
+    let mask = |texels: &[u8]| -> Vec<bool> {
+        let near = |px: &[u8; 4]| (0..3).all(|k| px[k].abs_diff(background[k]) <= 1);
+        texels.as_chunks::<4>().0.iter().map(|px| !near(px)).collect()
+    };
+    let (r, t) = (mask(reference), mask(test));
+    let (w, h) = (width as usize, height as usize);
+    // A pixel is at an edge of a mask when its 3x3 neighbourhood (clipped to the image) is not all the same.
+    let edge = |m: &[bool], i: usize| {
+        let (x, y) = (i % w, i / w);
+        (y.saturating_sub(1)..(y + 2).min(h))
+            .any(|v| (x.saturating_sub(1)..(x + 2).min(w)).any(|u| m[v * w + u] != m[i]))
+    };
     let error = flip(&rgb(reference), &rgb(test), width, height);
-    let mut errors: Vec<f32> = error
-        .iter()
-        .zip(&covered)
-        .filter(|(_, c)| **c)
-        .map(|(e, _)| *e)
-        .collect();
-    (score(&mut errors), error)
+    let (mut all, mut interior, mut silhouette) = (Vec::new(), Vec::new(), Vec::new());
+    for (i, &e) in error.iter().enumerate() {
+        if !r[i] && !t[i] {
+            continue;
+        }
+        all.push(e);
+        if r[i] && t[i] && !edge(&r, i) && !edge(&t, i) {
+            interior.push(e);
+        } else {
+            silhouette.push(e);
+        }
+    }
+    let region = |errors: &mut Vec<f32>| {
+        let s = score(errors);
+        Region {
+            mean: s.mean,
+            p99: s.p99,
+            pixels: s.pixels,
+        }
+    };
+    let score = ViewScore {
+        interior: region(&mut interior),
+        silhouette: region(&mut silhouette),
+        ..score(&mut all)
+    };
+    (score, error)
 }
 
 /// FLIP's error map of two sRGB RGB8 images, rows from the top; 0 where equal, up to 1.
@@ -484,6 +508,7 @@ pub fn score(errors: &mut [f32]) -> ViewScore {
         p99: errors[((n - 1) as f64 * 0.99).round() as usize],
         max: errors[n - 1],
         pixels: n as u32,
+        ..ViewScore::default()
     }
 }
 

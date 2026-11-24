@@ -100,6 +100,7 @@ fn markdown_has_a_column_per_stage_and_the_timings() {
         p99,
         max: p99,
         pixels: 1,
+        ..ViewScore::default()
     };
     report.parity = Some(Parity {
         reference: "source".into(),
