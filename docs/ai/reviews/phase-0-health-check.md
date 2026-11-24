@@ -290,3 +290,32 @@ SAFETY comment and an `unwrap()` fail the gate).
 compiled avatars' animator is 3.0 to 42 times cheaper than Unity's with AvatarOptimizer at 40 copies; the SDK's
 PhysBones are managed code in Unity and are not compared. Table and verdict in ADR 0082: the CPU half of the gate
 passes; the visual half (#101) is still open. #102 did not reproduce and is closed.
+
+## Update (#101, 2026-11-24)
+
+The visual half's causes, itemised from the parity images (ADR 0083). `parity` now splits each view into interior
+and silhouette pixels; at rest the interior carried nearly all the error, so the gaps were shading. Fixed from each
+shader's source: VRChat Mobile Toon Lit and MatCap Lit unshaded; lilToon's outline colour times `_OutlineTex`
+(format v23); UTS2's shade ramp and second shade; Poiyomi without a ramp texture unshaded; TSF as an unlit matcap;
+Toon Standard's emission strength. Rest mean against Unity, compiled packages:
+
+| export | before | after | light (ADR 0083) |
+| --- | ---: | ---: | --- |
+| Inuinu | 0.119 | 0.027 | green |
+| Blackbird | 0.108 | 0.040 | green |
+| HAOLAN_Quest | 0.150 | 0.046 | green |
+| Blackbird_Quest | 0.086 | 0.052 | green |
+| Megumi | 0.160 | 0.054 | green |
+| HAOLAN_PC | 0.057 | 0.057 | yellow |
+| Taro | 0.165 | 0.059 | yellow |
+| Cokoro | 0.132 | 0.070 | yellow |
+| Tessakuchan | 0.109 | 0.075 | yellow |
+| Ostgaroa | 0.099 | 0.099 | yellow |
+| Yumeka | 0.146 | 0.108 | red (#108) |
+| KohzieBoi | 0.140 | 0.140 | red (#106) |
+| Cokoro_Quest | 0.194 | 0.206 | red (#105) |
+
+Thresholds for a Unity reference (ADR 0083): green mean ≤ 0.06 and p99 ≤ 0.25 (the floor of the five exports left
+with only texture filtering and edge pixels), red mean > 0.12 or p99 > 0.9. Compiling costs 0.001 to 0.003 against
+Unity. Red states after rest are itemised in ADR 0083 (poses #109, Blackbird's wings #107, Cokoro's material
+toggles #110). The visual half stays open on #105, #106 and #108 (M0.11).

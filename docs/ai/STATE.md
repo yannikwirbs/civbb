@@ -19,7 +19,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   restored); normal maps in those formats are still skipped.
 - Materials (ADR 0043): `X_toon_material` is the material as Unity saved it plus the shader GUID; the importer
   fingerprints GUID (lilToon variant table), name, markers, and maps lilToon, Poiyomi, UTS2, MToon, Standard,
-  VRChat Mobile and unlit to Toon/PBR/Unlit (`gltf_import/unity_material.rs`). Toon materials name their light
+  VRChat Mobile, TSF and unlit to Toon/PBR/Unlit (`gltf_import/unity_material.rs`). Toon materials name their light
   model (ADR 0050): lilToon, Poiyomi, UTS2 clamp light plus ambient (lilToon between `_LightMinLimit` and
   `_LightMaxLimit`, animatable, ADR 0054); MToon, VRM and VRChat Mobile add the ambient. Matcaps add or multiply
   (MatCap Lit multiplies, ADR 0051) with a tint and a mask (lilToon `_MatCapColor`/`_MatCapBlendMask`, Poiyomi's
@@ -28,7 +28,11 @@ What exists, by area. Read the section for the area you touch; update it when th
   emission, UTS2 emissive) are taken as saved (ADR 0062). lilToon's shadow ramp in
   half-Lambert terms, shadow bands (strength, second shadow, main strength, border colour), rim ramp and masks, and
   emission main strength times the full albedo (ADR 0057), main texture tone correction (ADR 0058, format v19). Scores
-  on #82 and #87.
+  on #82 and #87. From each shader's source (#101): Mobile Toon Lit and MatCap Lit unshaded with no colour or
+  emission; Toon Standard's emission times `_EmissionStrength` (its ramp is #105); lilToon's outline colour times
+  `_OutlineTex` (`Toon::outline_tex`, format v23); UTS2's shade from `step - feather` to `step` in half-Lambert terms
+  plus its second shade as lilToon's second band; Poiyomi without a `_ToonRamp` texture unshaded; TSF an unlit
+  matcap (light clamped to exactly 1) times the texture by keyword.
 - Verified against Unity (`tools/unity-truth/Assets/Editor/Exported.cs` records into `corpus/local/unity-truth`,
   `crates/pipeline/tests/unity_export.rs` compares, local only): muscle, rotation, Euler, scale and blendshape
   curves of HAOLAN, Tessakuchan, Cokoro, Little Blackbird and Yumeka clips exact; 10 Unity constraints within
@@ -184,12 +188,18 @@ What exists, by area. Read the section for the area you touch; update it when th
   (Yumeka 191 to 186 µs). Rerun with ADR 0080's pinning: Blackbird 22.8 to 21.4 µs (#102 closed, not reproduced);
   its second table puts the compiled CPU next to Unity's and Unity + AvatarOptimizer's at 1 and 40 copies (ADR 0082:
   animator 3.0 to 42 times cheaper compiled).
+- Against Unity (#101, ADR 0083): each view's score also splits into `interior` (covered in both images, more than
+  1 px from either edge) and `silhouette` (`ViewScore`, report keys added, version kept), and a Unity reference is
+  lit with `UNITY_THRESHOLDS` (green mean <= 0.06 and p99 <= 0.25, red mean > 0.12 or p99 > 0.9; the report's
+  `thresholds` say which). Rest means after the #101 mapping fixes: 0.027 (Inuinu) to 0.206 (Cokoro_Quest); green
+  Inuinu, Blackbird, HAOLAN_Quest, Blackbird_Quest, Megumi; red Yumeka (#108), KohzieBoi (#106), Cokoro_Quest
+  (#105). Pose states (#109), Blackbird's wings (#107) and Cokoro's material toggles (#110) are red after rest.
 
 ## Renderer and viewer
 
 - Toon outlines (ADR 0034): inverted hulls, a second indirect draw per outlined toon submesh (`Shader::Outline`,
   front faces culled), width in metres times the width texture's G channel sampled in the vertex shader, unlit
-  outline colour. Material records are 132 words (toon: light model and bounds, matcap blend, tint and mask, rim
+  outline colour times the outline texture. Material records are 140 words (toon: light model and bounds, matcap blend, tint and mask, rim
   shade, shadow bands, rim ramp, tone correction; ADRs 0050 to 0054, 0057, 0058).
 - The viewer's title and `--frames` summary report draws and skinned meshes of the last frame. KTX2 textures are
   checked (header, level index, one 2D image) and transcoded to BC7 by the pure-Rust `basisu` crate (ETC1S, UASTC

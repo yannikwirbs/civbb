@@ -80,3 +80,7 @@ Add a line to the matching file whenever something costs more than one attempt.
 - After splitting a file, `cargo fix --allow-dirty -p <crate> --lib --tests` prunes the copied imports; it changes
   nothing while any compile error remains. Clippy may flag moved code it ignored inside a very long function
   (`manual_is_multiple_of` on 2026-11-24).
+- Splitting uncommitted work into two commits: copy the files to the scratchpad first, revert one change with the
+  Edit tool (Python replacements miss text that `cargo fmt` has reformatted), commit, then copy the files back.
+- A batch that runs `target/release` binaries for many minutes (parity over 13 exports) must not overlap a release
+  rebuild; debug `cargo test`/`xtask ci` can run meanwhile.

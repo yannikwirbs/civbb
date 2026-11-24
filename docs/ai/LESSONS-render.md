@@ -66,3 +66,12 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   5.99, which pointed at the colour conversion after compression, mips and gradient precision were ruled out.
 - Frustum and box tests are conservative at the edges: a box touching a plane at one corner counts as seen. Keep
   "outside" test cases clear of the plane by more than the box's extent (a 45 degree side at z = -6 passes x = 6).
+- Before tuning a Unity family's toon parameters, read whether the shader shades at all: VRChat Mobile Toon Lit and
+  MatCap Lit have no Lambert term, Poiyomi 7.3 lights through `_ToonRamp` (white, so unshaded, when unset) whatever
+  `_LightingMode` says, TSF is unlit. A per-export "ours/Unity luminance on interior pixels" ratio (about 0.9 on
+  half the pixels) flagged all of them in one script (#101).
+- Telling shading from geometry against Unity: the interior/silhouette split (`ViewScore`) and the avatar masks' IoU
+  from the `--images` side-by-sides (rest 0.98 to 1.0, pose differences 0.79 to 0.97). Parity states stack, so a
+  pose difference in one state carries into every later state.
+- Unity's texture import max size (2048) does not matter at the 640 px rig: shrinking 4096 sources to it moved
+  Megumi by 0.003 and Taro by nothing.
