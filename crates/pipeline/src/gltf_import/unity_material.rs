@@ -394,6 +394,12 @@ impl Importer<'_> {
             Family::Poiyomi => {
                 let base = p.color("_Color", WHITE);
                 let mut t = plain_toon(base, main);
+                let ramp = x.textures.get("_ToonRamp").is_some_and(|t| t.index.is_some());
+                if p.f("_LightingRampType", 0.0) == 0.0 && !ramp {
+                    // A ramp texture lights the surface by `lerp(1, ramp, strength)`; Poiyomi's default ramp is white,
+                    // so without one every side is fully lit (`CGI_PoiLighting.cginc`, 7.3).
+                    t.shade_color = [base[0], base[1], base[2]];
+                }
                 if let Some(normal) = self.unity_slot(x, "_BumpMap", ColorSpace::Linear) {
                     t.normal_tex = Some(normal);
                     t.normal_scale = p.f("_BumpScale", 1.0);

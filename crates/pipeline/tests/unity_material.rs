@@ -368,3 +368,21 @@ fn poiyomi_matcap_takes_its_add_or_multiply_weight_and_tint() {
     let t = matcap(json!({"_MatcapAdd": 0.25, "_MatcapEmissionStrength": 0.5}));
     assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Add, 0.75));
 }
+
+#[test]
+fn poiyomi_without_a_ramp_texture_is_unshaded() {
+    // Poiyomi 7.3 lights through `_ToonRamp`, white by default: without one, the shade is the lit colour.
+    let shade = |floats: Value, textures: Value| {
+        let m = material(json!({
+            "shader": "Hidden/.poiyomi/• Poiyomi Toon •/Body", "floats": floats, "textures": textures,
+            "colors": {"_Color": [0.5, 0.5, 0.5, 1]},
+        }));
+        (toon(&m).shade_color, toon(&m).base_color)
+    };
+    let (s, b) = shade(json!({"_LightingMode": 4}), json!({}));
+    assert_eq!(s, [b[0], b[1], b[2]]);
+    let (s, b) = shade(json!({}), json!({"_ToonRamp": tex([1.0, 1.0, 0.0, 0.0])}));
+    assert!(s[0] < b[0], "a ramp texture keeps the plain toon shade");
+    let (s, b) = shade(json!({"_LightingRampType": 1}), json!({}));
+    assert!(s[0] < b[0], "the math gradient keeps the plain toon shade");
+}
