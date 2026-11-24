@@ -122,6 +122,10 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/collapse.rs`: Compiler stage 5 toggle collapsing: layers that only switch between two constant clips on one bool collapse
 - `src/gltf_import/source.rs`: The source package's `X_*` extensions (ADR 0041): humanoid map, viewpoint and face, animator and clips,
 - `src/gltf_import/unity_material.rs`: Unity materials from the source package's `X_toon_material` (ADR 0043): the shader family fingerprinted by shader
+- `src/gltf_import/vrm/expressions.rs`: VRM expressions to visemes, blink and a Direct blend tree of toggles, and look-at to eye look.
+- `src/gltf_import/vrm/meta.rs`: VRM `meta` (0.x and 1.0) to the format's creator, licence and permission fields.
+- `src/gltf_import/vrm/mtoon.rs`: VRM MToon materials (0.x `materialProperties`, 1.0 `VRMC_materials_mtoon`) to the Toon model.
+- `src/gltf_import/vrm/springs.rs`: VRM spring bones (0.x `secondaryAnimation`, 1.0 `VRMC_springBone`) to chains and colliders (ADR 0006).
 - `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`, `VRMC_node_constraint`) to native
 - `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
 - `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
