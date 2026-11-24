@@ -94,6 +94,12 @@ What exists, by area. Read the section for the area you touch; update it when th
   `civbb_corpus::gltf::to_source_glb` writes them (round-trip test) except `X_toon_material` (a Unity property dump;
   hostile and mapping tests in `tests/unity_material.rs`). Fuzz seeds: `lean-source.glb` and `toon-materials.gltf`
   (every shader family, #71 closed).
+- Unity dialect 1 (ADR 0085, #114): the `X_*` shapes as format v25 wrote them are now an import dialect, not the
+  native format. Frozen fixtures `pipeline/tests/fixtures/unity-dialect-1*.gltf` (generated, every variant of every
+  `X_*` part but `X_toon_material`; never regenerate) import to `tests/golden/unity-dialect-1*.json` (re-bless with
+  `CIVBB_BLESS=1` when the native model changes, and read the diff). `asset.extras.civbb_unity_dialect`: absent is
+  1, newer refused (`UNITY_DIALECT` in `source.rs`). The native model's redesign (ADRs 0085 to 0090) is M1.1:
+  #115 to #125.
 - Curves (ADR 0039): the format stays Hermite; the exporter will bake weighted tangents, split equal key times and
   mirror position x, Euler and quaternion y/z. No Booth clip uses either (28,693 keys).
 - Constraint fields (ADR 0040, 0046, format v10): `Property::Constraint { kind, field }` binds weight, active, source
@@ -107,6 +113,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   material curves on renderers with differing materials, ADR 0067).
 
 ## Compiler (`civbb-pipeline`)
+
+- Runtime packages (ADR 0087, #113): `Package::decode_verified` refuses a `Header::format_version` other than
+  `FORMAT_VERSION` (`PackageError::FormatVersion`); after a bump, rebuild packages in corpus/local with `civbb build`.
 
 - glTF input (ADR 0076): `KHR_mesh_quantization` accepted (integer attributes, morph deltas and animation outputs
   through the normalising accessor reader); required Draco or meshopt compression refused with an export hint.

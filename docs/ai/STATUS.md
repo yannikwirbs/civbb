@@ -13,8 +13,11 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`.
   server/nodes, voice, minimal hub and join flow, avatar fidelity (#109, #107, #110, #92, #93, #94, #77), Phase 1
   gate (#61, #62, #63, #104). Milestones without issues get them filed from their design doc sections by the
   session that starts them.
-- Next: M1.1, #100 (the content model redesign). It is a design question first: read #100 and design doc §9, write
-  the ADR(s) before code.
+- **M1.1 (#100) is designed**: ADRs 0085 to 0090 (Unity, VRChat and VRM become import dialects lowered into a native
+  model; spec and generated schema; per-extension versions; state table and events; native animation targets;
+  materials with named features), design doc §9 updated. Done: #113 (runtime packages of another format version
+  refused), #114 (Unity dialect 1 frozen by fixtures and a native golden). Next: #115 (state table; layout and the
+  two-defaults pitfall are in its comment), then #116 to #125 in number order. Events are Phase 2 (#127).
 - Parity rerun (any change to materials, dynamics or the renderer): per export `civbb build
   corpus/local/unity-glb/<name>.glb --key corpus/local/unity-ref/key -o <pkg>` then `civbb-client parity
   corpus/local/unity-ref/<name> <pkg> --key corpus/local/unity-ref/key --images <dir>` (13 exports about 25 min,
@@ -24,27 +27,22 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`.
 
 ## Blockers and needs-user
 
-- None.
+- #126 (needs-user, not blocking): register a glTF vendor prefix (`CIVBB_` is provisional until the final name, D9).
 
 ## Decisions in flight
 
-None. ADRs 0017 to 0084 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
+None. ADRs 0017 to 0090 are accepted (0035 supersedes the codec, mip and gutter parts of 0029; 0036 the rig
 bounds of 0033; 0046 the capture frame and rebaking of 0040; 0047 refines 0017's shapes and proximity; 0049
 supersedes 0015 and the solver points of 0016; 0055 the frame count of 0033; 0062 the HDR conversion and reference
 time of 0052; 0065 ADR 0010's WD-on empty states and 0028's `Start` state; 0066 the interruption points of 0008; 0067
 the material default of 0025; 0068 the version 1.0 gravity of 0049; 0070 the collider velocity of 0049; 0074 the
 partial output step and in-frame interpolation of 0049; 0072 corrects 0064's thumb account; 0077 defers ADR 0023
-point 7's GPU culling to Phase 2, #59).
+point 7's GPU culling to Phase 2, #59; 0085 points 1 and 5 of 0041).
 
 ## Last sessions
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-24 (3): #103 closed (ADR 0080): `measure` pins its worker to the fastest core class (Windows,
-  `windows-sys`), reports `cpu.pinned`; scorecard no longer pins. #38 closed (ADR 0081, 0082): Unity baselines in
-  Editor play mode on the same core (`Baseline.Measure`, `corpus/unity_baseline.py`), with AvatarOptimizer in a
-  host copy; the SDK's PhysBones are managed jobs in Unity; animator 3.0 to 42x cheaper compiled, CPU half of the
-  gate passed. #102 closed (not reproduced). #104 filed. Next: #101.
 - 2026-11-24 (4): #101. `parity` splits views into interior and silhouette pixels (rest error was interior:
   shading). Fixed from shader sources: Mobile Toon Lit/MatCap Lit unshaded, lilToon outline times `_OutlineTex`
   (format v23), UTS2 shade ramp and second shade, Poiyomi without a ramp unshaded, TSF mapped, Toon Standard
@@ -54,3 +52,7 @@ The newest three; `SESSIONS.md` has them all.
   matcap replace, emission, second matcap, UV1 slots (format v25); #108 PhysBone limit rotations `qz qy qx`
   (recorded), Yumeka's skirt pushed by its hands (#92). No rest state red (5 green, 8 yellow). Epic #39 split into
   M1.1 to M1.9. Next: M1.1, #100.
+- 2026-11-24 (6): M1.1, #100 designed: survey (no protocol/WIT crates yet; state and bindings must change before
+  M1.2, materials and schema can wait), ADRs 0085 to 0090, design doc §9, issues #113 to #127 (#126 needs-user,
+  #127 Phase 2). #113: runtime packages of another format version refused. #114: Unity dialect 1 frozen (generated
+  fixtures, native golden, `civbb_unity_dialect` check). Next: #115.

@@ -82,5 +82,8 @@ Add a line to the matching file whenever something costs more than one attempt.
   (`manual_is_multiple_of` on 2026-11-24).
 - Splitting uncommitted work into two commits: copy the files to the scratchpad first, revert one change with the
   Edit tool (Python replacements miss text that `cargo fmt` has reformatted), commit, then copy the files back.
+- Goldens of floats: compare the serialised text, not re-parsed `serde_json::Value`s (without the `float_roundtrip`
+  feature parsing is off by an ULP, so a freshly blessed golden "differs"). Long `gh issue create` batches with
+  backticks and apostrophes break Bash quoting: write a Python script (list of bodies, `subprocess.run`) instead.
 - A batch that runs `target/release` binaries for many minutes (parity over 13 exports) must not overlap a release
   rebuild; debug `cargo test`/`xtask ci` can run meanwhile.
