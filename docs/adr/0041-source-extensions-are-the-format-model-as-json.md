@@ -1,6 +1,6 @@
 # 0041: The source package's X_* extensions carry the format model as JSON, with glTF node indices
 
-Status: accepted
+Status: accepted; points 1 and 5 superseded by 0085 (the `X_*` extensions become Unity dialect 1)
 Date: 2026-11-06
 
 ## Context

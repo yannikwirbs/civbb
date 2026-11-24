@@ -286,6 +286,12 @@ Internal deps: none
 - `docs/adr/0082-phase-0-cpu-half-of-the-gate.md`: 0082: Phase 0's gate, CPU half: compiled avatars are clearly cheaper than Unity's animator
 - `docs/adr/0083-parity-thresholds-against-unity.md`: 0083: Parity thresholds against Unity's renders, from the translation floor
 - `docs/adr/0084-phase-0-gate-passed.md`: 0084: Phase 0's gate is passed: cheaper on the animator, no rest state red against Unity
+- `docs/adr/0085-native-model-and-import-dialects.md`: 0085: The content model is the platform's own; Unity, VRChat and VRM are import dialects the pipeline lowers
+- `docs/adr/0086-written-spec-and-generated-schema.md`: 0086: A written spec and a JSON Schema generated from the format types, checked in
+- `docs/adr/0087-versions-per-extension-runtime-version-checked.md`: 0087: Each native extension has its own version and migrations; runtime packages are checked and rebuilt
+- `docs/adr/0088-state-table-and-events.md`: 0088: One state table per document, read and written by reference; events as a separate channel
+- `docs/adr/0089-native-animation-targets.md`: 0089: Curves target native properties by reference, in native units; Unity bindings are resolved by the importer
+- `docs/adr/0090-materials-as-native-features.md`: 0090: Materials are native models with named features; shader families are lowered into them by table
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

@@ -266,18 +266,27 @@ Creators upload an editable **source package**; the platform compiles it into a 
 
 ### Source format
 
-glTF 2.0 plus extensions, in the spirit of VRM:
+glTF 2.0 plus extensions, in the spirit of VRM. The content model is the platform's own (ADR 0085): Unity, VRChat
+and VRM content are import dialects that the compiler lowers into it, so their semantics (Unity paths and property
+names, Write Defaults as a flag, shader property names, VRChat's parameter names and bit budget) live in importers,
+not in the format. One document model serves avatars and worlds: a node tree, components that reference nodes, and
+a role (`avatar` now, `world` in Phase 2).
 
 | Extension | Holds |
 | --- | --- |
-| `X_avatar` | Humanoid bone mapping, viewpoint, viseme mapping, eye-look setup |
-| `X_animator` | Layers, state machines, blend trees, parameters, state behaviours |
-| `X_dynamics` | Bone chains, colliders, grab and pose settings |
-| `X_contacts`, `X_constraints` | Senders, receivers, constraint graph |
-| `X_expressions` | Menu tree and synced parameter declarations |
-| `X_toon_material` | Toon material model parameters; PBR uses standard `KHR_materials_*` |
-| `X_shader_source` | HLSL source for translated custom shaders (section 10) |
-| `X_scripts` | Script sources or Wasm modules and their interface version |
+| `CIVBB_avatar` | Avatar role: humanoid bone mapping (VRM 1.0 bone names), viewpoint, visemes, eye look |
+| `CIVBB_state` | The state table: typed entries every system reads and writes by reference, their sync encoding, events (ADR 0088) |
+| `CIVBB_animator` | Layers, state machines, blend trees, actions, and clips whose curves target native properties (ADR 0089) |
+| `CIVBB_dynamics` | Bone chains, colliders, grab and pose settings |
+| `CIVBB_contacts`, `CIVBB_constraints` | Senders, receivers, constraint graph |
+| `CIVBB_menu` | Menu tree over state entries |
+| `CIVBB_materials_toon` | Toon model and its named features (ADR 0090); PBR uses core glTF and `KHR_materials_*` |
+| `CIVBB_shader_source` | HLSL source for translated custom shaders (section 10) |
+| `CIVBB_scripts` | Script sources or Wasm modules and their interface version |
+
+The prefix is provisional until the final name (D9). A written spec and a JSON Schema generated from the format
+types define each extension (ADR 0086); each extension carries its own version with tested migrations, and runtime
+packages are rebuilt rather than migrated (ADR 0087). The Unity exporter's `X_*` extensions are Unity dialect 1.
 
 Being glTF means creators can also author directly in Blender with our add-on; Unity becomes optional.
 
