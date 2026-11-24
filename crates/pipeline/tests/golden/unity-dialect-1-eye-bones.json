@@ -1,0 +1,1158 @@
+{
+  "avatar": {
+    "animator": null,
+    "clips": [],
+    "constraints": [],
+    "contacts": {
+      "receivers": [],
+      "senders": []
+    },
+    "dynamics": {
+      "chains": [],
+      "colliders": []
+    },
+    "expressions": null,
+    "face": {
+      "blink": [
+        {
+          "mesh": 0,
+          "shape": 1,
+          "weight": 1.0
+        }
+      ],
+      "eyes": {
+        "driver": {
+          "Bones": {
+            "left": 4,
+            "right": null
+          }
+        },
+        "horizontal_inner": {
+          "input_max": 30.0,
+          "output_scale": 0.800000011920929
+        },
+        "horizontal_outer": {
+          "input_max": 30.0,
+          "output_scale": 0.800000011920929
+        },
+        "vertical_down": {
+          "input_max": 30.0,
+          "output_scale": 0.800000011920929
+        },
+        "vertical_up": {
+          "input_max": 30.0,
+          "output_scale": 0.800000011920929
+        }
+      },
+      "visemes": [
+        [
+          "Sil",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.0
+            }
+          ]
+        ],
+        [
+          "Pp",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.06666667014360428
+            }
+          ]
+        ],
+        [
+          "Ff",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.13333334028720856
+            }
+          ]
+        ],
+        [
+          "Th",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.20000000298023224
+            }
+          ]
+        ],
+        [
+          "Dd",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.2666666805744171
+            }
+          ]
+        ],
+        [
+          "Kk",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.3333333432674408
+            }
+          ]
+        ],
+        [
+          "Ch",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.4000000059604645
+            }
+          ]
+        ],
+        [
+          "Ss",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.46666666865348816
+            }
+          ]
+        ],
+        [
+          "Nn",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.5333333611488342
+            }
+          ]
+        ],
+        [
+          "Rr",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.6000000238418579
+            }
+          ]
+        ],
+        [
+          "Aa",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.6666666865348816
+            }
+          ]
+        ],
+        [
+          "E",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.7333333492279053
+            }
+          ]
+        ],
+        [
+          "I",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.800000011920929
+            }
+          ]
+        ],
+        [
+          "O",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.8666666746139526
+            }
+          ]
+        ],
+        [
+          "U",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.9333333373069763
+            }
+          ]
+        ]
+      ]
+    },
+    "hierarchy": {
+      "nodes": [
+        {
+          "active": true,
+          "name": "Armature",
+          "parent": null,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Hips",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.8999999761581421,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Spine",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Head",
+          "parent": 2,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.4000000059604645,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "LeftEye",
+          "parent": 3,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "RightEye",
+          "parent": 3,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Body",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": false,
+          "name": "Prop",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail0",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail0_1",
+          "parent": 8,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail1",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail1_1",
+          "parent": 10,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail2",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail2_1",
+          "parent": 12,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail3",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail3_1",
+          "parent": 14,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C0",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C1",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C2",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C3",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C4",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C5",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C6",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C7",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C8",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C9",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C10",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C11",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C12",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      ]
+    },
+    "humanoid": {
+      "bones": [
+        [
+          "Hips",
+          1
+        ],
+        [
+          "Spine",
+          2
+        ],
+        [
+          "Head",
+          3
+        ],
+        [
+          "LeftEye",
+          4
+        ],
+        [
+          "RightEye",
+          5
+        ]
+      ],
+      "center_of_mass": null,
+      "human_scale": 0.0,
+      "muscle_frames": [
+        {
+          "bone": "Spine",
+          "max": [
+            40.0,
+            30.0,
+            20.0
+          ],
+          "min": [
+            -40.0,
+            -30.0,
+            -20.0
+          ],
+          "post": [
+            0.6000000238418579,
+            0.0,
+            0.0,
+            0.800000011920929
+          ],
+          "pre": [
+            0.0,
+            0.6000000238418579,
+            0.0,
+            0.800000011920929
+          ],
+          "sign": [
+            1.0,
+            -1.0,
+            1.0
+          ],
+          "twist": 1.0
+        }
+      ],
+      "viewpoint": [
+        0.0,
+        1.4500000476837158,
+        0.07999999821186066
+      ]
+    },
+    "materials": [
+      {
+        "alpha": "Opaque",
+        "double_sided": false,
+        "model": {
+          "Pbr": {
+            "base_color": [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            "base_color_tex": null,
+            "emissive": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "emissive_tex": null,
+            "metallic": 0.0,
+            "metallic_roughness_tex": null,
+            "normal_scale": 1.0,
+            "normal_tex": null,
+            "occlusion_tex": null,
+            "roughness": 1.0
+          }
+        },
+        "name": "Plain",
+        "render_queue": 2000
+      }
+    ],
+    "meshes": [
+      {
+        "blend_shapes": [
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 0
+              }
+            ],
+            "name": "v_aa"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 1
+              }
+            ],
+            "name": "blink"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 2
+              }
+            ],
+            "name": "look_up"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 0
+              }
+            ],
+            "name": "look_down"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 1
+              }
+            ],
+            "name": "look_left"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 2
+              }
+            ],
+            "name": "look_right"
+          }
+        ],
+        "first_person": "Auto",
+        "indices": [
+          0,
+          1,
+          2
+        ],
+        "lods": [],
+        "name": "Body",
+        "node": 6,
+        "normals": [
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "positions": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.10000000149011612,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.10000000149011612,
+            0.0
+          ]
+        ],
+        "skin": null,
+        "submeshes": [
+          {
+            "first_index": 0,
+            "index_count": 3,
+            "material": 0
+          }
+        ],
+        "tangents": [],
+        "uv0": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "uv1": []
+      }
+    ],
+    "meta": null,
+    "name": "Armature",
+    "textures": []
+  },
+  "warnings": []
+}

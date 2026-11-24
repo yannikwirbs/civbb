@@ -1,0 +1,57 @@
+//! Unity dialect 1 (ADR 0085): the exporter's `X_*` extensions as format v25 wrote them, frozen in
+//! `tests/fixtures/unity-dialect-1*.gltf` (generated content covering every variant of every `X_*` part). The
+//! fixtures never change; the native model they import to is pinned by `tests/golden/unity-dialect-1*.json`, which
+//! `CIVBB_BLESS=1` rewrites after an intended change to the native model. A native change that the importer does not
+//! lower fails here instead of silently changing what existing exports read as.
+
+use std::path::Path;
+
+use civbb_pipeline::gltf_import::{Limits, import};
+use serde_json::{Value, json};
+
+fn no_files(_: &str) -> Option<Vec<u8>> {
+    None
+}
+
+fn fixture(name: &str) -> Vec<u8> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name);
+    std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+}
+
+#[test]
+fn unity_dialect_1_imports_to_its_golden() {
+    for name in ["unity-dialect-1", "unity-dialect-1-eye-bones"] {
+        let imported = import(&fixture(&format!("{name}.gltf")), &Limits::default(), no_files)
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let got = json!({"avatar": imported.avatar, "warnings": imported.warnings});
+        let text = serde_json::to_string_pretty(&got).unwrap() + "\n";
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("tests/golden/{name}.json"));
+        if std::env::var_os("CIVBB_BLESS").is_some() {
+            std::fs::write(&path, &text).unwrap();
+        }
+        // Compared as text: parsing floats back is not exact without serde_json's `float_roundtrip`.
+        let golden = std::fs::read_to_string(&path).expect("golden missing: run with CIVBB_BLESS=1");
+        assert!(
+            text == golden.replace("\r\n", "\n"),
+            "{name} imports differently from {}:\n{text}",
+            path.display()
+        );
+    }
+}
+
+#[test]
+fn unity_dialect_versions_are_checked() {
+    let mut doc: Value = serde_json::from_slice(&fixture("unity-dialect-1.gltf")).unwrap();
+    let with = |doc: &mut Value, extras: Value| {
+        doc["asset"]["extras"] = extras;
+        import(&serde_json::to_vec(doc).unwrap(), &Limits::default(), no_files)
+    };
+    with(&mut doc, json!({"civbb_unity_dialect": 1})).expect("dialect 1 named");
+    with(&mut doc, json!({"other": true})).expect("absent means 1");
+    for bad in [json!(2), json!(0), json!("1")] {
+        let err = with(&mut doc, json!({"civbb_unity_dialect": bad}))
+            .err()
+            .unwrap_or_else(|| panic!("{bad} accepted"));
+        assert!(err.to_string().contains("civbb_unity_dialect"), "{err}");
+    }
+}

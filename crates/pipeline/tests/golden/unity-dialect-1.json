@@ -1,0 +1,3838 @@
+{
+  "avatar": {
+    "animator": {
+      "groups": [
+        {
+          "name": "Base",
+          "weight": 1.0
+        },
+        {
+          "name": "FX",
+          "weight": 0.75
+        }
+      ],
+      "layers": [
+        {
+          "blending": "Override",
+          "group": 0,
+          "mask": null,
+          "name": "Base",
+          "state_machine": {
+            "any_state_transitions": [
+              {
+                "can_transition_to_self": true,
+                "conditions": [
+                  {
+                    "mode": "If",
+                    "param": 3,
+                    "threshold": 0.0
+                  }
+                ],
+                "dest": {
+                  "State": 3
+                },
+                "duration": 0.25,
+                "exit_time": 0.75,
+                "fixed_duration": false,
+                "has_exit_time": true,
+                "interruption": "DestinationThenSource",
+                "offset": 0.10000000149011612,
+                "ordered_interruption": false
+              }
+            ],
+            "default_state": 0,
+            "entry_transitions": [
+              {
+                "can_transition_to_self": true,
+                "conditions": [
+                  {
+                    "mode": "Greater",
+                    "param": 2,
+                    "threshold": 0.0
+                  }
+                ],
+                "dest": {
+                  "State": 2
+                },
+                "duration": 0.25,
+                "exit_time": 0.75,
+                "fixed_duration": false,
+                "has_exit_time": true,
+                "interruption": "None",
+                "offset": 0.10000000149011612,
+                "ordered_interruption": false
+              }
+            ],
+            "states": [
+              {
+                "behaviours": [],
+                "cycle_offset": 0.0,
+                "cycle_offset_param": null,
+                "mirror": false,
+                "mirror_param": null,
+                "motion": null,
+                "name": "Empty",
+                "speed": 1.0,
+                "speed_param": null,
+                "time_param": null,
+                "transitions": [
+                  {
+                    "can_transition_to_self": true,
+                    "conditions": [
+                      {
+                        "mode": "If",
+                        "param": 0,
+                        "threshold": 0.0
+                      },
+                      {
+                        "mode": "IfNot",
+                        "param": 6,
+                        "threshold": 0.0
+                      },
+                      {
+                        "mode": "Greater",
+                        "param": 1,
+                        "threshold": 0.5
+                      },
+                      {
+                        "mode": "Less",
+                        "param": 1,
+                        "threshold": 2.0
+                      },
+                      {
+                        "mode": "Equals",
+                        "param": 2,
+                        "threshold": 3.0
+                      },
+                      {
+                        "mode": "NotEqual",
+                        "param": 2,
+                        "threshold": 4.0
+                      },
+                      {
+                        "mode": "If",
+                        "param": 3,
+                        "threshold": 0.0
+                      }
+                    ],
+                    "dest": {
+                      "State": 1
+                    },
+                    "duration": 0.25,
+                    "exit_time": 0.75,
+                    "fixed_duration": false,
+                    "has_exit_time": true,
+                    "interruption": "Source",
+                    "offset": 0.10000000149011612,
+                    "ordered_interruption": false
+                  }
+                ],
+                "write_defaults": true
+              },
+              {
+                "behaviours": [
+                  {
+                    "ParameterDriver": {
+                      "local_only": false,
+                      "ops": [
+                        {
+                          "Set": {
+                            "param": 0,
+                            "value": 1.0
+                          }
+                        },
+                        {
+                          "Add": {
+                            "param": 2,
+                            "value": 1.0
+                          }
+                        },
+                        {
+                          "Random": {
+                            "chance": 0.5,
+                            "max": 1.0,
+                            "min": -1.0,
+                            "param": 1
+                          }
+                        },
+                        {
+                          "Copy": {
+                            "dst": 4,
+                            "remap": null,
+                            "src": 1
+                          }
+                        },
+                        {
+                          "Copy": {
+                            "dst": 5,
+                            "remap": [
+                              [
+                                0.0,
+                                10.0
+                              ],
+                              [
+                                -1.0,
+                                1.0
+                              ]
+                            ],
+                            "src": 2
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "TrackingControl": [
+                      [
+                        "Head",
+                        "Tracking"
+                      ],
+                      [
+                        "LeftHand",
+                        "Animation"
+                      ],
+                      [
+                        "RightHand",
+                        "Tracking"
+                      ],
+                      [
+                        "Hip",
+                        "Animation"
+                      ],
+                      [
+                        "LeftFoot",
+                        "Tracking"
+                      ],
+                      [
+                        "RightFoot",
+                        "Animation"
+                      ],
+                      [
+                        "LeftFingers",
+                        "Tracking"
+                      ],
+                      [
+                        "RightFingers",
+                        "Animation"
+                      ],
+                      [
+                        "Eyes",
+                        "Tracking"
+                      ],
+                      [
+                        "Mouth",
+                        "Animation"
+                      ]
+                    ]
+                  },
+                  {
+                    "LayerWeight": {
+                      "duration": 0.20000000298023224,
+                      "goal": 0.5,
+                      "layer": 1
+                    }
+                  },
+                  {
+                    "GroupWeight": {
+                      "duration": 0.0,
+                      "goal": 0.0,
+                      "group": 1
+                    }
+                  },
+                  {
+                    "Locomotion": {
+                      "disabled": true
+                    }
+                  }
+                ],
+                "cycle_offset": 0.30000001192092896,
+                "cycle_offset_param": 4,
+                "mirror": true,
+                "mirror_param": 6,
+                "motion": {
+                  "Clip": 0
+                },
+                "name": "Clip",
+                "speed": 2.0,
+                "speed_param": 1,
+                "time_param": null,
+                "transitions": [
+                  {
+                    "can_transition_to_self": true,
+                    "conditions": [],
+                    "dest": "Exit",
+                    "duration": 0.25,
+                    "exit_time": 0.75,
+                    "fixed_duration": false,
+                    "has_exit_time": true,
+                    "interruption": "Destination",
+                    "offset": 0.10000000149011612,
+                    "ordered_interruption": false
+                  },
+                  {
+                    "can_transition_to_self": true,
+                    "conditions": [
+                      {
+                        "mode": "Greater",
+                        "param": 1,
+                        "threshold": 1.0
+                      }
+                    ],
+                    "dest": {
+                      "State": 2
+                    },
+                    "duration": 0.25,
+                    "exit_time": 0.75,
+                    "fixed_duration": false,
+                    "has_exit_time": true,
+                    "interruption": "SourceThenDestination",
+                    "offset": 0.10000000149011612,
+                    "ordered_interruption": false
+                  }
+                ],
+                "write_defaults": false
+              },
+              {
+                "behaviours": [],
+                "cycle_offset": 0.0,
+                "cycle_offset_param": null,
+                "mirror": false,
+                "mirror_param": null,
+                "motion": {
+                  "BlendTree": {
+                    "children": [
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": null,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 0
+                        },
+                        "position": [
+                          0.0,
+                          1.0
+                        ],
+                        "threshold": 0.0,
+                        "time_scale": 1.5
+                      },
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": null,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 1
+                        },
+                        "position": [
+                          1.0,
+                          0.0
+                        ],
+                        "threshold": 1.0,
+                        "time_scale": 1.5
+                      }
+                    ],
+                    "kind": {
+                      "Simple1D": {
+                        "param": 1
+                      }
+                    },
+                    "normalize": false
+                  }
+                },
+                "name": "Simple1D",
+                "speed": 1.0,
+                "speed_param": null,
+                "time_param": 4,
+                "transitions": [],
+                "write_defaults": false
+              },
+              {
+                "behaviours": [],
+                "cycle_offset": 0.0,
+                "cycle_offset_param": null,
+                "mirror": false,
+                "mirror_param": null,
+                "motion": {
+                  "BlendTree": {
+                    "children": [
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": null,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 0
+                        },
+                        "position": [
+                          0.0,
+                          1.0
+                        ],
+                        "threshold": 0.0,
+                        "time_scale": 1.5
+                      },
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": null,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 1
+                        },
+                        "position": [
+                          1.0,
+                          0.0
+                        ],
+                        "threshold": 1.0,
+                        "time_scale": 1.5
+                      }
+                    ],
+                    "kind": {
+                      "SimpleDirectional2D": {
+                        "x": 4,
+                        "y": 5
+                      }
+                    },
+                    "normalize": false
+                  }
+                },
+                "name": "Simple2D",
+                "speed": 1.0,
+                "speed_param": null,
+                "time_param": null,
+                "transitions": [],
+                "write_defaults": false
+              },
+              {
+                "behaviours": [],
+                "cycle_offset": 0.0,
+                "cycle_offset_param": null,
+                "mirror": false,
+                "mirror_param": null,
+                "motion": {
+                  "BlendTree": {
+                    "children": [
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": null,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 0
+                        },
+                        "position": [
+                          0.0,
+                          1.0
+                        ],
+                        "threshold": 0.0,
+                        "time_scale": 1.5
+                      },
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": null,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 1
+                        },
+                        "position": [
+                          1.0,
+                          0.0
+                        ],
+                        "threshold": 1.0,
+                        "time_scale": 1.5
+                      }
+                    ],
+                    "kind": {
+                      "FreeformDirectional2D": {
+                        "x": 4,
+                        "y": 5
+                      }
+                    },
+                    "normalize": false
+                  }
+                },
+                "name": "Freeform2D",
+                "speed": 1.0,
+                "speed_param": null,
+                "time_param": null,
+                "transitions": [],
+                "write_defaults": false
+              },
+              {
+                "behaviours": [],
+                "cycle_offset": 0.0,
+                "cycle_offset_param": null,
+                "mirror": false,
+                "mirror_param": null,
+                "motion": {
+                  "BlendTree": {
+                    "children": [
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": null,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 0
+                        },
+                        "position": [
+                          0.0,
+                          1.0
+                        ],
+                        "threshold": 0.0,
+                        "time_scale": 1.5
+                      },
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": null,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 1
+                        },
+                        "position": [
+                          1.0,
+                          0.0
+                        ],
+                        "threshold": 1.0,
+                        "time_scale": 1.5
+                      }
+                    ],
+                    "kind": {
+                      "FreeformCartesian2D": {
+                        "x": 4,
+                        "y": 5
+                      }
+                    },
+                    "normalize": false
+                  }
+                },
+                "name": "Cartesian2D",
+                "speed": 1.0,
+                "speed_param": null,
+                "time_param": null,
+                "transitions": [],
+                "write_defaults": false
+              },
+              {
+                "behaviours": [],
+                "cycle_offset": 0.0,
+                "cycle_offset_param": null,
+                "mirror": false,
+                "mirror_param": null,
+                "motion": {
+                  "BlendTree": {
+                    "children": [
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": 1,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 0
+                        },
+                        "position": [
+                          0.0,
+                          1.0
+                        ],
+                        "threshold": 0.0,
+                        "time_scale": 1.5
+                      },
+                      {
+                        "cycle_offset": 0.20000000298023224,
+                        "direct_param": 4,
+                        "mirror": true,
+                        "motion": {
+                          "Clip": 1
+                        },
+                        "position": [
+                          1.0,
+                          0.0
+                        ],
+                        "threshold": 1.0,
+                        "time_scale": 1.5
+                      }
+                    ],
+                    "kind": "Direct",
+                    "normalize": true
+                  }
+                },
+                "name": "Direct",
+                "speed": 1.0,
+                "speed_param": null,
+                "time_param": null,
+                "transitions": [],
+                "write_defaults": true
+              }
+            ]
+          },
+          "weight": 1.0
+        },
+        {
+          "blending": "Additive",
+          "group": 1,
+          "mask": {
+            "body_parts": [
+              "Root",
+              "Body",
+              "Head",
+              "LeftLeg",
+              "RightLeg",
+              "LeftArm",
+              "RightArm",
+              "LeftFingers",
+              "RightFingers",
+              "LeftFootIk",
+              "RightFootIk",
+              "LeftHandIk",
+              "RightHandIk"
+            ],
+            "transforms": [
+              "Body",
+              "Prop"
+            ]
+          },
+          "name": "Additive",
+          "state_machine": {
+            "any_state_transitions": [],
+            "default_state": 0,
+            "entry_transitions": [],
+            "states": [
+              {
+                "behaviours": [],
+                "cycle_offset": 0.0,
+                "cycle_offset_param": null,
+                "mirror": false,
+                "mirror_param": null,
+                "motion": {
+                  "Clip": 1
+                },
+                "name": "Pose",
+                "speed": 1.0,
+                "speed_param": null,
+                "time_param": null,
+                "transitions": [],
+                "write_defaults": false
+              }
+            ]
+          },
+          "weight": 0.5
+        }
+      ],
+      "parameters": [
+        {
+          "default": 1.0,
+          "kind": "Bool",
+          "name": "Toggle"
+        },
+        {
+          "default": 0.5,
+          "kind": "Float",
+          "name": "Speed"
+        },
+        {
+          "default": 3.0,
+          "kind": "Int",
+          "name": "Count"
+        },
+        {
+          "default": 0.0,
+          "kind": "Trigger",
+          "name": "Fire"
+        },
+        {
+          "default": 0.0,
+          "kind": "Float",
+          "name": "X"
+        },
+        {
+          "default": 0.0,
+          "kind": "Float",
+          "name": "Y"
+        },
+        {
+          "default": 0.0,
+          "kind": "Bool",
+          "name": "Mirror"
+        }
+      ]
+    },
+    "clips": [
+      {
+        "curves": [
+          {
+            "binding": {
+              "path": "Hips",
+              "property": {
+                "Position": 0
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "Hips",
+              "property": {
+                "Rotation": 3
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "Hips/Spine",
+              "property": {
+                "EulerRotation": 1
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "Hips/Spine/Head",
+              "property": {
+                "Scale": 2
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "",
+              "property": {
+                "Muscle": "Left Arm Down-Up"
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "",
+              "property": {
+                "RootMotion": 5
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "Body",
+              "property": {
+                "BlendShape": "v_aa"
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "Prop",
+              "property": "Active"
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "Body",
+              "property": "RendererEnabled"
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "Body",
+              "property": {
+                "Material": "_Color.r"
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "Body",
+              "property": {
+                "MaterialSlot": 0
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.5,
+                "value": 0.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "",
+              "property": {
+                "Parameter": "Speed"
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "C1",
+              "property": {
+                "Constraint": {
+                  "field": "Weight",
+                  "kind": "Rotation"
+                }
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "C1",
+              "property": {
+                "Constraint": {
+                  "field": "Active",
+                  "kind": "Rotation"
+                }
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "C1",
+              "property": {
+                "Constraint": {
+                  "field": {
+                    "SourceWeight": 0
+                  },
+                  "kind": "Rotation"
+                }
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "C1",
+              "property": {
+                "Constraint": {
+                  "field": "Freeze",
+                  "kind": "Rotation"
+                }
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          },
+          {
+            "binding": {
+              "path": "Prop",
+              "property": {
+                "Component": {
+                  "component": "AudioSource",
+                  "property": "m_Volume"
+                }
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          }
+        ],
+        "length": 0.5,
+        "looping": false,
+        "name": "All",
+        "root": {
+          "bake_orientation": true,
+          "bake_position_xz": false,
+          "bake_position_y": true,
+          "level": 0.05000000074505806,
+          "loop_pose": true,
+          "orientation_offset": 15.0,
+          "original_orientation": true,
+          "original_position_xz": true,
+          "original_position_y": false
+        }
+      },
+      {
+        "curves": [
+          {
+            "binding": {
+              "path": "Hips/Spine",
+              "property": {
+                "Rotation": 0
+              }
+            },
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ]
+          }
+        ],
+        "length": 1.0,
+        "looping": true,
+        "name": "Pose",
+        "root": null
+      }
+    ],
+    "constraints": [
+      {
+        "active": true,
+        "axes": [
+          true,
+          false,
+          true
+        ],
+        "kind": {
+          "Position": {
+            "offset": [
+              0.10000000149011612,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "options": {
+          "freeze": false,
+          "local_space": false,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 16,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": false,
+        "axes": [
+          true,
+          true,
+          true
+        ],
+        "kind": {
+          "Rotation": {
+            "offset": [
+              0.0,
+              10.0,
+              0.0
+            ]
+          }
+        },
+        "options": {
+          "freeze": true,
+          "local_space": true,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 17,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": true,
+        "axes": [
+          true,
+          true,
+          true
+        ],
+        "kind": {
+          "Scale": {
+            "offset": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        },
+        "options": {
+          "freeze": false,
+          "local_space": false,
+          "rebake": true
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 18,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": false,
+        "axes": [
+          true,
+          false,
+          true
+        ],
+        "kind": {
+          "Parent": {
+            "rotation_axes": [
+              true,
+              false,
+              true
+            ]
+          }
+        },
+        "options": {
+          "freeze": false,
+          "local_space": true,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 19,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": true,
+        "axes": [
+          true,
+          true,
+          true
+        ],
+        "kind": {
+          "Aim": {
+            "aim_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "up_axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "world_up": "SceneUp"
+          }
+        },
+        "options": {
+          "freeze": true,
+          "local_space": false,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 20,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": false,
+        "axes": [
+          true,
+          true,
+          true
+        ],
+        "kind": {
+          "Aim": {
+            "aim_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "up_axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "world_up": {
+              "Vector": [
+                0.0,
+                1.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "options": {
+          "freeze": false,
+          "local_space": true,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 21,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": true,
+        "axes": [
+          true,
+          false,
+          true
+        ],
+        "kind": {
+          "Aim": {
+            "aim_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "up_axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "world_up": {
+              "ObjectUp": 2
+            }
+          }
+        },
+        "options": {
+          "freeze": false,
+          "local_space": false,
+          "rebake": true
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 22,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": false,
+        "axes": [
+          true,
+          true,
+          true
+        ],
+        "kind": {
+          "Aim": {
+            "aim_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "up_axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "world_up": {
+              "ObjectRotationUp": [
+                3,
+                [
+                  1.0,
+                  0.0,
+                  0.0
+                ]
+              ]
+            }
+          }
+        },
+        "options": {
+          "freeze": true,
+          "local_space": true,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 23,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": true,
+        "axes": [
+          true,
+          true,
+          true
+        ],
+        "kind": {
+          "Aim": {
+            "aim_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "up_axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "world_up": "None"
+          }
+        },
+        "options": {
+          "freeze": false,
+          "local_space": false,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 24,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": false,
+        "axes": [
+          true,
+          false,
+          true
+        ],
+        "kind": {
+          "LookAt": {
+            "offset": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "roll": 5.0,
+            "world_up_node": 2
+          }
+        },
+        "options": {
+          "freeze": false,
+          "local_space": true,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 25,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": true,
+        "axes": [
+          true,
+          true,
+          true
+        ],
+        "kind": "RestRotation",
+        "options": {
+          "freeze": true,
+          "local_space": false,
+          "rebake": true
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 26,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": false,
+        "axes": [
+          true,
+          true,
+          true
+        ],
+        "kind": {
+          "RestRoll": {
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        "options": {
+          "freeze": false,
+          "local_space": true,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 27,
+        "weight": 0.8999999761581421
+      },
+      {
+        "active": true,
+        "axes": [
+          true,
+          false,
+          true
+        ],
+        "kind": {
+          "RestAim": {
+            "axis": [
+              0.0,
+              1.0,
+              0.0
+            ]
+          }
+        },
+        "options": {
+          "freeze": false,
+          "local_space": false,
+          "rebake": false
+        },
+        "rest": {
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "sources": [
+          {
+            "node": 1,
+            "offset": {
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ]
+            },
+            "weight": 0.5
+          }
+        ],
+        "target": 28,
+        "weight": 0.8999999761581421
+      }
+    ],
+    "contacts": {
+      "receivers": [
+        {
+          "allow_others": false,
+          "allow_self": true,
+          "face": false,
+          "kind": "Constant",
+          "local_only": false,
+          "min_velocity": 0.0,
+          "parameter": "Toggle",
+          "tags": [
+            "Hand"
+          ],
+          "volume": {
+            "node": 3,
+            "position": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "shape": {
+              "Sphere": {
+                "radius": 0.20000000298023224
+              }
+            }
+          }
+        },
+        {
+          "allow_others": true,
+          "allow_self": false,
+          "face": false,
+          "kind": "OnEnter",
+          "local_only": true,
+          "min_velocity": 0.05000000074505806,
+          "parameter": "Fire",
+          "tags": [
+            "Finger"
+          ],
+          "volume": {
+            "component": 7,
+            "node": 2,
+            "position": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "shape": {
+              "Capsule": {
+                "height": 0.4000000059604645,
+                "radius": 0.10000000149011612
+              }
+            }
+          }
+        },
+        {
+          "allow_others": true,
+          "allow_self": true,
+          "face": true,
+          "kind": "Proximity",
+          "local_only": false,
+          "min_velocity": 0.0,
+          "parameter": "Speed",
+          "tags": [
+            "Head"
+          ],
+          "volume": {
+            "node": 1,
+            "position": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "shape": {
+              "Box": {
+                "size": [
+                  0.20000000298023224,
+                  0.20000000298023224,
+                  0.20000000298023224
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "senders": [
+        {
+          "local_only": false,
+          "tags": [
+            "Head"
+          ],
+          "volume": {
+            "node": 3,
+            "position": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "shape": {
+              "Sphere": {
+                "radius": 0.10000000149011612
+              }
+            }
+          }
+        },
+        {
+          "local_only": true,
+          "tags": [
+            "Hand",
+            "Finger"
+          ],
+          "volume": {
+            "component": 7,
+            "node": 2,
+            "position": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "shape": {
+              "Capsule": {
+                "height": 0.20000000298023224,
+                "radius": 0.05000000074505806
+              }
+            }
+          }
+        },
+        {
+          "local_only": false,
+          "tags": [
+            "Hip"
+          ],
+          "volume": {
+            "node": 1,
+            "position": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "shape": {
+              "Box": {
+                "size": [
+                  0.10000000149011612,
+                  0.20000000298023224,
+                  0.30000001192092896
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dynamics": {
+      "chains": [
+        {
+          "allow_grab": true,
+          "allow_posing": false,
+          "colliders": [
+            0,
+            1,
+            2
+          ],
+          "endpoint": [
+            0.0,
+            0.05000000074505806,
+            0.0
+          ],
+          "gravity": {
+            "curve": [],
+            "value": 0.05000000074505806
+          },
+          "gravity_falloff": {
+            "curve": [],
+            "value": 0.5
+          },
+          "ignore": [],
+          "immobile": {
+            "curve": [],
+            "value": 0.25
+          },
+          "immobile_type": "AllMotion",
+          "integration": "Simplified",
+          "limit": "None",
+          "max_squish": {
+            "curve": [],
+            "value": 0.05000000074505806
+          },
+          "max_stretch": {
+            "curve": [],
+            "value": 0.10000000149011612
+          },
+          "multi_child": "Ignore",
+          "parameter": "Tail",
+          "pull": {
+            "curve": [],
+            "value": 0.20000000298023224
+          },
+          "radius": {
+            "curve": [],
+            "value": 0.019999999552965164
+          },
+          "root": 8,
+          "spring": {
+            "curve": [
+              [
+                0.0,
+                1.0
+              ],
+              [
+                1.0,
+                0.5
+              ]
+            ],
+            "value": 0.30000001192092896
+          },
+          "stiffness": {
+            "curve": [],
+            "value": 0.10000000149011612
+          },
+          "version": "Version_1_0"
+        },
+        {
+          "allow_grab": true,
+          "allow_posing": false,
+          "colliders": [
+            0,
+            1,
+            2
+          ],
+          "endpoint": [
+            0.0,
+            0.05000000074505806,
+            0.0
+          ],
+          "gravity": {
+            "curve": [],
+            "value": 0.05000000074505806
+          },
+          "gravity_falloff": {
+            "curve": [],
+            "value": 0.5
+          },
+          "ignore": [],
+          "immobile": {
+            "curve": [],
+            "value": 0.25
+          },
+          "immobile_type": "World",
+          "integration": "Advanced",
+          "limit": {
+            "Angle": {
+              "max_angle": {
+                "curve": [],
+                "value": 45.0
+              },
+              "rotation": [
+                0.0,
+                10.0,
+                0.0
+              ]
+            }
+          },
+          "max_squish": {
+            "curve": [],
+            "value": 0.05000000074505806
+          },
+          "max_stretch": {
+            "curve": [],
+            "value": 0.10000000149011612
+          },
+          "multi_child": "First",
+          "parameter": "Tail",
+          "pull": {
+            "curve": [],
+            "value": 0.20000000298023224
+          },
+          "radius": {
+            "curve": [],
+            "value": 0.019999999552965164
+          },
+          "root": 10,
+          "spring": {
+            "curve": [
+              [
+                0.0,
+                1.0
+              ],
+              [
+                1.0,
+                0.5
+              ]
+            ],
+            "value": 0.30000001192092896
+          },
+          "stiffness": {
+            "curve": [],
+            "value": 0.10000000149011612
+          },
+          "version": "Version_1_1"
+        },
+        {
+          "allow_grab": true,
+          "allow_posing": false,
+          "colliders": [
+            0,
+            1,
+            2
+          ],
+          "endpoint": [
+            0.0,
+            0.05000000074505806,
+            0.0
+          ],
+          "gravity": {
+            "curve": [],
+            "value": 0.05000000074505806
+          },
+          "gravity_falloff": {
+            "curve": [],
+            "value": 0.5
+          },
+          "ignore": [],
+          "immobile": {
+            "curve": [],
+            "value": 0.25
+          },
+          "immobile_type": "AllMotion",
+          "integration": "Simplified",
+          "limit": {
+            "Hinge": {
+              "max_angle": {
+                "curve": [],
+                "value": 30.0
+              },
+              "rotation": [
+                5.0,
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "max_squish": {
+            "curve": [],
+            "value": 0.05000000074505806
+          },
+          "max_stretch": {
+            "curve": [],
+            "value": 0.10000000149011612
+          },
+          "multi_child": "Average",
+          "parameter": "Tail",
+          "pull": {
+            "curve": [],
+            "value": 0.20000000298023224
+          },
+          "radius": {
+            "curve": [],
+            "value": 0.019999999552965164
+          },
+          "root": 12,
+          "spring": {
+            "curve": [
+              [
+                0.0,
+                1.0
+              ],
+              [
+                1.0,
+                0.5
+              ]
+            ],
+            "value": 0.30000001192092896
+          },
+          "stiffness": {
+            "curve": [],
+            "value": 0.10000000149011612
+          },
+          "version": "Version_1_1"
+        },
+        {
+          "allow_grab": true,
+          "allow_posing": false,
+          "colliders": [
+            0,
+            1,
+            2
+          ],
+          "endpoint": [
+            0.0,
+            0.05000000074505806,
+            0.0
+          ],
+          "gravity": {
+            "curve": [],
+            "value": 0.05000000074505806
+          },
+          "gravity_falloff": {
+            "curve": [],
+            "value": 0.5
+          },
+          "ignore": [],
+          "immobile": {
+            "curve": [],
+            "value": 0.25
+          },
+          "immobile_type": "World",
+          "integration": "Advanced",
+          "limit": {
+            "Polar": {
+              "max_pitch": {
+                "curve": [],
+                "value": 20.0
+              },
+              "max_yaw": {
+                "curve": [],
+                "value": 40.0
+              },
+              "rotation": [
+                0.0,
+                0.0,
+                15.0
+              ]
+            }
+          },
+          "max_squish": {
+            "curve": [],
+            "value": 0.05000000074505806
+          },
+          "max_stretch": {
+            "curve": [],
+            "value": 0.10000000149011612
+          },
+          "multi_child": "Ignore",
+          "parameter": "Tail",
+          "pull": {
+            "curve": [],
+            "value": 0.20000000298023224
+          },
+          "radius": {
+            "curve": [],
+            "value": 0.019999999552965164
+          },
+          "root": 14,
+          "spring": {
+            "curve": [
+              [
+                0.0,
+                1.0
+              ],
+              [
+                1.0,
+                0.5
+              ]
+            ],
+            "value": 0.30000001192092896
+          },
+          "stiffness": {
+            "curve": [],
+            "value": 0.10000000149011612
+          },
+          "version": "Version_1_0"
+        }
+      ],
+      "colliders": [
+        {
+          "inside": false,
+          "node": 1,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "shape": {
+            "Sphere": {
+              "radius": 0.05000000074505806
+            }
+          }
+        },
+        {
+          "inside": true,
+          "node": 2,
+          "position": [
+            0.0,
+            0.10000000149011612,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "shape": {
+            "Capsule": {
+              "height": 0.30000001192092896,
+              "radius": 0.05000000074505806
+            }
+          }
+        },
+        {
+          "inside": false,
+          "node": 0,
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "shape": "Plane"
+        }
+      ]
+    },
+    "expressions": {
+      "menu": {
+        "controls": [
+          {
+            "icon": null,
+            "kind": "Button",
+            "name": "Button",
+            "parameter": "Count",
+            "sub_parameters": [],
+            "value": 1.0
+          },
+          {
+            "icon": null,
+            "kind": "Toggle",
+            "name": "Toggle",
+            "parameter": "Toggle",
+            "sub_parameters": [],
+            "value": 1.0
+          },
+          {
+            "icon": null,
+            "kind": {
+              "SubMenu": {
+                "controls": [
+                  {
+                    "icon": null,
+                    "kind": "TwoAxisPuppet",
+                    "name": "Two",
+                    "parameter": null,
+                    "sub_parameters": [
+                      "X",
+                      "Y"
+                    ],
+                    "value": 1.0
+                  },
+                  {
+                    "icon": null,
+                    "kind": "FourAxisPuppet",
+                    "name": "Four",
+                    "parameter": null,
+                    "sub_parameters": [
+                      "X",
+                      "Y",
+                      "X",
+                      "Y"
+                    ],
+                    "value": 1.0
+                  },
+                  {
+                    "icon": null,
+                    "kind": "RadialPuppet",
+                    "name": "Radial",
+                    "parameter": null,
+                    "sub_parameters": [
+                      "Speed"
+                    ],
+                    "value": 1.0
+                  }
+                ]
+              }
+            },
+            "name": "More",
+            "parameter": "Count",
+            "sub_parameters": [],
+            "value": 1.0
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "default": 1.0,
+          "kind": "Bool",
+          "name": "Toggle",
+          "saved": true,
+          "synced": true
+        },
+        {
+          "default": 3.0,
+          "kind": "Int",
+          "name": "Count",
+          "saved": false,
+          "synced": true
+        },
+        {
+          "default": 0.5,
+          "kind": "Float",
+          "name": "Speed",
+          "saved": true,
+          "synced": false
+        }
+      ]
+    },
+    "face": {
+      "blink": [
+        {
+          "mesh": 0,
+          "shape": 1,
+          "weight": 1.0
+        }
+      ],
+      "eyes": {
+        "driver": {
+          "Shapes": {
+            "down": [
+              {
+                "mesh": 0,
+                "shape": 3,
+                "weight": 1.0
+              }
+            ],
+            "left": [
+              {
+                "mesh": 0,
+                "shape": 4,
+                "weight": 0.5
+              }
+            ],
+            "right": [
+              {
+                "mesh": 0,
+                "shape": 5,
+                "weight": 0.5
+              }
+            ],
+            "up": [
+              {
+                "mesh": 0,
+                "shape": 2,
+                "weight": 1.0
+              }
+            ]
+          }
+        },
+        "horizontal_inner": {
+          "input_max": 30.0,
+          "output_scale": 0.800000011920929
+        },
+        "horizontal_outer": {
+          "input_max": 30.0,
+          "output_scale": 0.800000011920929
+        },
+        "vertical_down": {
+          "input_max": 30.0,
+          "output_scale": 0.800000011920929
+        },
+        "vertical_up": {
+          "input_max": 30.0,
+          "output_scale": 0.800000011920929
+        }
+      },
+      "visemes": [
+        [
+          "Sil",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.0
+            }
+          ]
+        ],
+        [
+          "Pp",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.06666667014360428
+            }
+          ]
+        ],
+        [
+          "Ff",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.13333334028720856
+            }
+          ]
+        ],
+        [
+          "Th",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.20000000298023224
+            }
+          ]
+        ],
+        [
+          "Dd",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.2666666805744171
+            }
+          ]
+        ],
+        [
+          "Kk",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.3333333432674408
+            }
+          ]
+        ],
+        [
+          "Ch",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.4000000059604645
+            }
+          ]
+        ],
+        [
+          "Ss",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.46666666865348816
+            }
+          ]
+        ],
+        [
+          "Nn",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.5333333611488342
+            }
+          ]
+        ],
+        [
+          "Rr",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.6000000238418579
+            }
+          ]
+        ],
+        [
+          "Aa",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.6666666865348816
+            }
+          ]
+        ],
+        [
+          "E",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.7333333492279053
+            }
+          ]
+        ],
+        [
+          "I",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.800000011920929
+            }
+          ]
+        ],
+        [
+          "O",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.8666666746139526
+            }
+          ]
+        ],
+        [
+          "U",
+          [
+            {
+              "mesh": 0,
+              "shape": 0,
+              "weight": 0.9333333373069763
+            }
+          ]
+        ]
+      ]
+    },
+    "hierarchy": {
+      "nodes": [
+        {
+          "active": true,
+          "name": "Armature",
+          "parent": null,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Hips",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.8999999761581421,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Spine",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Head",
+          "parent": 2,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.4000000059604645,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "LeftEye",
+          "parent": 3,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "RightEye",
+          "parent": 3,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Body",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": false,
+          "name": "Prop",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail0",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail0_1",
+          "parent": 8,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail1",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail1_1",
+          "parent": 10,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail2",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail2_1",
+          "parent": 12,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail3",
+          "parent": 1,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "Tail3_1",
+          "parent": 14,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.10000000149011612,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C0",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C1",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C2",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C3",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C4",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C5",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C6",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C7",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C8",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C9",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C10",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C11",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "active": true,
+          "name": "C12",
+          "parent": 0,
+          "rest": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        }
+      ]
+    },
+    "humanoid": {
+      "bones": [
+        [
+          "Hips",
+          1
+        ],
+        [
+          "Spine",
+          2
+        ],
+        [
+          "Head",
+          3
+        ],
+        [
+          "LeftEye",
+          4
+        ],
+        [
+          "RightEye",
+          5
+        ]
+      ],
+      "center_of_mass": [
+        0.0,
+        0.8500000238418579,
+        0.019999999552965164
+      ],
+      "human_scale": 1.100000023841858,
+      "muscle_frames": [
+        {
+          "bone": "Spine",
+          "max": [
+            40.0,
+            30.0,
+            20.0
+          ],
+          "min": [
+            -40.0,
+            -30.0,
+            -20.0
+          ],
+          "post": [
+            0.6000000238418579,
+            0.0,
+            0.0,
+            0.800000011920929
+          ],
+          "pre": [
+            0.0,
+            0.6000000238418579,
+            0.0,
+            0.800000011920929
+          ],
+          "sign": [
+            1.0,
+            -1.0,
+            1.0
+          ],
+          "twist": 1.0
+        }
+      ],
+      "viewpoint": [
+        0.0,
+        1.4500000476837158,
+        0.07999999821186066
+      ]
+    },
+    "materials": [
+      {
+        "alpha": "Opaque",
+        "double_sided": false,
+        "model": {
+          "Pbr": {
+            "base_color": [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            "base_color_tex": null,
+            "emissive": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "emissive_tex": null,
+            "metallic": 0.0,
+            "metallic_roughness_tex": null,
+            "normal_scale": 1.0,
+            "normal_tex": null,
+            "occlusion_tex": null,
+            "roughness": 1.0
+          }
+        },
+        "name": "Plain",
+        "render_queue": 2000
+      }
+    ],
+    "meshes": [
+      {
+        "blend_shapes": [
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 0
+              }
+            ],
+            "name": "v_aa"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 1
+              }
+            ],
+            "name": "blink"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 2
+              }
+            ],
+            "name": "look_up"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 0
+              }
+            ],
+            "name": "look_down"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 1
+              }
+            ],
+            "name": "look_left"
+          },
+          {
+            "default_weight": 0.0,
+            "deltas": [
+              {
+                "normal": [
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "position": [
+                  0.0,
+                  0.009999999776482582,
+                  0.0
+                ],
+                "vertex": 2
+              }
+            ],
+            "name": "look_right"
+          }
+        ],
+        "first_person": "Auto",
+        "indices": [
+          0,
+          1,
+          2
+        ],
+        "lods": [],
+        "name": "Body",
+        "node": 6,
+        "normals": [
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "positions": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.10000000149011612,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.10000000149011612,
+            0.0
+          ]
+        ],
+        "skin": null,
+        "submeshes": [
+          {
+            "first_index": 0,
+            "index_count": 3,
+            "material": 0
+          }
+        ],
+        "tangents": [],
+        "uv0": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "uv1": []
+      }
+    ],
+    "meta": null,
+    "name": "Armature",
+    "textures": []
+  },
+  "warnings": []
+}

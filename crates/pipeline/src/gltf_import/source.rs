@@ -58,6 +58,10 @@ struct XAnimator {
     clips: Vec<Clip>,
 }
 
+/// Newest Unity dialect this module reads (ADRs 0085, 0087). Dialect 1 is the `X_*` shapes of format v25, frozen by
+/// `tests/unity_dialect.rs`.
+const UNITY_DIALECT: u64 = 1;
+
 /// Extensions this module reads.
 const NAMES: [&str; 6] = [
     "X_avatar",
@@ -79,6 +83,7 @@ impl Importer<'_> {
         if NAMES.iter().all(|n| doc.extension_value(n).is_none()) {
             return Ok(None);
         }
+        self.unity_dialect()?;
         let mut s = Source::default();
         if let Some(v) = doc.extension_value("X_avatar") {
             let mut x: XAvatar = parse("X_avatar", v)?;
@@ -131,6 +136,23 @@ impl Importer<'_> {
             s.expressions = Some(parse("X_expressions", v)?);
         }
         Ok(Some(s))
+    }
+
+    /// The Unity dialect version in `asset.extras.civbb_unity_dialect` (absent means 1); newer ones are refused.
+    fn unity_dialect(&self) -> Result<u64, String> {
+        let Some(extras) = &self.doc.as_json().asset.extras else {
+            return Ok(1);
+        };
+        let extras: Value = serde_json::from_str(extras.get()).map_err(|e| format!("asset.extras: {e}"))?;
+        match extras.get("civbb_unity_dialect") {
+            None => Ok(1),
+            Some(v) => match v.as_u64() {
+                Some(n @ 1..=UNITY_DIALECT) => Ok(n),
+                _ => Err(format!(
+                    "asset.extras.civbb_unity_dialect {v}: this importer reads Unity dialect 1 to {UNITY_DIALECT}"
+                )),
+            },
+        }
     }
 
     /// A glTF node index from an extension as a hierarchy index.
