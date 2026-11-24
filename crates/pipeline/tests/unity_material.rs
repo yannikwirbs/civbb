@@ -274,8 +274,11 @@ fn standard_vrchat_mobile_unlit_and_unknown_shaders() {
         assert_eq!(t.shade_tex, t.base_color_tex, "{shader}");
         assert_eq!((t.emissive, t.emissive_tex), ([0.0; 3], None), "{shader}");
     }
-    let m = material(json!({"shader": "VRChat/Mobile/Toon Standard", "colors": leftovers, "textures": emission}));
-    assert_eq!(toon(&m).emissive, [1.0, 0.0, 0.0]);
+    let m = material(
+        json!({"shader": "VRChat/Mobile/Toon Standard", "colors": leftovers, "textures": emission,
+        "floats": {"_EmissionStrength": 1.5}}),
+    );
+    assert_eq!(toon(&m).emissive, [1.5, 0.0, 0.0], "colour times strength");
     assert!(toon(&m).emissive_tex.is_some());
 
     let m = material(json!({"shader": "VRChat/Mobile/Particles/Additive"}));

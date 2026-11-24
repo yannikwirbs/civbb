@@ -512,10 +512,10 @@ impl Importer<'_> {
                 let mut t = plain_toon(p.color("_Color", WHITE), main);
                 // VRChat's mobile shaders score closer to Unity unclamped (ADR 0050).
                 t.light = ToonLight::Additive;
-                if let Some(e) = self.unity_slot(x, "_EmissionMap", srgb) {
-                    t.emissive_tex = Some(e);
-                    t.emissive = p.rgb("_EmissionColor", WHITE);
-                }
+                // Emission is always on: map times colour times strength (`VertexFragment.cginc`); the ramp, the
+                // albedo-coloured shadow and the rest are #105.
+                t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
+                t.emissive = scale(p.rgb("_EmissionColor", BLACK), p.f("_EmissionStrength", 1.0));
                 (MaterialModel::Toon(t), queue_alpha.unwrap_or(Alpha::Opaque), 2.0)
             }
             Family::Tsf => {
