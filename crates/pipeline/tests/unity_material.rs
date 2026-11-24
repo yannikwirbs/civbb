@@ -220,15 +220,23 @@ fn uts2_maps_shade_step_feather_and_outline() {
     let m = material(json!({
         "shader": "Hidden/InternalErrorShader", "keywords": ["_OUTLINE_NML"],
         "floats": {"_utsVersion": 2.08, "_BaseColor_Step": 0.7, "_BaseShade_Feather": 0.2, "_Outline_Width": 2,
-            "_CullMode": 0, "_RimLight": 1},
+            "_CullMode": 0, "_RimLight": 1, "_ShadeColor_Step": 0.4, "_1st2nd_Shades_Feather": 0.1},
         "colors": {"_BaseColor": [1, 1, 1, 1], "_1st_ShadeColor": [0, 0, 1, 1], "_RimLightColor": [1, 0, 0, 1],
-            "_Color": [0, 1, 0, 1]},
+            "_Color": [0, 1, 0, 1], "_2nd_ShadeColor": [1, 0, 0, 1]},
         "textures": {"_MainTex": tex([1.0, 1.0, 0.0, 0.0])},
     }));
     let t = toon(&m);
     assert_eq!(t.base_color, [1.0; 4], "UTS2 reads _BaseColor, not _Color");
     assert_eq!(t.shade_color, [0.0, 0.0, 1.0]);
-    assert!(close(t.shade_shift, 0.5) && close(t.shade_toony, 0.8));
+    // Shaded below half-Lambert 0.5, lit above 0.7: MToon's shift -0.2 and toony 0.8 (as lilToon's test).
+    assert!(close(t.shade_shift, -0.2) && close(t.shade_toony, 0.8));
+    // The second shade below 0.3 to 0.4: lilToon's second band, border 0.35 and blur 0.1.
+    let b = t.shade_bands.expect("second shade");
+    assert_eq!(
+        (b.second_color, b.second_strength, b.strength),
+        ([1.0, 0.0, 0.0], 1.0, 1.0)
+    );
+    assert!(close(b.second_border, 0.35) && close(b.second_blur, 0.1) && b.border_color == [0.0; 3]);
     assert!(close(t.outline_width, 0.002) && t.rim_color == [1.0, 0.0, 0.0] && m.double_sided);
 }
 

@@ -681,10 +681,23 @@ impl Importer<'_> {
         let mut t = plain_toon(base, main);
         t.shade_color = p.rgb("_1st_ShadeColor", WHITE);
         t.shade_tex = self.unity_slot(x, "_1st_ShadeMap", srgb).or(main);
-        // The shade starts at `step - feather` in half-Lambert space and is full at `step`.
+        // Fully shaded below `step - feather` in half-Lambert terms, fully lit above `step`
+        // (`UCTS_DoubleShadeWithFeather.cginc`); MToon's shift and toony for that ramp, as lilToon's.
         let (step, feather) = (p.f("_BaseColor_Step", 0.5), p.f("_BaseShade_Feather", 0.0001));
-        t.shade_shift = (step - feather).clamp(-1.0, 1.0);
+        t.shade_shift = (1.0 + feather - 2.0 * step).clamp(-1.0, 1.0);
         t.shade_toony = (1.0 - feather).clamp(0.0, 1.0);
+        // The second shade, below `_ShadeColor_Step` by its feather: lilToon's second shadow band with nothing else.
+        let (step2, feather2) = (p.f("_ShadeColor_Step", 0.0), p.f("_1st2nd_Shades_Feather", 0.0001));
+        t.shade_bands = Some(ShadeBands {
+            strength: 1.0,
+            main_strength: 0.0,
+            second_color: p.rgb("_2nd_ShadeColor", WHITE),
+            second_strength: 1.0,
+            second_border: step2 - feather2 * 0.5,
+            second_blur: feather2,
+            border_color: [0.0; 3],
+            border_range: 0.0,
+        });
         t.normal_tex = self.unity_slot(x, "_NormalMap", ColorSpace::Linear);
         t.normal_scale = p.f("_BumpScale", 1.0);
         if p.on("_RimLight") {
