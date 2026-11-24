@@ -282,6 +282,7 @@ Internal deps: none
 - `docs/adr/0078-phase-0-gate-not-yet-passed.md`: 0078: Phase 0's gate is not yet passed; its evidence comes before Phase 1
 - `docs/adr/0079-source-guardrails-in-the-gate.md`: 0079: Source guardrails in the gate
 - `docs/adr/0080-measure-pins-to-a-performance-core.md`: 0080: `measure` pins its worker to a performance core
+- `docs/adr/0081-unity-cpu-baseline-method.md`: 0081: How the Unity CPU baselines are measured
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

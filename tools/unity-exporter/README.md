@@ -17,6 +17,10 @@ links no VRChat SDK code.
 - `Editor/Json.cs`: JSON text helpers and the X mirror for vectors, rotations and Euler angles.
 - `Editor/Reference.cs`: reference renders for parity (ADR 0048): `Civbb.Exporter.Reference.Render` renders a
   prefab with the rig, light and states of a `civbb-client rig` hand-off, one PNG per state and view, in play mode.
+- `Editor/Baseline.cs`: Unity CPU baselines (ADR 0081): `Civbb.Exporter.Baseline.Measure` steps 0, 1 and 40 copies
+  of a prefab in play mode as our bench steps them, job workers off and the process on one core, optionally after
+  AvatarOptimizer through NDMF (`-civbbOptimize`), and writes per-marker milliseconds per frame. Runner:
+  `corpus/unity_baseline.py`.
 
 Status: runs on Unity 6000.3.28f1 without the VRChat SDK and on 2022.3.22f1 with it (SDK 3.10.6). All humanoid
 prefabs of the 11 local avatar packages export; meshes, triangles, shapes, joints and bind poses match the Blender

@@ -30,6 +30,8 @@ namespace Civbb.Exporter
         /// The descriptor's layer masks by group, filled by `Layers`: the animator export intersects each layer's mask
         /// with its group's; reference renders apply them as VRChat does.
         public readonly Dictionary<string, AvatarMask> Masks = new Dictionary<string, AvatarMask>();
+        /// The controllers by group, filled by `Layers`; also those an optimiser generated in memory, which have no path.
+        public readonly Dictionary<string, RuntimeAnimatorController> Controllers = new Dictionary<string, RuntimeAnimatorController>();
 
         public VrcExport(Transform root, Func<Transform, int> node)
         {
@@ -92,6 +94,7 @@ namespace Civbb.Exporter
                 masks += P(l, "mask").objectReferenceValue != null ? 1 : 0;
                 Masks[type] = P(l, "mask").objectReferenceValue as AvatarMask;
                 groups[type] = AssetDatabase.GetAssetPath(controller);
+                Controllers[type] = controller as RuntimeAnimatorController;
                 used++;
             }
             int special = 0;

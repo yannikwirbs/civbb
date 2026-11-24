@@ -119,3 +119,16 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
   names (`SourcePath`, `PlaybackOrder`) found nothing because the names were wrong, which proves nothing. Walk the
   real objects instead: a scratch `BehaviourSurvey.cs` (every `AnimatorController` under `Assets/`, behaviours by
   type name, about 60 s) answered it. Give any text scan a positive control (a marker known to be present).
+- The VRChat SDK's dynamics are managed code in Unity: no job struct in `VRC.Dynamics.dll` has `[BurstCompile]`
+  (`PhysBoneJob`, `VRCConstraintJob`, the contact broadphase), so PhysBones cost 10x+ what Burst would, in the Editor
+  and in any player. A `(Burst)` marker name proves nothing (every job registers one); check which marker gets the
+  time, or time with `--burst-disable-compilation` (unchanged means no Burst). Burst itself works in batch mode.
+- Timing Unity on one core: `JobsUtility.JobWorkerCount = 0` plus `Process.ProcessorAffinity`; then `PlayerLoop`
+  (a `ProfilerRecorder`) is all the frame's CPU work. Find where time goes by recording every available
+  `TimeNanoseconds` marker once (`Baseline.Measure -civbbTop N`).
+- AvatarOptimizer refuses `-nographics` ("MeshInfo2 does not support -nographics"): run with `--graphics`. NDMF's
+  `AvatarProcessor.ProcessAvatar` fills the descriptor's default playable layers with copies of the SDK controllers
+  and clones the `proxy_*` clips (no package path any more): compare layers and proxies from before processing.
+- `Arg(name)` helpers that return the next argument miss a value-less flag passed last: test flags with
+  `GetCommandLineArgs().Contains`.
+
