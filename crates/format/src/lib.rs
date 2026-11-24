@@ -23,7 +23,8 @@ pub use ed25519_dalek::{SigningKey, VerifyingKey};
 pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
-/// Version of the data model. Bump on any incompatible change to the types in this crate.
+/// Version of the runtime package's data model. Bump on any change to the types in this crate; readers refuse
+/// packages of any other version, which are rebuilt from their kept source (ADR 0087).
 pub const FORMAT_VERSION: u32 = 25;
 
 #[cfg(test)]

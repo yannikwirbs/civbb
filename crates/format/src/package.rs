@@ -112,6 +112,9 @@ pub enum PackageError {
     BadMagic,
     #[error("unsupported container version {0}")]
     UnsupportedVersion(u32),
+    /// Built for another data model; rebuild it from its source (ADR 0087).
+    #[error("built for format version {found}, this reader reads {expected}; rebuild it from its source")]
+    FormatVersion { found: u32, expected: u32 },
     #[error("truncated package")]
     Truncated,
     #[error("trailing bytes after the last blob")]
@@ -222,6 +225,12 @@ impl Package {
             .map_err(|_| PackageError::BadSignature)?;
 
         let manifest: Manifest = cbor::from_slice(manifest_bytes, limits.max_manifest_bytes)?;
+        if manifest.header.format_version != crate::FORMAT_VERSION {
+            return Err(PackageError::FormatVersion {
+                found: manifest.header.format_version,
+                expected: crate::FORMAT_VERSION,
+            });
+        }
         if manifest.blobs.len() > limits.max_blobs {
             return Err(PackageError::TooLarge("blob count"));
         }
@@ -362,6 +371,21 @@ mod tests {
         let mut long = bytes.clone();
         long.push(0);
         assert!(matches!(decode(&long), Err(PackageError::TrailingBytes)));
+    }
+
+    #[test]
+    fn other_format_versions_are_rejected() {
+        let (pkg, _) = sample();
+        for found in [crate::FORMAT_VERSION - 1, crate::FORMAT_VERSION + 1] {
+            let mut old = pkg.clone();
+            old.header.format_version = found;
+            let err = decode(&old.encode_signed(&key())).unwrap_err();
+            assert!(
+                matches!(err, PackageError::FormatVersion { found: f, expected } if f == found && expected == crate::FORMAT_VERSION),
+                "{err}"
+            );
+            assert!(err.to_string().contains(&found.to_string()));
+        }
     }
 
     #[test]
