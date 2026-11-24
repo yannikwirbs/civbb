@@ -44,6 +44,7 @@ Client: wires the avatar systems into per-avatar islands and frames; a headless 
 
 Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-format, civbb-render
 
+- `src/affinity.rs`: Pins the calling thread to a performance core, so one-worker timings on hybrid CPUs do not depend on where the
 - `src/bench.rs`: Headless CPU benchmark: N avatar islands stepped for a number of frames at each worker count (design doc §21).
 - `src/cull.rs`: Frustum culling of mesh instances before skinning (design doc §6, ADR 0077): conservative world bounds from
 - `src/frame.rs`: One simulation frame's avatar work: every island as its own parallel job, then the cross-avatar contact pass
@@ -280,6 +281,7 @@ Internal deps: none
 - `docs/adr/0077-cpu-instance-culling-before-gpu-culling.md`: 0077: Cull mesh instances on the CPU before skinning; the GPU culling pass waits for worlds
 - `docs/adr/0078-phase-0-gate-not-yet-passed.md`: 0078: Phase 0's gate is not yet passed; its evidence comes before Phase 1
 - `docs/adr/0079-source-guardrails-in-the-gate.md`: 0079: Source guardrails in the gate
+- `docs/adr/0080-measure-pins-to-a-performance-core.md`: 0080: `measure` pins its worker to a performance core
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

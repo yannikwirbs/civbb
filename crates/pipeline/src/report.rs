@@ -198,6 +198,16 @@ impl Report {
                     "\n## CPU ({} build, {} worker of {} logical cores)\n\n{} avatars, {} frames after {} warm-up.\n",
                     t.profile, c.threads, c.logical_cores, c.avatars, c.frames, c.warmup
                 );
+                match &c.pinned {
+                    Some(p) => {
+                        let _ = writeln!(
+                            md,
+                            "Pinned to logical CPU {} (efficiency class {}, the fastest); ran on CPU {}.\n",
+                            p.logical_cpu, p.efficiency_class, p.ran_on
+                        );
+                    }
+                    None => md.push_str("Unpinned: on a hybrid CPU the worker may have run on an efficiency core.\n\n"),
+                }
                 md.push_str("| | ms |\n| --- | ---: |\n");
                 let _ = writeln!(md, "| frame, mean | {:.3} |", c.ms_per_frame);
                 let _ = writeln!(md, "| frame, p99 | {:.3} |", c.ms_per_frame_p99);

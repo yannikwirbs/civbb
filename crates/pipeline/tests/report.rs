@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use civbb_format::cost::{CpuTimes, GpuTimes, Light, Measured, Parity, Rig, RigView, StateParity, ViewScore};
+use civbb_format::cost::{CpuTimes, GpuTimes, Light, Measured, Parity, Pinned, Rig, RigView, StateParity, ViewScore};
 use civbb_format::package::Platform;
 use civbb_format::{Package, ReadLimits, SigningKey};
 use civbb_pipeline::{Imported, Report, compile};
@@ -74,6 +74,18 @@ fn markdown_has_a_column_per_stage_and_the_timings() {
     });
     let md = report.markdown();
     assert!(md.contains("| **per avatar** | **0.0123** |"), "{md}");
+    assert!(md.contains("Unpinned"), "{md}");
+    let pinned = Pinned {
+        logical_cpu: 11,
+        efficiency_class: 1,
+        ran_on: 11,
+    };
+    report.timings.as_mut().unwrap().cpu.pinned = Some(pinned);
+    let pinned_md = report.markdown();
+    assert!(
+        pinned_md.contains("Pinned to logical CPU 11 (efficiency class 1, the fastest); ran on CPU 11."),
+        "{pinned_md}"
+    );
     assert!(md.contains("| per avatar: dynamics | 0.0100 |"), "{md}");
     assert!(md.contains("## GPU (Test GPU)"), "{md}");
     assert!(md.contains("| **GPU per avatar** | **0.0045** |"), "{md}");

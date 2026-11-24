@@ -33,7 +33,8 @@ last).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
 300) and through the viewer's frames on an offscreen 1280x720 target (N copies, same frames) and prints the times
-as JSON for `civbb build --measure` (ADR 0032). GPU times are null without a Vulkan device. Release builds only.
+as JSON for `civbb build --measure` (ADR 0032). The bench worker is pinned to a performance core where the OS
+allows it (ADR 0080; cpu.pinned says which). GPU times are null without a Vulkan device. Release builds only.
 
 parity renders both packages' avatars with the reference's camera rig in every state (rest, then each parameter
 set in turn), compares each view with NVIDIA FLIP and prints the scores and traffic lights as JSON (ADR 0033).
@@ -109,6 +110,7 @@ fn parse(args: &[String]) -> Option<(Config, Option<(String, String)>)> {
         threads: bench::doubling(cores),
         frames: 300,
         warmup: 60,
+        pin: false,
     };
     let (mut package, mut key) = (None, None);
     let mut it = rest.iter();
@@ -372,6 +374,7 @@ fn measure(package: &Path, key: &Path, avatars: u32, frames: u32, warmup: u32) -
         threads: vec![1],
         frames,
         warmup,
+        pin: true,
     };
     let report = bench::run(&cfg, &avatar).ok_or("worker pool failed")?;
     let run = &report.runs[0];
@@ -385,6 +388,7 @@ fn measure(package: &Path, key: &Path, avatars: u32, frames: u32, warmup: u32) -
         ms_per_frame_p99: run.ms_per_frame_p99,
         ms_per_avatar: run.ms_per_avatar,
         systems_ms_per_avatar: run.cpu_ms_per_avatar.iter().map(|(&k, &v)| (k.to_owned(), v)).collect(),
+        pinned: run.pinned.clone(),
     };
     let (width, height) = MEASURE_SIZE;
     let view = view::Config {

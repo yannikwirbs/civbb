@@ -108,9 +108,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   on one worker and the viewer's frames on an offscreen target (`Renderer::headless`), GPU null without a device.
   Golden for lean counts: `crates/pipeline/tests/golden/report-lean.json` (`CIVBB_BLESS=1` rewrites it). All 31
   files in corpus/local build with measured reports (summary on #34): e.g. Yumeka draws 23 to 7, 563 shapes to 0,
-  7.6 µs CPU and 17.9 µs GPU per avatar; HAOLAN textures 19.0 to 3.3 MB, 33.5 µs GPU. `measure`'s one worker is
-  not pinned: on the hybrid reference CPU it lands on a P- or an E-core at random (up to 1.8x apart), so single
-  `--measure` CPU numbers are noisy until #103.
+  7.6 µs CPU and 17.9 µs GPU per avatar; HAOLAN textures 19.0 to 3.3 MB, 33.5 µs GPU. `measure` pins its one
+  worker to the fastest core class's highest logical CPU (Windows only, ADR 0080, `client/src/affinity.rs`) and
+  reports it as `cpu.pinned` (null: unpinned); two pinned runs agree within 10 % (`#[ignore]`d test in
+  `client/tests/measure.rs`, Yumeka 185/180 µs on CPU 11).
 - Compiler stages in `civbb-pipeline`, run by `civbb build` between import and packaging, each proven
   behaviour-identical by tests that step islands before and after:
   - Order in `civbb build`: `prune`, `atlas`, `merge`, `lod`, `collapse`, `compress`.

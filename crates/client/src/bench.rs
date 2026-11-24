@@ -7,10 +7,11 @@ use std::time::Instant;
 use civbb_core::math::Pose;
 use civbb_core::{Counters, System, jobs};
 use civbb_format::Avatar;
+use civbb_format::cost::Pinned;
 use serde::Serialize;
 
-use crate::frame;
 use crate::island::{Island, Model};
+use crate::{affinity, frame};
 
 /// Simulation step, seconds: one frame at the 90 Hz target of design doc §1.
 pub const DT: f32 = 1.0 / 90.0;
@@ -30,6 +31,8 @@ pub struct Config {
     pub frames: u32,
     /// Frames run before measuring, per worker count.
     pub warmup: u32,
+    /// Pin one-worker runs to a performance core (ADR 0080).
+    pub pin: bool,
 }
 
 /// The benchmark's result, written as JSON.
@@ -71,6 +74,8 @@ pub struct Run {
     /// Mean CPU time per frame and avatar by system, milliseconds (the contact pass, which runs once over all
     /// avatars, is divided by the avatar count too).
     pub cpu_ms_per_avatar: BTreeMap<&'static str, f64>,
+    /// The core a pinned one-worker run used; `None` when unpinned.
+    pub pinned: Option<Pinned>,
 }
 
 /// The corpus avatar called `name`.
@@ -98,7 +103,18 @@ pub fn run(cfg: &Config, avatar: &Avatar) -> Option<Report> {
     let mut runs: Vec<Run> = Vec::with_capacity(cfg.threads.len());
     for &threads in &cfg.threads {
         let pool = jobs::pool(threads).ok()?;
-        let (mut frame_ms, counters) = pool.install(|| measure(&model, cfg));
+        let (mut frame_ms, counters, pinned) = pool.install(|| {
+            // With one worker this closure runs on it, and so does every job it spawns.
+            let pinned = (cfg.pin && threads == 1)
+                .then(affinity::pin_to_performance_core)
+                .flatten();
+            let (frame_ms, counters) = measure(&model, cfg);
+            let pinned = pinned.map(|p| Pinned {
+                ran_on: affinity::current_cpu().unwrap_or(p.ran_on),
+                ..p
+            });
+            (frame_ms, counters, pinned)
+        });
         frame_ms.sort_by(f64::total_cmp);
         let n = f64::from(cfg.frames.max(1));
         let mean = frame_ms.iter().sum::<f64>() / n;
@@ -120,6 +136,7 @@ pub fn run(cfg: &Config, avatar: &Avatar) -> Option<Report> {
                 .iter()
                 .map(|&s| (s.name(), counters.seconds(s) * 1e3 / per_avatar))
                 .collect(),
+            pinned,
         });
     }
     Some(Report {

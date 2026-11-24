@@ -93,6 +93,21 @@ pub struct CpuTimes {
     pub ms_per_avatar: f64,
     /// CPU time per frame and avatar by system, milliseconds.
     pub systems_ms_per_avatar: std::collections::BTreeMap<String, f64>,
+    /// The core the worker was pinned to (ADR 0080); `None` when it ran unpinned (not Windows, or the OS refused).
+    #[serde(default)]
+    pub pinned: Option<Pinned>,
+}
+
+/// The logical CPU a one-worker benchmark was pinned to (ADR 0080).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Pinned {
+    /// Logical CPU index (Windows: in processor group 0).
+    pub logical_cpu: u32,
+    /// The OS's efficiency class of that core: higher is faster, and no core in the machine has a higher one.
+    pub efficiency_class: u8,
+    /// The logical CPU the worker read after its last measured frame; differs from `logical_cpu` only if pinning
+    /// did not hold.
+    pub ran_on: u32,
 }
 
 /// The viewer's numbers for copies of one avatar drawn offscreen.
