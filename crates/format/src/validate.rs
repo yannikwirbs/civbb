@@ -10,7 +10,7 @@ use crate::animator::{
 };
 use crate::avatar::Avatar;
 use crate::constraint::{Constraint, ConstraintKind, WorldUp};
-use crate::dynamics::{ContactShape, ContactVolume, Contacts, Dynamics, Graded, Limit};
+use crate::dynamics::{ContactShape, ContactVolume, Contacts, Dynamics, Graded, Limit, Shape};
 use crate::expressions::{ControlKind, Expressions, Menu};
 use crate::face::{EyeDriver, Face, ShapeBind};
 use crate::hierarchy::{Hierarchy, Humanoid};
@@ -552,7 +552,12 @@ impl V {
         for (i, col) in d.colliders.iter().enumerate() {
             let p = || format!("dynamics.colliders[{i}]");
             self.index(col.node as usize, nodes, p, "node");
-            self.finite(&[col.position.as_slice(), &col.rotation].concat(), p);
+            let dims = match col.shape {
+                Shape::Sphere { radius } => vec![radius],
+                Shape::Capsule { radius, height } => vec![radius, height],
+                Shape::Plane => vec![],
+            };
+            self.finite(&[col.position.as_slice(), &col.rotation, &dims].concat(), p);
         }
     }
 
@@ -973,6 +978,18 @@ mod tests {
         let curve = &mut a.clips[0].curves[0];
         curve.keys.push(curve.keys[0]);
         expect_error(&a, "clips[0].curves[0]");
+
+        for shape in [
+            Shape::Sphere { radius: f32::NAN },
+            Shape::Capsule {
+                radius: 0.1,
+                height: f32::INFINITY,
+            },
+        ] {
+            let mut a = sample_avatar();
+            a.dynamics.colliders[0].shape = shape;
+            expect_error(&a, "dynamics.colliders[0]");
+        }
     }
 
     #[test]
