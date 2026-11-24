@@ -50,7 +50,7 @@ Two findings decide it (2026-11-24, `corpus/local/unity-export-vrc`, Unity 2022.
    is 4,564 µs under the emulator against 4,477 µs with our setup (+2 %). The emulator evaluates its graph from a
    script and still created a non-local clone with clones switched off, so its animator time could not be split
    out; the 5 % animator check of #38's plan is inconclusive (#104). It cannot change the gate: the
-   compiled avatars' animator is at least 3.2 times cheaper than Unity's, so only a setup that made Unity's
+   compiled avatars' animator is at least 3.0 times cheaper than Unity's, so only a setup that made Unity's
    animator more than three times cheaper would.
 
 ## Consequences

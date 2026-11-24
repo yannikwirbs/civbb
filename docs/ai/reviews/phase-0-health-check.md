@@ -283,3 +283,10 @@ SAFETY comment and an `unwrap()` fail the gate).
 | Unsafe blocks without `SAFETY:` | 13 (tests) | 0, enforced |
 | `unwrap()` outside tests | 0 by convention | 0, enforced |
 | Direct external dependencies / `Cargo.lock` packages | 20 / 288 | 20 / 288 |
+
+## Update (M0.11, 2026-11-24)
+
+`measure` pins itself to a performance core (ADR 0080, #103). Unity CPU baselines measured (ADR 0081, #38): the
+compiled avatars' animator is 3.0 to 42 times cheaper than Unity's with AvatarOptimizer at 40 copies; the SDK's
+PhysBones are managed code in Unity and are not compared. Table and verdict in ADR 0082: the CPU half of the gate
+passes; the visual half (#101) is still open. #102 did not reproduce and is closed.

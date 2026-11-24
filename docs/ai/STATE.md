@@ -70,6 +70,14 @@ What exists, by area. Read the section for the area you touch; update it when th
   export or `civbb build --report` (`unity_parity`): #98, Phase 3 (ADR 0075).
 - No NDMF / Modular Avatar / VRCFury build before export (ADR 0075, #97, Phase 3): none of the 13 local packages
   uses them (survey on #36).
+- Unity CPU baselines (#38, ADR 0081): `Civbb.Exporter.Baseline.Measure` (`tools/unity-exporter/Editor/Baseline.cs`,
+  runner `corpus/unity_baseline.py`, `--graphics`) steps 0, 1 and 40 copies in play mode as our bench does, job
+  workers off and the Editor confined to `measure`'s core; `PlayerLoop` less the 0-copy frame per copy is Unity's
+  CPU per avatar, the director markers its animator. Output `corpus/local/unity-baseline/<unity|aao>/<name>.json`,
+  read by `corpus/scorecard.py`'s second table. The SDK's PhysBones, contacts and VRChat constraints are managed
+  jobs in Unity (no `[BurstCompile]` in `VRC.Dynamics.dll`), so only the animator is compared like for like.
+  AvatarOptimizer 1.9.23 + NDMF 1.15.1 and Av3Emulator 3.5.0 live only in the gitignored host copy
+  `corpus/local/unity-export-aao` (`-civbbOptimize`, `-civbbEmulator`; the emulator check is #104).
 - VRChat components reach the compiler only through the Unity exporter (ADR 0037); the compiler never parses
   `.unitypackage` or Unity YAML.
 - Exporter (ADR 0038): UPM package `tools/unity-exporter` in this repo (not a separate repo), excluded from the
@@ -173,7 +181,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   package's Unity FLIP (ADR 0078, M0.11), measuring pinned to a P-core. Run 2026-11-24 (table in the health check
   report and on #101): compiled against Unity rest means 0.057 (HAOLAN_PC) to 0.194 (Cokoro_Quest), worst states
   up to 0.487, none green; GPU per avatar down where draws or shapes go (Yumeka 59.9 to 33.6 µs), CPU unchanged
-  (Yumeka 191 to 186 µs) except Blackbird 22 to 29 µs (#102).
+  (Yumeka 191 to 186 µs). Rerun with ADR 0080's pinning: Blackbird 22.8 to 21.4 µs (#102 closed, not reproduced);
+  its second table puts the compiled CPU next to Unity's and Unity + AvatarOptimizer's at 1 and 40 copies (ADR 0082:
+  animator 3.0 to 42 times cheaper compiled).
 
 ## Renderer and viewer
 

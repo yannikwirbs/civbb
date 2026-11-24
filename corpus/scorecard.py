@@ -2,7 +2,9 @@
 
 For every export in corpus/local/unity-glb/exports.txt this builds the import without compiler stages and the
 compiled package, measures both with `civbb-client measure` (release, one worker), and scores the compiled package
-against Unity's reference renders in corpus/local/unity-ref/<name>/ (ADR 0048). Prints one Markdown table.
+against Unity's reference renders in corpus/local/unity-ref/<name>/ (ADR 0048). Prints one Markdown table, then a
+second with CPU per avatar against Unity's at 1 and 40 copies, unoptimised (`unity`) and after AvatarOptimizer
+(`aao`), from `corpus/unity_baseline.py`'s files in corpus/local/unity-baseline/<variant>/ (ADR 0081).
 
     cargo build --release -p civbb-pipeline -p civbb-client --bins
     python corpus/scorecard.py [name-filter] > scorecard.md
@@ -31,13 +33,42 @@ def run(*args):
     return p.stdout
 
 
-def measure(pkg):
-    m = json.loads(run("civbb-client", "measure", pkg, "--key", KEY))
+def measure_json(pkg, avatars=100):
+    m = json.loads(run("civbb-client", "measure", pkg, "--key", KEY, "--avatars", avatars))
     # `measure` pins its worker to a performance core (ADR 0080); unpinned numbers are core-class noise.
     if not m["cpu"].get("pinned"):
         raise RuntimeError(f"{pkg}: measure ran unpinned")
+    return m
+
+
+def measure(pkg):
+    m = measure_json(pkg)
     gpu = m["gpu"]["gpu_ms_per_avatar"] * 1000 if m["gpu"] else float("nan")
     return m["cpu"]["ms_per_avatar"] * 1000, gpu
+
+
+# Unity's animator markers (ADR 0081); the rest of `PlayerLoop` is mostly the SDK's managed dynamics.
+ANIMATOR = ["Update.DirectorUpdate", "PreLateUpdate.DirectorUpdateAnimationBegin", "PreLateUpdate.DirectorUpdateAnimationEnd"]
+COPIES = (1, 40)
+
+
+def ours(pkg):
+    """Our CPU µs per avatar, total and animator, at each of COPIES."""
+    out = {}
+    for n in COPIES:
+        c = measure_json(pkg, n)["cpu"]
+        out[n] = (c["ms_per_avatar"] * 1000, c["systems_ms_per_avatar"]["animator"] * 1000)
+    return out
+
+
+def unity(variant, name):
+    """Unity's CPU µs per avatar, total (`PlayerLoop`) and animator, at each of COPIES, less the 0-copy frame."""
+    f = LOCAL / "unity-baseline" / variant / f"{name}.json"
+    if not f.exists():
+        return None
+    runs = {r["copies"]: r["marker_ms"] for r in json.loads(f.read_text(encoding="utf-8"))["runs"]}
+    per = lambda n, keys: sum(runs[n][k] - runs[0][k] for k in keys) / n * 1000
+    return {n: (per(n, ["PlayerLoop"]), per(n, ANIMATOR)) for n in COPIES}
 
 
 def views_mean(state):
@@ -72,16 +103,27 @@ def main():
             (d / "unity-parity.json").write_text(json.dumps(p, indent=1), encoding="utf-8")
             unity_rest = views_mean(p["states"][0])
             unity_worst = max(views_mean(s) for s in p["states"])
-        rows.append((name, first, last, cpu0, cpu1, gpu0, gpu1, unity_rest, unity_worst, current))
+        rows.append((name, first, last, cpu0, cpu1, gpu0, gpu1, unity_rest, unity_worst, current,
+                     ours(compiled), unity("unity", name), unity("aao", name)))
         print(f"{name}: done", file=sys.stderr)
 
     print("| export | draws | shapes | CPU µs/avatar | GPU µs/avatar | Unity FLIP rest | Unity FLIP worst | reference current |")
     print("| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
-    for name, a, b, cpu0, cpu1, gpu0, gpu1, rest, worst, cur in rows:
+    for name, a, b, cpu0, cpu1, gpu0, gpu1, rest, worst, cur, *_ in rows:
         print(
             f"| {name} | {a['draws']} → {b['draws']} | {a['blend_shapes']} → {b['blend_shapes']} "
             f"| {cpu0:.1f} → {cpu1:.1f} | {gpu0:.1f} → {gpu1:.1f} | {rest:.3f} | {worst:.3f} | {cur} |"
         )
+
+    def cell(t, n, part):
+        return f"{t[n][part]:.1f}" if t else "–"
+
+    print("\nCPU µs per avatar at 1 / 40 copies, compiled against Unity (ADR 0081); total, then the animator alone.\n")
+    print("| export | CIVBB | Unity | Unity + AAO | CIVBB animator | Unity animator | Unity + AAO animator |")
+    print("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+    for name, *_, mine, u, aao in rows:
+        cols = [" / ".join(cell(t, n, part) for n in COPIES) for part in (0, 1) for t in (mine, u, aao)]
+        print(f"| {name} | {' | '.join(cols)} |")
 
 
 if __name__ == "__main__":
