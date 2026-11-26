@@ -7,13 +7,13 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#115, then #116 to #125 in number order (events are Phase 2, #127). For #115 read ADRs 0085 and 0088, the issue's
-comment (planned layout, the two-defaults pitfall) and the STATE.md sections for the compiler and the runtime.
-#115 moves data, not evaluation: before changing anything, settle the two defaults (`Controller::start` uses the
-expression default, `bind.rs` the animator default for parameter slots) and keep both behaviours. The animator
-goldens, contact recordings, `report-lean.json` and corpus builds must not change; re-bless
-`tests/golden/unity-dialect-1*.json` and check its diff only moves parameters into `state`. Bump `FORMAT_VERSION`
-(packages in corpus/local then need `civbb build` again).
+#116, then #117 to #125 in number order (events are Phase 2, #127). #116: chain outputs (`_IsGrabbed`, `_IsPosed`,
+`_Angle`, `_Stretch`, `_Squish`) are computed (`civbb_dynamics::solver::ChainParams`) but nothing writes them to
+the animator yet, so wiring them is new behaviour: rerun parity, a corpus avatar may animate on `_Angle`.
+`Chain::parameter` is still the name prefix. Give `Chain` one `Option<EntryIndex>` per output, resolve
+`<prefix>_<Output>` in `gltf_import/unity_state.rs` (the lowering of #115, ADR 0095; `X_dynamics` keeps the prefix
+string, so lower it as receivers are) and write the values in `Island::step` next to the receivers. Raise them back
+in `civbb_corpus::gltf` for the round-trip test.
 
 ## Now
 
@@ -22,10 +22,11 @@ goldens, contact recordings, `report-lean.json` and corpus builds must not chang
   first, then ECS client runtime, desktop mode/locomotion/IK, OpenXR, protocol/instance server/nodes, voice,
   minimal hub and join flow, avatar fidelity (#109, #107, #110, #92, #93, #94, #77), Phase 1 gate (#61, #62, #63,
   #104). Milestones without issues get them filed from their design doc sections by the session that starts them.
-- **M1.1 (#100) is designed**: ADRs 0085 to 0090, design doc §9. Done: #113, #114.
+- **M1.1 (#100) is designed**: ADRs 0085 to 0090, design doc §9. Done: #113, #114, #115 (state table, ADR 0095,
+  format v26: packages in corpus/local need `civbb build` again).
 - Parity rerun after any change to materials, dynamics or the renderer: `tools/parity.sh --against <last run>
   <out dir>` in the background. The ADR 0084 table must not regress; Yumeka's rest worst view is 0.1197, 0.0003
-  under red.
+  under red. Last full run: `corpus/local/unity-ref/scores/s115` (#115, equal to the table).
 - Session cost: ADRs 0091 and 0092 (2026-11-26). After about five sessions, compare `python
   tools/session-stats.py --since 2026-11-26` with the baseline in `docs/iteration-baseline.md` ($9.2 and 28 M
   cache-read tokens per closed issue) and record the result there.
@@ -39,10 +40,6 @@ goldens, contact recordings, `report-lean.json` and corpus builds must not chang
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-24 (5): M0.11 closed: Phase 0's gate passed (ADR 0084). #105 Toon Standard ramp and shadow; #106 Poiyomi
-  matcap replace, emission, second matcap, UV1 slots (format v25); #108 PhysBone limit rotations `qz qy qx`
-  (recorded), Yumeka's skirt pushed by its hands (#92). No rest state red (5 green, 8 yellow). Epic #39 split into
-  M1.1 to M1.9. Next: M1.1, #100.
 - 2026-11-24 (6): M1.1, #100 designed: survey (no protocol/WIT crates yet; state and bindings must change before
   M1.2, materials and schema can wait), ADRs 0085 to 0090, design doc §9, issues #113 to #127 (#126 needs-user,
   #127 Phase 2). #113: runtime packages of another format version refused. #114: Unity dialect 1 frozen (generated
@@ -51,3 +48,6 @@ The newest three; `SESSIONS.md` has them all.
   unused tools (ADR 0091, first-call context 47 k to 22 k tokens), session shape and `/continue` (ADR 0092),
   nextest in the gate (ADR 0093, 19 to 12 s), LSP (ADR 0094), helpers `tools/issue.sh`, `ci.sh`, `parity.sh`,
   `context.py`. Next: #115.
+- 2026-11-26 (2): #115 state table (ADR 0088 points 1 and 2, ADR 0095): `civbb_format::state`, every parameter
+  reference an entry index, Unity dialect 1 lowered in `gltf_import/unity_state.rs`, `rest` keeps the two defaults,
+  parity against Unity steps through the stored hand-off. Format v26. Next: #116.
