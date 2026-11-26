@@ -157,7 +157,9 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 let (lo, hi) = ramp(r.border, r.blur);
                 rim_shade_ramp = [lo, hi, r.power, 0.0];
             }
-            toon = [t.shade_shift, t.shade_toony, t.rim_power, t.matcap_strength];
+            // A black rim adds nothing; power 0 turns it off in the shader.
+            let rim_power = if t.rim_color == [0.0; 3] { 0.0 } else { t.rim_power };
+            toon = [t.shade_shift, t.shade_toony, rim_power, t.matcap_strength];
             if let Some(b) = t.shade_bands {
                 // The first ramp's start and end in half-Lambert terms, from MToon's shift and toony.
                 let lo = (t.shade_toony - t.shade_shift) * 0.5;
