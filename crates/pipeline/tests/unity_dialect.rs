@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use civbb_format::animator::{Behaviour, DriverOp};
-use civbb_format::state::{EntryKind, SyncMode};
+use civbb_format::state::{EntryKind, Range, SyncMode};
 use civbb_pipeline::gltf_import::{Limits, import};
 use serde_json::{Value, json};
 
@@ -60,7 +60,7 @@ fn unity_dialect_versions_are_checked() {
 
 /// Dialect 1's parameters lower to state entries (ADR 0088, #115): the animator's first, in order, then expression
 /// parameters it lacks; an expression parameter's default starts the entry, the animator's stays its `rest`; the
-/// animator's type holds; unknown names in the menu and receivers reference nothing.
+/// animator's type holds and picks the range; unknown names in the menu and receivers reference nothing.
 #[test]
 fn unity_parameters_lower_to_state_entries() {
     let mut doc: Value = serde_json::from_slice(&fixture("unity-dialect-1.gltf")).unwrap();
@@ -88,6 +88,16 @@ fn unity_parameters_lower_to_state_entries() {
         (EntryKind::Int, 2.0, SyncMode::Owner, true)
     );
     assert!(!e[3].external && e[3].sync == SyncMode::None);
+    // VRChat's types lower exactly (ADR 0098): ints 0..255, floats -1..1 in 8 bits; animator-only ones unranged.
+    assert_eq!(e[7].range, Some(Range::Int { min: 0, max: 255 }));
+    assert_eq!(e[7].sync_bits(), 8);
+    let speed = Range::Float {
+        min: -1.0,
+        max: 1.0,
+        bits: 8,
+    };
+    assert_eq!((e[1].range, e[1].sync_bits()), (Some(speed), 8));
+    assert_eq!(e[3].range, None);
     assert_eq!(a.expressions.unwrap().menu.controls[0].parameter, None);
     assert_eq!(a.contacts.receivers[0].parameter, None);
 }

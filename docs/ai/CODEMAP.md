@@ -302,6 +302,7 @@ Internal deps: none
 - `docs/adr/0095-lowering-unity-parameters-to-state-entries.md`: 0095: Lowering Unity parameters to state entries; an entry's rest value
 - `docs/adr/0096-platform-values.md`: 0096: Platform values: the `platform/` namespace, VRChat's units, lowered built-ins
 - `docs/adr/0097-texture-cache.md`: 0097: An opt-in cache of encoded textures, keyed by everything the bytes depend on
+- `docs/adr/0098-sync-encoding-per-entry.md`: 0098: The sync encoding of a state entry: ranges, unranged values and the exact midpoint
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

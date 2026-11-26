@@ -4,7 +4,7 @@ use civbb_format::animator::*;
 use civbb_format::expressions::{Control, ControlKind, Expressions, Menu};
 use civbb_format::face::{EyeDriver, EyeLook, Face, RangeMap, ShapeBind, Viseme};
 use civbb_format::hierarchy::{HumanBone, Humanoid};
-use civbb_format::state::{Entry, EntryIndex, EntryKind, StateTable, SyncMode};
+use civbb_format::state::{Entry, EntryIndex, EntryKind, Range, StateTable, SyncMode};
 use serde_json::Value;
 
 use super::{Vrm, index, num};
@@ -171,16 +171,21 @@ impl Importer<'_> {
                 root: None,
                 curves,
             });
-            // Beyond the synced budget expressions still work, just locally. A float costs 8 bits.
-            let synced = bits + 8 <= self.caps.synced_bits;
-            if synced {
-                bits += 8;
-            }
-            entries.push(Entry {
-                sync: if synced { SyncMode::Owner } else { SyncMode::None },
+            // Beyond the synced budget expressions still work, just locally. A weight is 0..1 in 8 bits (ADR 0098).
+            let mut entry = Entry {
+                range: Some(Range::Float {
+                    min: 0.0,
+                    max: 1.0,
+                    bits: 8,
+                }),
                 external: true,
                 ..Entry::new(name.clone(), EntryKind::Float, 0.0)
-            });
+            };
+            if bits + entry.sync_bits() <= self.caps.synced_bits {
+                bits += entry.sync_bits();
+                entry.sync = SyncMode::Owner;
+            }
+            entries.push(entry);
             controls.push(Control {
                 name,
                 icon: None,

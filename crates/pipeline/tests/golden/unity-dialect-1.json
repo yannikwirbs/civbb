@@ -3811,6 +3811,13 @@
           "external": true,
           "kind": "Float",
           "name": "Speed",
+          "range": {
+            "Float": {
+              "bits": 8,
+              "max": 1.0,
+              "min": -1.0
+            }
+          },
           "saved": true,
           "sync": "None"
         },
@@ -3819,6 +3826,12 @@
           "external": true,
           "kind": "Int",
           "name": "Count",
+          "range": {
+            "Int": {
+              "max": 255,
+              "min": 0
+            }
+          },
           "saved": false,
           "sync": "Owner"
         },

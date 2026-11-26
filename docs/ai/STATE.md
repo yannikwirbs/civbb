@@ -119,15 +119,18 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 - glTF input (ADR 0076): `KHR_mesh_quantization` accepted (integer attributes, morph deltas and animation outputs
   through the normalising accessor reader); required Draco or meshopt compression refused with an export hint.
-- State table (ADR 0088, 0095, 0096, #115 to #117, format v28): `civbb_format::state` (`StateTable`, `Entry {name, kind, default,
+- State table (ADR 0088, 0095, 0096, 0098, #115 to #118, format v29): `civbb_format::state` (`StateTable`, `Entry {name, kind, default, range,
   rest, sync, saved, external}`, `EntryIndex`), `Avatar::state`. Animator conditions, blend inputs, speed/offset/
   time/mirror inputs, drivers, menu controls (`Option<EntryIndex>`, puppet axes `Vec<Option<_>>`), contact
   receivers and chain outputs (`Chain::outputs`, one per grabbed/posed/angle/stretch/squish; dialect 1's prefix
   resolves `<prefix>_IsGrabbed` etc.) reference entries; the animator has no parameter table and `Expressions` only the menu. The Unity
   importer lowers dialect 1 in `gltf_import/unity_state.rs` (animator parameters in order, then expression-only ones;
   expression default starts, animator default is `rest`; unknown names `None`); `civbb_corpus::gltf` raises entries
-  back to dialect 1. Validation checks every reference and unique names; synced bits count the entry's type until
-  #118. Platform values (ADR 0096): `state::Platform`, entries named `platform/...`
+  back to dialect 1. Validation checks every reference and unique names. Sync encoding (ADR 0098, #118, format v29):
+  `Entry::range` (`Range::Int {min, max}`, `Range::Float {min, max, bits 2..=16}`), `Entry::sync_bits` (bool 1,
+  trigger 0 and never synced, ranged int ceil(log2(span + 1)), ranged float `bits`, unranged 32), `encode`/`decode`
+  (floats on `2^bits - 2` steps, midpoint exact); one budget `Caps::synced_bits` 1,024. Lowered expression
+  parameters get Int 0..255 / Float -1..1 8 bits, VRM weights Float 0..1 8 bits: corpus totals unchanged. Platform values (ADR 0096): `state::Platform`, entries named `platform/...`
   (VRChat's names via `vrchat_name`, renamed by the importer, raised back by the corpus writer and the parity
   hand-off), never synced/saved/external and written by no content (validated; the importer drops driver writes).
   Still by name: curve targets (#119).

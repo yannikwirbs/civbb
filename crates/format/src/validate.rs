@@ -15,7 +15,7 @@ use crate::material::{MaterialModel, TextureSlot};
 use crate::math::Transform;
 use crate::mesh::{Mesh, Skin};
 use crate::meta::Meta;
-use crate::state::{EntryIndex, PLATFORM_NAMESPACE, Platform, StateTable, SyncMode};
+use crate::state::{EntryIndex, EntryKind, PLATFORM_NAMESPACE, Platform, StateTable, SyncMode};
 
 mod animator;
 
@@ -523,6 +523,11 @@ impl V {
                 p,
                 format!("name {:?} used twice", e.name),
             );
+            if let Some(Err(problem)) = e.range.map(|r| r.check(e.kind)) {
+                self.fail(p, problem);
+            }
+            let synced_trigger = e.kind == EntryKind::Trigger && e.sync != SyncMode::None;
+            self.ensure(!synced_trigger, p, "a trigger is not synced");
             let platform = e.name.starts_with(PLATFORM_NAMESPACE);
             if platform {
                 self.ensure(Platform::from_name(&e.name).is_some(), p, "unknown platform value");

@@ -26,7 +26,7 @@ pub use validate::{Caps, validate};
 
 /// Version of the runtime package's data model. Bump on any change to the types in this crate; readers refuse
 /// packages of any other version, which are rebuilt from their kept source (ADR 0087).
-pub const FORMAT_VERSION: u32 = 28;
+pub const FORMAT_VERSION: u32 = 29;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -39,7 +39,7 @@ pub(crate) mod testutil {
     use crate::material::*;
     use crate::math::Transform;
     use crate::mesh::*;
-    use crate::state::{Entry, EntryKind, StateTable, SyncMode};
+    use crate::state::{Entry, EntryKind, Range, StateTable, SyncMode};
     use crate::*;
 
     /// A tiny skinned, morphing, textured avatar touching every type.
@@ -193,6 +193,7 @@ pub(crate) mod testutil {
                         name: "Toggle".into(),
                         kind: EntryKind::Bool,
                         default: 0.0,
+                        range: None,
                         rest: None,
                         sync: SyncMode::Owner,
                         saved: true,
@@ -202,6 +203,11 @@ pub(crate) mod testutil {
                         name: "Boop".into(),
                         kind: EntryKind::Float,
                         default: 0.0,
+                        range: Some(Range::Float {
+                            min: 0.0,
+                            max: 1.0,
+                            bits: 8,
+                        }),
                         rest: None,
                         sync: SyncMode::None,
                         saved: false,

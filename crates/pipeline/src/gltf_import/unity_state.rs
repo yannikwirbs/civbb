@@ -5,7 +5,7 @@
 use civbb_format::animator::{Animator, Behaviour, DriverOp};
 use civbb_format::dynamics::ChainOutputs;
 use civbb_format::expressions::{Control, ControlKind, Menu};
-use civbb_format::state::{Entry, EntryIndex, EntryKind, PLATFORM_NAMESPACE, Platform, StateTable, SyncMode};
+use civbb_format::state::{Entry, EntryIndex, EntryKind, PLATFORM_NAMESPACE, Platform, Range, StateTable, SyncMode};
 use serde::Deserialize;
 
 /// An animator parameter as dialect 1 writes it (`X_animator.animator.parameters`).
@@ -78,7 +78,17 @@ enum XControlKind {
 pub(super) fn lower(animator: Vec<XParameter>, expressions: Option<&XExpressions>) -> StateTable {
     let expressions = expressions.map_or(&[][..], |e| &e.parameters[..]);
     let find = |name: &str| expressions.iter().find(|e| e.name == name);
+    // VRChat's expression types lower exactly (ADR 0098): Int to 0..255, Float to -1..1 in 8 bits.
     let lowered = |e: &XExpressionParameter, kind| Entry {
+        range: match kind {
+            EntryKind::Int => Some(Range::Int { min: 0, max: 255 }),
+            EntryKind::Float => Some(Range::Float {
+                min: -1.0,
+                max: 1.0,
+                bits: 8,
+            }),
+            EntryKind::Bool | EntryKind::Trigger => None,
+        },
         sync: if e.synced { SyncMode::Owner } else { SyncMode::None },
         saved: e.saved,
         external: true,
