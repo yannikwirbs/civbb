@@ -41,15 +41,11 @@ const TABLE: [(HumanBone, Quat, Vec3); 55] = [
     (H::RightFoot, [0.0, 0.0, 0.0, 1.0], [1.0, 1.0, -1.0]),
     (H::RightToes, [0.0, 0.0, 0.0, 1.0], [1.0, -1.0, -1.0]),
     (
-        H::LeftThumbProximal,
+        H::LeftThumbMetacarpal,
         [0.0, -0.123091, -0.123092, 0.984732],
         [-1.0, 1.0, -1.0],
     ),
-    (
-        H::LeftThumbIntermediate,
-        [0.0, 0.196116, 0.0, 0.980581],
-        [-1.0, -1.0, -1.0],
-    ),
+    (H::LeftThumbProximal, [0.0, 0.196116, 0.0, 0.980581], [-1.0, -1.0, -1.0]),
     (H::LeftThumbDistal, [0.0, 0.196116, 0.0, 0.980581], [-1.0, -1.0, -1.0]),
     (
         H::LeftIndexProximal,
@@ -96,15 +92,11 @@ const TABLE: [(HumanBone, Quat, Vec3); 55] = [
     ),
     (H::LeftLittleDistal, [0.0, 0.0, -0.313377, 0.949629], [-1.0, -1.0, 1.0]),
     (
-        H::RightThumbProximal,
+        H::RightThumbMetacarpal,
         [0.0, 0.123091, 0.123091, 0.984732],
         [1.0, 1.0, 1.0],
     ),
-    (
-        H::RightThumbIntermediate,
-        [0.0, -0.196116, 0.0, 0.980581],
-        [1.0, -1.0, 1.0],
-    ),
+    (H::RightThumbProximal, [0.0, -0.196116, 0.0, 0.980581], [1.0, -1.0, 1.0]),
     (H::RightThumbDistal, [0.0, -0.196116, 0.0, 0.980581], [1.0, -1.0, 1.0]),
     (
         H::RightIndexProximal,
@@ -194,12 +186,12 @@ fn along(b: HumanBone) -> Along {
 /// Finger bones: proximal and intermediate point to the next joint, distal ones continue the intermediate.
 fn finger(b: HumanBone) -> Along {
     const FINGERS: [[HumanBone; 3]; 10] = [
-        [H::LeftThumbProximal, H::LeftThumbIntermediate, H::LeftThumbDistal],
+        [H::LeftThumbMetacarpal, H::LeftThumbProximal, H::LeftThumbDistal],
         [H::LeftIndexProximal, H::LeftIndexIntermediate, H::LeftIndexDistal],
         [H::LeftMiddleProximal, H::LeftMiddleIntermediate, H::LeftMiddleDistal],
         [H::LeftRingProximal, H::LeftRingIntermediate, H::LeftRingDistal],
         [H::LeftLittleProximal, H::LeftLittleIntermediate, H::LeftLittleDistal],
-        [H::RightThumbProximal, H::RightThumbIntermediate, H::RightThumbDistal],
+        [H::RightThumbMetacarpal, H::RightThumbProximal, H::RightThumbDistal],
         [H::RightIndexProximal, H::RightIndexIntermediate, H::RightIndexDistal],
         [H::RightMiddleProximal, H::RightMiddleIntermediate, H::RightMiddleDistal],
         [H::RightRingProximal, H::RightRingIntermediate, H::RightRingDistal],

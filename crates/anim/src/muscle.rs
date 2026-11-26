@@ -93,9 +93,9 @@ pub const MUSCLES: [Muscle; COUNT] = [
     m("Right Forearm Twist In-Out", H::RightLowerArm, 0, -90.0, 90.0),
     m("Right Hand Down-Up", H::RightHand, 2, -80.0, 80.0),
     m("Right Hand In-Out", H::RightHand, 1, -40.0, 40.0),
-    m("LeftHand.Thumb.1 Stretched", H::LeftThumbProximal, 2, -20.0, 20.0),
-    m("LeftHand.Thumb.Spread", H::LeftThumbProximal, 1, -25.0, 25.0),
-    m("LeftHand.Thumb.2 Stretched", H::LeftThumbIntermediate, 2, -40.0, 35.0),
+    m("LeftHand.Thumb.1 Stretched", H::LeftThumbMetacarpal, 2, -20.0, 20.0),
+    m("LeftHand.Thumb.Spread", H::LeftThumbMetacarpal, 1, -25.0, 25.0),
+    m("LeftHand.Thumb.2 Stretched", H::LeftThumbProximal, 2, -40.0, 35.0),
     m("LeftHand.Thumb.3 Stretched", H::LeftThumbDistal, 2, -40.0, 35.0),
     m("LeftHand.Index.1 Stretched", H::LeftIndexProximal, 2, -50.0, 50.0),
     m("LeftHand.Index.Spread", H::LeftIndexProximal, 1, -20.0, 20.0),
@@ -113,9 +113,9 @@ pub const MUSCLES: [Muscle; COUNT] = [
     m("LeftHand.Little.Spread", H::LeftLittleProximal, 1, -20.0, 20.0),
     m("LeftHand.Little.2 Stretched", H::LeftLittleIntermediate, 2, -45.0, 45.0),
     m("LeftHand.Little.3 Stretched", H::LeftLittleDistal, 2, -45.0, 45.0),
-    m("RightHand.Thumb.1 Stretched", H::RightThumbProximal, 2, -20.0, 20.0),
-    m("RightHand.Thumb.Spread", H::RightThumbProximal, 1, -25.0, 25.0),
-    m("RightHand.Thumb.2 Stretched", H::RightThumbIntermediate, 2, -40.0, 35.0),
+    m("RightHand.Thumb.1 Stretched", H::RightThumbMetacarpal, 2, -20.0, 20.0),
+    m("RightHand.Thumb.Spread", H::RightThumbMetacarpal, 1, -25.0, 25.0),
+    m("RightHand.Thumb.2 Stretched", H::RightThumbProximal, 2, -40.0, 35.0),
     m("RightHand.Thumb.3 Stretched", H::RightThumbDistal, 2, -40.0, 35.0),
     m("RightHand.Index.1 Stretched", H::RightIndexProximal, 2, -50.0, 50.0),
     m("RightHand.Index.Spread", H::RightIndexProximal, 1, -20.0, 20.0),
@@ -146,6 +146,25 @@ pub const MUSCLES: [Muscle; COUNT] = [
     ),
     m("RightHand.Little.3 Stretched", H::RightLittleDistal, 2, -45.0, 45.0),
 ];
+
+/// Unity's `HumanBodyBones` name of `bone` (the Unity dialect's humanoid names, ADR 0085 point 6): the native name
+/// capitalised, except the thumb, whose metacarpal, proximal and distal are Unity's proximal, intermediate and
+/// distal.
+pub fn unity_bone_name(bone: HumanBone) -> String {
+    match bone {
+        H::LeftThumbMetacarpal => "LeftThumbProximal".into(),
+        H::LeftThumbProximal => "LeftThumbIntermediate".into(),
+        H::RightThumbMetacarpal => "RightThumbProximal".into(),
+        H::RightThumbProximal => "RightThumbIntermediate".into(),
+        // The variant names are the native names capitalised.
+        _ => format!("{bone:?}"),
+    }
+}
+
+/// The bone a Unity `HumanBodyBones` name names.
+pub fn unity_bone(name: &str) -> Option<HumanBone> {
+    HumanBone::ALL.into_iter().find(|&b| unity_bone_name(b) == name)
+}
 
 /// The muscle a Unity clip property names.
 pub fn find(name: &str) -> Option<u8> {

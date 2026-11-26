@@ -29,8 +29,15 @@ struct RecordedNode {
     rotation: Quat,
 }
 
+/// A bone by Unity's `HumanBodyBones` name.
+fn unity_bone<'de, D: serde::Deserializer<'de>>(d: D) -> Result<HumanBone, D::Error> {
+    let name = String::deserialize(d)?;
+    civbb_anim::muscle::unity_bone(&name).ok_or_else(|| serde::de::Error::custom(format!("no bone {name}")))
+}
+
 #[derive(Deserialize)]
 struct RecordedFrame {
+    #[serde(deserialize_with = "unity_bone")]
     bone: HumanBone,
     node: u32,
     pre: Quat,

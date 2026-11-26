@@ -79,8 +79,9 @@ fn mirror(q: Quat) -> Quat {
     [q[0], -q[1], -q[2], q[3]]
 }
 
+/// A bone by Unity's `HumanTrait.BoneName` (`Left Thumb Proximal`).
 fn human_bone(unity_name: &str) -> HumanBone {
-    serde_json::from_value(serde_json::Value::String(unity_name.replace(' ', ""))).unwrap()
+    civbb_anim::muscle::unity_bone(&unity_name.replace(' ', "")).unwrap()
 }
 
 /// Angle between two rotations in degrees.
@@ -97,6 +98,28 @@ fn default_limits(bone: HumanBone) -> ([f32; 3], [f32; 3]) {
         max[m.axis as usize] = m.max;
     }
     (min, max)
+}
+
+/// Unity's recorded bone names (`HumanTrait.BoneName`, without spaces `HumanBodyBones`) map one to one onto the
+/// native (VRM 1.0) bones, the thumb shifted by one: Unity's proximal is the metacarpal (ADR 0085 point 6).
+#[test]
+fn unity_bone_names_map_one_to_one() {
+    use civbb_anim::muscle::{unity_bone, unity_bone_name};
+    let t: Table = load("muscles.json");
+    let mut bones: Vec<HumanBone> = t.bones.iter().map(|n| human_bone(n)).collect();
+    bones.sort();
+    assert_eq!(bones, HumanBone::ALL, "every bone once");
+    for b in HumanBone::ALL {
+        assert_eq!(unity_bone(&unity_bone_name(b)), Some(b));
+    }
+    assert_eq!(human_bone("Left Thumb Proximal"), HumanBone::LeftThumbMetacarpal);
+    assert_eq!(human_bone("Right Thumb Intermediate"), HumanBone::RightThumbProximal);
+    assert_eq!(human_bone("Left Thumb Distal"), HumanBone::LeftThumbDistal);
+    assert_eq!(
+        serde_json::to_value(HumanBone::LeftThumbMetacarpal).unwrap(),
+        "leftThumbMetacarpal",
+        "VRM 1.0's name"
+    );
 }
 
 #[test]

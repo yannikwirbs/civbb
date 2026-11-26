@@ -426,7 +426,10 @@ fn source_extensions_map_nodes_and_clips() {
     let mut animator_with_parameters = json!(animator);
     animator_with_parameters["parameters"] = json!([]);
     doc["extensions"] = json!({
-        "X_avatar": {"humanoid": {"Hips": 1}},
+        // Unity's names: its thumb proximal is the native metacarpal (ADR 0085 point 6).
+        "X_avatar": {"humanoid": {"Hips": 1, "LeftThumbProximal": 0}, "muscle_frames": [{"bone": "LeftThumbProximal",
+            "pre": [0.0, 0.0, 0.0, 1.0], "post": [0.0, 0.0, 0.0, 1.0], "sign": [1.0, 1.0, 1.0], "min": [0.0, 0.0, 0.0],
+            "max": [0.0, 0.0, 0.0], "twist": 1.0}]},
         "X_animator": {"animator": animator_with_parameters, "clips": [clip]},
         "X_constraints": [constraint],
     });
@@ -434,7 +437,9 @@ fn source_extensions_map_nodes_and_clips() {
     let names: Vec<(&str, bool)> = a.hierarchy.nodes.iter().map(|n| (n.name.as_str(), n.active)).collect();
     assert_eq!(names, [("Root", true), ("A", true), ("B", false)]);
     let r = a.avatar().unwrap();
-    assert_eq!(r.humanoid.as_ref().unwrap().bones, [(HumanBone::Hips, 2)]);
+    let h = r.humanoid.as_ref().unwrap();
+    assert_eq!(h.bones, [(HumanBone::Hips, 2), (HumanBone::LeftThumbMetacarpal, 1)]);
+    assert_eq!(h.muscle_frames[0].bone, HumanBone::LeftThumbMetacarpal);
     assert_eq!(r.viewpoint, [0.0; 3], "no head: origin");
     assert_eq!(a.clips.len(), 2);
     assert_eq!(a.clips[1].name, "X");

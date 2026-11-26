@@ -1092,23 +1092,23 @@
         "humanoid": {
           "bones": [
             [
-              "Hips",
+              "hips",
               1
             ],
             [
-              "Spine",
+              "spine",
               2
             ],
             [
-              "Head",
+              "head",
               3
             ],
             [
-              "LeftEye",
+              "leftEye",
               4
             ],
             [
-              "RightEye",
+              "rightEye",
               5
             ]
           ],
@@ -1116,7 +1116,7 @@
           "human_scale": 0.0,
           "muscle_frames": [
             {
-              "bone": "Spine",
+              "bone": "spine",
               "max": [
                 40.0,
                 30.0,

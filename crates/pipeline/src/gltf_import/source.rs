@@ -4,13 +4,14 @@
 //!
 //! A malformed extension or a node index outside the scene fails the import; `validate` then checks the rest.
 
+use civbb_anim::muscle::unity_bone;
 use civbb_format::animator::{Animator, Clip, Motion};
 use civbb_format::constraint::{Constraint, ConstraintKind, WorldUp};
 use civbb_format::dynamics::{Contacts, Dynamics};
 use civbb_format::expressions::Expressions;
 use civbb_format::face::{EyeDriver, Face, ShapeBind};
 use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, NodeIndex};
-use civbb_format::math::Vec3;
+use civbb_format::math::{Quat, Vec3};
 use civbb_format::state::StateTable;
 use serde::Deserialize;
 use serde_json::Value;
@@ -34,6 +35,19 @@ pub(super) struct Source {
     pub state: StateTable,
 }
 
+/// Dialect 1's muscle frame: the format's `MuscleFrame` of v32, its bone by Unity `HumanBodyBones` name.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct XMuscleFrame {
+    bone: String,
+    pre: Quat,
+    post: Quat,
+    sign: Vec3,
+    min: Vec3,
+    max: Vec3,
+    twist: f32,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct XAvatar {
@@ -41,9 +55,9 @@ struct XAvatar {
     humanoid: serde_json::Map<String, Value>,
     #[serde(default)]
     viewpoint: Option<Vec3>,
-    /// Format `MuscleFrame`s in glTF space (ADR 0042).
+    /// Muscle frames in glTF space (ADR 0042).
     #[serde(default)]
-    muscle_frames: Vec<MuscleFrame>,
+    muscle_frames: Vec<XMuscleFrame>,
     /// The format `Face` with each bind's `mesh` the glTF node carrying the mesh and eye bones as glTF nodes
     /// (ADR 0042).
     #[serde(default)]
@@ -230,7 +244,7 @@ impl Importer<'_> {
     fn x_avatar(&mut self, x: XAvatar) -> Result<(Humanoid, Vec3), String> {
         let mut h = Humanoid::default();
         for (name, node) in &x.humanoid {
-            let bone: HumanBone = parse("X_avatar", &Value::String(name.clone()))?;
+            let bone = unity_bone(name).ok_or_else(|| format!("X_avatar: unknown bone {name}"))?;
             let i = node
                 .as_u64()
                 .and_then(|i| u32::try_from(i).ok())
@@ -241,7 +255,18 @@ impl Importer<'_> {
             h.bones.push((bone, self.x_node("X_avatar", i)?));
         }
         h.bones.sort_unstable_by_key(|&(b, _)| b);
-        h.muscle_frames = x.muscle_frames;
+        for f in x.muscle_frames {
+            h.muscle_frames.push(MuscleFrame {
+                bone: unity_bone(&f.bone)
+                    .ok_or_else(|| format!("X_avatar: muscle frame of unknown bone {}", f.bone))?,
+                pre: f.pre,
+                post: f.post,
+                sign: f.sign,
+                min: f.min,
+                max: f.max,
+                twist: f.twist,
+            });
+        }
         h.human_scale = x.human_scale;
         h.center_of_mass = x.center_of_mass;
         let viewpoint = match (x.viewpoint, h.node(HumanBone::Head)) {

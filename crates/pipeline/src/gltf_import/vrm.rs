@@ -4,6 +4,7 @@
 //! Runs after the glTF import and reads the extension JSON tolerantly: a missing or malformed field takes the
 //! VRM default, an unresolvable reference is skipped with a warning. Validation still checks the result.
 
+use civbb_anim::muscle::unity_bone;
 use civbb_core::math::{add, conj, cross, dot};
 use civbb_format::animator::*;
 use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
@@ -277,22 +278,14 @@ impl Importer<'_> {
     }
 }
 
-/// Maps a VRM bone name to a humanoid bone. VRM 1.0 renamed the thumb: its metacarpal is Unity's proximal.
+/// Maps a VRM bone name to a humanoid bone: VRM 1.0's names are the native ones; VRM 0.x names Unity's bones
+/// (its `leftThumbProximal` is Unity's, the metacarpal).
 fn human_bone(name: &str, v1: bool) -> Option<HumanBone> {
-    let renamed = match (v1, name) {
-        (true, "leftThumbMetacarpal") => "LeftThumbProximal",
-        (true, "leftThumbProximal") => "LeftThumbIntermediate",
-        (true, "rightThumbMetacarpal") => "RightThumbProximal",
-        (true, "rightThumbProximal") => "RightThumbIntermediate",
-        _ => "",
-    };
-    let pascal = if renamed.is_empty() {
-        let mut c = name.chars();
-        c.next().map(|f| f.to_ascii_uppercase().to_string() + c.as_str())?
-    } else {
-        renamed.to_owned()
-    };
-    serde_json::from_value(Value::String(pascal)).ok()
+    if v1 {
+        return serde_json::from_value(Value::String(name.into())).ok();
+    }
+    let mut c = name.chars();
+    unity_bone(&(c.next()?.to_ascii_uppercase().to_string() + c.as_str()))
 }
 
 fn index(v: &Value) -> Option<usize> {
@@ -381,15 +374,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn vrm1_thumb_names_shift_one_segment() {
+    fn vrm0_thumb_names_shift_one_segment() {
         assert_eq!(
             human_bone("leftThumbMetacarpal", true),
-            Some(HumanBone::LeftThumbProximal)
+            Some(HumanBone::LeftThumbMetacarpal)
         );
         assert_eq!(
             human_bone("leftThumbProximal", false),
+            Some(HumanBone::LeftThumbMetacarpal)
+        );
+        assert_eq!(
+            human_bone("leftThumbIntermediate", false),
             Some(HumanBone::LeftThumbProximal)
         );
+        assert_eq!(human_bone("leftThumbIntermediate", true), None);
         assert_eq!(human_bone("upperChest", true), Some(HumanBone::UpperChest));
         assert_eq!(human_bone("tail", true), None);
     }

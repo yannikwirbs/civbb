@@ -528,8 +528,8 @@ impl BodyPart {
             H::RightShoulder | H::RightUpperArm | H::RightLowerArm | H::RightHand => BodyPart::RightArm,
             H::LeftUpperLeg | H::LeftLowerLeg | H::LeftFoot | H::LeftToes => BodyPart::LeftLeg,
             H::RightUpperLeg | H::RightLowerLeg | H::RightFoot | H::RightToes => BodyPart::RightLeg,
-            H::LeftThumbProximal
-            | H::LeftThumbIntermediate
+            H::LeftThumbMetacarpal
+            | H::LeftThumbProximal
             | H::LeftThumbDistal
             | H::LeftIndexProximal
             | H::LeftIndexIntermediate

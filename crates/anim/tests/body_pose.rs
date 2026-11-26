@@ -65,7 +65,7 @@ fn positions(s: &Skeleton, c: &Case) -> HashMap<HumanBone, Vec3> {
         .zip(&c.world)
         .filter(|(n, _)| !s.unmapped.contains(&n.name))
         .filter_map(|(n, (p, _))| {
-            let bone = serde_json::from_value(serde_json::Value::String(n.name.clone())).ok()?;
+            let bone = civbb_anim::muscle::unity_bone(&n.name)?;
             Some((bone, mirror(*p)))
         })
         .collect()
@@ -134,12 +134,7 @@ fn hips_placement_matches_unity() {
         };
         let bones: Vec<(HumanBone, u32)> = (s.nodes.iter().enumerate())
             .filter(|(_, n)| !s.unmapped.contains(&n.name))
-            .filter_map(|(i, n)| {
-                Some((
-                    serde_json::from_value(serde_json::Value::String(n.name.clone())).ok()?,
-                    i as u32,
-                ))
-            })
+            .filter_map(|(i, n)| Some((civbb_anim::muscle::unity_bone(&n.name)?, i as u32)))
             .collect();
         let hips = bones.iter().find(|b| b.0 == HumanBone::Hips).unwrap().1 as usize;
         // Anchored to Unity's rest centre of mass, as exports are: the rest case is the rest pose moved to body

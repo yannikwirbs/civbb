@@ -28,7 +28,7 @@ pub use validate::{Caps, validate};
 
 /// Version of the runtime package's data model. Bump on any change to the types in this crate; readers refuse
 /// packages of any other version, which are rebuilt from their kept source (ADR 0087).
-pub const FORMAT_VERSION: u32 = 33;
+pub const FORMAT_VERSION: u32 = 34;
 
 #[cfg(test)]
 pub(crate) mod testutil {

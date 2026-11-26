@@ -733,7 +733,7 @@
               "Humanoid": {
                 "Muscle": {
                   "axis": 2,
-                  "bone": "LeftUpperArm"
+                  "bone": "leftUpperArm"
                 }
               }
             }
@@ -3720,23 +3720,23 @@
         "humanoid": {
           "bones": [
             [
-              "Hips",
+              "hips",
               1
             ],
             [
-              "Spine",
+              "spine",
               2
             ],
             [
-              "Head",
+              "head",
               3
             ],
             [
-              "LeftEye",
+              "leftEye",
               4
             ],
             [
-              "RightEye",
+              "rightEye",
               5
             ]
           ],
@@ -3748,7 +3748,7 @@
           "human_scale": 1.100000023841858,
           "muscle_frames": [
             {
-              "bone": "Spine",
+              "bone": "spine",
               "max": [
                 40.0,
                 30.0,

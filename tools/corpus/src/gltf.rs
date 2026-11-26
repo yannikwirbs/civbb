@@ -4,6 +4,7 @@
 //! their base colour only; textures and animations are left out. [`to_source_glb`] adds the source package's
 //! `X_*` extensions (ADR 0041) for what glTF lacks.
 
+use civbb_anim::muscle::unity_bone_name;
 use civbb_format::Document;
 use civbb_format::animator::{
     Action, Animator, EulerOrder, HumanoidProperty, Key, MeshProperty, NodeProperty, Target, Unwritten,
@@ -124,21 +125,15 @@ pub fn to_source_glb(a: &Document) -> Vec<u8> {
     }
     let mut ext = serde_json::Map::new();
     if let Some(h) = a.avatar().and_then(|r| r.humanoid.as_ref()) {
-        let bones: serde_json::Map<String, Value> = h
-            .bones
-            .iter()
-            .map(|(b, n)| {
-                (
-                    serde_json::to_value(b)
-                        .expect("bone")
-                        .as_str()
-                        .expect("name")
-                        .to_owned(),
-                    json!(n),
-                )
-            })
-            .collect();
-        let mut x = json!({"humanoid": bones, "viewpoint": a.avatar().map_or([0.0; 3], |r| r.viewpoint), "muscle_frames": h.muscle_frames});
+        // Dialect 1 names bones as Unity's `HumanBodyBones`.
+        let bones: serde_json::Map<String, Value> =
+            (h.bones.iter()).map(|(b, n)| (unity_bone_name(*b), json!(n))).collect();
+        let mut frames = json!(h.muscle_frames);
+        for (f, v) in h.muscle_frames.iter().zip(frames.as_array_mut().expect("array")) {
+            v["bone"] = json!(unity_bone_name(f.bone));
+        }
+        let viewpoint = a.avatar().map_or([0.0; 3], |r| r.viewpoint);
+        let mut x = json!({"humanoid": bones, "viewpoint": viewpoint, "muscle_frames": frames});
         if let Some(face) = a.avatar().and_then(|r| r.face.as_ref()) {
             // Binds name the glTF node carrying the mesh (ADR 0042); node indices equal the avatar's.
             let mut face = face.clone();

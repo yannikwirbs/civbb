@@ -27,9 +27,11 @@ pub struct Hierarchy {
     pub nodes: Vec<Node>,
 }
 
-/// Humanoid bones, matching the Unity/VRM humanoid set so legacy animations retarget unchanged.
+/// Humanoid bones: VRM 1.0's humanoid bone set and names (ADR 0085 point 6), serialised as VRM writes them
+/// (`leftThumbMetacarpal`). Importers map other names (Unity's `HumanBodyBones`) by table.
 #[allow(missing_docs)] // The names are the documentation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum HumanBone {
     Hips,
     Spine,
@@ -56,8 +58,8 @@ pub enum HumanBone {
     RightLowerLeg,
     RightFoot,
     RightToes,
+    LeftThumbMetacarpal,
     LeftThumbProximal,
-    LeftThumbIntermediate,
     LeftThumbDistal,
     LeftIndexProximal,
     LeftIndexIntermediate,
@@ -71,8 +73,8 @@ pub enum HumanBone {
     LeftLittleProximal,
     LeftLittleIntermediate,
     LeftLittleDistal,
+    RightThumbMetacarpal,
     RightThumbProximal,
-    RightThumbIntermediate,
     RightThumbDistal,
     RightIndexProximal,
     RightIndexIntermediate,
@@ -134,6 +136,68 @@ impl Humanoid {
 }
 
 impl HumanBone {
+    /// Every bone, in declaration order.
+    pub const ALL: [HumanBone; 55] = {
+        use HumanBone as H;
+        [
+            H::Hips,
+            H::Spine,
+            H::Chest,
+            H::UpperChest,
+            H::Neck,
+            H::Head,
+            H::Jaw,
+            H::LeftEye,
+            H::RightEye,
+            H::LeftShoulder,
+            H::LeftUpperArm,
+            H::LeftLowerArm,
+            H::LeftHand,
+            H::RightShoulder,
+            H::RightUpperArm,
+            H::RightLowerArm,
+            H::RightHand,
+            H::LeftUpperLeg,
+            H::LeftLowerLeg,
+            H::LeftFoot,
+            H::LeftToes,
+            H::RightUpperLeg,
+            H::RightLowerLeg,
+            H::RightFoot,
+            H::RightToes,
+            H::LeftThumbMetacarpal,
+            H::LeftThumbProximal,
+            H::LeftThumbDistal,
+            H::LeftIndexProximal,
+            H::LeftIndexIntermediate,
+            H::LeftIndexDistal,
+            H::LeftMiddleProximal,
+            H::LeftMiddleIntermediate,
+            H::LeftMiddleDistal,
+            H::LeftRingProximal,
+            H::LeftRingIntermediate,
+            H::LeftRingDistal,
+            H::LeftLittleProximal,
+            H::LeftLittleIntermediate,
+            H::LeftLittleDistal,
+            H::RightThumbMetacarpal,
+            H::RightThumbProximal,
+            H::RightThumbDistal,
+            H::RightIndexProximal,
+            H::RightIndexIntermediate,
+            H::RightIndexDistal,
+            H::RightMiddleProximal,
+            H::RightMiddleIntermediate,
+            H::RightMiddleDistal,
+            H::RightRingProximal,
+            H::RightRingIntermediate,
+            H::RightRingDistal,
+            H::RightLittleProximal,
+            H::RightLittleIntermediate,
+            H::RightLittleDistal,
+        ]
+    };
+
     /// The bone that takes the rest of this bone's twist ([`MuscleFrame::twist`]), for the four limb bones that
     /// split their twist.
     pub fn twist_child(self) -> Option<HumanBone> {
