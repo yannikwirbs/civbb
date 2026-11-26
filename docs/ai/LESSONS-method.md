@@ -45,3 +45,5 @@ run that takes minutes.
   every state's view means and the red count in both runs' `parity.json` (a short Python loop over the score dirs).
 - A round trip (raise, then lower) cannot catch a raise that leaves a value unchanged when the lowering accepts both
   forms (native `platform/` names lowered as-is): also assert on the raised text itself.
+- Waiting on a build log with `until grep -q 'error' ...`: `civbb build`'s lod line contains `error [...]` and ends
+  the wait early. Match anchored, specific lines (`^stage seconds|^civbb:`).
