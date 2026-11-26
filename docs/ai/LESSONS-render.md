@@ -82,3 +82,5 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   before modelling a light model from the source (a "ramp lighting" model of it made the score worse).
 - Unity feeds a shader's UV1 from UV0 when the mesh has no second UV set (KohzieBoi: main texture on `_MainTextureUV`
   1, rendered as on UV0); the renderer does the same (`scene.rs`).
+- A batch that runs `target/release` binaries for many minutes (`tools/parity.sh` over 13 exports) must not overlap
+  a release rebuild; debug `cargo test`/`xtask ci` can run meanwhile.

@@ -8,82 +8,38 @@ General gotchas; read every session. Read a topic file before working in its are
 - `LESSONS-parsers.md`: parsers of untrusted input, fuzz targets or native (`-sys`) dependencies.
 - `LESSONS-anim.md`: `civbb-anim`, `civbb-dynamics`, constraints, muscles or their tests.
 - `LESSONS-data.md`: Booth archives, Blender conversions, GLB files, meshes or goldens.
+- `LESSONS-method.md`: tests meant to catch a bug, refactor pins, measurements, benchmarks, runs of minutes.
 
 Add a line to the matching file whenever something costs more than one attempt.
 
-- `cargo` is on PATH in Git Bash sessions (checked 2026-11-18). A shell started before a toolchain install may lack it:
-  then prefix `export PATH="$HOME/.cargo/bin:$PATH" &&`.
-- Git Bash rewrites leading-slash args into Windows paths: use `gh api repos/...`, not `gh api /repos/...`.
-- A `cd` in a Bash call persists into later calls; use absolute paths.
-- Never `canonicalize()` repo paths on Windows: it adds a verbatim `\\?\` prefix and breaks comparisons with cargo metadata paths.
-- Python `open(p, "w")` on Windows writes CRLF; use `newline="\n"`. rustfmt is pinned to Unix newlines.
-- Python heredocs via Bash: a Rust escape like backslash-x02 inside a normal triple-quoted string becomes a real byte; use raw strings (`r'''...'''`) when the text holds Rust escapes. A Bash heredoc containing a stray quote fails to parse; write long content to the scratchpad with Write and `cat >>` it.
-- The workspace globs `tools/*`: a non-crate directory there (the Unity project) must be in `[workspace] exclude`.
-- `python -I` drops the script's directory from `sys.path`, so own scratch helper modules don't import; use it for scripts that read untrusted downloads, not for own analysis scripts.
-- The workspace globs `crates/*`: an empty `crates/<name>/` without a `Cargo.toml` breaks every cargo command, `fmt` included. Create the manifest first.
-- Benchmarks: `cargo run` defaults to debug; numbers only mean something from `--release` (the report's `profile` field says which).
-- Python run from a Bash heredoc turns Rust or Windows-path backslash escapes inside normal strings into real characters (a carriage return in a Rust literal, which clippy reports as `no_effect_replace`; `\1` in a path). Write Rust and docs with the Write/Edit tools; if Python must write them, use raw strings and check the output.
-- The Bash tool rejects `sleep N; cmd` waits; watch CI with `gh run watch <id> --exit-status` in a background call.
-- Mutation-check equivalence tests, and make the mutated case reachable: a parameter driver that only fires on
-  frame 1 (when every layer starts in its default state anyway) could not show a driver-timing bug.
-- Before/after binaries: `git worktree add --detach <scratchpad>/wt HEAD`, build there with
-  `--target-dir <scratchpad>/wt-target`, then `git worktree remove --force` it. Piping `civbb build` into `head`
-  makes it panic with "failed printing to stdout"; harmless.
-- Python's `open()` on Windows defaults to cp1252: read and write repo files with `encoding="utf-8"`, or
-  replacements containing `§` or other non-ASCII text silently fail to match. Git Bash's `iconv` reports every file
-  as invalid UTF-8; check with Python's strict `decode("utf-8")` instead.
-- Python `str.replace` silently does nothing when the pattern is not there: a "no effect" experiment may never
-  have run. `assert old in s` before every replace, or use the Edit tool (it fails loudly).
-- `gh run list --commit <sha>` right after `git push` can come back empty; list runs a few seconds later (or by
-  `--limit`) and watch each run ID.
-- `gh run view <id> --log-failed` prints nothing while any job of the run is still going; fetch a finished job's log
-  with `gh api repos/yannikwirbs/civbb/actions/jobs/<job id>/logs` (job ids from `gh run view <id> --json jobs`).
-- Don't benchmark while compiling: run timing batches alone (background them and wait) or the numbers mean nothing.
-- Python heredocs through the Bash tool turn `\n` inside Rust string literals into real newlines too (valid Rust,
-  but it breaks string continuations and reads badly). Write Rust strings with escapes through Edit/Write only.
-- A throwaway study that runs for minutes: check it uses more than one core (CPU seconds against wall time) and that
-  its filters still apply after edits; a variant list that stopped honouring `STUDY_VARIANTS` ran full encodes per
-  file and looked like a leak. Pipe long output through `grep --line-buffered` or progress stays invisible.
-- Long measurement runs (the 2026-11-05 session took 202 min, about 60 of them avoidable): before starting a corpus-wide
-  run, (1) run it on the smallest input first and on one real avatar, (2) after a minute check CPU seconds against
-  wall time and committed memory, (3) drop variants the one-avatar run already rules out (corpus-wide RDO variants
-  cost 13 min after AliciaSolid had shown XUASTC beats RDO), (4) run one variant when only images or one property
-  are needed, and (5) never end the turn just to wait: do the next independent issue meanwhile.
-- `local_avatars_atlas_and_shrink` is `#[ignore]`d (two minutes of codec-ladder encodes, and CI has no corpus/local):
-  run it with `--ignored` after changing `atlas` or `texture`. Run `cargo fmt --all` before `cargo xtask ci`, and the
-  gate once per commit, targeted `cargo test -p <crate> --test <name>` in between.
-- `python -I` ignores `PYTHONIOENCODING`: print non-ASCII paths (the Booth packages' Japanese folder names) with
-  `python -I -X utf8`. `xargs ... python -I -` takes stdin for the file list and leaves Python in the REPL; write
-  the script to a file instead.
-- Before calling a test a check, make each case one the code under test could fail: a freeze test whose source
-  never moved while frozen passed with freezing switched off. Mutate the branch and see the test fail.
-- Stopping a background job (TaskStop) can leave its children running (`timeout`, Unity); a second run then aborts
-  with "another Unity instance is running with this project open". Find leftovers with PowerShell
-  `Get-CimInstance Win32_Process` filtered by command line and stop them by PID; never stop every `Unity.exe` (the
-  owner may have an Editor open). Git Bash has no `setsid`.
-- `a && b >> file` in one Bash call skips the append when `a` fails (a `grep` with no match): check that an appended
-  file changed. A background `cargo test` started before an edit compiles the old code; rerun after editing.
-- Don't restore a file with `git checkout --` after a mutation check of a file you changed this session: it reverts to the commit and drops your uncommitted edits. Revert the mutation with the inverse edit.
-- Before fitting an engine's behaviour from its outputs, read its own state and constants by reflection (field names
-  from an `ApiProbe` run, then values): the SDK's per-bone `prevVelocity`, its `COLLISION_FRICTION`, Unity's
-  `Avatar.GetAxisLength` and `humanDescription.skeleton` each turned an hour of ill-conditioned fitting into one
-  clean regression (2026-11-23: #83, #84, #95, #96).
+- Shell: Git Bash rewrites leading-slash args into Windows paths (`gh api repos/...`, not `gh api /repos/...`). A
+  `cd` persists into later calls; use absolute paths. `cargo` is on PATH (a shell started before a toolchain
+  install may lack it: `export PATH="$HOME/.cargo/bin:$PATH"`).
 - `cargo xtask ci 2>&1 | tail -3 && git commit ...` commits even when CI fails: the pipeline's status is `tail`'s.
-  Start such Bash calls with `set -o pipefail` (a red commit had to be rewritten on 2026-11-24).
-- One-worker timings on the hybrid i5-12600K land on a P- or an E-core at random (up to 1.8x apart, a thread can
-  migrate mid-run): pin them (`cmd //c "start /affinity 4 /wait /b <exe> ..."` from Git Bash, logical CPU 2 is a
-  P-core; `taskset -c 2` on Linux) and run twice before believing a before/after difference (#103).
-- Behaviour pins for refactors: a standalone scratch crate in the scratchpad with path dependencies on the repo's
-  crates (plus a copy pointing at a `git worktree` of the start commit for the baseline) stays out of git, the code
-  map and `xtask ci`. Compare with `cmp` and a line count, never by counting `diff` lines: a harness whose setup
-  panics under a silenced panic hook writes an empty file that "has no differing lines". Mutation-check the pin.
-- After splitting a file, `cargo fix --allow-dirty -p <crate> --lib --tests` prunes the copied imports; it changes
-  nothing while any compile error remains. Clippy may flag moved code it ignored inside a very long function
-  (`manual_is_multiple_of` on 2026-11-24).
-- Splitting uncommitted work into two commits: copy the files to the scratchpad first, revert one change with the
-  Edit tool (Python replacements miss text that `cargo fmt` has reformatted), commit, then copy the files back.
-- Goldens of floats: compare the serialised text, not re-parsed `serde_json::Value`s (without the `float_roundtrip`
-  feature parsing is off by an ULP, so a freshly blessed golden "differs"). Long `gh issue create` batches with
-  backticks and apostrophes break Bash quoting: write a Python script (list of bodies, `subprocess.run`) instead.
-- A batch that runs `target/release` binaries for many minutes (parity over 13 exports) must not overlap a release
-  rebuild; debug `cargo test`/`xtask ci` can run meanwhile.
+  Start such Bash calls with `set -o pipefail`. Likewise `a && b >> file` skips the append when `a` fails (a `grep`
+  with no match): check that an appended file changed.
+- Never `canonicalize()` repo paths on Windows: it adds a verbatim `\\?\` prefix and breaks comparisons with cargo
+  metadata paths.
+- The workspace globs `crates/*` and `tools/*`: an empty `crates/<name>/` without a `Cargo.toml` breaks every cargo
+  command (create the manifest first); a non-crate directory under `tools/` must be in `[workspace] exclude`.
+- Write Rust and docs with the Write/Edit tools. Python run from a Bash heredoc turns backslash escapes inside normal
+  strings into real characters (`\x02`, `\n` in a Rust literal, `\1` in a path), and a stray quote breaks the
+  heredoc. If Python must write them, use raw strings and check the output.
+- Python on Windows: `open()` defaults to cp1252 (replacements containing `§` silently fail to match) and `"w"`
+  writes CRLF: use `encoding="utf-8", newline="\n"`. `str.replace` silently does nothing when the pattern is
+  missing: `assert old in s` first, or use the Edit tool. Git Bash's `iconv` reports every file as invalid UTF-8;
+  check with Python's strict `decode("utf-8")`.
+- `python -I` drops the script's directory from `sys.path` and ignores `PYTHONIOENCODING` (print non-ASCII with
+  `python -I -X utf8`); use it for scripts that read untrusted downloads, not for own analysis scripts.
+  `xargs ... python -I -` leaves Python in the REPL; write the script to a file instead.
+- GitHub CI: `tools/ci.sh` (it copes with runs not yet listed right after a push and with `--log-failed` printing
+  nothing while a job runs). The Bash tool rejects `sleep N; cmd` waits; `tools/ci.sh --wait` in a background call.
+  File issues with `tools/issue.sh new` (body on stdin): long `gh issue create` bodies with backticks and
+  apostrophes break Bash quoting.
+- Stopping a background job (TaskStop) can leave its children running (`timeout`, Unity); a second run then aborts
+  with "another Unity instance is running with this project open". Find leftovers with
+  `powershell -NoProfile -Command "Get-CimInstance Win32_Process"` filtered by command line and stop them by PID;
+  never stop every `Unity.exe` (the owner may have an Editor open). Git Bash has no `setsid`.
+- A background `cargo test` started before an edit compiles the old code; rerun after editing.
+- Don't restore a file with `git checkout --` after a mutation check of a file you changed this session: it reverts
+  to the commit and drops your uncommitted edits. Revert the mutation with the inverse edit.

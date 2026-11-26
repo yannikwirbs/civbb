@@ -20,3 +20,5 @@ Read before working on atlasing, mips, KTX2 or the Basis Universal encoder. Add 
   match. To isolate codec error from mip error, decode the codec's level 0 back to PNG and let both sides mip it.
 - Size budgets per texture: an atlas PNG written with fast compression is larger than the textures it replaces and
   lets a bigger codec "fit"; compare like with like (best-compressed PNG).
+- `local_avatars_atlas_and_shrink` is `#[ignore]`d (two minutes of codec-ladder encodes, and CI has no corpus/local):
+  run it with `--ignored` after changing `atlas` or `texture`.

@@ -294,14 +294,16 @@ Internal deps: none
 - `docs/adr/0089-native-animation-targets.md`: 0089: Curves target native properties by reference, in native units; Unity bindings are resolved by the importer
 - `docs/adr/0090-materials-as-native-features.md`: 0090: Materials are native models with named features; shader families are lowered into them by table
 - `docs/adr/0091-project-claude-settings-trim-fixed-context.md`: 0091: Project Claude Code settings drop tools this repo never uses
+- `docs/adr/0092-session-shape-and-handover.md`: 0092: Sessions end at a chain's end or 250 k tokens of context; the handover is STATUS.md's Next and `/continue`
+- `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
+- `docs/ai/LESSONS-method.md`: Lessons: method
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing
 - `docs/ai/LESSONS-render.md`: Lessons: renderer and viewer
 - `docs/ai/LESSONS-textures.md`: Lessons: textures
 - `docs/ai/LESSONS-unity.md`: Lessons: Unity
 - `docs/ai/LESSONS.md`: Lessons
-- `docs/ai/NEXT_PROMPT.md`: Next prompt
 - `docs/ai/SESSIONS.md`: Sessions
 - `docs/ai/STATE.md`: State
 - `docs/ai/STATUS.md`: Status

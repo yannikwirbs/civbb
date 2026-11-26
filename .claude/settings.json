@@ -4,5 +4,17 @@
   },
   "enabledPlugins": {
     "unity@claude-plugins-official": false
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python \"$CLAUDE_PROJECT_DIR/tools/context.py\" statusline"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Read|Grep|Glob|Agent|WebFetch|LSP",
+        "hooks": [{ "type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/tools/context.py\" hook" }]
+      }
+    ]
   }
 }
