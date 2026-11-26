@@ -14,6 +14,7 @@ use civbb_format::hierarchy::{HumanBone, Humanoid, NodeIndex};
 use civbb_format::math::{Quat, Transform, Vec3};
 use civbb_format::mesh::FirstPerson;
 use civbb_format::meta::Meta;
+use civbb_format::state::StateTable;
 use serde_json::Value;
 
 use super::Importer;
@@ -32,6 +33,7 @@ pub(super) struct Vrm {
     pub dynamics: Dynamics,
     pub animator: Option<Animator>,
     pub expressions: Option<Expressions>,
+    pub state: StateTable,
     pub meta: Option<Meta>,
     pub constraints: Vec<Constraint>,
 }
@@ -79,6 +81,7 @@ impl Importer<'_> {
             dynamics,
             animator: None,
             expressions: None,
+            state: StateTable::default(),
             meta: meta(&root["meta"], v1),
             constraints,
         };

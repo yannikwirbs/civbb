@@ -11,6 +11,7 @@ use crate::hierarchy::{Hierarchy, Humanoid};
 use crate::material::{Material, Texture};
 use crate::mesh::Mesh;
 use crate::meta::Meta;
+use crate::state::StateTable;
 
 /// A complete avatar. Cross references are indices into the vectors here; `validate` checks them.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -31,11 +32,13 @@ pub struct Avatar {
     pub materials: Vec<Material>,
     /// Textures referenced by materials; pixels live in blobs.
     pub textures: Vec<Texture>,
+    /// Shared state: animator parameters, menu and network values (ADR 0088).
+    pub state: StateTable,
     /// Animator controller; `None` plays the rest pose.
     pub animator: Option<Animator>,
     /// Clips referenced by the animator.
     pub clips: Vec<Clip>,
-    /// Expression menu and synced parameters.
+    /// Expression menu.
     pub expressions: Option<Expressions>,
     /// Bone dynamics.
     pub dynamics: Dynamics,

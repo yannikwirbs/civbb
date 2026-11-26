@@ -8,9 +8,10 @@ use civbb_client::{Island, Model, frame};
 use civbb_core::math::Pose;
 use civbb_core::{System, jobs};
 use civbb_format::Avatar;
-use civbb_format::animator::{Binding, ParamKind, Parameter, Property};
+use civbb_format::animator::{Binding, Property};
 use civbb_format::dynamics::ReceiverKind;
 use civbb_format::material::{Material, MaterialModel};
+use civbb_format::state::{Entry, EntryKind};
 
 const DT: f32 = 1.0 / 90.0;
 
@@ -25,7 +26,7 @@ fn island(avatar: &Avatar, id: u64, local: bool) -> Island {
 #[test]
 fn a_toggle_parameter_switches_its_node() {
     let avatar = civbb_corpus::generate(&civbb_corpus::lean());
-    let name = avatar.animator.as_ref().unwrap().parameters[0].name.clone();
+    let name = avatar.state.entries[0].name.clone();
     let node = avatar.hierarchy.nodes.iter().position(|n| n.name == name).unwrap();
     let mut i = island(&avatar, 0, true);
     let mut c = Default::default();
@@ -47,15 +48,12 @@ fn receiver_values_reach_parameters_on_the_next_frame() {
     receiver.allow_self = true;
     // Constant: 1 from the first frame of contact (Proximity starts on the second, ADR 0047).
     receiver.kind = ReceiverKind::Constant;
-    let (head, param) = (receiver.volume.node, receiver.parameter.clone());
+    let p = avatar.state.entries.len();
+    receiver.parameter = Some(p as u32);
+    let head = receiver.volume.node;
     avatar.contacts.senders[0].volume.node = head;
-    avatar.animator.as_mut().unwrap().parameters.push(Parameter {
-        name: param.clone(),
-        kind: ParamKind::Float,
-        default: 0.0,
-    });
+    avatar.state.entries.push(Entry::new("HeadPat", EntryKind::Float, 0.0));
     let mut islands = vec![island(&avatar, 0, true)];
-    let p = islands[0].model().controller().unwrap().param(&param).unwrap() as usize;
 
     frame::step(&mut islands, |_, _| true, DT);
     assert_eq!(islands[0].contact_values(), [1.0]);
@@ -106,7 +104,7 @@ fn results_do_not_depend_on_the_worker_count() {
 fn animated_materials_are_per_island() {
     let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());
     // A toggle that starts off: with Write Defaults off, a value an island once had would persist.
-    let params = &avatar.animator.as_ref().unwrap().parameters;
+    let params = &avatar.state.entries;
     let name = params.iter().find(|p| p.default == 0.0).unwrap().name.clone();
     // The toggle's on clip also lights up the body's emission.
     let body = avatar.meshes[0].node as usize;
@@ -159,7 +157,7 @@ fn animated_materials_are_per_island() {
 #[test]
 fn a_toggle_can_swap_a_material_slot_per_island() {
     let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());
-    let params = &avatar.animator.as_ref().unwrap().parameters;
+    let params = &avatar.state.entries;
     let name = params.iter().find(|p| p.default == 0.0).unwrap().name.clone();
     // A second material only the toggle's on clip puts into the body's first slot.
     let mut swapped = avatar.materials[0].clone();
@@ -214,7 +212,7 @@ fn a_toggle_can_switch_a_constraint_per_island() {
     let target = c.target as usize;
     let path = civbb_anim::bind::node_paths(&avatar.hierarchy)[target].clone();
     // A toggle that starts off; its on clip switches the constraint off.
-    let params = &avatar.animator.as_ref().unwrap().parameters;
+    let params = &avatar.state.entries;
     let name = params.iter().find(|p| p.default == 0.0).unwrap().name.clone();
     let on = avatar
         .clips

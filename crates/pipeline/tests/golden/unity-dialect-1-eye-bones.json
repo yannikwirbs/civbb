@@ -1152,6 +1152,9 @@
     ],
     "meta": null,
     "name": "Armature",
+    "state": {
+      "entries": []
+    },
     "textures": []
   },
   "warnings": []

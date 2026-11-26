@@ -94,14 +94,14 @@ Content format: avatar data model and signed, content-addressed runtime packages
 
 Internal deps: none
 
-- `src/animator.rs`: Animator data with Mecanim semantics: parameters, layers, state machines, blend trees, transitions, clips.
+- `src/animator.rs`: Animator data with Mecanim semantics: layers, state machines, blend trees, transitions, clips.
 - `src/avatar.rs`: The avatar root type tying every part of an avatar together.
 - `src/blob.rs`: Content addresses: BLAKE3 hashes identifying blobs.
 - `src/cbor.rs`: CBOR encoding helpers with bounded decoding for untrusted input.
 - `src/constraint.rs`: Transform constraints (position, rotation, scale, parent, aim, look-at) with Unity's semantics (ADR 0018).
 - `src/cost.rs`: Cost profile: counted and measured CPU, GPU, memory and network cost of content (design doc §8).
 - `src/dynamics.rs`: Bone dynamics (PhysBone-compatible chains and colliders) and contact senders and receivers.
-- `src/expressions.rs`: Expression menu and synced expression parameters (design doc §7).
+- `src/expressions.rs`: Expression menu (design doc §7).
 - `src/face.rs`: Face setup: blendshapes driven by lip sync, automatic blinking and eye look (design doc §7, `X_avatar`).
 - `src/hierarchy.rs`: Node hierarchy (bones and other transforms) and the humanoid bone mapping.
 - `src/lib.rs`: CIVBB content format: the avatar data model and signed, content-addressed runtime packages (design doc §9).
@@ -110,6 +110,7 @@ Internal deps: none
 - `src/mesh.rs`: Meshes: vertex streams, skinning, submeshes and sparse blendshapes.
 - `src/meta.rs`: Creator and licence metadata (VRM `meta`): who made an avatar and what others may do with it (ADR 0012).
 - `src/package.rs`: Runtime packages: a signed CBOR manifest followed by the BLAKE3-addressed blobs it lists.
+- `src/state.rs`: The document's state table (ADR 0088): typed entries every reader and writer references by index.
 - `src/validate/animator.rs`: Validation of clips and animator controllers: curves and keys, layers, states, transitions, blend trees and
 - `src/validate.rs`: Structural validation and hard caps for untrusted avatars. After [`validate`] passes, every index is in range.
 
@@ -127,6 +128,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/gltf_import/mesh.rs`: glTF meshes: one format mesh per node (its primitives become submeshes), vertex streams, skins and morph targets.
 - `src/gltf_import/source.rs`: The source package's `X_*` extensions (ADR 0041): humanoid map, viewpoint and face, animator and clips,
 - `src/gltf_import/unity_material.rs`: Unity materials from the source package's `X_toon_material` (ADR 0043): the shader family fingerprinted by shader
+- `src/gltf_import/unity_state.rs`: Unity dialect 1's animator and expression parameters lowered to state entries (ADR 0088, 0095).
 - `src/gltf_import/vrm/expressions.rs`: VRM expressions to visemes, blink and a Direct blend tree of toggles, and look-at to eye look.
 - `src/gltf_import/vrm/meta.rs`: VRM `meta` (0.x and 1.0) to the format's creator, licence and permission fields.
 - `src/gltf_import/vrm/mtoon.rs`: VRM MToon materials (0.x `materialProperties`, 1.0 `VRMC_materials_mtoon`) to the Toon model.
@@ -297,6 +299,7 @@ Internal deps: none
 - `docs/adr/0092-session-shape-and-handover.md`: 0092: Sessions end at a chain's end or 250 k tokens of context; the handover is STATUS.md's Next and `/continue`
 - `docs/adr/0093-gate-runs-tests-with-nextest.md`: 0093: The gate runs tests with cargo-nextest when it is installed
 - `docs/adr/0094-rust-navigation-through-lsp.md`: 0094: Sessions navigate Rust through the LSP tool
+- `docs/adr/0095-lowering-unity-parameters-to-state-entries.md`: 0095: Lowering Unity parameters to state entries; an entry's rest value
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

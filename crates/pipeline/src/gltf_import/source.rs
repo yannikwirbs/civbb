@@ -1,5 +1,6 @@
 //! The source package's `X_*` extensions (ADR 0041): humanoid map, viewpoint and face, animator and clips,
-//! constraints, dynamics, contacts and expressions, read as the format model's JSON with glTF node indices.
+//! constraints, dynamics, contacts and expressions, read as the format model's JSON with glTF node indices, the
+//! parameters lowered to the state table by `unity_state`.
 //!
 //! A malformed extension or a node index outside the scene fails the import; `validate` then checks the rest.
 
@@ -10,10 +11,12 @@ use civbb_format::expressions::Expressions;
 use civbb_format::face::{EyeDriver, Face, ShapeBind};
 use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, NodeIndex};
 use civbb_format::math::Vec3;
+use civbb_format::state::StateTable;
 use serde::Deserialize;
 use serde_json::Value;
 
 use super::Importer;
+use super::unity_state::{self, XAnimatorParameters, XExpressions};
 
 /// The avatar parts the `X_*` extensions add to a plain glTF import.
 #[derive(Default)]
@@ -26,6 +29,7 @@ pub(super) struct Source {
     pub contacts: Contacts,
     pub expressions: Option<Expressions>,
     pub face: Option<Face>,
+    pub state: StateTable,
 }
 
 #[derive(Deserialize)]
@@ -93,8 +97,10 @@ impl Importer<'_> {
             }
             s.humanoid = Some(self.x_avatar(x)?);
         }
+        let mut params = Vec::new();
         if let Some(v) = doc.extension_value("X_animator") {
             let x: XAnimator = parse("X_animator", v)?;
+            params = parse::<XAnimatorParameters>("X_animator", &v["animator"])?.parameters;
             let mut animator = x.animator;
             let base = u32::try_from(clip_base).map_err(|_| "X_animator: too many clips")?;
             for layer in &mut animator.layers {
@@ -125,16 +131,29 @@ impl Importer<'_> {
                 c.node = self.x_node("X_dynamics", c.node)?;
             }
         }
+        let expressions: Option<XExpressions> = (doc.extension_value("X_expressions"))
+            .map(|v| parse("X_expressions", v))
+            .transpose()?;
+        s.state = unity_state::lower(params, expressions.as_ref());
         if let Some(v) = doc.extension_value("X_contacts") {
-            s.contacts = parse("X_contacts", v)?;
+            let mut v = v.clone();
+            let receivers = v.get_mut("receivers").and_then(Value::as_array_mut);
+            for r in receivers.into_iter().flatten() {
+                let p = r
+                    .get_mut("parameter")
+                    .ok_or("X_contacts: a receiver has no parameter")?;
+                let name = p.as_str().ok_or("X_contacts: a receiver's parameter is not a string")?;
+                *p = Value::from(s.state.find(name));
+            }
+            s.contacts = parse("X_contacts", &v)?;
             let volumes = s.contacts.senders.iter_mut().map(|c| &mut c.volume);
             for v in volumes.chain(s.contacts.receivers.iter_mut().map(|c| &mut c.volume)) {
                 v.node = self.x_node("X_contacts", v.node)?;
             }
         }
-        if let Some(v) = doc.extension_value("X_expressions") {
-            s.expressions = Some(parse("X_expressions", v)?);
-        }
+        s.expressions = expressions.map(|x| Expressions {
+            menu: unity_state::menu(x.menu, &s.state),
+        });
         Ok(Some(s))
     }
 

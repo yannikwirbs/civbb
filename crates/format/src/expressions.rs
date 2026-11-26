@@ -1,48 +1,14 @@
-//! Expression menu and synced expression parameters (design doc §7).
+//! Expression menu (design doc §7).
 
 use serde::{Deserialize, Serialize};
 
-/// Synced parameters and the radial menu that drives them.
+use crate::state::EntryIndex;
+
+/// The radial menu; the parameters it writes are state entries (ADR 0088).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Expressions {
-    /// Parameters exposed to the menu, OSC and the network.
-    pub parameters: Vec<ExpressionParam>,
     /// Root menu.
     pub menu: Menu,
-}
-
-/// A parameter declared for expressions. It names an animator parameter.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ExpressionParam {
-    /// Animator parameter name.
-    pub name: String,
-    /// Network type; decides its synced bit cost (bool 1, int 8, float 8).
-    pub kind: ExpressionParamKind,
-    /// Initial value.
-    pub default: f32,
-    /// Persisted across sessions.
-    pub saved: bool,
-    /// Sent to other players.
-    pub synced: bool,
-}
-
-/// Network types of expression parameters.
-#[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ExpressionParamKind {
-    Bool,
-    Int,
-    Float,
-}
-
-impl ExpressionParamKind {
-    /// Bits this parameter costs in the synced budget.
-    pub fn bits(self) -> u32 {
-        match self {
-            Self::Bool => 1,
-            Self::Int | Self::Float => 8,
-        }
-    }
 }
 
 /// A menu page.
@@ -61,12 +27,12 @@ pub struct Control {
     pub icon: Option<u32>,
     /// Behaviour.
     pub kind: ControlKind,
-    /// Parameter set while active (buttons, toggles, submenus).
-    pub parameter: Option<String>,
+    /// Entry set while active (buttons, toggles, submenus).
+    pub parameter: Option<EntryIndex>,
     /// Value written to `parameter`.
     pub value: f32,
-    /// Axis parameters of puppets, in legacy order.
-    pub sub_parameters: Vec<String>,
+    /// Axis entries of puppets, in legacy order; `None` for an axis without one.
+    pub sub_parameters: Vec<Option<EntryIndex>>,
 }
 
 /// Control kinds.

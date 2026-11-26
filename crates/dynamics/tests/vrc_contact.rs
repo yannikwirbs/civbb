@@ -108,7 +108,7 @@ fn avatar(case: &Case) -> Avatar {
             receivers: vec![ContactReceiver {
                 volume: volume(1, Some(2), &case.receiver_shape),
                 tags,
-                parameter: "P".into(),
+                parameter: None,
                 kind: case.kind,
                 allow_self: true,
                 allow_others: true,

@@ -610,43 +610,6 @@
           },
           "weight": 0.5
         }
-      ],
-      "parameters": [
-        {
-          "default": 1.0,
-          "kind": "Bool",
-          "name": "Toggle"
-        },
-        {
-          "default": 0.5,
-          "kind": "Float",
-          "name": "Speed"
-        },
-        {
-          "default": 3.0,
-          "kind": "Int",
-          "name": "Count"
-        },
-        {
-          "default": 0.0,
-          "kind": "Trigger",
-          "name": "Fire"
-        },
-        {
-          "default": 0.0,
-          "kind": "Float",
-          "name": "X"
-        },
-        {
-          "default": 0.0,
-          "kind": "Float",
-          "name": "Y"
-        },
-        {
-          "default": 0.0,
-          "kind": "Bool",
-          "name": "Mirror"
-        }
       ]
     },
     "clips": [
@@ -2021,7 +1984,7 @@
           "kind": "Constant",
           "local_only": false,
           "min_velocity": 0.0,
-          "parameter": "Toggle",
+          "parameter": 0,
           "tags": [
             "Hand"
           ],
@@ -2052,7 +2015,7 @@
           "kind": "OnEnter",
           "local_only": true,
           "min_velocity": 0.05000000074505806,
-          "parameter": "Fire",
+          "parameter": 3,
           "tags": [
             "Finger"
           ],
@@ -2085,7 +2048,7 @@
           "kind": "Proximity",
           "local_only": false,
           "min_velocity": 0.0,
-          "parameter": "Speed",
+          "parameter": 1,
           "tags": [
             "Head"
           ],
@@ -2577,7 +2540,7 @@
             "icon": null,
             "kind": "Button",
             "name": "Button",
-            "parameter": "Count",
+            "parameter": 2,
             "sub_parameters": [],
             "value": 1.0
           },
@@ -2585,7 +2548,7 @@
             "icon": null,
             "kind": "Toggle",
             "name": "Toggle",
-            "parameter": "Toggle",
+            "parameter": 0,
             "sub_parameters": [],
             "value": 1.0
           },
@@ -2600,8 +2563,8 @@
                     "name": "Two",
                     "parameter": null,
                     "sub_parameters": [
-                      "X",
-                      "Y"
+                      4,
+                      5
                     ],
                     "value": 1.0
                   },
@@ -2611,10 +2574,10 @@
                     "name": "Four",
                     "parameter": null,
                     "sub_parameters": [
-                      "X",
-                      "Y",
-                      "X",
-                      "Y"
+                      4,
+                      5,
+                      4,
+                      5
                     ],
                     "value": 1.0
                   },
@@ -2624,7 +2587,7 @@
                     "name": "Radial",
                     "parameter": null,
                     "sub_parameters": [
-                      "Speed"
+                      1
                     ],
                     "value": 1.0
                   }
@@ -2632,35 +2595,12 @@
               }
             },
             "name": "More",
-            "parameter": "Count",
+            "parameter": 2,
             "sub_parameters": [],
             "value": 1.0
           }
         ]
-      },
-      "parameters": [
-        {
-          "default": 1.0,
-          "kind": "Bool",
-          "name": "Toggle",
-          "saved": true,
-          "synced": true
-        },
-        {
-          "default": 3.0,
-          "kind": "Int",
-          "name": "Count",
-          "saved": false,
-          "synced": true
-        },
-        {
-          "default": 0.5,
-          "kind": "Float",
-          "name": "Speed",
-          "saved": true,
-          "synced": false
-        }
-      ]
+      }
     },
     "face": {
       "blink": [
@@ -3832,6 +3772,66 @@
     ],
     "meta": null,
     "name": "Armature",
+    "state": {
+      "entries": [
+        {
+          "default": 1.0,
+          "external": true,
+          "kind": "Bool",
+          "name": "Toggle",
+          "saved": true,
+          "sync": "Owner"
+        },
+        {
+          "default": 0.5,
+          "external": true,
+          "kind": "Float",
+          "name": "Speed",
+          "saved": true,
+          "sync": "None"
+        },
+        {
+          "default": 3.0,
+          "external": true,
+          "kind": "Int",
+          "name": "Count",
+          "saved": false,
+          "sync": "Owner"
+        },
+        {
+          "default": 0.0,
+          "external": false,
+          "kind": "Trigger",
+          "name": "Fire",
+          "saved": false,
+          "sync": "None"
+        },
+        {
+          "default": 0.0,
+          "external": false,
+          "kind": "Float",
+          "name": "X",
+          "saved": false,
+          "sync": "None"
+        },
+        {
+          "default": 0.0,
+          "external": false,
+          "kind": "Float",
+          "name": "Y",
+          "saved": false,
+          "sync": "None"
+        },
+        {
+          "default": 0.0,
+          "external": false,
+          "kind": "Bool",
+          "name": "Mirror",
+          "saved": false,
+          "sync": "None"
+        }
+      ]
+    },
     "textures": []
   },
   "warnings": []

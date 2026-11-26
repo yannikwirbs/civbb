@@ -9,6 +9,7 @@ use civbb_format::Avatar;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, MuscleFrame, Node};
 use civbb_format::math::Transform;
+use civbb_format::state::{Entry, EntryIndex, EntryKind, StateTable};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -38,7 +39,7 @@ fn the_mirror_map_matches_unity() {
     assert_eq!(r.mirrored_both, r.plain);
 }
 
-/// Hips with the spine and both upper arms under it, every bone with a frame, and `animator`.
+/// Hips with the spine and both upper arms under it, every bone with a frame, the bool entry `m` at 1, and `animator`.
 fn humanoid(clips: Vec<Clip>, animator: Animator) -> Avatar {
     let bones = [
         HumanBone::Hips,
@@ -49,6 +50,9 @@ fn humanoid(clips: Vec<Clip>, animator: Animator) -> Avatar {
     let names = ["Root", "Hips", "Spine", "LeftArm", "RightArm"];
     let parents = [None, Some(0), Some(1), Some(1), Some(1)];
     Avatar {
+        state: StateTable {
+            entries: vec![Entry::new("m", EntryKind::Bool, 1.0)],
+        },
         hierarchy: Hierarchy {
             nodes: names
                 .iter()
@@ -109,14 +113,9 @@ fn clip(curves: &[(&str, f32)]) -> Clip {
     }
 }
 
-/// One layer playing `motion` in a state with `mirror` and `mirror_param`; parameter 0 is the bool `m`.
-fn animator(motion: Motion, mirror: bool, mirror_param: Option<ParamIndex>) -> Animator {
+/// One layer playing `motion` in a state with `mirror` and `mirror_param`; entry 0 is the bool `m` ([`humanoid`]).
+fn animator(motion: Motion, mirror: bool, mirror_param: Option<EntryIndex>) -> Animator {
     Animator {
-        parameters: vec![Parameter {
-            name: "m".into(),
-            kind: ParamKind::Bool,
-            default: 1.0,
-        }],
         groups: vec![LayerGroup {
             name: "All".into(),
             weight: 1.0,

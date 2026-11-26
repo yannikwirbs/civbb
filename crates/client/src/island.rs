@@ -10,11 +10,11 @@ use civbb_core::{Counters, System};
 use civbb_dynamics::contact::Participant;
 use civbb_dynamics::{ContactRig, ContactState, State};
 use civbb_format::Avatar;
-use civbb_format::animator::{ParamIndex, ParamKind};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::material::Material;
 use civbb_format::math::Transform;
 use civbb_format::mesh::MeshIndex;
+use civbb_format::state::{EntryIndex, EntryKind};
 
 /// An avatar's systems compiled once, shared by every island showing that avatar.
 #[derive(Clone, Debug)]
@@ -28,8 +28,8 @@ pub struct Model {
     active: Vec<bool>,
     /// Per mesh, each blendshape's default weight (0 to 1).
     shapes: Vec<Vec<f32>>,
-    /// Per contact receiver, the animator parameter its value goes to; `None` when the animator lacks it.
-    receivers: Vec<Option<(ParamIndex, ParamKind)>>,
+    /// Per contact receiver, the state entry its value goes to; `None` without one or without an animator.
+    receivers: Vec<Option<(EntryIndex, EntryKind)>>,
     /// Renderers with animated material properties, by mesh index.
     renderers: Vec<AnimatedRenderer>,
     /// Per mesh, the animator slot of each submesh whose material it swaps; empty for most meshes.
@@ -58,9 +58,8 @@ impl Model {
             .receivers
             .iter()
             .map(|r| {
-                let c = controller.as_ref()?;
-                let p = c.param(&r.parameter)?;
-                Some((p, c.animator.parameters[p as usize].kind))
+                let (c, p) = (controller.as_ref()?, r.parameter?);
+                Some((p, c.state.entries[p as usize].kind))
             })
             .collect();
         let mut renderers: Vec<AnimatedRenderer> = Vec::new();

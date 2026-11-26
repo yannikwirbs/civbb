@@ -7,6 +7,7 @@ use civbb_format::Avatar;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::Transform;
+use civbb_format::state::{Entry, EntryKind, StateTable};
 
 /// Clip `k` holds `A.x` at `k + 1` (so the pose names the state); 1 s long.
 fn value_clip(k: usize, looping: bool) -> Clip {
@@ -109,23 +110,11 @@ fn avatar(layers: Vec<Layer>, clips: Vec<Clip>) -> Avatar {
         rest: Transform::IDENTITY,
         active: true,
     };
-    let mut parameters: Vec<Parameter> = (0..4)
-        .map(|i| Parameter {
-            name: format!("b{i}"),
-            kind: ParamKind::Bool,
-            default: 0.0,
-        })
+    let mut entries: Vec<Entry> = (0..4)
+        .map(|i| Entry::new(format!("b{i}"), EntryKind::Bool, 0.0))
         .collect();
-    parameters.push(Parameter {
-        name: "t".into(),
-        kind: ParamKind::Trigger,
-        default: 0.0,
-    });
-    parameters.push(Parameter {
-        name: "f".into(),
-        kind: ParamKind::Float,
-        default: 0.0,
-    });
+    entries.push(Entry::new("t", EntryKind::Trigger, 0.0));
+    entries.push(Entry::new("f", EntryKind::Float, 0.0));
     let groups = (0..2)
         .map(|i| LayerGroup {
             name: format!("g{i}"),
@@ -136,11 +125,8 @@ fn avatar(layers: Vec<Layer>, clips: Vec<Clip>) -> Avatar {
         hierarchy: Hierarchy {
             nodes: vec![node("Root", None), node("A", Some(0)), node("B", Some(0))],
         },
-        animator: Some(Animator {
-            parameters,
-            groups,
-            layers,
-        }),
+        state: StateTable { entries },
+        animator: Some(Animator { groups, layers }),
         clips,
         ..Avatar::default()
     };

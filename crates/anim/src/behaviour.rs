@@ -1,6 +1,7 @@
 //! Legacy built-in parameters and state behaviours: parameter drivers, tracking, layer and locomotion control.
 
-use civbb_format::animator::{DriverOp, ParamKind, Parameter, TrackingMode, TrackingPart};
+use civbb_format::animator::{DriverOp, TrackingMode, TrackingPart};
+use civbb_format::state::{Entry, EntryKind};
 
 /// Built-in parameters the engine sets each frame, with their legacy names and types (design doc §7).
 #[allow(missing_docs)]
@@ -126,23 +127,23 @@ impl Builtin {
     }
 
     /// The type the engine provides it as.
-    pub fn kind(self) -> ParamKind {
+    pub fn kind(self) -> EntryKind {
         use Builtin::*;
         match self {
             IsLocal | Grounded | Seated | Afk | MuteSelf | InStation | Earmuffs | IsOnFriendsList
-            | IsAnimatorEnabled | ScaleModified => ParamKind::Bool,
-            PreviewMode | Viseme | GestureLeft | GestureRight | TrackingType | VrMode | AvatarVersion => ParamKind::Int,
-            _ => ParamKind::Float,
+            | IsAnimatorEnabled | ScaleModified => EntryKind::Bool,
+            PreviewMode | Viseme | GestureLeft | GestureRight | TrackingType | VrMode | AvatarVersion => EntryKind::Int,
+            _ => EntryKind::Float,
         }
     }
 }
 
 /// `v` as a parameter of type `kind` holds it: ints round, bools and triggers are 1 when not 0 (ADR 0011).
-pub fn coerce(kind: ParamKind, v: f32) -> f32 {
+pub fn coerce(kind: EntryKind, v: f32) -> f32 {
     match kind {
-        ParamKind::Float => v,
-        ParamKind::Int => v.round(),
-        ParamKind::Bool | ParamKind::Trigger => f32::from(u8::from(v != 0.0)),
+        EntryKind::Float => v,
+        EntryKind::Int => v.round(),
+        EntryKind::Bool | EntryKind::Trigger => f32::from(u8::from(v != 0.0)),
     }
 }
 
@@ -163,7 +164,7 @@ impl Rng {
 }
 
 /// Applies parameter driver operations in order.
-pub fn drive(ops: &[DriverOp], decls: &[Parameter], params: &mut [f32], rng: &mut Rng) {
+pub fn drive(ops: &[DriverOp], decls: &[Entry], params: &mut [f32], rng: &mut Rng) {
     for op in ops {
         let (dst, v) = match *op {
             DriverOp::Set { param, value } => (param, value),
@@ -176,10 +177,10 @@ pub fn drive(ops: &[DriverOp], decls: &[Parameter], params: &mut [f32], rng: &mu
             } => {
                 let r = rng.unit();
                 let v = match decls[param as usize].kind {
-                    ParamKind::Float => min + r * (max - min),
+                    EntryKind::Float => min + r * (max - min),
                     // Inclusive integer range.
-                    ParamKind::Int => (min + r * (max - min + 1.0)).floor().min(max),
-                    ParamKind::Bool | ParamKind::Trigger => f32::from(u8::from(r < chance)),
+                    EntryKind::Int => (min + r * (max - min + 1.0)).floor().min(max),
+                    EntryKind::Bool | EntryKind::Trigger => f32::from(u8::from(r < chance)),
                 };
                 (param, v)
             }

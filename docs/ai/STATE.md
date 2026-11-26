@@ -119,8 +119,16 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 - glTF input (ADR 0076): `KHR_mesh_quantization` accepted (integer attributes, morph deltas and animation outputs
   through the normalising accessor reader); required Draco or meshopt compression refused with an export hint.
+- State table (ADR 0088, 0095, #115, format v26): `civbb_format::state` (`StateTable`, `Entry {name, kind, default,
+  rest, sync, saved, external}`, `EntryIndex`), `Avatar::state`. Animator conditions, blend inputs, speed/offset/
+  time/mirror inputs, drivers, menu controls (`Option<EntryIndex>`, puppet axes `Vec<Option<_>>`) and contact
+  receivers reference entries; the animator has no parameter table and `Expressions` only the menu. The Unity
+  importer lowers dialect 1 in `gltf_import/unity_state.rs` (animator parameters in order, then expression-only ones;
+  expression default starts, animator default is `rest`; unknown names `None`); `civbb_corpus::gltf` raises entries
+  back to dialect 1. Validation checks every reference and unique names; synced bits count the entry's type until
+  #118. Still by name: built-ins (#117), curve targets (#119), chain outputs' prefix (#116).
 - Importer layout (health check): `gltf_import.rs` (entry, parsing, URI resolver, buffers, hierarchy) with
-  `gltf_import/{material,mesh,animation,source,unity_material}.rs` and `vrm.rs` (entry, humanoid, node constraints,
+  `gltf_import/{material,mesh,animation,source,unity_material,unity_state}.rs` and `vrm.rs` (entry, humanoid, node constraints,
   first person) with `vrm/{springs,mtoon,expressions,meta}.rs`. vrm keeps its own `qmul`/`rotate`/`from_to` (core's
   round differently); the rest of its math is `civbb_core::math`. Validation (`civbb_format::validate`) checks one
   avatar part per method, animator checks in `validate/animator.rs`; PhysBone collider radius and height must be
@@ -172,7 +180,7 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 - FLIP parity (ADR 0033): `civbb-client parity <reference> <test> --key <k> [--images <dir>]` renders both avatars
   with the reference's rig (640x640, front/left/back/right framed from the bind-pose bounds) in every state
-  (`civbb_client::parity::states`: rest, then each parameter set away from its start in turn, 60 frames each so
+  (`civbb_client::parity::states`: rest, then each state entry set away from its start in turn, 60 frames each so
   states settle, ADR 0055; the stage tests call it too), reads
   pixels back (`Renderer::read_last`) and scores each view with FLIP (`flip-rs`, checked against NVIDIA's
   `flip-evaluator`) over the avatar's pixels: mean, p99, traffic light (green mean <= 0.02 and p99 <= 0.2, red
@@ -183,7 +191,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   accepted yellow). lean and bloated are green in every state (`crates/pipeline/tests/parity.rs`).
 - Unity as the reference (ADR 0048): `civbb build --unstaged` packages the import, `civbb-client rig <pkg>` writes
   the hand-off (`parity::Handoff`: rig, light, dt, parameters, states), the exporter renders `<state>-<view>.png`,
-  and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`). After #82, #86/#85, #87 and
+  and `civbb-client parity <dir> <pkg>` scores against them (`"reference": "unity"`), stepping through the stored
+  hand-off's states, the ones Unity rendered (ADR 0095). After #82, #86/#85, #87 and
   #88 (2026-11-20) rest means (front) run 0.06 (Inuinu) to 0.23 (Cokoro Quest); worst toggled states 0.12 to 0.37
   (Tessakuchan). Bone radii in world units (#90) took HAOLAN to 0.054 front, worst 0.072; `[HDR]` colours as saved and the reference at
   shader time 0 (#91) Cokoro to 0.109, Ostgaroa to 0.134. Fitted mass positions (ADR 0073, run `m96`) undid the
@@ -257,7 +266,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   and keeps its scratch per island (#66): lean 0.97 to 0.49 µs, bloated 12.7 to 9.45 µs per avatar on one worker.
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
-  human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056), the start time does not reach one and a transition fired at its exit time starts with the overshoot elapsed; the first update advances like any other; a Write Defaults on state without a motion writes nothing (ADR 0065, recorded); instances start parameters at the expression defaults (`Controller::start`, #85) and built-ins
+  human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056), the start time does not reach one and a transition fired at its exit time starts with the overshoot elapsed; the first update advances like any other; a Write Defaults on state without a motion writes nothing (ADR 0065, recorded); instances start entries at `Entry::default` (`Controller::start`; the expression default for lowered Unity content,
+  #85) and Write Defaults restores a curve-written entry to `Entry::rest` (the animator default, ADR 0095) and built-ins
   standing on the ground (`Builtin::at_rest`, ADR 0055). Material slots swap per island
   (`Target::MaterialSlot`, `Island::submesh_materials`, a per-submesh override in `MeshData::draws`; ADR 0059).
   Mirrored states and blend tree children map muscles as Unity records (`muscle::mirror`, exclusive or; ADR 0060). `civbb-dynamics`: PhysBone chains as the SDK

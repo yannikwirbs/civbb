@@ -21,15 +21,25 @@ use civbb_format::material::{
 };
 use civbb_format::math::Transform;
 use civbb_format::mesh::{Mesh, Submesh};
+use civbb_format::state::{Entry, EntryKind, StateTable};
 use serde::Deserialize;
 use serde_json::Value;
+
+/// A state entry of a case: the animator parameter Unity recorded.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ParamSpec {
+    name: String,
+    kind: EntryKind,
+    default: f32,
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Case {
     source: String,
     nodes: Vec<NodeSpec>,
-    params: Vec<Parameter>,
+    params: Vec<ParamSpec>,
     clips: BTreeMap<String, ClipSpec>,
     layers: Vec<LayerSpec>,
     dt: f32,
@@ -283,8 +293,12 @@ impl Case {
             meshes,
             materials,
             textures,
+            state: StateTable {
+                entries: (self.params.iter())
+                    .map(|p| Entry::new(p.name.clone(), p.kind, p.default))
+                    .collect(),
+            },
             animator: Some(Animator {
-                parameters: self.params.clone(),
                 groups: vec![LayerGroup {
                     name: "All".into(),
                     weight: 1.0,

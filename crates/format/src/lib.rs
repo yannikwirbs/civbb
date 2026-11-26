@@ -15,6 +15,7 @@ pub mod math;
 pub mod mesh;
 pub mod meta;
 pub mod package;
+pub mod state;
 pub mod validate;
 
 pub use avatar::Avatar;
@@ -25,7 +26,7 @@ pub use validate::{Caps, validate};
 
 /// Version of the runtime package's data model. Bump on any change to the types in this crate; readers refuse
 /// packages of any other version, which are rebuilt from their kept source (ADR 0087).
-pub const FORMAT_VERSION: u32 = 25;
+pub const FORMAT_VERSION: u32 = 26;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -38,6 +39,7 @@ pub(crate) mod testutil {
     use crate::material::*;
     use crate::math::Transform;
     use crate::mesh::*;
+    use crate::state::{Entry, EntryKind, StateTable, SyncMode};
     use crate::*;
 
     /// A tiny skinned, morphing, textured avatar touching every type.
@@ -185,6 +187,28 @@ pub(crate) mod testutil {
                 color_space: ColorSpace::Srgb,
                 blob: BlobId([0; 32]),
             }],
+            state: StateTable {
+                entries: vec![
+                    Entry {
+                        name: "Toggle".into(),
+                        kind: EntryKind::Bool,
+                        default: 0.0,
+                        rest: None,
+                        sync: SyncMode::Owner,
+                        saved: true,
+                        external: true,
+                    },
+                    Entry {
+                        name: "Boop".into(),
+                        kind: EntryKind::Float,
+                        default: 0.0,
+                        rest: None,
+                        sync: SyncMode::None,
+                        saved: false,
+                        external: false,
+                    },
+                ],
+            },
             animator: Some(sample_animator()),
             clips: vec![Clip {
                 name: "Toggle".into(),
@@ -205,19 +229,12 @@ pub(crate) mod testutil {
                 }],
             }],
             expressions: Some(Expressions {
-                parameters: vec![ExpressionParam {
-                    name: "Toggle".into(),
-                    kind: ExpressionParamKind::Bool,
-                    default: 0.0,
-                    saved: true,
-                    synced: true,
-                }],
                 menu: Menu {
                     controls: vec![Control {
                         name: "Toggle".into(),
                         icon: None,
                         kind: ControlKind::Toggle,
-                        parameter: Some("Toggle".into()),
+                        parameter: Some(0),
                         value: 1.0,
                         sub_parameters: vec![],
                     }],
@@ -275,7 +292,7 @@ pub(crate) mod testutil {
                         rotation: [0.0, 0.0, 0.0, 1.0],
                     },
                     tags: vec!["Hand".into()],
-                    parameter: "Boop".into(),
+                    parameter: Some(1),
                     kind: ReceiverKind::OnEnter,
                     allow_self: false,
                     allow_others: true,
@@ -359,11 +376,6 @@ pub(crate) mod testutil {
             }],
         });
         Animator {
-            parameters: vec![Parameter {
-                name: "Toggle".into(),
-                kind: ParamKind::Bool,
-                default: 0.0,
-            }],
             groups: vec![LayerGroup {
                 name: "FX".into(),
                 weight: 1.0,

@@ -12,6 +12,7 @@ use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, Node, NodeIndex};
 use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, Toon, ToonLight};
 use civbb_format::math::{Transform, Vec3};
 use civbb_format::mesh::{BlendShape, Mesh, ShapeDelta, Skin, Submesh};
+use civbb_format::state::{Entry, EntryIndex, EntryKind, StateTable, SyncMode};
 
 /// What to generate.
 #[derive(Clone, Debug)]
@@ -616,7 +617,6 @@ pub fn generate(spec: &Spec) -> Avatar {
 
     // Animator: one FX layer per toggle (the common legacy pattern the compiler later collapses).
     let mut animator = Animator {
-        parameters: Vec::new(),
         groups: vec![LayerGroup {
             name: "FX".into(),
             weight: 1.0,
@@ -624,22 +624,16 @@ pub fn generate(spec: &Spec) -> Avatar {
         layers: Vec::new(),
     };
     let mut clips = Vec::new();
-    let mut expression_params = Vec::new();
+    let mut entries = Vec::new();
     for &node in &toggle_nodes {
         let name = b.nodes[node as usize].name.clone();
         let default_on = b.nodes[node as usize].active;
-        let param = animator.parameters.len() as ParamIndex;
-        animator.parameters.push(Parameter {
-            name: name.clone(),
-            kind: ParamKind::Bool,
-            default: if default_on { 1.0 } else { 0.0 },
-        });
-        expression_params.push(ExpressionParam {
-            name: name.clone(),
-            kind: ExpressionParamKind::Bool,
-            default: if default_on { 1.0 } else { 0.0 },
+        let param = entries.len() as EntryIndex;
+        entries.push(Entry {
+            sync: SyncMode::Owner,
             saved: true,
-            synced: true,
+            external: true,
+            ..Entry::new(name.clone(), EntryKind::Bool, if default_on { 1.0 } else { 0.0 })
         });
         let off_clip = clips.len() as ClipIndex;
         clips.push(toggle_clip(format!("{name}_Off"), b.path(node), false));
@@ -693,7 +687,8 @@ pub fn generate(spec: &Spec) -> Avatar {
     }
 
     // Menu: toggles in pages of eight, as legacy menus are limited to eight controls.
-    let pages: Vec<Control> = expression_params
+    let pages: Vec<Control> = (entries.iter().zip(0..))
+        .collect::<Vec<_>>()
         .chunks(8)
         .enumerate()
         .map(|(i, page)| Control {
@@ -702,11 +697,11 @@ pub fn generate(spec: &Spec) -> Avatar {
             kind: ControlKind::SubMenu(Menu {
                 controls: page
                     .iter()
-                    .map(|p| Control {
-                        name: p.name.clone(),
+                    .map(|&(e, i)| Control {
+                        name: e.name.clone(),
                         icon: None,
                         kind: ControlKind::Toggle,
-                        parameter: Some(p.name.clone()),
+                        parameter: Some(i),
                         value: 1.0,
                         sub_parameters: vec![],
                     })
@@ -737,7 +732,8 @@ pub fn generate(spec: &Spec) -> Avatar {
         receivers: vec![ContactReceiver {
             volume: volume(b.find("Head"), 0.15),
             tags: vec!["Hand".into()],
-            parameter: "HeadPat".into(),
+            // No entry: the pat writes nothing, as the animator declares no `HeadPat`.
+            parameter: None,
             kind: ReceiverKind::Proximity,
             allow_self: false,
             allow_others: true,
@@ -774,10 +770,10 @@ pub fn generate(spec: &Spec) -> Avatar {
         meta: None,
         materials,
         textures: vec![],
+        state: StateTable { entries },
         animator: Some(animator),
         clips,
         expressions: Some(Expressions {
-            parameters: expression_params,
             menu: Menu { controls: pages },
         }),
         dynamics,

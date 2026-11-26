@@ -15,6 +15,7 @@ use crate::material::{MaterialModel, TextureSlot};
 use crate::math::Transform;
 use crate::mesh::{Mesh, Skin};
 use crate::meta::Meta;
+use crate::state::StateTable;
 
 mod animator;
 
@@ -188,14 +189,16 @@ impl V {
         self.cap(totals.deltas, c.shape_deltas, "total blend shape deltas");
         self.materials(a, has_blob);
         self.clips(&a.clips);
+        self.state(&a.state);
+        let entries = a.state.entries.len();
         if let Some(anim) = &a.animator {
-            self.animator(anim, a.clips.len());
+            self.animator(anim, a.clips.len(), entries);
         }
         if let Some(e) = &a.expressions {
-            self.expressions(e, a.textures.len());
+            self.expressions(e, a.textures.len(), entries);
         }
         self.dynamics(&a.dynamics, nodes);
-        self.contacts(&a.contacts, nodes);
+        self.contacts(&a.contacts, nodes, entries);
         self.constraints(&a.constraints, nodes);
     }
 
@@ -491,21 +494,32 @@ impl V {
         }
     }
 
-    fn expressions(&mut self, e: &Expressions, textures: usize) {
+    fn state(&mut self, st: &StateTable) {
         let c = self.caps;
-        let bits: u32 = e.parameters.iter().filter(|p| p.synced).map(|p| p.kind.bits()).sum();
+        let bits = st.synced_bits();
         self.ensure(
             bits <= c.synced_bits,
-            || "expressions".into(),
+            || "state".into(),
             format!("{bits} synced bits over cap"),
         );
-        self.cap(e.parameters.len(), c.parameters, "expressions.parameters");
-        for (i, p) in e.parameters.iter().enumerate() {
-            self.string(&p.name, || format!("expressions.parameters[{i}]"));
+        self.cap(st.entries.len(), c.parameters, "state.entries");
+        let mut names = HashSet::new();
+        for (i, e) in st.entries.iter().enumerate() {
+            let p = || format!("state.entries[{i}]");
+            self.string(&e.name, p);
+            self.finite(&[e.default, e.rest()], p);
+            self.ensure(
+                names.insert(e.name.as_str()),
+                p,
+                format!("name {:?} used twice", e.name),
+            );
         }
+    }
+
+    fn expressions(&mut self, e: &Expressions, textures: usize, entries: usize) {
         let mut controls = 0;
-        self.menu(&e.menu, 0, textures, &mut controls);
-        self.cap(controls, c.menu_controls, "expressions.menu controls");
+        self.menu(&e.menu, 0, textures, entries, &mut controls);
+        self.cap(controls, self.caps.menu_controls, "expressions.menu controls");
     }
 
     fn dynamics(&mut self, d: &Dynamics, nodes: usize) {
@@ -567,18 +581,18 @@ impl V {
         }
     }
 
-    fn contacts(&mut self, c: &Contacts, nodes: usize) {
+    fn contacts(&mut self, c: &Contacts, nodes: usize, entries: usize) {
         self.cap(c.senders.len() + c.receivers.len(), self.caps.contacts, "contacts");
         let senders = c.senders.iter().map(|s| (&s.volume, &s.tags, None));
-        let receivers = c.receivers.iter().map(|r| (&r.volume, &r.tags, Some(&r.parameter)));
+        let receivers = c.receivers.iter().map(|r| (&r.volume, &r.tags, r.parameter));
         for (i, (vol, tags, param)) in senders.chain(receivers).enumerate() {
             let p = || format!("contacts[{i}]");
             self.volume(vol, nodes, p);
             for t in tags {
                 self.string(t, p);
             }
-            if let Some(s) = param {
-                self.string(s, p);
+            if let Some(e) = param {
+                self.index(e as usize, entries, p, "entry");
             }
         }
     }
@@ -649,7 +663,7 @@ impl V {
         self.finite(&[v.position.as_slice(), &v.rotation, &dims].concat(), path);
     }
 
-    fn menu(&mut self, m: &Menu, depth: usize, textures: usize, controls: &mut usize) {
+    fn menu(&mut self, m: &Menu, depth: usize, textures: usize, entries: usize, controls: &mut usize) {
         let cap = self.caps.menu_depth;
         if depth > cap {
             self.fail(|| "expressions.menu".into(), format!("nested deeper than {cap}"));
@@ -662,11 +676,11 @@ impl V {
             if let Some(icon) = ctl.icon {
                 self.index(icon as usize, textures, p, "icon texture");
             }
-            for s in ctl.parameter.iter().chain(&ctl.sub_parameters) {
-                self.string(s, p);
+            for &e in ctl.parameter.iter().chain(ctl.sub_parameters.iter().flatten()) {
+                self.index(e as usize, entries, p, "entry");
             }
             if let ControlKind::SubMenu(sub) = &ctl.kind {
-                self.menu(sub, depth + 1, textures, controls);
+                self.menu(sub, depth + 1, textures, entries, controls);
             }
         }
     }
@@ -676,6 +690,7 @@ impl V {
 mod tests {
     use super::*;
     use crate::animator::TransitionDest;
+    use crate::state::{Entry, SyncMode};
     use crate::testutil::sample_avatar;
 
     fn check(a: &Avatar) -> Result<(), Vec<ValidationError>> {
@@ -795,7 +810,26 @@ mod tests {
             ("animator.layers[0]", |a| {
                 a.animator.as_mut().unwrap().layers[0].state_machine.states[0].transitions[0].conditions[0].param = 9
             }),
+            ("animator.layers[0].states[0]", |a| {
+                a.animator.as_mut().unwrap().layers[0].state_machine.states[0].mirror_param = Some(9)
+            }),
             ("animator.layers[0].states[1]", |a| a.clips.clear()),
+            ("state.entries[1]", |a| a.state.entries[1].name = "Toggle".into()),
+            ("state.entries[1]", |a| a.state.entries[1].rest = Some(f32::NAN)),
+            ("state", |a| {
+                let e = a.state.entries[1].clone();
+                a.state.entries = (0..300)
+                    .map(|i| Entry {
+                        name: format!("{i}"),
+                        sync: SyncMode::Owner,
+                        ..e.clone()
+                    })
+                    .collect()
+            }),
+            ("expressions.menu(depth 0)[0]", |a| {
+                a.expressions.as_mut().unwrap().menu.controls[0].sub_parameters = vec![None, Some(2)]
+            }),
+            ("contacts[0]", |a| a.contacts.receivers[0].parameter = Some(2)),
             ("dynamics.chains[0]", |a| a.dynamics.chains[0].colliders[0] = 4),
             ("dynamics.colliders[0]", |a| a.dynamics.colliders[0].node = 40),
             ("contacts[0]", |a| a.contacts.receivers[0].volume.node = 40),

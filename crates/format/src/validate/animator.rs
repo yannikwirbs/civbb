@@ -60,15 +60,10 @@ impl V {
         self.cap(keys, c.keys, "total keys");
     }
 
-    pub(super) fn animator(&mut self, a: &Animator, clips: usize) {
+    /// `params` is the number of state entries.
+    pub(super) fn animator(&mut self, a: &Animator, clips: usize, params: usize) {
         let c = self.caps;
-        let params = a.parameters.len();
-        self.cap(params, c.parameters, "animator.parameters");
         self.cap(a.layers.len(), c.layers, "animator.layers");
-        for (i, p) in a.parameters.iter().enumerate() {
-            self.string(&p.name, || format!("animator.parameters[{i}]"));
-            self.finite(&[p.default], || format!("animator.parameters[{i}]"));
-        }
         let (mut states, mut transitions) = (0, 0);
         for (li, layer) in a.layers.iter().enumerate() {
             let p = || format!("animator.layers[{li}]");
@@ -93,7 +88,7 @@ impl V {
             for (si, s) in sm.states.iter().enumerate() {
                 let sp = || format!("animator.layers[{li}].states[{si}]");
                 self.string(&s.name, sp);
-                for o in [s.speed_param, s.cycle_offset_param, s.time_param]
+                for o in [s.speed_param, s.cycle_offset_param, s.time_param, s.mirror_param]
                     .into_iter()
                     .flatten()
                 {

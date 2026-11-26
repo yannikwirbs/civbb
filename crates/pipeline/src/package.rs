@@ -56,12 +56,14 @@ pub struct Stats {
     pub clips: usize,
     pub curves: usize,
     pub keys: usize,
+    /// State entries (ADR 0088).
     pub parameters: usize,
     pub layers: usize,
     pub states: usize,
     pub transitions: usize,
     /// CBOR size of the animator, a rough measure of its complexity.
     pub animator_bytes: usize,
+    /// External state entries: for lowered Unity content, the expression parameters.
     pub expression_params: usize,
     pub synced_bits: u32,
     pub chains: usize,
@@ -146,7 +148,6 @@ pub fn stats(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> Stats {
         .collect();
     if let Some(anim) = &a.animator {
         let machines = anim.layers.iter().map(|l| &l.state_machine);
-        s.parameters = anim.parameters.len();
         s.layers = anim.layers.len();
         s.states = machines.clone().map(|m| m.states.len()).sum();
         s.transitions = machines
@@ -157,10 +158,9 @@ pub fn stats(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> Stats {
             .sum();
         s.animator_bytes = cbor::to_vec(anim).len();
     }
-    if let Some(e) = &a.expressions {
-        s.expression_params = e.parameters.len();
-        s.synced_bits = e.parameters.iter().filter(|p| p.synced).map(|p| p.kind.bits()).sum();
-    }
+    s.parameters = a.state.entries.len();
+    s.expression_params = a.state.entries.iter().filter(|e| e.external).count();
+    s.synced_bits = a.state.synced_bits();
     s
 }
 

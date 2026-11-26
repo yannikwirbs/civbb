@@ -162,24 +162,19 @@ pub fn handoff(avatar: &Avatar) -> Handoff {
     }
 }
 
-/// Each parameter of the avatar's animator with the value a fresh local instance starts it at
-/// (`Controller::start`: the expression default, else the animator's; a built-in's `Builtin::at_rest`).
+/// Each state entry of an avatar with an animator, with the value a fresh local instance starts it at
+/// (`Controller::start`; a built-in's `Builtin::at_rest`).
 fn start(avatar: &Avatar) -> Vec<(String, f32)> {
     let Some(c) = Controller::new(avatar) else {
         return Vec::new();
     };
     let i = Instance::new(&c, true);
-    c.animator
-        .parameters
-        .iter()
-        .map(|p| p.name.clone())
-        .zip(i.params)
-        .collect()
+    c.state.entries.iter().map(|e| e.name.clone()).zip(i.params).collect()
 }
 
-/// Each parameter of the avatar's animator with the value away from its start it takes in [`states`]. Parameters the
-/// compiler added are left out, so a compiled avatar has its import's states.
-fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
+/// Each state entry with the value away from its start it takes in [`states`]. Entries the compiler added are left
+/// out, so a compiled avatar has its import's states.
+pub fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
     start(avatar)
         .into_iter()
         .filter(|(p, _)| !p.starts_with(COMPILER_PARAMETER_PREFIX))
@@ -187,15 +182,14 @@ fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
         .collect()
 }
 
-/// Steps one island per avatar through the same states: rest, then each of the first avatar's parameters set away
-/// from its start (0 to 1, anything else to 0) on top of the state before, [`FRAMES_PER_STATE`] frames each.
+/// Steps one island per avatar through the same states: rest, then each of `params` set (by entry name; [`toggles`]
+/// of the first avatar, or a hand-off's states) on top of the state before, [`FRAMES_PER_STATE`] frames each.
 /// Calls `check` with the state number, its name (`rest`, `Hat=1`) and the islands after each.
-pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &str, &[Island])) {
+pub fn states(avatars: &[&Avatar], params: &[(String, f32)], mut check: impl FnMut(usize, &str, &[Island])) {
     let mut islands: Vec<Island> = avatars
         .iter()
         .map(|a| Island::new(Arc::new(Model::new(a)), 1, true, Pose::IDENTITY))
         .collect();
-    let params = toggles(avatars[0]);
     for state in 0..=params.len() {
         for island in &mut islands {
             if state > 0 {
@@ -345,7 +339,14 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
         eprintln!("civbb-client: {}: {e}", dir.display());
     }
     let avatars: Vec<&Avatar> = sides.iter().map(|s| s.avatar).collect();
-    states(&avatars, |state, name, islands| {
+    // Against Unity, exactly the states it rendered.
+    let params = match &reference {
+        Reference::Package(r) => toggles(r.avatar),
+        Reference::Unity { handoff, .. } => (handoff.states.iter().skip(1))
+            .map(|s| (s.parameter.clone(), s.value))
+            .collect(),
+    };
+    states(&avatars, &params, |state, name, islands| {
         if failed.is_some() {
             return;
         }

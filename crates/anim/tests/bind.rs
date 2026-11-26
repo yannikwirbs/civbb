@@ -8,6 +8,7 @@ use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Quat, Transform};
 use civbb_format::mesh::{BlendShape, Mesh};
+use civbb_format::state::{Entry, EntryKind, StateTable};
 
 const ARM_REST: Quat = [0.0, 0.0, 0.382_683_43, 0.923_879_5]; // 45 degrees about Z.
 
@@ -59,11 +60,7 @@ fn avatar(clips: Vec<Clip>) -> Avatar {
     let mut arm = node("Arm", Some(1), true);
     arm.rest.rotation = ARM_REST;
     arm.rest.translation = [0.0, 0.5, 0.0];
-    let param = |name: &str, kind| Parameter {
-        name: name.into(),
-        kind,
-        default: 0.25,
-    };
+    let param = |name: &str, kind| Entry::new(name, kind, 0.25);
     Avatar {
         hierarchy: Hierarchy {
             nodes: vec![
@@ -83,10 +80,10 @@ fn avatar(clips: Vec<Clip>) -> Avatar {
             }],
             ..Mesh::default()
         }],
-        animator: Some(Animator {
-            parameters: vec![param("Fl", ParamKind::Float), param("B", ParamKind::Bool)],
-            ..Animator::default()
-        }),
+        state: StateTable {
+            entries: vec![param("Fl", EntryKind::Float), param("B", EntryKind::Bool)],
+        },
+        animator: Some(Animator::default()),
         clips,
         ..Avatar::default()
     }
@@ -133,6 +130,18 @@ fn binds_targets_with_defaults_and_shares_slots_across_clips() {
     // A clip writes only its own slots.
     b.clips[1].sample(0.0, &mut out);
     close(&out, &[3.0, 100.0, 1.0, 0.0, 0.75]);
+}
+
+#[test]
+fn a_parameter_slot_defaults_to_the_entry_rest() {
+    // Lowered Unity content: the entry starts at the expression default, Write Defaults restores the animator's (#115).
+    let mut a = avatar(vec![clip(vec![curve(
+        "",
+        Property::Parameter("Fl".into()),
+        &[(0.0, 0.75)],
+    )])]);
+    a.state.entries[0].rest = Some(0.5);
+    close(&bind(&a).bindings.defaults, &[0.5]);
 }
 
 #[test]

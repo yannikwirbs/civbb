@@ -6,6 +6,7 @@
 
 use std::path::Path;
 
+use civbb_format::state::{EntryKind, SyncMode};
 use civbb_pipeline::gltf_import::{Limits, import};
 use serde_json::{Value, json};
 
@@ -54,4 +55,38 @@ fn unity_dialect_versions_are_checked() {
             .unwrap_or_else(|| panic!("{bad} accepted"));
         assert!(err.to_string().contains("civbb_unity_dialect"), "{err}");
     }
+}
+
+/// Dialect 1's parameters lower to state entries (ADR 0088, #115): the animator's first, in order, then expression
+/// parameters it lacks; an expression parameter's default starts the entry, the animator's stays its `rest`; the
+/// animator's type holds; unknown names in the menu and receivers reference nothing.
+#[test]
+fn unity_parameters_lower_to_state_entries() {
+    let mut doc: Value = serde_json::from_slice(&fixture("unity-dialect-1.gltf")).unwrap();
+    let ext = &mut doc["extensions"];
+    ext["X_animator"]["animator"]["parameters"][1]["default"] = json!(0.0); // Speed: 0.5 in the expressions
+    let expression = &mut ext["X_expressions"]["parameters"];
+    expression[1]["kind"] = json!("Float"); // Count: an int in the animator
+    expression
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"name": "Extra", "kind": "Int", "default": 2.0, "saved": false, "synced": true}));
+    ext["X_expressions"]["menu"]["controls"][0]["parameter"] = json!("Nope");
+    ext["X_contacts"]["receivers"][0]["parameter"] = json!("");
+    let a = import(&serde_json::to_vec(&doc).unwrap(), &Limits::default(), no_files)
+        .unwrap()
+        .avatar;
+    let e = &a.state.entries;
+    let names: Vec<&str> = e.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(names, ["Toggle", "Speed", "Count", "Fire", "X", "Y", "Mirror", "Extra"]);
+    assert_eq!((e[1].default, e[1].rest), (0.5, Some(0.0)));
+    assert_eq!((e[0].default, e[0].rest), (1.0, None));
+    assert_eq!(e[2].kind, EntryKind::Int);
+    assert_eq!(
+        (e[7].kind, e[7].default, e[7].sync, e[7].external),
+        (EntryKind::Int, 2.0, SyncMode::Owner, true)
+    );
+    assert!(!e[3].external && e[3].sync == SyncMode::None);
+    assert_eq!(a.expressions.unwrap().menu.controls[0].parameter, None);
+    assert_eq!(a.contacts.receivers[0].parameter, None);
 }

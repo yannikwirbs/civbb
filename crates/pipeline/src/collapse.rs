@@ -8,13 +8,14 @@ use civbb_anim::Target;
 use civbb_format::Avatar;
 use civbb_format::animator::{
     Animator, Behaviour, BlendTree, BlendTreeKind, COMPILER_PARAMETER_PREFIX, Clip, ClipIndex, ConditionMode, DriverOp,
-    Layer, LayerBlending, Motion, ParamIndex, ParamKind, Parameter, State, StateMachine, Transition, TransitionDest,
+    Layer, LayerBlending, Motion, State, StateMachine, Transition, TransitionDest,
 };
+use civbb_format::state::{Entry, EntryIndex, EntryKind};
 
 /// A layer that only switches between two constant clips on one bool parameter.
 struct Toggle {
     layer: usize,
-    param: ParamIndex,
+    param: EntryIndex,
     off: ClipIndex,
     on: ClipIndex,
 }
@@ -45,7 +46,7 @@ pub fn collapse(a: &mut Avatar) -> usize {
     for &s in layer_slots.iter().flatten() {
         writers[s as usize] += 1;
     }
-    let animated_params: HashSet<ParamIndex> = layer_slots
+    let animated_params: HashSet<EntryIndex> = layer_slots
         .iter()
         .flatten()
         .filter_map(|&s| match bound.bindings.targets[s as usize] {
@@ -62,7 +63,7 @@ pub fn collapse(a: &mut Avatar) -> usize {
         })
         .collect();
     // Parameters a driver in each layer sets; they change mid-update, so layer order decides who sees them.
-    let driven: Vec<HashSet<ParamIndex>> = (0..n)
+    let driven: Vec<HashSet<EntryIndex>> = (0..n)
         .map(|li| {
             behaviours(li)
                 .filter_map(|b| match b {
@@ -81,7 +82,7 @@ pub fn collapse(a: &mut Avatar) -> usize {
     // Each toggle must write slots no other layer writes (so summing them equals layering them), on a bool no clip
     // animates (clips may set fractions the blend tree would blend), in a layer no behaviour reweights.
     let mut groups: Vec<(u32, Vec<Toggle>)> = Vec::new();
-    for t in (0..n).filter_map(|li| toggle(an, &a.clips, li)) {
+    for t in (0..n).filter_map(|li| toggle(an, &a.state.entries, &a.clips, li)) {
         if !layer_slots[t.layer].iter().all(|&s| writers[s as usize] == 1)
             || animated_params.contains(&t.param)
             || weighted.contains(&(t.layer as u32))
@@ -108,15 +109,11 @@ pub fn collapse(a: &mut Avatar) -> usize {
     let wd_off = any_wd_off(an);
     let an = a.animator.as_mut().expect("checked above");
     let mut name = format!("{COMPILER_PARAMETER_PREFIX}One");
-    while an.parameters.iter().any(|p| p.name == name) {
+    while a.state.find(&name).is_some() {
         name.push('_');
     }
-    let one = an.parameters.len() as ParamIndex;
-    an.parameters.push(Parameter {
-        name,
-        kind: ParamKind::Float,
-        default: 1.0,
-    });
+    let one = a.state.entries.len() as EntryIndex;
+    a.state.entries.push(Entry::new(name, EntryKind::Float, 1.0));
     let mut replace: HashMap<usize, Layer> = HashMap::new();
     let mut removed = HashSet::new();
     for (group, ts) in &groups {
@@ -160,7 +157,7 @@ pub fn collapse(a: &mut Avatar) -> usize {
 /// The toggle a layer is, if it is one: an override layer at weight 1 without a mask, two states each playing a
 /// constant clip with one zero-duration transition to the other on the same bool (`If` from off, `IfNot` from on),
 /// no exit times, entry or any-state transitions, and no behaviours.
-fn toggle(an: &Animator, clips: &[Clip], li: usize) -> Option<Toggle> {
+fn toggle(an: &Animator, entries: &[Entry], clips: &[Clip], li: usize) -> Option<Toggle> {
     let l = &an.layers[li];
     let sm = &l.state_machine;
     if l.blending != LayerBlending::Override
@@ -193,7 +190,7 @@ fn toggle(an: &Animator, clips: &[Clip], li: usize) -> Option<Toggle> {
     let [Some((c0, p0, m0)), Some((c1, p1, m1))] = arms else {
         return None;
     };
-    if p0 != p1 || an.parameters[p0 as usize].kind != ParamKind::Bool {
+    if p0 != p1 || entries[p0 as usize].kind != EntryKind::Bool {
         return None;
     }
     let (off, on) = match (m0, m1) {
@@ -223,7 +220,7 @@ fn constant(clip: &Clip) -> bool {
 /// The collapsed layer: `Toggles` plays each toggle's clip for its bool through a 1D tree, from the first frame, as
 /// each toggle layer takes its transition on its first update (ADR 0065). Every child weighs 1 by the constant
 /// parameter `one`, and Write Defaults is on so each slot gets exactly its one clip's value (ADR 0010).
-fn layer(group: u32, ts: &[Toggle], one: ParamIndex) -> Layer {
+fn layer(group: u32, ts: &[Toggle], one: EntryIndex) -> Layer {
     let child = |motion, threshold, direct_param| civbb_format::animator::ChildMotion {
         motion,
         threshold,

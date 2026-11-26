@@ -8,6 +8,7 @@ use civbb_format::Avatar;
 use civbb_format::face::{EyeDriver, ShapeBind};
 use civbb_format::material::MaterialModel;
 use civbb_format::mesh::Mesh;
+use civbb_format::state::{EntryIndex, EntryKind, SyncMode};
 use serde_json::{Value, json};
 
 const FLOAT: u32 = 5126;
@@ -126,8 +127,17 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
         }
         ext.insert("X_avatar".into(), x);
     }
+    // Unity dialect 1's parameters (the inverse of the importer's lowering): every entry an animator parameter with
+    // its rest value as default, every external one an expression parameter, references as names.
+    let entries = &a.state.entries;
+    let name = |e: Option<EntryIndex>| e.map_or("", |i| entries[i as usize].name.as_str());
     if let Some(animator) = &a.animator {
-        ext.insert("X_animator".into(), json!({"animator": animator, "clips": a.clips}));
+        let mut x = json!(animator);
+        let params = entries
+            .iter()
+            .map(|e| json!({"name": e.name, "kind": e.kind, "default": e.rest()}));
+        x["parameters"] = json!(params.collect::<Vec<_>>());
+        ext.insert("X_animator".into(), json!({"animator": x, "clips": a.clips}));
     }
     if !a.constraints.is_empty() {
         ext.insert("X_constraints".into(), json!(a.constraints));
@@ -136,14 +146,48 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
         ext.insert("X_dynamics".into(), json!(a.dynamics));
     }
     if !a.contacts.senders.is_empty() || !a.contacts.receivers.is_empty() {
-        ext.insert("X_contacts".into(), json!(a.contacts));
+        let mut x = json!(a.contacts);
+        for (r, v) in a
+            .contacts
+            .receivers
+            .iter()
+            .zip(x["receivers"].as_array_mut().expect("array"))
+        {
+            v["parameter"] = json!(name(r.parameter));
+        }
+        ext.insert("X_contacts".into(), x);
     }
     if let Some(e) = &a.expressions {
-        ext.insert("X_expressions".into(), json!(e));
+        let external = entries.iter().filter(|e| e.external && e.kind != EntryKind::Trigger);
+        let params = external.map(|e| {
+            let synced = e.sync == SyncMode::Owner;
+            json!({"name": e.name, "kind": e.kind, "default": e.default, "saved": e.saved, "synced": synced})
+        });
+        let mut menu = json!(e.menu);
+        menu_names(&mut menu, &name);
+        ext.insert(
+            "X_expressions".into(),
+            json!({"parameters": params.collect::<Vec<_>>(), "menu": menu}),
+        );
     }
     doc["extensionsUsed"] = json!(ext.keys().collect::<Vec<_>>());
     doc["extensions"] = Value::Object(ext);
     glb(serde_json::to_vec(&doc).expect("json"), bin)
+}
+
+/// A serialised menu's entry references as dialect 1's names.
+fn menu_names<'a>(menu: &mut Value, name: &dyn Fn(Option<EntryIndex>) -> &'a str) {
+    let index = |v: &Value| v.as_u64().map(|i| i as EntryIndex);
+    for c in menu["controls"].as_array_mut().expect("array") {
+        c["parameter"] = index(&c["parameter"]).map_or(Value::Null, |i| json!(name(Some(i))));
+        let subs: Vec<&str> = (c["sub_parameters"].as_array().expect("array").iter())
+            .map(|v| name(index(v)))
+            .collect();
+        c["sub_parameters"] = json!(subs);
+        if let Some(sub) = c["kind"].get_mut("SubMenu") {
+            menu_names(sub, name);
+        }
+    }
 }
 
 fn document(a: &Avatar) -> (Value, Vec<u8>) {

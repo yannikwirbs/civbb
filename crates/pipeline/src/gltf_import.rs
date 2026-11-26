@@ -21,6 +21,7 @@ mod material;
 mod mesh;
 mod source;
 mod unity_material;
+mod unity_state;
 mod vrm;
 
 /// Limits for one import.
@@ -135,6 +136,7 @@ pub fn import(
                 dynamics: v.dynamics,
                 animator: v.animator,
                 expressions: v.expressions,
+                state: v.state,
                 meta: v.meta,
                 constraints: v.constraints,
                 ..Avatar::default()
@@ -151,6 +153,7 @@ pub fn import(
         avatar.contacts = s.contacts;
         avatar.expressions = s.expressions;
         avatar.face = s.face;
+        avatar.state = s.state;
     }
     let validate = |avatar: &Avatar| {
         civbb_format::validate(avatar, &limits.caps, |id| im.blobs.contains_key(&id)).map_err(|errors| {

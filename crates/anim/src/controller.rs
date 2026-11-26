@@ -3,9 +3,10 @@
 use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
-use civbb_format::animator::{Animator, Behaviour, BodyPart, ParamIndex, State, TrackingMode};
+use civbb_format::animator::{Animator, Behaviour, BodyPart, State, TrackingMode};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform};
+use civbb_format::state::{EntryIndex, StateTable};
 
 use crate::behaviour::{Builtin, Rng, Tracking, coerce, drive, part_index};
 use crate::bind::{Bound, Slot, Target, bind, node_paths};
@@ -19,6 +20,8 @@ use crate::muscle::{self, COUNT, MUSCLES};
 pub struct Controller {
     /// The animator.
     pub animator: Animator,
+    /// The state table its parameters are entries of.
+    pub state: StateTable,
     /// Bound clips and slots.
     pub bound: Bound,
     /// Per layer, which slots its mask lets it write; `None` writes all.
@@ -35,8 +38,8 @@ pub struct Controller {
     /// Slots of humanoid muscles. Write Defaults off never holds them: Unity writes the whole human pose each frame,
     /// muscles nothing animates at their default (probed in the SDK host project), so frames start them there.
     muscles: Vec<usize>,
-    /// Per parameter, the value an instance starts at: its expression parameter's default when the expressions
-    /// declare it (VRChat loads those, #85), else the animator's default; in the parameter's type.
+    /// Per entry, the value an instance starts at, in the entry's type: `Entry::default` (for lowered Unity content
+    /// the expression parameter's default where there is one, as VRChat loads those, #85).
     pub start: Vec<f32>,
 }
 
@@ -115,20 +118,11 @@ impl Controller {
         let muscles = (0..bound.bindings.targets.len())
             .filter(|&s| matches!(bound.bindings.targets[s], Target::Muscle(_)))
             .collect();
-        let start = animator
-            .parameters
-            .iter()
-            .map(|p| {
-                let expression = avatar
-                    .expressions
-                    .iter()
-                    .flat_map(|e| &e.parameters)
-                    .find(|e| e.name == p.name);
-                coerce(p.kind, expression.map_or(p.default, |e| e.default))
-            })
-            .collect();
+        let state = avatar.state.clone();
+        let start = state.entries.iter().map(|e| coerce(e.kind, e.default)).collect();
         Some(Self {
             animator,
+            state,
             bound,
             masks,
             rot,
@@ -140,13 +134,9 @@ impl Controller {
         })
     }
 
-    /// The parameter called `name`.
-    pub fn param(&self, name: &str) -> Option<ParamIndex> {
-        self.animator
-            .parameters
-            .iter()
-            .position(|p| p.name == name)
-            .map(|i| i as ParamIndex)
+    /// The entry called `name`.
+    pub fn param(&self, name: &str) -> Option<EntryIndex> {
+        self.state.find(name)
     }
 }
 
@@ -215,7 +205,7 @@ impl Instance {
     /// Sets a built-in parameter if the animator declares it, converted to the declared type.
     pub fn set_builtin(&mut self, c: &Controller, b: Builtin, value: f32) {
         if let Some(p) = c.param(b.name()) {
-            self.params[p as usize] = coerce(c.animator.parameters[p as usize].kind, value);
+            self.params[p as usize] = coerce(c.state.entries[p as usize].kind, value);
         }
     }
 
@@ -306,7 +296,7 @@ impl Instance {
             let ctx = Ctx {
                 sm: &layer.state_machine,
                 clips: &c.bound.clips,
-                decls: &c.animator.parameters,
+                decls: &c.state.entries,
             };
             // The first update enters the start state and then advances like any other (recorded, #54).
             let started = self.runs[li].is_none().then(|| {
@@ -359,7 +349,7 @@ impl Instance {
             match b {
                 Behaviour::ParameterDriver { local_only, ops } => {
                     if self.local || !local_only {
-                        drive(ops, &c.animator.parameters, &mut self.params, &mut self.rng);
+                        drive(ops, &c.state.entries, &mut self.params, &mut self.rng);
                     }
                 }
                 Behaviour::TrackingControl(parts) => {

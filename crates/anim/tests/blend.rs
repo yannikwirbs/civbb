@@ -7,6 +7,7 @@ use civbb_format::Avatar;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::Transform;
+use civbb_format::state::{Entry, EntryKind, StateTable};
 
 fn close(a: &[f32], b: &[f32]) {
     assert!(
@@ -166,11 +167,7 @@ fn avatar(motion: Motion) -> Avatar {
         rest: Transform::IDENTITY,
         active: true,
     };
-    let param = |name: &str| Parameter {
-        name: name.into(),
-        kind: ParamKind::Float,
-        default: 0.0,
-    };
+    let param = |name: &str| Entry::new(name, EntryKind::Float, 0.0);
     Avatar {
         hierarchy: Hierarchy {
             nodes: vec![node("Root", None), node("A", Some(0))],
@@ -186,8 +183,10 @@ fn avatar(motion: Motion) -> Avatar {
             ),
             clip(1.0, vec![curve(Property::Position(1), vec![key(0.0, 4.0, 0.0)])]),
         ],
+        state: StateTable {
+            entries: vec![param("p"), param("q")],
+        },
         animator: Some(Animator {
-            parameters: vec![param("p"), param("q")],
             groups: vec![LayerGroup {
                 name: "g".into(),
                 weight: 1.0,

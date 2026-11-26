@@ -1,9 +1,10 @@
 //! VRM expressions to visemes, blink and a Direct blend tree of toggles, and look-at to eye look.
 
 use civbb_format::animator::*;
-use civbb_format::expressions::{Control, ControlKind, ExpressionParam, ExpressionParamKind, Expressions, Menu};
+use civbb_format::expressions::{Control, ControlKind, Expressions, Menu};
 use civbb_format::face::{EyeDriver, EyeLook, Face, RangeMap, ShapeBind, Viseme};
 use civbb_format::hierarchy::{HumanBone, Humanoid};
+use civbb_format::state::{Entry, EntryIndex, EntryKind, StateTable, SyncMode};
 use serde_json::Value;
 
 use super::{Vrm, index, num};
@@ -130,8 +131,7 @@ impl Importer<'_> {
         }
 
         let mut children = Vec::new();
-        let mut params = Vec::new();
-        let mut expr_params = Vec::new();
+        let mut entries = Vec::new();
         let mut controls = Vec::new();
         let mut bits = 0;
         for (i, (name, binds)) in toggles.into_iter().enumerate() {
@@ -159,7 +159,7 @@ impl Importer<'_> {
                 motion: Motion::Clip(clips.len() as ClipIndex),
                 threshold: 0.0,
                 position: [0.0; 2],
-                direct_param: Some(i as ParamIndex),
+                direct_param: Some(i as EntryIndex),
                 time_scale: 1.0,
                 mirror: false,
                 cycle_offset: 0.0,
@@ -171,34 +171,26 @@ impl Importer<'_> {
                 root: None,
                 curves,
             });
-            params.push(Parameter {
-                name: name.clone(),
-                kind: ParamKind::Float,
-                default: 0.0,
-            });
-            // Beyond the synced budget expressions still work, just locally.
-            let synced = bits + ExpressionParamKind::Float.bits() <= self.caps.synced_bits;
+            // Beyond the synced budget expressions still work, just locally. A float costs 8 bits.
+            let synced = bits + 8 <= self.caps.synced_bits;
             if synced {
-                bits += ExpressionParamKind::Float.bits();
+                bits += 8;
             }
-            expr_params.push(ExpressionParam {
-                name: name.clone(),
-                kind: ExpressionParamKind::Float,
-                default: 0.0,
-                saved: false,
-                synced,
+            entries.push(Entry {
+                sync: if synced { SyncMode::Owner } else { SyncMode::None },
+                external: true,
+                ..Entry::new(name.clone(), EntryKind::Float, 0.0)
             });
             controls.push(Control {
-                name: name.clone(),
+                name,
                 icon: None,
                 kind: ControlKind::Toggle,
-                parameter: Some(name),
+                parameter: Some(i as EntryIndex),
                 value: 1.0,
                 sub_parameters: Vec::new(),
             });
         }
         let animator = Animator {
-            parameters: params,
             groups: vec![LayerGroup {
                 name: "FX".into(),
                 weight: 1.0,
@@ -235,8 +227,8 @@ impl Importer<'_> {
             }],
         };
         out.animator = Some(animator);
+        out.state = StateTable { entries };
         out.expressions = Some(Expressions {
-            parameters: expr_params,
             menu: Menu { controls },
         });
         Ok(look)

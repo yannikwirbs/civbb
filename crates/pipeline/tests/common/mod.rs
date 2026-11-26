@@ -17,13 +17,7 @@ pub fn valid(a: &Avatar) {
 /// state number and the islands after each.
 pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &[Island])) {
     // The parity stepper skips a parameter an avatar lacks; a stage must keep them all.
-    let names = |a: &Avatar| -> Vec<String> {
-        a.animator
-            .iter()
-            .flat_map(|x| &x.parameters)
-            .map(|p| p.name.clone())
-            .collect()
-    };
+    let names = |a: &Avatar| -> Vec<String> { a.state.entries.iter().map(|p| p.name.clone()).collect() };
     for a in avatars {
         let have = names(a);
         assert!(
@@ -31,7 +25,8 @@ pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &[Island])) {
             "a parameter is gone"
         );
     }
-    civbb_client::parity::states(avatars, |state, _, islands| check(state, islands));
+    let params = civbb_client::parity::toggles(avatars[0]);
+    civbb_client::parity::states(avatars, &params, |state, _, islands| check(state, islands));
 }
 
 /// Steps both avatars through the same states and compares what they show.

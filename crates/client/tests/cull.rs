@@ -2,7 +2,7 @@
 //! the frustum keeps what is in view.
 
 use civbb_client::cull::{Frustum, MeshBounds};
-use civbb_client::parity::{placed, states};
+use civbb_client::parity::{placed, states, toggles};
 use civbb_client::view::skin_matrices;
 use civbb_format::Avatar;
 use civbb_render::View;
@@ -17,7 +17,7 @@ fn bounds_hold_every_skinned_vertex() {
         let shaped = avatar.meshes.iter().filter(|m| !m.blend_shapes.is_empty()).count();
         assert!(shaped > 0, "{name}: no blendshapes to check the padding with");
         let mut checked = 0;
-        states(&[&avatar], |_, state, islands| {
+        states(&[&avatar], &toggles(&avatar), |_, state, islands| {
             let island = &islands[0];
             let mut weights = Vec::new();
             island.shape_weights(&mut weights);

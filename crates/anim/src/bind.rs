@@ -3,10 +3,11 @@
 use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
-use civbb_format::animator::{Animator, ClipIndex, Curve, Key, Motion, ParamIndex, ParamKind, Property};
+use civbb_format::animator::{Animator, ClipIndex, Curve, Key, Motion, Property};
 use civbb_format::constraint::{ConstraintField, ConstraintType};
 use civbb_format::hierarchy::{Hierarchy, NodeIndex};
 use civbb_format::mesh::MeshIndex;
+use civbb_format::state::{EntryIndex, EntryKind};
 
 use civbb_core::math::quat_to_euler;
 
@@ -35,7 +36,7 @@ pub enum Target {
     /// Mesh renderer enabled flag.
     RendererEnabled(MeshIndex),
     /// Float animator parameter.
-    Parameter(ParamIndex),
+    Parameter(EntryIndex),
     /// Humanoid muscle, by index into [`MUSCLES`].
     Muscle(u8),
     /// Component of a material field on every material of a renderer that has the field (ADR 0025).
@@ -173,7 +174,7 @@ struct Binder<'a> {
     avatar: &'a Avatar,
     nodes: HashMap<String, NodeIndex>,
     meshes: HashMap<NodeIndex, Vec<MeshIndex>>,
-    params: HashMap<&'a str, ParamIndex>,
+    params: HashMap<&'a str, EntryIndex>,
     rig: Option<Rig>,
     body: Option<BodyRig>,
     slots: HashMap<Target, Slot>,
@@ -202,8 +203,8 @@ impl<'a> Binder<'a> {
             meshes.entry(m.node).or_default().push(i as MeshIndex);
         }
         let mut params = HashMap::new();
-        for (i, p) in avatar.animator.iter().flat_map(|a| a.parameters.iter()).enumerate() {
-            params.entry(p.name.as_str()).or_insert(i as ParamIndex);
+        for (i, e) in avatar.state.entries.iter().enumerate() {
+            params.entry(e.name.as_str()).or_insert(i as EntryIndex);
         }
         let rest = |n: NodeIndex| avatar.hierarchy.nodes[n as usize].rest.rotation;
         let rig = avatar.humanoid.as_ref().and_then(|h| Rig::new(h, rest));
@@ -356,9 +357,8 @@ impl<'a> Binder<'a> {
         let b = &curve.binding;
         if let Property::Parameter(name) = &b.property {
             let &p = self.params.get(name.as_str()).ok_or("no such parameter")?;
-            let kind = self.avatar.animator.as_ref().expect("params exist").parameters[p as usize].kind;
-            return match kind {
-                ParamKind::Float => Ok(Resolved::Target(Target::Parameter(p))),
+            return match self.avatar.state.entries[p as usize].kind {
+                EntryKind::Float => Ok(Resolved::Target(Target::Parameter(p))),
                 _ => Err("only float parameters can be animated"),
             };
         }
@@ -450,7 +450,7 @@ impl<'a> Binder<'a> {
             Target::BlendShape(m, i) => a.meshes[m as usize].blend_shapes[i as usize].default_weight * 100.0,
             Target::Active(n) => f32::from(u8::from(a.hierarchy.nodes[n as usize].active)),
             Target::RendererEnabled(_) => 1.0,
-            Target::Parameter(p) => a.animator.as_ref().expect("bound").parameters[p as usize].default,
+            Target::Parameter(p) => a.state.entries[p as usize].rest(),
             // Unity's default human pose is every muscle at 0, not the rest pose (#86, recorded at rest).
             Target::Muscle(_) => 0.0,
             // The rest pose's body: hips that are not animated stay where they rest (ADR 0063).

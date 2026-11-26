@@ -60,14 +60,16 @@ fn handoff_matches_the_states() {
     let avatar = civbb_corpus::generate(&civbb_corpus::lean());
     let h = parity::handoff(&avatar);
     let mut names = Vec::new();
-    parity::states(&[&avatar], |_, name, _| names.push(name.to_owned()));
+    parity::states(&[&avatar], &parity::toggles(&avatar), |_, name, _| {
+        names.push(name.to_owned())
+    });
     assert!(names.len() > 1, "the lean avatar has parameters");
     assert_eq!(h.states.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), names);
     assert_eq!(h.states[0].parameter, "");
     for s in &h.states[1..] {
         assert_eq!(s.name, format!("{}={}", s.parameter, s.value));
     }
-    let params = &avatar.animator.as_ref().unwrap().parameters;
+    let params = &avatar.state.entries;
     assert_eq!(h.parameters.len(), params.len());
     assert!(
         h.parameters

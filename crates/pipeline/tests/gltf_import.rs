@@ -79,6 +79,7 @@ fn corpus_round_trips_through_source_extensions() {
         assert_eq!(a.dynamics, original.dynamics, "{}", spec.name);
         assert_eq!(a.contacts, original.contacts, "{}", spec.name);
         assert_eq!(a.expressions, original.expressions, "{}", spec.name);
+        assert_eq!(a.state, original.state, "{}", spec.name);
         assert!(imported.warnings.is_empty(), "{:?}", imported.warnings);
     }
 }
@@ -116,7 +117,14 @@ fn hostile_source_extensions_are_rejected() {
     let mut c = serde_json::to_value(&lean.constraints[0]).unwrap();
     c["target"] = json!(u32::MAX);
     reject("X_constraints: node 4294967295", json!({"X_constraints": [c]}));
+    // Unity dialect 1: the animator declares its parameters.
     let mut animator = serde_json::to_value(lean.animator.as_ref().unwrap()).unwrap();
+    let params = lean.state.entries.iter();
+    animator["parameters"] = json!(
+        params
+            .map(|e| json!({"name": e.name, "kind": e.kind, "default": e.default}))
+            .collect::<Vec<_>>()
+    );
     reject("clip", json!({"X_animator": {"animator": animator, "clips": []}}));
     animator["layers"] = json!("x");
     reject("X_animator", json!({"X_animator": {"animator": animator}}));
@@ -327,7 +335,6 @@ fn source_extensions_map_nodes_and_clips() {
         behaviours: Vec::new(),
     };
     let animator = Animator {
-        parameters: Vec::new(),
         groups: vec![LayerGroup {
             name: "FX".into(),
             weight: 1.0,
@@ -365,9 +372,11 @@ fn source_extensions_map_nodes_and_clips() {
         rest: Transform::IDENTITY,
         options: Default::default(),
     };
+    let mut animator_with_parameters = json!(animator);
+    animator_with_parameters["parameters"] = json!([]);
     doc["extensions"] = json!({
         "X_avatar": {"humanoid": {"Hips": 1}},
-        "X_animator": {"animator": animator, "clips": [clip]},
+        "X_animator": {"animator": animator_with_parameters, "clips": [clip]},
         "X_constraints": [constraint],
     });
     let a = import(&gltf(doc, &bin), &Limits::default(), no_files).unwrap().avatar;
@@ -846,7 +855,7 @@ fn vrm1_imports() {
         "missing permissions are denied"
     );
     assert_eq!(l.url, "https://vrm.dev/licenses/1.0/");
-    assert_eq!(a.animator.as_ref().unwrap().parameters.len(), 2);
+    assert_eq!(a.state.entries.len(), 2);
 
     let chain = &a.dynamics.chains[0];
     assert_eq!(

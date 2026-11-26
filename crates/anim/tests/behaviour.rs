@@ -4,16 +4,12 @@
 use civbb_anim::{Builtin, Controller, Instance};
 use civbb_format::Avatar;
 use civbb_format::animator::*;
-use civbb_format::expressions::{ExpressionParam, ExpressionParamKind, Expressions, Menu};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::Transform;
+use civbb_format::state::{Entry, EntryKind, StateTable};
 
-fn param(name: &str, kind: ParamKind) -> Parameter {
-    Parameter {
-        name: name.into(),
-        kind,
-        default: 0.0,
-    }
+fn param(name: &str, kind: EntryKind) -> Entry {
+    Entry::new(name, kind, 0.0)
 }
 
 fn state(behaviours: Vec<Behaviour>, transitions: Vec<Transition>) -> State {
@@ -49,12 +45,9 @@ fn layer(states: Vec<State>, group: u32) -> Layer {
     }
 }
 
-fn controller(parameters: Vec<Parameter>, layers: Vec<Layer>) -> Controller {
-    controller_with(parameters, layers, None)
-}
-
-fn controller_with(parameters: Vec<Parameter>, layers: Vec<Layer>, expressions: Option<Expressions>) -> Controller {
+fn controller(entries: Vec<Entry>, layers: Vec<Layer>) -> Controller {
     let a = Avatar {
+        state: StateTable { entries },
         hierarchy: Hierarchy {
             nodes: vec![Node {
                 name: "Root".into(),
@@ -64,7 +57,6 @@ fn controller_with(parameters: Vec<Parameter>, layers: Vec<Layer>, expressions: 
             }],
         },
         animator: Some(Animator {
-            parameters,
             groups: (0..2)
                 .map(|i| LayerGroup {
                     name: format!("g{i}"),
@@ -73,7 +65,6 @@ fn controller_with(parameters: Vec<Parameter>, layers: Vec<Layer>, expressions: 
                 .collect(),
             layers,
         }),
-        expressions,
         ..Avatar::default()
     };
     civbb_format::validate(&a, &civbb_format::Caps::default(), |_| true).unwrap();
@@ -88,16 +79,16 @@ fn builtins_have_legacy_names_and_convert_to_the_declared_type() {
     unique.dedup();
     assert_eq!(unique.len(), names.len());
     assert!(names.contains(&"AFK") && names.contains(&"VRMode") && names.contains(&"GestureLeftWeight"));
-    assert_eq!(Builtin::GestureLeft.kind(), ParamKind::Int);
-    assert_eq!(Builtin::Upright.kind(), ParamKind::Float);
-    assert_eq!(Builtin::Seated.kind(), ParamKind::Bool);
+    assert_eq!(Builtin::GestureLeft.kind(), EntryKind::Int);
+    assert_eq!(Builtin::Upright.kind(), EntryKind::Float);
+    assert_eq!(Builtin::Seated.kind(), EntryKind::Bool);
 
     let params = vec![
-        param("IsLocal", ParamKind::Bool),
-        param("GestureLeft", ParamKind::Int),
-        param("VelocityX", ParamKind::Float),
+        param("IsLocal", EntryKind::Bool),
+        param("GestureLeft", EntryKind::Int),
+        param("VelocityX", EntryKind::Float),
         // Declared with another type than the engine's: converted to the declared one.
-        param("GestureRightWeight", ParamKind::Bool),
+        param("GestureRightWeight", EntryKind::Bool),
     ];
     let c = controller(params, vec![layer(vec![state(vec![], vec![])], 0)]);
     assert_eq!(Instance::new(&c, false).params[0], 0.0);
@@ -114,49 +105,32 @@ fn builtins_have_legacy_names_and_convert_to_the_declared_type() {
 fn instances_start_standing_on_the_ground() {
     // Creators often leave Grounded and Upright at 0; VRChat's locomotion would then start in SmallHop (#86).
     let params = vec![
-        param("Grounded", ParamKind::Bool),
-        param("Upright", ParamKind::Float),
-        param("AvatarVersion", ParamKind::Int),
-        param("ScaleFactor", ParamKind::Float),
-        param("VelocityY", ParamKind::Float),
-        param("Seated", ParamKind::Bool),
-        param("user", ParamKind::Float),
+        param("Grounded", EntryKind::Bool),
+        param("Upright", EntryKind::Float),
+        param("AvatarVersion", EntryKind::Int),
+        param("ScaleFactor", EntryKind::Float),
+        param("VelocityY", EntryKind::Float),
+        param("Seated", EntryKind::Bool),
+        param("user", EntryKind::Float),
     ];
     let c = controller(params, vec![layer(vec![state(vec![], vec![])], 0)]);
     assert_eq!(Instance::new(&c, false).params, [1.0, 1.0, 3.0, 1.0, 0.0, 0.0, 0.0]);
 }
 
 #[test]
-fn instances_start_at_the_expression_defaults() {
-    // Cokoro's brightness slider: 0 in the animator, 0.5 in the expressions, which VRChat loads (#85).
-    let expression = |name: &str, kind, default| ExpressionParam {
-        name: name.into(),
-        kind,
-        default,
-        saved: true,
-        synced: true,
-    };
+fn instances_start_at_the_entry_defaults_in_their_types() {
+    // The Unity importer puts the expression parameter's default into `default` (#85, `gltf_import` tests).
     let params = vec![
-        param("07_mat", ParamKind::Float),
-        param("WingsClosed", ParamKind::Bool),
-        // Declared as an int in the menu, a float in the animator: the animator's type holds it.
-        param("Outfit", ParamKind::Float),
-        Parameter {
-            default: 0.25,
-            ..param("local", ParamKind::Float)
+        Entry::new("07_mat", EntryKind::Float, 0.5),
+        Entry::new("WingsClosed", EntryKind::Bool, 0.75),
+        Entry::new("Outfit", EntryKind::Int, 2.4),
+        Entry {
+            rest: Some(0.0),
+            ..Entry::new("local", EntryKind::Float, 0.25)
         },
-        param("Grounded", ParamKind::Bool),
+        param("Grounded", EntryKind::Bool),
     ];
-    let e = Expressions {
-        parameters: vec![
-            expression("07_mat", ExpressionParamKind::Float, 0.5),
-            expression("WingsClosed", ExpressionParamKind::Bool, 1.0),
-            expression("Outfit", ExpressionParamKind::Int, 2.0),
-            expression("Unused", ExpressionParamKind::Int, 3.0),
-        ],
-        menu: Menu::default(),
-    };
-    let c = controller_with(params, vec![layer(vec![state(vec![], vec![])], 0)], Some(e));
+    let c = controller(params, vec![layer(vec![state(vec![], vec![])], 0)]);
     assert_eq!(c.start, [0.5, 1.0, 2.0, 0.25, 0.0]);
     assert_eq!(Instance::new(&c, false).params, [0.5, 1.0, 2.0, 0.25, 1.0]);
 }
@@ -168,12 +142,12 @@ fn driver(local_only: bool, ops: Vec<DriverOp>) -> Behaviour {
 #[test]
 fn parameter_drivers_run_on_enter_in_order() {
     let params = vec![
-        param("f", ParamKind::Float),
-        param("i", ParamKind::Int),
-        param("b", ParamKind::Bool),
-        param("r", ParamKind::Float),
-        param("n", ParamKind::Int),
-        param("local", ParamKind::Float),
+        param("f", EntryKind::Float),
+        param("i", EntryKind::Int),
+        param("b", EntryKind::Bool),
+        param("r", EntryKind::Float),
+        param("n", EntryKind::Int),
+        param("local", EntryKind::Float),
     ];
     let ops = vec![
         DriverOp::Set { param: 0, value: 2.0 },
@@ -222,7 +196,7 @@ fn parameter_drivers_run_on_enter_in_order() {
 
 #[test]
 fn random_ints_cover_their_inclusive_range() {
-    let params = vec![param("n", ParamKind::Int), param("go", ParamKind::Bool)];
+    let params = vec![param("n", EntryKind::Int), param("go", EntryKind::Bool)];
     let reenter = Transition {
         dest: TransitionDest::State(0),
         conditions: vec![Condition {
@@ -292,7 +266,7 @@ fn layer_and_group_weight_control_blend_to_their_goals() {
     ];
     let base = layer(vec![state(vec![], vec![go]), state(control, vec![])], 0);
     let other = layer(vec![state(vec![], vec![])], 0);
-    let c = controller(vec![param("go", ParamKind::Bool)], vec![base, other]);
+    let c = controller(vec![param("go", EntryKind::Bool)], vec![base, other]);
     let mut i = Instance::new(&c, true);
     i.update(&c, 0.1);
     i.params[0] = 1.0;

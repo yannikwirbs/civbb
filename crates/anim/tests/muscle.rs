@@ -9,6 +9,7 @@ use civbb_anim::{Controller, Instance, Rig, Target, bind};
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, Node, NodeIndex};
 use civbb_format::math::{Quat, Transform};
+use civbb_format::state::{Entry, EntryKind};
 use civbb_format::{Avatar, Caps, validate};
 use serde::Deserialize;
 
@@ -517,7 +518,6 @@ fn masks_gate_muscles_by_body_part_and_the_pose_follows_the_muscles() {
         transforms: Some(Vec::new()),
     };
     a.animator = Some(Animator {
-        parameters: Vec::new(),
         groups: vec![LayerGroup {
             name: "All".into(),
             weight: 1.0,
@@ -615,12 +615,8 @@ fn write_defaults_off_never_holds_muscles() {
         })));
         let mut l = layer(0, None);
         l.state_machine.states = vec![first, tree];
+        a.state.entries = vec![Entry::new("b", EntryKind::Float, 0.0)];
         a.animator = Some(Animator {
-            parameters: vec![Parameter {
-                name: "b".into(),
-                kind: ParamKind::Float,
-                default: 0.0,
-            }],
             groups: vec![LayerGroup {
                 name: "All".into(),
                 weight: 1.0,

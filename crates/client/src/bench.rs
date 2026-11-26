@@ -171,7 +171,7 @@ fn scene(model: &Arc<Model>, avatars: u32) -> Vec<Island> {
 fn measure(model: &Arc<Model>, cfg: &Config) -> (Vec<f64>, Counters) {
     let mut islands = scene(model, cfg.avatars);
     let homes: Vec<Pose> = islands.iter().map(|i| i.origin).collect();
-    let params = model.controller().map_or(0, |c| c.animator.parameters.len());
+    let params = model.controller().map_or(0, |c| c.state.entries.len());
     let mut frame_ms = Vec::with_capacity(cfg.frames as usize);
     let mut total = Counters::default();
     for f in 0..cfg.warmup + cfg.frames {

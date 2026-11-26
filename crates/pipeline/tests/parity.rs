@@ -45,7 +45,7 @@ fn parity(reference: &Avatar, test: &Avatar) -> Option<Parity> {
 fn lean_compiled_matches_its_import_in_every_state() {
     let (source, compiled) = compiled(&civbb_corpus::lean());
     let Some(p) = parity(&source, &compiled) else { return };
-    let params = source.animator.iter().flat_map(|a| &a.parameters).count();
+    let params = source.state.entries.len();
     assert!(params >= 2, "lean has an outfit and a prop toggle");
     assert_eq!(p.states.len(), params + 1);
     assert_eq!(p.states[0].name, "rest");
@@ -66,10 +66,10 @@ fn compiled_states_match_the_import() {
     let (source, compiled) = compiled(&civbb_corpus::bloated());
     let names = |a: &Avatar| {
         let mut names = Vec::new();
-        parity::states(&[a], |_, name, _| names.push(name.to_owned()));
+        parity::states(&[a], &parity::toggles(a), |_, name, _| names.push(name.to_owned()));
         names
     };
-    let params = |a: &Avatar| a.animator.as_ref().unwrap().parameters.len();
+    let params = |a: &Avatar| a.state.entries.len();
     assert!(params(&compiled) > params(&source), "collapsing added a parameter");
     assert_eq!(names(&compiled), names(&source));
 }

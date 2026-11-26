@@ -1,4 +1,6 @@
-//! Animator data with Mecanim semantics: parameters, layers, state machines, blend trees, transitions, clips.
+//! Animator data with Mecanim semantics: layers, state machines, blend trees, transitions, clips.
+//!
+//! Parameters are entries of the document's state table (`crate::state`).
 //!
 //! Exporters flatten sub-state machines into one state list per layer and drop muted transitions, so the
 //! runtime only sees states, entry transitions, any-state transitions and per-state transitions.
@@ -6,9 +8,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::hierarchy::HumanBone;
+use crate::state::EntryIndex;
 
-/// Index into [`Animator::parameters`].
-pub type ParamIndex = u32;
 /// Index into [`crate::Avatar::clips`].
 pub type ClipIndex = u32;
 /// Index into [`StateMachine::states`].
@@ -18,37 +19,14 @@ pub type StateIndex = u32;
 /// layer list in that order, each tagged with its [`LayerGroup`].
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Animator {
-    /// Parameters, shared by all layers.
-    pub parameters: Vec<Parameter>,
     /// Layer groups (legacy playable layers), weighted as a whole.
     pub groups: Vec<LayerGroup>,
     /// Layers, evaluated in order.
     pub layers: Vec<Layer>,
 }
 
-/// Prefix of the parameters the compiler adds (`civbb/One`, ADR 0028); no creator state toggles them.
+/// Prefix of the state entries the compiler adds (`civbb/One`, ADR 0028); no creator state toggles them.
 pub const COMPILER_PARAMETER_PREFIX: &str = "civbb/";
-
-/// An animator parameter.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Parameter {
-    /// Name, as conditions, drivers, OSC and expressions refer to it.
-    pub name: String,
-    /// Type.
-    pub kind: ParamKind,
-    /// Initial value; bools and triggers use 0 or 1.
-    pub default: f32,
-}
-
-/// Parameter types.
-#[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ParamKind {
-    Float,
-    Int,
-    Bool,
-    Trigger,
-}
 
 /// A group of layers with a shared weight (a legacy playable layer).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -135,13 +113,13 @@ pub struct State {
     /// Playback speed multiplier.
     pub speed: f32,
     /// Parameter multiplied into `speed`.
-    pub speed_param: Option<ParamIndex>,
+    pub speed_param: Option<EntryIndex>,
     /// Normalised start offset.
     pub cycle_offset: f32,
     /// Parameter replacing `cycle_offset`.
-    pub cycle_offset_param: Option<ParamIndex>,
+    pub cycle_offset_param: Option<EntryIndex>,
     /// Parameter driving normalised time directly (Unity "Motion Time").
-    pub time_param: Option<ParamIndex>,
+    pub time_param: Option<EntryIndex>,
     /// Write Defaults: animated properties not in this state's motion revert to their defaults.
     pub write_defaults: bool,
     /// Plays humanoid muscles mirrored left to right (Unity "Mirror"; ADR 0060).
@@ -149,7 +127,7 @@ pub struct State {
     pub mirror: bool,
     /// Bool parameter replacing `mirror`.
     #[serde(default)]
-    pub mirror_param: Option<ParamIndex>,
+    pub mirror_param: Option<EntryIndex>,
     /// Outgoing transitions, checked in order.
     pub transitions: Vec<Transition>,
     /// State behaviours run on enter.
@@ -180,10 +158,10 @@ pub struct BlendTree {
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum BlendTreeKind {
-    Simple1D { param: ParamIndex },
-    SimpleDirectional2D { x: ParamIndex, y: ParamIndex },
-    FreeformDirectional2D { x: ParamIndex, y: ParamIndex },
-    FreeformCartesian2D { x: ParamIndex, y: ParamIndex },
+    Simple1D { param: EntryIndex },
+    SimpleDirectional2D { x: EntryIndex, y: EntryIndex },
+    FreeformDirectional2D { x: EntryIndex, y: EntryIndex },
+    FreeformCartesian2D { x: EntryIndex, y: EntryIndex },
     Direct,
 }
 
@@ -197,7 +175,7 @@ pub struct ChildMotion {
     /// 2D position.
     pub position: [f32; 2],
     /// Weight parameter for `Direct` trees.
-    pub direct_param: Option<ParamIndex>,
+    pub direct_param: Option<EntryIndex>,
     /// Speed multiplier.
     pub time_scale: f32,
     /// Normalised time offset.
@@ -245,7 +223,7 @@ pub enum TransitionDest {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Condition {
     /// Tested parameter.
-    pub param: ParamIndex,
+    pub param: EntryIndex,
     /// Comparison.
     pub mode: ConditionMode,
     /// Comparison value for numeric modes.
@@ -317,24 +295,24 @@ pub enum Behaviour {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DriverOp {
     Set {
-        param: ParamIndex,
+        param: EntryIndex,
         value: f32,
     },
     Add {
-        param: ParamIndex,
+        param: EntryIndex,
         value: f32,
     },
     /// Random in `[min, max]`; for bools, true with probability `chance`.
     Random {
-        param: ParamIndex,
+        param: EntryIndex,
         min: f32,
         max: f32,
         chance: f32,
     },
     /// Copies `src` to `dst`, optionally remapping `from` range to `to` range.
     Copy {
-        src: ParamIndex,
-        dst: ParamIndex,
+        src: EntryIndex,
+        dst: EntryIndex,
         remap: Option<([f32; 2], [f32; 2])>,
     },
 }

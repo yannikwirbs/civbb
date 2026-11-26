@@ -7,9 +7,10 @@ use std::sync::Arc;
 use civbb_client::{Island, Model, frame};
 use civbb_core::math::Pose;
 use civbb_format::animator::{
-    Behaviour, Condition, ConditionMode, DriverOp, InterruptionSource, Key, Layer, LayerBlending, Motion, ParamKind,
-    Parameter, State, StateMachine, Transition, TransitionDest,
+    Behaviour, Condition, ConditionMode, DriverOp, InterruptionSource, Key, Layer, LayerBlending, Motion, State,
+    StateMachine, Transition, TransitionDest,
 };
+use civbb_format::state::{Entry, EntryKind};
 use civbb_format::{Avatar, Caps, validate};
 use civbb_pipeline::collapse;
 
@@ -49,7 +50,7 @@ fn corpus_toggle_layers_collapse_into_one() {
         .collect();
     // Every state was a toggle's, with Write Defaults off: `Hold` keeps frames starting from the last pose.
     assert_eq!(states, ["Toggles", "Hold"]);
-    assert_eq!(an.parameters.last().unwrap().name, "civbb/One");
+    assert_eq!(a.state.entries.last().unwrap().name, "civbb/One");
     let mut again = a.clone();
     assert_eq!(collapse(&mut again), 0);
 }
@@ -65,7 +66,7 @@ fn layers_that_are_not_plain_toggles_stay() {
     // A float parameter's conditions are not a bool's.
     let mut a = bloated();
     let p = toggle_param(&a, 7);
-    a.animator.as_mut().unwrap().parameters[p].kind = ParamKind::Float;
+    a.state.entries[p].kind = EntryKind::Float;
     assert_eq!(collapsed(&a).1, 46);
 
     // Layer 11's on clip also writes layer 10's node: both stay, as summing them is not layering them.
@@ -82,13 +83,9 @@ fn layers_that_are_not_plain_toggles_stay() {
     // driver layer's weight behaviour follows its layer to its new index.
     let mut a = bloated();
     let p = toggle_param(&a, 5) as u32;
+    let drive = a.state.entries.len() as u32;
+    a.state.entries.push(Entry::new("Drive", EntryKind::Bool, 0.0));
     let an = a.animator.as_mut().unwrap();
-    let drive = an.parameters.len() as u32;
-    an.parameters.push(Parameter {
-        name: "Drive".into(),
-        kind: ParamKind::Bool,
-        default: 0.0,
-    });
     let go = |dest, mode| Transition {
         dest: TransitionDest::State(dest),
         conditions: vec![Condition {
@@ -194,17 +191,12 @@ fn toggle_param(a: &Avatar, layer: usize) -> usize {
 fn same_pose(before: &Avatar, after: &Avatar) {
     let island = |a: &Avatar| Island::new(Arc::new(Model::new(a)), 1, true, Pose::IDENTITY);
     let (mut b, mut a) = (island(before), island(after));
-    let bools: Vec<usize> = before
-        .animator
-        .as_ref()
-        .unwrap()
-        .parameters
-        .iter()
+    let bools: Vec<usize> = (before.state.entries.iter())
         .enumerate()
-        .filter(|(_, p)| p.kind == ParamKind::Bool)
+        .filter(|(_, p)| p.kind == EntryKind::Bool)
         .map(|(i, _)| i)
         .collect();
-    let n = before.animator.as_ref().unwrap().parameters.len();
+    let n = before.state.entries.len();
     let mut rng = 0x2545_f491_4f6c_dd1d_u64;
     let mut next = move |m: usize| {
         rng ^= rng << 13;

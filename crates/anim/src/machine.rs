@@ -1,9 +1,9 @@
 //! Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
 
 use civbb_format::animator::{
-    Condition, ConditionMode, InterruptionSource, ParamKind, Parameter, State, StateIndex, StateMachine, Transition,
-    TransitionDest,
+    Condition, ConditionMode, InterruptionSource, State, StateIndex, StateMachine, Transition, TransitionDest,
 };
+use civbb_format::state::{Entry, EntryKind};
 
 use crate::bind::Slot;
 use crate::clip::BoundClip;
@@ -67,8 +67,8 @@ pub struct Ctx<'a> {
     pub sm: &'a StateMachine,
     /// All clips.
     pub clips: &'a [BoundClip],
-    /// Parameter declarations.
-    pub decls: &'a [Parameter],
+    /// State entries.
+    pub decls: &'a [Entry],
 }
 
 impl Ctx<'_> {
@@ -134,7 +134,7 @@ impl Ctx<'_> {
 
     fn consume(&self, t: &Transition, params: &mut [f32]) {
         for c in &t.conditions {
-            if self.decls[c.param as usize].kind == ParamKind::Trigger {
+            if self.decls[c.param as usize].kind == EntryKind::Trigger {
                 params[c.param as usize] = 0.0;
             }
         }

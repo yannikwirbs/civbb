@@ -36,7 +36,7 @@ fn receiver(shape: ContactShape, kind: ReceiverKind) -> ContactReceiver {
     ContactReceiver {
         volume: vol(shape),
         tags: vec!["Hand".into()],
-        parameter: "P".into(),
+        parameter: None,
         kind,
         allow_self: true,
         allow_others: true,

@@ -7,6 +7,7 @@ use civbb_format::Avatar;
 use civbb_format::dynamics::{ContactShape, ContactVolume, ReceiverKind};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Vec3};
+use civbb_format::state::EntryIndex;
 
 use civbb_core::math::{Pose, add, conj, cross, dot, length, mul, rotate, scale, sub};
 
@@ -43,8 +44,8 @@ pub struct Volume {
 pub struct Receiver {
     /// Volume.
     pub volume: Volume,
-    /// Animator parameter the value goes to.
-    pub parameter: String,
+    /// State entry the value goes to; `None` writes nothing.
+    pub parameter: Option<EntryIndex>,
     /// How the value is computed.
     pub kind: ReceiverKind,
     /// Senders on the same avatar count.
@@ -81,7 +82,7 @@ impl ContactRig {
                 .iter()
                 .map(|r| Receiver {
                     volume: volume(&r.volume, &r.tags, r.local_only),
-                    parameter: r.parameter.clone(),
+                    parameter: r.parameter,
                     kind: r.kind,
                     allow_self: r.allow_self,
                     allow_others: r.allow_others,

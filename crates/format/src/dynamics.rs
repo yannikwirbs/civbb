@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hierarchy::NodeIndex;
 use crate::math::{Quat, Vec3};
+use crate::state::EntryIndex;
 
 /// All dynamics of an avatar.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -244,8 +245,8 @@ pub struct ContactReceiver {
     pub volume: ContactVolume,
     /// Accepted tags; any match counts.
     pub tags: Vec<String>,
-    /// Animator parameter written.
-    pub parameter: String,
+    /// Entry written; `None` writes nothing.
+    pub parameter: Option<EntryIndex>,
     /// How the parameter is driven.
     pub kind: ReceiverKind,
     /// Senders on the same avatar count.
