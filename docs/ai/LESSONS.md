@@ -43,3 +43,5 @@ Add a line to the matching file whenever something costs more than one attempt.
 - A background `cargo test` started before an edit compiles the old code; rerun after editing.
 - Don't restore a file with `git checkout --` after a mutation check of a file you changed this session: it reverts
   to the commit and drops your uncommitted edits. Revert the mutation with the inverse edit.
+- Renaming a field with `sed -E 's/\bname\b/new/'` across files also renames same-named fields of other types
+  (`local_only` of drivers and of contact receivers): build right after and revert the hits the compiler names.
