@@ -12,12 +12,12 @@ use civbb_format::{Document, Package, ReadLimits, SigningKey};
 use civbb_pipeline::gltf_import::{Limits, import};
 use civbb_render::material::pack;
 
-/// One line per material: its index, name and record words in hex.
+/// One line per material: its index, name, draw queue (the renderer sorts by it) and record words in hex.
 fn records(doc: &Document) -> String {
     let identity: Vec<u32> = (0..doc.textures.len() as u32).collect();
     let mut out = String::new();
     for (i, m) in doc.materials.iter().enumerate() {
-        write!(out, "{i} {:?}", m.name).unwrap();
+        write!(out, "{i} {:?} queue {}", m.name, m.render_queue).unwrap();
         for w in pack(m, &identity) {
             write!(out, " {w:08x}").unwrap();
         }
