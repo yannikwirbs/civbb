@@ -153,6 +153,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `tests/common/mod.rs`: Shared by the stage tests: validity, stepping islands through an avatar's states, and what an avatar shows.
 - `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
 - `tests/lod.rs`: LOD chain (ADR 0031): levels fall in triangles within their error caps, keep submesh borders and UV seams, keep
+- `tests/material_records.rs`: The material records the renderer uploads (`civbb_render::material::pack`), pinned so a restructuring of the
 - `tests/merge.rs`: Mesh merging (ADR 0027): meshes always visible together merge and same-material submeshes join, everything
 - `tests/parity.rs`: FLIP parity on a device (ADR 0033): the lean and bloated corpus avatars after every compiler stage render like
 - `tests/prune.rs`: Pruning (ADR 0026): unused skin joints, unreferenced nodes and undriven blendshapes go; everything referenced,
