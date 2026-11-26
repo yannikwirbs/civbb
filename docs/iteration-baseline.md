@@ -111,3 +111,59 @@ Not pursued: merging each crate's integration tests into one binary. After a for
 take 149 of 186 CPU seconds, but they link in parallel; the wall-time path is the pipeline library (7.0 s) and then
 one test binary (at most 6.7 s), which merging would not shorten. The slowest test is now
 `parity::bloated_compiled_matches_its_import_in_every_state` at 6.5 s (GPU with validation in debug builds).
+
+## Session cost baseline (2026-11-26)
+
+Measured with `python tools/session-stats.py --since 2026-11-19` (repeat it the same way): the 20 sessions after the
+iteration tuning, 2026-11-19 to 2026-11-24. Tokens are the API's usage counts. Dollars use per-token prices fitted
+to Claude Code's own `cost-state` totals (Opus 5.5: $4 input, $20 output, $0.20 cache read, $8 cache write per
+Mtok; fitted and reported totals agree within 2 %). All sessions ran `opus[1m]` at high effort; every cache write
+used the 1-hour TTL and only one call missed the cache, so cache writes are simply new content.
+
+| Measure | Total | Per closed issue |
+| --- | --- | --- |
+| Cost | $295 (mean $14.75 per session) | $9.2 |
+| Issues closed (`Closes #N` in the session's commits) | 32 (median 2 per session) | |
+| Cache-read tokens | 900 M | 28.1 M |
+| Cache-write tokens | 7.0 M | 219 k |
+| Output tokens (thinking 1.12 M of them) | 2.95 M | 92 k |
+| API calls (main thread; subagents: 1 call in 20 sessions) | 3,539 | 111 |
+| Tool calls / tool output | 3,955 / 6.1 MB | 124 / 190 KB |
+| Agent time (wall minus time waiting for the owner) | 20.1 h | 38 min |
+| of it: API (model) time / tool time | 9.1 h / 7.4 h | |
+
+Where the money goes: cache reads $180 (61 %), cache writes $56 (19 %), output $59 (20 %). Each call re-reads the
+whole context, so a session's cost grows with the square of its length: the mean call carried 254 k tokens, the mean
+session peaked at 359 k (max 572 k), and no session compacted. Cache-read dollars by context size at the call:
+0-100 k $5, 100-200 k $29, 200-300 k $51, 300-400 k $49, over 400 k $47.
+
+What a call carries:
+
+- **Base context, 51 k tokens before anything is read** (20 % of the mean call). Mostly the harness: tool schemas
+  69 KB (Artifact 26 KB plus 30 KB of Artifact instructions, never used in this repo; PowerShell 10 KB, used 10
+  times; AskUserQuestion, ScheduleWakeup, ReportFindings, ListAgents 15 KB), skill listings ~20 KB (Unity plugin
+  8 KB; its skills were called 3 times in 47 sessions), MCP and browser instructions ~8 KB. CLAUDE.md is 5.6 KB.
+- **Tool output**, about 30 % of a session's final context. Carried cost (written once, re-read by every later
+  call): reading code with Bash $27 (`sed -n` slices 1.5 MB, `cat` of whole files 0.8 MB, `grep` 0.7 MB), python
+  $8, Read $5, Unity $2, `gh issue` $2, parity $2; everything else under $2 each.
+- **The session's own output**, about 45 %: code written through Write, Edit and heredocs, text, and thinking
+  (38 % of output tokens).
+
+Session start (until the first edit outside `docs/`), mean of 19 sessions: 18 calls, $1.34, 4 min, 104 KB of tool
+output (61 k tokens). Of that 104 KB: code and data 35 KB, `STATE.md` sections 15 KB, `STATUS.md` + `LESSONS.md`
+11 KB, `LESSONS-<topic>.md` 8 KB (several topic files read whole, up to 26 KB), other Reads 10 KB, `gh issue` 5 KB,
+design doc 4 KB, ADRs 4 KB. Session end (docs upkeep after the last code edit): 13 calls, $1.21, 9 min.
+
+Wall time, tool side (minutes over the 20 sessions): Unity 84, gate (`cargo xtask ci`, 142 runs, 33 s mean) 79,
+polling loops and `sleep` waiting on background jobs 56, parity 50, `cargo build` (mostly release builds for parity)
+40, `civbb` runs 43, GitHub CI watching (`gh run watch` / `list`) 36, `cargo test` 30. The warm gate takes 19 s
+alone (33 s on the first run after a build).
+
+Other findings:
+
+- `rust-analyzer-lsp` is enabled in the user settings, but `rust-analyzer` is not installed (not a component of the
+  pinned toolchain), so the LSP tool has never worked; sessions navigate with `grep -n` and `sed -n`.
+- Errors are rare: 47 failed tool calls in 3,955 (python heredocs 26, gate 7, Unity 6), not a cost driver.
+- Most-read files across sessions: `unity_material.rs`, `solver.rs`, `Reference.cs`, `STATE.md` (each re-read in
+  2 to 4 sessions, 19 to 53 KB in all).
+- Tool output sizes are already in the transcripts (`toolUseResult`), so a logging hook would duplicate them.
