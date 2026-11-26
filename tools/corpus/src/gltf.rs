@@ -5,6 +5,8 @@
 //! `X_*` extensions (ADR 0041) for what glTF lacks.
 
 use civbb_format::Avatar;
+use civbb_format::animator::{HumanoidProperty, MeshProperty, NodeProperty, Target};
+use civbb_format::constraint::ConstraintType;
 use civbb_format::face::{EyeDriver, ShapeBind};
 use civbb_format::material::MaterialModel;
 use civbb_format::mesh::Mesh;
@@ -139,7 +141,22 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
             .iter()
             .map(|e| json!({"name": dialect(&e.name), "kind": e.kind, "default": e.rest()}));
         x["parameters"] = json!(params.collect::<Vec<_>>());
-        ext.insert("X_animator".into(), json!({"animator": x, "clips": a.clips}));
+        let paths = node_paths(a);
+        for layer in x["layers"].as_array_mut().expect("array") {
+            if let Some(t) = layer.pointer_mut("/mask/transforms").filter(|t| t.is_array()) {
+                let nodes = t.as_array().expect("array").iter().map(|n| n.as_u64().expect("node"));
+                *t = json!(nodes.map(|n| paths[n as usize].as_str()).collect::<Vec<_>>());
+            }
+        }
+        let mut clips = json!(a.clips);
+        for (clip, v) in a.clips.iter().zip(clips.as_array_mut().expect("array")) {
+            for (c, v) in clip.curves.iter().zip(v["curves"].as_array_mut().expect("array")) {
+                let o = v.as_object_mut().expect("object");
+                o.remove("target");
+                o.insert("binding".into(), binding(a, &paths, &c.target));
+            }
+        }
+        ext.insert("X_animator".into(), json!({"animator": x, "clips": clips}));
     }
     if !a.constraints.is_empty() {
         ext.insert("X_constraints".into(), json!(a.constraints));
@@ -185,6 +202,57 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
     doc["extensionsUsed"] = json!(ext.keys().collect::<Vec<_>>());
     doc["extensions"] = Value::Object(ext);
     glb(serde_json::to_vec(&doc).expect("json"), bin)
+}
+
+/// Each node's dialect 1 path: names below the root joined by `/`, the root's empty.
+fn node_paths(a: &Avatar) -> Vec<String> {
+    let mut paths: Vec<String> = Vec::with_capacity(a.hierarchy.nodes.len());
+    for n in &a.hierarchy.nodes {
+        paths.push(match n.parent {
+            None => String::new(),
+            Some(0) => n.name.clone(),
+            Some(p) => format!("{}/{}", paths[p as usize], n.name),
+        });
+    }
+    paths
+}
+
+/// A curve target as dialect 1's binding (the inverse of the importer's resolution): a path and a Unity property.
+fn binding(a: &Avatar, paths: &[String], t: &Target) -> Value {
+    let (path, property) = match t {
+        Target::Node { node, property } => {
+            let p = match *property {
+                NodeProperty::Translation(i) => json!({"Position": i}),
+                NodeProperty::Rotation(i) => json!({"Rotation": i}),
+                NodeProperty::EulerRotation(i) => json!({"EulerRotation": i}),
+                NodeProperty::Scale(i) => json!({"Scale": i}),
+                NodeProperty::Active => json!("Active"),
+            };
+            (paths[*node as usize].as_str(), p)
+        }
+        Target::Mesh { mesh, property } => {
+            let m = &a.meshes[*mesh as usize];
+            let p = match property {
+                MeshProperty::Visible => json!("RendererEnabled"),
+                MeshProperty::Weight(s) => json!({"BlendShape": m.blend_shapes[*s as usize].name}),
+                MeshProperty::Material(name) => json!({"Material": name}),
+                MeshProperty::MaterialSlot(s) => json!({"MaterialSlot": s}),
+            };
+            (paths[m.node as usize].as_str(), p)
+        }
+        Target::Humanoid(HumanoidProperty::Muscle(name)) => ("", json!({"Muscle": name})),
+        Target::Humanoid(HumanoidProperty::Body(i)) => ("", json!({"RootMotion": i})),
+        Target::Entry(e) => ("", json!({"Parameter": dialect(&a.state.entries[*e as usize].name)})),
+        Target::Constraint { constraint, field } => {
+            let c = &a.constraints[*constraint as usize];
+            let kind = ConstraintType::of(&c.kind).expect("an animatable constraint");
+            (
+                paths[c.target as usize].as_str(),
+                json!({"Constraint": {"kind": kind, "field": field}}),
+            )
+        }
+    };
+    json!({"path": path, "property": property})
 }
 
 /// An entry's name in dialect 1: platform values under VRChat's names.

@@ -4,14 +4,14 @@
 use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
-use civbb_format::animator::Property;
+use civbb_format::animator::{MeshProperty, NodeProperty, Target};
 use civbb_format::face::EyeDriver;
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::material::AlphaMode;
 use civbb_format::math::Mat4;
 use civbb_format::mesh::{FirstPerson, Mesh, Skin, Submesh};
 
-use crate::prune::node_paths;
+use crate::renumber::Renumber;
 
 /// How much merging removed.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -39,23 +39,19 @@ struct Key {
 pub fn merge(a: &mut Avatar) -> Merged {
     let meshes_before = a.meshes.len();
     let submeshes_before: usize = a.meshes.iter().map(|m| m.submeshes.len()).sum();
-    let paths = node_paths(&a.hierarchy);
-    // Clip paths resolve to the first node with that path, as `civbb-anim` binds them.
-    let by_path: HashMap<&str, usize> = paths.iter().enumerate().rev().map(|(i, p)| (p.as_str(), i)).collect();
     let n = a.hierarchy.nodes.len();
     let mut toggled = vec![false; n];
-    let mut renderer = vec![false; n];
-    let mut shape_curves: Vec<HashSet<&str>> = vec![HashSet::new(); n];
+    let mut renderer = vec![false; a.meshes.len()];
     for c in a.clips.iter().flat_map(|c| &c.curves) {
-        let Some(&i) = by_path.get(c.binding.path.as_str()) else {
-            continue;
-        };
-        match &c.binding.property {
-            Property::Active => toggled[i] = true,
-            Property::RendererEnabled | Property::Material(_) | Property::MaterialSlot(_) => renderer[i] = true,
-            Property::BlendShape(name) => {
-                shape_curves[i].insert(name.as_str());
-            }
+        match c.target {
+            Target::Node {
+                node,
+                property: NodeProperty::Active,
+            } => toggled[node as usize] = true,
+            Target::Mesh {
+                mesh,
+                property: MeshProperty::Visible | MeshProperty::Material(_) | MeshProperty::MaterialSlot(_),
+            } => renderer[mesh as usize] = true,
             _ => {}
         }
     }
@@ -63,18 +59,16 @@ pub fn merge(a: &mut Avatar) -> Merged {
     for m in &a.meshes {
         per_node[m.node as usize] += 1;
     }
-    // A mesh merges only when it is its node's only mesh, its path is its own, no clip animates its renderer or
-    // materials, it draws nothing blended (draw order) and some state can show it.
-    let keys: Vec<Option<Key>> = a
-        .meshes
-        .iter()
-        .map(|m| {
+    // A mesh merges only when it is its node's only mesh, no clip animates its visibility or materials, it draws
+    // nothing blended (draw order) and some state can show it.
+    let keys: Vec<Option<Key>> = (a.meshes.iter().enumerate())
+        .map(|(mi, m)| {
             let node = m.node as usize;
             let blended = m
                 .submeshes
                 .iter()
                 .any(|s| matches!(a.materials[s.material as usize].alpha, AlphaMode::Blend));
-            if per_node[node] > 1 || by_path[paths[node].as_str()] != node || renderer[node] || blended {
+            if per_node[node] > 1 || renderer[mi] || blended {
                 return None;
             }
             let mut toggles = Vec::new();
@@ -96,9 +90,8 @@ pub fn merge(a: &mut Avatar) -> Merged {
         })
         .collect();
 
-    // In mesh order, a mesh joins the first group with its key when no shape name repeats (curves and face
-    // tracking find shapes by name), no curve on the group's path names its shapes (it was unbound before), and
-    // joints still fit 16-bit indices.
+    // In mesh order, a mesh joins the first group with its key when no shape name repeats (face tracking finds
+    // shapes by name) and joints still fit 16-bit indices.
     let mut groups: Vec<Vec<usize>> = Vec::new();
     let mut of = vec![None; a.meshes.len()];
     {
@@ -109,11 +102,8 @@ pub fn merge(a: &mut Avatar) -> Merged {
             let own: Vec<&str> = m.blend_shapes.iter().map(|s| s.name.as_str()).collect();
             let j = m.skin.as_ref().map_or(0, |s| s.joints.len()).max(1);
             let fits = |g: usize| {
-                let first = &a.meshes[groups[g][0]];
                 keys[groups[g][0]].as_ref() == Some(key)
-                    && own
-                        .iter()
-                        .all(|s| !names[g].contains(s) && !shape_curves[first.node as usize].contains(s))
+                    && own.iter().all(|s| !names[g].contains(s))
                     && joints[g] + j <= 1 << 16
             };
             let g = match (0..groups.len()).find(|&g| fits(g)) {
@@ -132,32 +122,9 @@ pub fn merge(a: &mut Avatar) -> Merged {
         }
     }
 
-    // Shape curves on a merged-away mesh's node move to the group's node, if they named one of its shapes.
-    let mut moved: HashMap<usize, (usize, HashSet<String>)> = HashMap::new();
-    for g in groups.iter().filter(|g| g.len() > 1) {
-        let to = a.meshes[g[0]].node as usize;
-        for &i in &g[1..] {
-            let m = &a.meshes[i];
-            let names = m.blend_shapes.iter().map(|s| s.name.clone()).collect();
-            moved.insert(m.node as usize, (to, names));
-        }
-    }
-    for c in a.clips.iter_mut().flat_map(|c| &mut c.curves) {
-        let Property::BlendShape(name) = &c.binding.property else {
-            continue;
-        };
-        let Some(&i) = by_path.get(c.binding.path.as_str()) else {
-            continue;
-        };
-        if let Some((to, names)) = moved.get(&i)
-            && names.contains(name)
-        {
-            c.binding.path = paths[*to].clone();
-        }
-    }
-
     // Old mesh to new mesh and the offset of its shapes there.
     let mut target = vec![(0u32, 0u32); a.meshes.len()];
+    let shape_counts: Vec<u32> = a.meshes.iter().map(|m| m.blend_shapes.len() as u32).collect();
     let mut old: Vec<Option<Mesh>> = std::mem::take(&mut a.meshes).into_iter().map(Some).collect();
     for i in 0..old.len() {
         let Some(mut m) = old[i].take() else { continue };
@@ -198,6 +165,15 @@ pub fn merge(a: &mut Avatar) -> Merged {
             b.shape += offset;
         }
     }
+    let shapes = (target.iter().zip(&shape_counts))
+        .map(|(&(_, offset), &count)| (0..count).map(|s| Some(s + offset)).collect())
+        .collect();
+    Renumber {
+        meshes: target.iter().map(|&(mesh, _)| Some(mesh)).collect(),
+        shapes,
+        ..Renumber::default()
+    }
+    .apply(a);
     Merged {
         meshes: meshes_before - a.meshes.len(),
         submeshes: submeshes_before - a.meshes.iter().map(|m| m.submeshes.len()).sum::<usize>(),

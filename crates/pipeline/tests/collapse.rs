@@ -71,10 +71,10 @@ fn layers_that_are_not_plain_toggles_stay() {
 
     // Layer 11's on clip also writes layer 10's node: both stay, as summing them is not layering them.
     let mut a = bloated();
-    let path = a.clips[layer_clip(&a, 10, 1)].curves[0].binding.path.clone();
+    let target = a.clips[layer_clip(&a, 10, 1)].curves[0].target.clone();
     let clip = layer_clip(&a, 11, 1);
     let mut curve = a.clips[clip].curves[0].clone();
-    curve.binding.path = path;
+    curve.target = target;
     a.clips[clip].curves.push(curve);
     assert_eq!(collapsed(&a).1, 45);
 

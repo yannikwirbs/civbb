@@ -13,6 +13,7 @@ use std::path::Path;
 use civbb_anim::material::{self, to_linear};
 use civbb_anim::{Controller, Instance, Target};
 use civbb_format::Avatar;
+use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
 use civbb_format::blob::BlobId;
 use civbb_format::hierarchy::{Hierarchy, Node};
@@ -206,7 +207,9 @@ impl Case {
                 length: c.length,
                 looping: c.looping,
                 root: None,
-                curves: c.curves.iter().map(|(target, keys)| curve(target, keys)).collect(),
+                curves: (c.curves.iter())
+                    .map(|(target, keys)| curve(&self.nodes, target, keys))
+                    .collect(),
             })
             .collect();
         let layers = self
@@ -248,7 +251,7 @@ impl Case {
                     },
                     mask: l.mask.as_ref().map(|t| AvatarMask {
                         body_parts: Vec::new(),
-                        transforms: Some(t.clone()),
+                        transforms: Some(t.iter().map(|name| node_index(&self.nodes, name)).collect()),
                     }),
                     state_machine: StateMachine {
                         states,
@@ -381,29 +384,43 @@ fn unity_material(spec: &BTreeMap<String, Value>) -> Material {
     }
 }
 
-fn curve(target: &str, keys: &[(f32, f32)]) -> Curve {
-    let (path, property) = match target.split_once(':') {
-        Some((path, prop)) => (path, Property::Material(prop.into())),
+/// The index of the node named `name`: spec nodes follow the root.
+fn node_index(nodes: &[NodeSpec], name: &str) -> u32 {
+    let i = nodes.iter().position(|n| n.name == name);
+    i.unwrap_or_else(|| panic!("no node {name}")) as u32 + 1
+}
+
+/// `"<node>.<x|y|z|active>"` or `"<node>:<material property>"` (a mesh per node with materials, in node order).
+fn curve(nodes: &[NodeSpec], target: &str, keys: &[(f32, f32)]) -> Curve {
+    let target = match target.split_once(':') {
+        Some((name, prop)) => {
+            let n = node_index(nodes, name) as usize - 1;
+            let mesh = nodes[..n].iter().filter(|n| !n.materials.is_empty()).count() as u32;
+            CurveTarget::Mesh {
+                mesh,
+                property: MeshProperty::Material(prop.into()),
+            }
+        }
         None => {
-            let (path, prop) = target
+            let (name, prop) = target
                 .rsplit_once('.')
                 .unwrap_or_else(|| panic!("bad curve target {target}"));
             let property = match prop {
-                "x" => Property::Position(0),
-                "y" => Property::Position(1),
-                "z" => Property::Position(2),
-                "active" => Property::Active,
+                "x" => NodeProperty::Translation(0),
+                "y" => NodeProperty::Translation(1),
+                "z" => NodeProperty::Translation(2),
+                "active" => NodeProperty::Active,
                 _ => panic!("unknown property {prop}"),
             };
-            (path, property)
+            CurveTarget::Node {
+                node: node_index(nodes, name),
+                property,
+            }
         }
     };
     let slope = |i: usize, j: usize| (keys[j].1 - keys[i].1) / (keys[j].0 - keys[i].0);
     Curve {
-        binding: Binding {
-            path: path.into(),
-            property,
-        },
+        target,
         keys: (0..keys.len())
             .map(|i| Key {
                 time: keys[i].0,

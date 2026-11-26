@@ -1,7 +1,7 @@
 //! glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
 
 use base64::Engine;
-use civbb_format::animator::Property;
+use civbb_format::animator::{MeshProperty, NodeProperty, Target};
 use civbb_format::material::MaterialModel;
 use civbb_format::state::{Entry, EntryKind, Platform};
 use civbb_pipeline::gltf_import::{Limits, dir_resolver, import};
@@ -211,19 +211,29 @@ fn edge_cases_import() {
     assert_eq!(clip.curves.len(), 3 + 1 + 4);
     let tx = &clip.curves[0];
     assert_eq!(
-        (tx.binding.path.as_str(), &tx.binding.property),
-        ("Twin (1)", &Property::Position(0))
+        tx.target,
+        Target::Node {
+            node: 2,
+            property: NodeProperty::Translation(0)
+        }
     );
     assert_eq!(
         (tx.keys[0].out_tangent, tx.keys[1].in_tangent, tx.keys[1].value),
         (2.0, 2.0, 2.0)
     );
     let w = &clip.curves[3];
-    assert_eq!(w.binding.property, Property::BlendShape("Smile".into()));
+    assert_eq!(
+        w.target,
+        Target::Mesh {
+            mesh: 0,
+            property: MeshProperty::Weight(0)
+        }
+    );
     assert_eq!(w.keys[1].value, 100.0);
     assert!(w.keys[0].out_tangent.is_infinite());
     let ry = &clip.curves[4];
-    assert_eq!((ry.binding.path.as_str(), ry.keys[0].out_tangent), ("Twin", 0.1));
+    assert!(matches!(ry.target, Target::Node { node: 1, .. }));
+    assert_eq!(ry.keys[0].out_tangent, 0.1);
 }
 
 /// `KHR_mesh_quantization` (#45): integer positions, normals, morph deltas and morph weight keys, dequantised by
@@ -717,8 +727,16 @@ fn vrm0_imports() {
     assert_eq!(l.other_terms_url, "https://example.com/terms");
 
     let joy = a.clips.iter().find(|c| c.name == "Joy").unwrap();
-    assert_eq!(joy.curves[0].binding.path, "Face");
-    assert_eq!(joy.curves[0].binding.property, Property::BlendShape("Joy".into()));
+    let Target::Mesh {
+        mesh,
+        property: MeshProperty::Weight(s),
+    } = joy.curves[0].target
+    else {
+        panic!("{:?}", joy.curves[0].target);
+    };
+    let m = &a.meshes[mesh as usize];
+    assert_eq!(a.hierarchy.nodes[m.node as usize].name, "Face");
+    assert_eq!(m.blend_shapes[s as usize].name, "Joy");
     assert_eq!(joy.curves[0].keys[0].value, 50.0);
     assert_eq!(
         a.expressions.as_ref().unwrap().menu.controls.len(),

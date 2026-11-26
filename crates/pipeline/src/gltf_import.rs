@@ -20,6 +20,7 @@ mod animation;
 mod material;
 mod mesh;
 mod source;
+mod unity_clip;
 mod unity_material;
 mod unity_state;
 mod vrm;
@@ -399,25 +400,5 @@ impl Importer<'_> {
             }
         }
         Ok(self.nodes[0].name.clone())
-    }
-
-    /// The Unity-style binding path of a node: names below the root joined by `/`.
-    fn path(&self, node: NodeIndex) -> Result<String, String> {
-        let mut parts = Vec::new();
-        let mut len = 0;
-        let mut cur = node as usize;
-        while let Some(p) = self.nodes[cur].parent {
-            len += self.nodes[cur].name.len() + 1;
-            if len > self.caps.string_len + 1 {
-                return Err(format!(
-                    "path of node {node} longer than {} bytes",
-                    self.caps.string_len
-                ));
-            }
-            parts.push(self.nodes[cur].name.as_str());
-            cur = p as usize;
-        }
-        parts.reverse();
-        Ok(parts.join("/"))
     }
 }

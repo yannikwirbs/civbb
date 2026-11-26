@@ -5,7 +5,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Cursor;
 
-use civbb_format::animator::{Key, Property};
+use civbb_format::animator::{MeshProperty, Target};
 use civbb_format::expressions::{ControlKind, Menu};
 use civbb_format::material::{ImageFormat, Material, MaterialModel, Texture, TextureSlot};
 use civbb_format::{Avatar, BlobId};
@@ -13,7 +13,7 @@ use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use image::{ExtendedColorType, ImageEncoder, RgbaImage};
 
 use crate::Imported;
-use crate::prune::node_paths;
+use crate::renumber::Renumber;
 use crate::texture::decode;
 
 /// Texels of gutter around each rectangle, wrapping its content as the repeating sampler does; also the alignment
@@ -312,14 +312,14 @@ fn eligible(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> (Vec<Option<Size>>
         })
         .collect();
 
-    let paths = node_paths(&a.hierarchy);
-    let by_path: HashMap<&str, usize> = paths.iter().enumerate().rev().map(|(i, p)| (p.as_str(), i)).collect();
-    let mut animated = vec![false; a.hierarchy.nodes.len()];
+    let mut animated = vec![false; a.meshes.len()];
     for c in a.clips.iter().flat_map(|c| &c.curves) {
-        if let (Property::Material(_) | Property::MaterialSlot(_), Some(&i)) =
-            (&c.binding.property, by_path.get(c.binding.path.as_str()))
+        if let Target::Mesh {
+            mesh,
+            property: MeshProperty::Material(_) | MeshProperty::MaterialSlot(_),
+        } = c.target
         {
-            animated[i] = true;
+            animated[mesh as usize] = true;
         }
     }
     // A material a slot swaps in keeps its own UVs and textures.
@@ -329,7 +329,7 @@ fn eligible(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> (Vec<Option<Size>>
     // Each triangle must lie in one unit UV tile and each vertex in one tile; whole-tile offsets are shifted
     // back, which the repeating sampler makes equal.
     let mut tiles: Vec<Vec<[f32; 2]>> = Vec::with_capacity(a.meshes.len());
-    for m in &a.meshes {
+    for (mi, m) in a.meshes.iter().enumerate() {
         let mut tile: Vec<Option<[f32; 2]>> = vec![None; m.uv0.len()];
         let mut bad = vec![false; m.uv0.len()];
         for t in m.indices.as_chunks::<3>().0.iter().filter(|_| !m.uv0.is_empty()) {
@@ -350,7 +350,7 @@ fn eligible(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> (Vec<Option<Size>>
                 && m.indices[start..start + s.index_count as usize]
                     .iter()
                     .all(|&i| !bad[i as usize]);
-            if animated[m.node as usize] || !fine {
+            if animated[mi] || !fine {
                 ok[s.material as usize] = None;
             }
         }
@@ -535,14 +535,11 @@ fn compact(imported: &mut Imported) {
     for s in a.meshes.iter_mut().flat_map(|m| &mut m.submeshes) {
         s.material = map[s.material as usize];
     }
-    for key in slot_keys(a) {
-        if let Some(&k) = map.get(key.value as usize)
-            && key.value >= 0.0
-            && key.value.fract() == 0.0
-        {
-            key.value = k as f32;
-        }
+    Renumber {
+        materials: (map.iter().zip(&used)).map(|(&m, &u)| u.then_some(m)).collect(),
+        ..Renumber::default()
     }
+    .apply(a);
 
     let mut used = vec![false; a.textures.len()];
     for m in &mut a.materials {
@@ -583,29 +580,28 @@ fn remap_icons(menu: &mut Menu, map: &[u32]) {
     }
 }
 
-/// New index of each kept item.
-/// The keys of material-slot curves.
-fn slot_keys(a: &mut Avatar) -> impl Iterator<Item = &mut Key> {
-    a.clips
-        .iter_mut()
-        .flat_map(|c| &mut c.curves)
-        .filter(|c| matches!(c.binding.property, Property::MaterialSlot(_)))
-        .flat_map(|c| &mut c.keys)
-}
-
 /// The materials material-slot curves swap in, as valid indices (the animator rejects the others).
 fn slot_materials(a: &Avatar) -> Vec<u32> {
     let n = a.materials.len();
     a.clips
         .iter()
         .flat_map(|c| &c.curves)
-        .filter(|c| matches!(c.binding.property, Property::MaterialSlot(_)))
+        .filter(|c| {
+            matches!(
+                c.target,
+                Target::Mesh {
+                    property: MeshProperty::MaterialSlot(_),
+                    ..
+                }
+            )
+        })
         .flat_map(|c| &c.keys)
         .filter(|k| k.value >= 0.0 && (k.value as usize) < n && k.value.fract() == 0.0)
         .map(|k| k.value as u32)
         .collect()
 }
 
+/// New index of each kept item.
 fn renumber(keep: &[bool]) -> Vec<u32> {
     let mut next = 0;
     keep.iter()

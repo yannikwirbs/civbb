@@ -5,7 +5,7 @@
 mod common;
 
 use civbb_format::Avatar;
-use civbb_format::animator::{Binding, Clip, Curve, Key, Property};
+use civbb_format::animator::{Clip, Curve, Key, MeshProperty, NodeProperty, Target};
 use civbb_format::face::{Face, ShapeBind};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::material::{AlphaMode, Material, MaterialModel, Unlit};
@@ -84,11 +84,8 @@ fn avatar() -> Avatar {
         double_sided: false,
         render_queue: 2000,
     };
-    let curve = |path: &str, property| Curve {
-        binding: Binding {
-            path: path.into(),
-            property,
-        },
+    let curve = |target| Curve {
+        target,
         keys: vec![Key {
             time: 0.0,
             value: 1.0,
@@ -139,11 +136,18 @@ fn avatar() -> Avatar {
             looping: false,
             root: None,
             curves: vec![
-                curve("Toggle", Property::Active),
-                curve("Toggle/ShirtB", Property::BlendShape("Fold".into())),
-                // ShirtB has no `Lift`: unbound before, and it must not reach ShirtA's after.
-                curve("Toggle/ShirtB", Property::BlendShape("Lift".into())),
-                curve("Glow", Property::Material("_Color.r".into())),
+                curve(Target::Node {
+                    node: 2,
+                    property: NodeProperty::Active,
+                }),
+                curve(Target::Mesh {
+                    mesh: 1,
+                    property: MeshProperty::Weight(0),
+                }),
+                curve(Target::Mesh {
+                    mesh: 4,
+                    property: MeshProperty::Material("_Color.r".into()),
+                }),
             ],
         }],
         ..Avatar::default()
@@ -189,9 +193,22 @@ fn merges_meshes_that_show_together_and_keeps_the_rest_apart() {
         .map(|s| (s.name.as_str(), s.deltas[0].vertex))
         .collect();
     assert_eq!(shapes, [("Lift", 3), ("Fold", 7)]);
-    // Fold's curve follows it to ShirtA's path; the unbound Lift curve stays where it was.
-    let paths: Vec<_> = a.clips[0].curves.iter().map(|c| c.binding.path.as_str()).collect();
-    assert_eq!(paths, ["Toggle", "Toggle/ShirtA", "Toggle/ShirtB", "Glow"]);
+    // Targets follow their meshes and shapes (ADR 0089): Fold into the merged shirt, Glow's material to its new index.
+    let targets: Vec<_> = a.clips[0].curves.iter().map(|c| c.target.clone()).collect();
+    assert_eq!(
+        targets,
+        [
+            before.clips[0].curves[0].target.clone(),
+            Target::Mesh {
+                mesh: 0,
+                property: MeshProperty::Weight(1)
+            },
+            Target::Mesh {
+                mesh: 3,
+                property: MeshProperty::Material("_Color.r".into())
+            },
+        ]
+    );
     assert_eq!(a.meshes[3..6], before.meshes[4..7]);
     assert_eq!(a.face.as_ref().unwrap().blink[0].mesh, 0);
     assert_eq!(a.face.as_ref().unwrap().blink[0].shape, 1);
@@ -201,13 +218,6 @@ fn merges_meshes_that_show_together_and_keeps_the_rest_apart() {
 
     // A second pass finds nothing.
     assert_eq!(merge(&mut a), Merged::default());
-
-    // A curve on ShirtA's path naming ShirtB's shape is unbound; merging would bind it, so they stay apart.
-    let mut a = before.clone();
-    let mut c = a.clips[0].curves[1].clone();
-    c.binding.path = "Toggle/ShirtA".into();
-    a.clips[0].curves.push(c);
-    assert_eq!(merge(&mut a).meshes, 0);
 }
 
 #[test]

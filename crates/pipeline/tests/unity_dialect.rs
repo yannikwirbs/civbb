@@ -6,7 +6,8 @@
 
 use std::path::Path;
 
-use civbb_format::animator::{Behaviour, DriverOp};
+use civbb_format::animator::{Behaviour, DriverOp, MeshProperty, NodeProperty, Target};
+use civbb_format::constraint::ConstraintField;
 use civbb_format::state::{EntryKind, Range, SyncMode};
 use civbb_pipeline::gltf_import::{Limits, import};
 use serde_json::{Value, json};
@@ -153,4 +154,72 @@ fn vrchat_builtins_lower_to_platform_values() {
         "{:?}",
         imported.warnings
     );
+}
+
+/// Dialect 1's curve bindings resolve to typed targets by path (ADR 0089, #119): the node with the path (sibling names
+/// are unique after import), the mesh on it, a shape by name, an entry by name, the first constraint of a type on the
+/// node. Bindings that resolve to nothing are reported per reason and dropped; mask paths become nodes.
+#[test]
+fn unity_bindings_resolve_by_path_or_are_dropped() {
+    let mut doc: Value = serde_json::from_slice(&fixture("unity-dialect-1.gltf")).unwrap();
+    let x = &mut doc["extensions"]["X_animator"];
+    (x["animator"]["parameters"].as_array_mut().unwrap())
+        .push(json!({"name": "Grounded", "kind": "Float", "default": 0.0}));
+    let key = json!([{"time": 0.0, "value": 1.0, "in_tangent": 0.0, "out_tangent": 0.0}]);
+    let curves = x["clips"][1]["curves"].as_array_mut().unwrap();
+    curves.clear();
+    for (path, property) in [
+        ("Body", json!({"BlendShape": "v_aa"})),
+        ("Body", json!("Active")),
+        ("C1", json!({"Constraint": {"kind": "Rotation", "field": "Weight"}})),
+        ("Nope", json!("Active")),
+        ("Hips", json!("RendererEnabled")),
+        ("Body", json!({"BlendShape": "Nope"})),
+        ("", json!({"Parameter": "Nope"})),
+        ("", json!({"Parameter": "Grounded"})),
+        ("C1", json!({"Constraint": {"kind": "Aim", "field": "Weight"}})),
+    ] {
+        curves.push(json!({"binding": {"path": path, "property": property}, "keys": key}));
+    }
+    let imported = import(&serde_json::to_vec(&doc).unwrap(), &Limits::default(), no_files).unwrap();
+    let a = &imported.avatar;
+    let body = a.hierarchy.nodes.iter().position(|n| n.name == "Body").unwrap() as u32;
+    let targets: Vec<&Target> = a.clips.last().unwrap().curves.iter().map(|c| &c.target).collect();
+    assert_eq!(
+        targets,
+        [
+            &Target::Mesh {
+                mesh: 0,
+                property: MeshProperty::Weight(0)
+            },
+            &Target::Node {
+                node: body,
+                property: NodeProperty::Active
+            },
+            &Target::Constraint {
+                constraint: 1,
+                field: ConstraintField::Weight
+            },
+        ]
+    );
+    let dropped: Vec<&str> = (imported.warnings.iter())
+        .filter_map(|w| w.strip_prefix("X_animator: "))
+        .collect();
+    assert_eq!(
+        dropped,
+        [
+            "1 curves dropped: no mesh at path",
+            "1 curves dropped: no node at path",
+            "1 curves dropped: no such blendshape",
+            "1 curves dropped: no such constraint on the node",
+            "1 curves dropped: no such parameter",
+            "1 curves dropped: unsupported component property",
+            "1 curves dropped: writes a platform value",
+        ]
+    );
+    let mask = a.animator.as_ref().unwrap().layers[1].mask.as_ref().unwrap();
+    let names: Vec<&str> = (mask.transforms.as_ref().unwrap().iter())
+        .map(|&n| a.hierarchy.nodes[n as usize].name.as_str())
+        .collect();
+    assert_eq!(names, ["Body", "Prop"]);
 }

@@ -11,10 +11,21 @@ use civbb_format::state::{Entry, EntryKind, StateTable};
 
 /// Clip `k` holds `A.x` at `k + 1` (so the pose names the state); 1 s long.
 fn value_clip(k: usize, looping: bool) -> Clip {
-    keyed_clip(&[(0.0, k as f32 + 1.0)], 1.0, looping, "A", Property::Position(0))
+    keyed_clip(
+        &[(0.0, k as f32 + 1.0)],
+        1.0,
+        looping,
+        Target::Node {
+            node: A,
+            property: NodeProperty::Translation(0),
+        },
+    )
 }
 
-fn keyed_clip(keys: &[(f32, f32)], length: f32, looping: bool, path: &str, property: Property) -> Clip {
+/// Node `A` (index 1).
+const A: u32 = 1;
+
+fn keyed_clip(keys: &[(f32, f32)], length: f32, looping: bool, target: Target) -> Clip {
     let slope = |i: usize, j: usize| (keys[j].1 - keys[i].1) / (keys[j].0 - keys[i].0);
     Clip {
         name: String::new(),
@@ -22,10 +33,7 @@ fn keyed_clip(keys: &[(f32, f32)], length: f32, looping: bool, path: &str, prope
         looping,
         root: None,
         curves: vec![Curve {
-            binding: Binding {
-                path: path.into(),
-                property,
-            },
+            target,
             keys: (0..keys.len())
                 .map(|i| Key {
                     time: keys[i].0,
@@ -491,7 +499,15 @@ fn an_interruption_blends_from_a_static_snapshot() {
 #[test]
 fn motion_time_and_cycle_offset_pick_the_sample_time() {
     // A.x goes 0 -> 10 over the clip.
-    let clip = keyed_clip(&[(0.0, 0.0), (1.0, 10.0)], 1.0, false, "A", Property::Position(0));
+    let clip = keyed_clip(
+        &[(0.0, 0.0), (1.0, 10.0)],
+        1.0,
+        false,
+        Target::Node {
+            node: A,
+            property: NodeProperty::Translation(0),
+        },
+    );
     let mut s = state(0);
     s.time_param = Some(5);
     s.cycle_offset = 0.25;
@@ -506,7 +522,15 @@ fn motion_time_and_cycle_offset_pick_the_sample_time() {
 
 #[test]
 fn layers_override_by_weight_and_add_deltas_within_masks() {
-    let ramp = keyed_clip(&[(0.0, 10.0), (1.0, 12.0)], 1.0, false, "A", Property::Position(0));
+    let ramp = keyed_clip(
+        &[(0.0, 10.0), (1.0, 12.0)],
+        1.0,
+        false,
+        Target::Node {
+            node: A,
+            property: NodeProperty::Translation(0),
+        },
+    );
     let clips = vec![value_clip(0, false), value_clip(2, false), ramp];
     let mut base = layer(vec![state(0)]);
     base.weight = 0.0; // Ignored: the first layer of a group is always 1.
@@ -526,7 +550,7 @@ fn layers_override_by_weight_and_add_deltas_within_masks() {
     // Masked to `B` only, the override layer cannot write `A`.
     over.mask = Some(AvatarMask {
         body_parts: Vec::new(),
-        transforms: Some(vec!["B".into()]),
+        transforms: Some(vec![2]),
     });
     let (c, mut i) = run(avatar(vec![base.clone(), over], clips.clone()));
     i.update(&c, 0.1);
@@ -546,7 +570,7 @@ fn layers_override_by_weight_and_add_deltas_within_masks() {
 
 #[test]
 fn animated_parameters_take_effect_next_frame() {
-    let drive = keyed_clip(&[(0.0, 1.0)], 1.0, false, "", Property::Parameter("f".into()));
+    let drive = keyed_clip(&[(0.0, 1.0)], 1.0, false, Target::Entry(5));
     let mut s0 = state(0);
     s0.transitions = vec![to(
         1,
@@ -567,9 +591,25 @@ fn animated_parameters_take_effect_next_frame() {
 }
 
 fn rotation_clip(q: [f32; 4]) -> Clip {
-    let mut c = keyed_clip(&[(0.0, q[0])], 1.0, false, "A", Property::Rotation(0));
+    let mut c = keyed_clip(
+        &[(0.0, q[0])],
+        1.0,
+        false,
+        Target::Node {
+            node: A,
+            property: NodeProperty::Rotation(0),
+        },
+    );
     for (k, &v) in q.iter().enumerate().skip(1) {
-        let extra = keyed_clip(&[(0.0, v)], 1.0, false, "A", Property::Rotation(k as u8));
+        let extra = keyed_clip(
+            &[(0.0, v)],
+            1.0,
+            false,
+            Target::Node {
+                node: A,
+                property: NodeProperty::Rotation(k as u8),
+            },
+        );
         c.curves.extend(extra.curves);
     }
     c

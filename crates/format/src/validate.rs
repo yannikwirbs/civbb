@@ -198,11 +198,11 @@ impl V {
         self.cap(totals.shapes, c.blend_shapes, "total blend shapes");
         self.cap(totals.deltas, c.shape_deltas, "total blend shape deltas");
         self.materials(a, has_blob);
-        self.clips(&a.clips);
         self.state(&a.state);
+        self.clips(a);
         let entries = a.state.entries.len();
         if let Some(anim) = &a.animator {
-            self.animator(anim, a.clips.len(), entries);
+            self.animator(anim, a.clips.len(), entries, nodes);
         }
         if let Some(e) = &a.expressions {
             self.expressions(e, a.textures.len());

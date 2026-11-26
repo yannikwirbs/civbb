@@ -4,7 +4,7 @@
 use civbb_anim::material::{self, Field, to_linear, to_srgb};
 use civbb_anim::{Target, bind};
 use civbb_format::Avatar;
-use civbb_format::animator::{Binding, Clip, Curve, Key, Property};
+use civbb_format::animator::{Clip, Curve, Key, MeshProperty, Target as CurveTarget};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr, TextureSlot, Unlit};
 use civbb_format::math::Transform;
@@ -48,11 +48,12 @@ fn pbr() -> Material {
     }
 }
 
-fn curve(path: &str, name: &str, value: f32) -> Curve {
+/// A material curve on the `Body` renderer (mesh 0).
+fn curve(name: &str, value: f32) -> Curve {
     Curve {
-        binding: Binding {
-            path: path.into(),
-            property: Property::Material(name.into()),
+        target: CurveTarget::Mesh {
+            mesh: 0,
+            property: MeshProperty::Material(name.into()),
         },
         keys: vec![Key {
             time: 0.0,
@@ -165,9 +166,9 @@ fn values_are_in_unity_units() {
 #[test]
 fn curves_bind_per_renderer_with_the_first_materials_default() {
     let b = bind(&avatar(vec![
-        curve("Body", "_Color.g", 1.0),
-        curve("Body", "_Metallic", 0.0),
-        curve("Body", "_MainTex_ST.w", 0.0),
+        curve("_Color.g", 1.0),
+        curve("_Metallic", 0.0),
+        curve("_MainTex_ST.w", 0.0),
     ]));
     assert!(b.unbound.is_empty(), "{:?}", b.unbound);
     // Unity writes a vector property whole: the components no curve animates get slots too, at 0 (ADR 0067).
@@ -196,10 +197,9 @@ fn curves_bind_per_renderer_with_the_first_materials_default() {
 #[test]
 fn curves_without_a_target_are_reported() {
     let cases = [
-        (curve("Body", "_Nope.r", 1.0), "unknown material property"),
-        (curve("Hat", "_Color.r", 1.0), "no mesh at path"),
+        (curve("_Nope.r", 1.0), "unknown material property"),
         (
-            curve("Body", "_ShadeColor.r", 1.0),
+            curve("_ShadeColor.r", 1.0),
             "no material on the renderer has the property",
         ),
     ];

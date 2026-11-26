@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 use std::io::Cursor;
 
-use civbb_format::animator::{Binding, Clip, Curve, Key, Property};
+use civbb_format::animator::{Clip, Curve, Key, MeshProperty, Target};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::material::{
     AlphaMode, ColorSpace, ImageFormat, Material, MaterialModel, Pbr, Texture, TextureSlot, Unlit,
@@ -181,9 +181,9 @@ fn avatar() -> Imported {
                 looping: false,
                 root: None,
                 curves: vec![Curve {
-                    binding: Binding {
-                        path: "Glow".into(),
-                        property: Property::Material("_Color.r".into()),
+                    target: Target::Mesh {
+                        mesh: 1,
+                        property: MeshProperty::Material("_Color.r".into()),
                     },
                     keys: vec![key(0.0), key(1.0)],
                 }],
@@ -316,9 +316,9 @@ fn atlas_keeps_and_renumbers_a_material_a_slot_swaps_in() {
         .push(unlit("swap", 4, [0.5; 4], [1.0, 1.0, 0.0, 0.0]));
     let swap = after.avatar.materials.len() as f32 - 1.0;
     after.avatar.clips[0].curves.push(Curve {
-        binding: Binding {
-            path: "Glow".into(),
-            property: Property::MaterialSlot(0),
+        target: Target::Mesh {
+            mesh: 1,
+            property: MeshProperty::MaterialSlot(0),
         },
         keys: vec![Key {
             time: 0.0,

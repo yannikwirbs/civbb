@@ -208,17 +208,6 @@ impl Builder {
             .position(|n| n.name == name)
             .unwrap_or_else(|| panic!("no node {name}")) as NodeIndex
     }
-
-    /// Unity-style path relative to the root: names joined by `/`, root excluded.
-    fn path(&self, mut node: NodeIndex) -> String {
-        let mut parts = Vec::new();
-        while let Some(parent) = self.nodes[node as usize].parent {
-            parts.push(self.nodes[node as usize].name.as_str());
-            node = parent;
-        }
-        parts.reverse();
-        parts.join("/")
-    }
 }
 
 fn add(a: Vec3, b: Vec3) -> Vec3 {
@@ -374,7 +363,7 @@ fn graded(value: f32) -> Graded {
     Graded::constant(value)
 }
 
-fn toggle_clip(name: String, path: String, on: bool) -> Clip {
+fn toggle_clip(name: String, node: NodeIndex, on: bool) -> Clip {
     let value = if on { 1.0 } else { 0.0 };
     Clip {
         name,
@@ -382,9 +371,9 @@ fn toggle_clip(name: String, path: String, on: bool) -> Clip {
         looping: false,
         root: None,
         curves: vec![Curve {
-            binding: Binding {
-                path,
-                property: Property::Active,
+            target: Target::Node {
+                node,
+                property: NodeProperty::Active,
             },
             keys: vec![Key {
                 time: 0.0,
@@ -636,8 +625,8 @@ pub fn generate(spec: &Spec) -> Avatar {
             ..Entry::new(name.clone(), EntryKind::Bool, if default_on { 1.0 } else { 0.0 })
         });
         let off_clip = clips.len() as ClipIndex;
-        clips.push(toggle_clip(format!("{name}_Off"), b.path(node), false));
-        clips.push(toggle_clip(format!("{name}_On"), b.path(node), true));
+        clips.push(toggle_clip(format!("{name}_Off"), node, false));
+        clips.push(toggle_clip(format!("{name}_On"), node, true));
         let to = |state, mode| Transition {
             dest: TransitionDest::State(state),
             conditions: vec![Condition {
@@ -836,12 +825,15 @@ mod tests {
     }
 
     #[test]
-    fn toggle_paths_resolve_to_nodes() {
+    fn toggles_target_their_nodes() {
         let a = generate(&lean());
-        let names: Vec<&str> = a.hierarchy.nodes.iter().map(|n| n.name.as_str()).collect();
         for clip in &a.clips {
-            let path = &clip.curves[0].binding.path;
-            assert!(names.contains(&path.rsplit('/').next().unwrap()), "{path}");
+            let Target::Node { node, property } = clip.curves[0].target else {
+                panic!("{}: not a node target", clip.name);
+            };
+            assert_eq!(property, NodeProperty::Active);
+            let name = &a.hierarchy.nodes[node as usize].name;
+            assert!(clip.name.starts_with(name.as_str()), "{} on {name}", clip.name);
         }
     }
 }

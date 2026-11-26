@@ -2,7 +2,7 @@
 //! its ancestors, chain descendants, animated, face-bound, face-tracking and non-zero shapes stay, with every index
 //! remapped, the avatar valid and its clips binding as before.
 
-use civbb_format::animator::{Binding, Clip, Curve, Key, Property};
+use civbb_format::animator::{Clip, Curve, Key, MeshProperty, NodeProperty, Target};
 use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
 use civbb_format::face::{Face, ShapeBind};
 use civbb_format::hierarchy::{Hierarchy, Node};
@@ -95,15 +95,18 @@ fn avatar() -> Avatar {
             looping: false,
             root: None,
             curves: [
-                ("Toggle", Property::Active),
-                ("Body", Property::BlendShape("Smile".into())),
+                Target::Node {
+                    node: 7,
+                    property: NodeProperty::Active,
+                },
+                Target::Mesh {
+                    mesh: 0,
+                    property: MeshProperty::Weight(1),
+                },
             ]
             .into_iter()
-            .map(|(path, property)| Curve {
-                binding: Binding {
-                    path: path.into(),
-                    property,
-                },
+            .map(|target| Curve {
+                target,
                 keys: vec![Key {
                     time: 0.0,
                     value: 1.0,
@@ -166,6 +169,21 @@ fn prunes_what_nothing_references_and_remaps_the_rest() {
     let shapes: Vec<_> = a.meshes[0].blend_shapes.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(shapes, ["Smile", "Rest", "jawopen", "Blink"]);
     assert_eq!(a.face.as_ref().unwrap().blink[0].shape, 3);
+    // Curve targets follow their renumbered node (Toggle 7 to 5) and shape (Smile 1 to 0), ADR 0089.
+    let targets: Vec<_> = a.clips[0].curves.iter().map(|c| c.target.clone()).collect();
+    assert_eq!(
+        targets,
+        [
+            Target::Node {
+                node: 5,
+                property: NodeProperty::Active
+            },
+            Target::Mesh {
+                mesh: 0,
+                property: MeshProperty::Weight(0)
+            },
+        ]
+    );
 
     // A second pass finds nothing.
     assert_eq!(prune(&mut a), Pruned::default());

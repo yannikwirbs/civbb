@@ -1,15 +1,18 @@
 //! Validation of clips and animator controllers: curves and keys, layers, states, transitions, blend trees and
 //! behaviours.
 
+use crate::Avatar;
 use crate::animator::{
-    Animator, Behaviour, BlendTreeKind, Clip, DriverOp, Motion, Property, Transition, TransitionDest,
+    Animator, Behaviour, BlendTreeKind, DriverOp, HumanoidProperty, MeshProperty, Motion, NodeProperty, Target,
+    Transition, TransitionDest,
 };
 
 use super::V;
 
 impl V {
-    pub(super) fn clips(&mut self, clips: &[Clip]) {
-        let c = self.caps;
+    /// After [`V::state`]: curves on entries are checked against the platform values.
+    pub(super) fn clips(&mut self, a: &Avatar) {
+        let (c, clips) = (self.caps, &a.clips);
         self.cap(clips.len(), c.clips, "clips");
         let (mut curves, mut keys) = (0, 0);
         for (ci, clip) in clips.iter().enumerate() {
@@ -23,24 +26,42 @@ impl V {
             for (ki, curve) in clip.curves.iter().enumerate() {
                 let cp = || format!("clips[{ci}].curves[{ki}]");
                 keys += curve.keys.len();
-                self.string(&curve.binding.path, cp);
-                let component_ok = match &curve.binding.property {
-                    Property::Position(i) | Property::EulerRotation(i) | Property::Scale(i) => *i < 3,
-                    Property::Rotation(i) => *i < 4,
-                    Property::RootMotion(i) => *i < 7,
-                    Property::Muscle(s) | Property::BlendShape(s) | Property::Material(s) | Property::Parameter(s) => {
+                let component_ok = match &curve.target {
+                    Target::Node { node, property } => {
+                        self.index(*node as usize, a.hierarchy.nodes.len(), cp, "node");
+                        match property {
+                            NodeProperty::Translation(i) | NodeProperty::EulerRotation(i) | NodeProperty::Scale(i) => {
+                                *i < 3
+                            }
+                            NodeProperty::Rotation(i) => *i < 4,
+                            NodeProperty::Active => true,
+                        }
+                    }
+                    Target::Mesh { mesh, property } => {
+                        self.index(*mesh as usize, a.meshes.len(), cp, "mesh");
+                        match property {
+                            MeshProperty::Weight(s) => {
+                                let shapes = a.meshes.get(*mesh as usize).map_or(0, |m| m.blend_shapes.len());
+                                self.index(*s as usize, shapes, cp, "blend shape");
+                            }
+                            MeshProperty::Material(s) => self.string(s, cp),
+                            MeshProperty::Visible | MeshProperty::MaterialSlot(_) => {}
+                        }
+                        true
+                    }
+                    Target::Humanoid(HumanoidProperty::Muscle(s)) => {
                         self.string(s, cp);
                         true
                     }
-                    Property::Component { component, property } => {
-                        self.string(component, cp);
-                        self.string(property, cp);
+                    Target::Humanoid(HumanoidProperty::Body(i)) => *i < 7,
+                    Target::Entry(e) => {
+                        self.written(*e, cp, "entry");
                         true
                     }
-                    Property::Active
-                    | Property::RendererEnabled
-                    | Property::MaterialSlot(_)
-                    | Property::Constraint { .. } => true,
+                    Target::Constraint { constraint, .. } => {
+                        self.index(*constraint as usize, a.constraints.len(), cp, "constraint");
+                        true
+                    }
                 };
                 self.ensure(component_ok, cp, "component index out of range");
                 // Tangents may be infinite (stepped keys); times and values may not.
@@ -60,8 +81,8 @@ impl V {
         self.cap(keys, c.keys, "total keys");
     }
 
-    /// `params` is the number of state entries.
-    pub(super) fn animator(&mut self, a: &Animator, clips: usize, params: usize) {
+    /// `params` is the number of state entries, `nodes` of nodes.
+    pub(super) fn animator(&mut self, a: &Animator, clips: usize, params: usize, nodes: usize) {
         let c = self.caps;
         self.cap(a.layers.len(), c.layers, "animator.layers");
         let (mut states, mut transitions) = (0, 0);
@@ -70,8 +91,8 @@ impl V {
             self.string(&layer.name, p);
             self.index(layer.group as usize, a.groups.len(), p, "group");
             if let Some(mask) = &layer.mask {
-                for t in mask.transforms.iter().flatten() {
-                    self.string(t, p);
+                for &t in mask.transforms.iter().flatten() {
+                    self.index(t as usize, nodes, p, "mask node");
                 }
             }
             let sm = &layer.state_machine;

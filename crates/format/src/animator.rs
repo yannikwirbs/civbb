@@ -7,7 +7,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hierarchy::HumanBone;
+use crate::hierarchy::{HumanBone, NodeIndex};
+use crate::mesh::MeshIndex;
 use crate::state::EntryIndex;
 
 /// Index into [`crate::Avatar::clips`].
@@ -62,13 +63,13 @@ pub enum LayerBlending {
     Additive,
 }
 
-/// Unity avatar mask: humanoid body parts plus an optional transform path allowlist.
+/// Unity avatar mask: humanoid body parts plus an optional node allowlist.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct AvatarMask {
     /// Enabled humanoid body parts.
     pub body_parts: Vec<BodyPart>,
-    /// Transform paths the layer may animate; `None` allows all non-humanoid transforms.
-    pub transforms: Option<Vec<String>>,
+    /// Nodes the layer may animate (curves on their meshes and constraints too); `None` allows all.
+    pub transforms: Option<Vec<NodeIndex>>,
 }
 
 /// Humanoid body parts of an avatar mask.
@@ -350,7 +351,7 @@ pub struct Clip {
     pub length: f32,
     /// Loop time.
     pub looping: bool,
-    /// How the body pose curves (`RootMotion`) reach the pose; `None` takes them as keyed (ADR 0063).
+    /// How the body pose curves (`HumanoidProperty::Body`) reach the pose; `None` takes them as keyed (ADR 0063).
     #[serde(default)]
     pub root: Option<RootSettings>,
     /// Animated properties.
@@ -386,7 +387,7 @@ pub struct RootSettings {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Curve {
     /// What it animates.
-    pub binding: Binding,
+    pub target: Target,
     /// Keys in ascending time.
     pub keys: Vec<Key>,
 }
@@ -408,58 +409,74 @@ fn tangent<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f32, D::Error> {
     Ok(Option::<f32>::deserialize(d)?.unwrap_or(f32::INFINITY))
 }
 
-/// The target of a curve: a node path (Unity style, `/`-separated, relative to the root) and a property.
-/// Bindings are resolved to component indices at compile time; unresolved ones are reported, not fatal.
+/// What a curve animates: an element of the document by index and one of its properties (ADR 0089). Values are in
+/// each property's units. Importers resolve source paths and names; stages that renumber elements remap targets.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Binding {
-    /// Node path; empty for the root and for animator parameters.
-    pub path: String,
-    /// Animated property.
-    pub property: Property,
+pub enum Target {
+    /// A property of a node in [`Hierarchy::nodes`](crate::hierarchy::Hierarchy::nodes).
+    Node {
+        /// Node index.
+        node: NodeIndex,
+        /// Animated property.
+        property: NodeProperty,
+    },
+    /// A property of a mesh instance in [`Avatar::meshes`](crate::Avatar::meshes).
+    Mesh {
+        /// Mesh index.
+        mesh: MeshIndex,
+        /// Animated property.
+        property: MeshProperty,
+    },
+    /// A property of the humanoid.
+    Humanoid(HumanoidProperty),
+    /// The value of a state entry (a float entry; ADR 0088).
+    Entry(EntryIndex),
+    /// A field of a constraint in [`Avatar::constraints`](crate::Avatar::constraints) (ADR 0040).
+    Constraint {
+        /// Constraint index.
+        constraint: u32,
+        /// Animated field.
+        field: crate::constraint::ConstraintField,
+    },
 }
 
-/// Animatable properties.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum Property {
-    /// Local position component (0 = x, 1 = y, 2 = z).
-    Position(u8),
+/// Animatable node properties.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NodeProperty {
+    /// Local translation component (0 = x, 1 = y, 2 = z), metres.
+    Translation(u8),
     /// Local rotation quaternion component (0 = x .. 3 = w).
     Rotation(u8),
     /// Local Euler angle component in degrees about our axes, applied Z, X, Y (Unity `localEulerAnglesRaw`, ADR 0007).
     EulerRotation(u8),
     /// Local scale component.
     Scale(u8),
-    /// Humanoid muscle, by Unity clip property name (`Left Arm Down-Up`, `LeftHand.Index.1 Stretched`; ADR 0014).
-    Muscle(String),
-    /// Humanoid root motion: position (0..3) or rotation (3..7) component.
-    RootMotion(u8),
-    /// Blendshape weight, 0 to 100 as in Unity, on the mesh at `path`.
-    BlendShape(String),
-    /// Node active flag.
+    /// Active flag, 0 or 1.
     Active,
-    /// Mesh renderer enabled flag.
-    RendererEnabled,
-    /// Material property on the renderer at `path`, e.g. `_Color.r`.
+}
+
+/// Animatable mesh instance properties.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum MeshProperty {
+    /// Visible flag, 0 or 1.
+    Visible,
+    /// Morph target (blendshape) weight, by index into the mesh's blend shapes, 0 to 100 as in Unity.
+    Weight(u32),
+    /// A material property on the mesh's submeshes that have it, by Unity property name, e.g. `_Color.r`
+    /// (`civbb_anim::material`, ADR 0025).
     Material(String),
-    /// The material in a slot (submesh) of the renderer at `path`: key values are indices into
-    /// [`Avatar::materials`](crate::Avatar::materials), held until the next key (Unity's `m_Materials.Array.data[n]`).
+    /// The material of a submesh: key values are indices into [`Avatar::materials`](crate::Avatar::materials),
+    /// held until the next key.
     MaterialSlot(u8),
-    /// Animator parameter driven by the clip (legacy FX technique).
-    Parameter(String),
-    /// A field of the first constraint of this type whose target is the node at `path` (ADR 0040).
-    Constraint {
-        /// Component type.
-        kind: crate::constraint::ConstraintType,
-        /// Animated field.
-        field: crate::constraint::ConstraintField,
-    },
-    /// Any other component property, kept so the compiler can report or map it later.
-    Component {
-        /// Source component type name.
-        component: String,
-        /// Property path on that component.
-        property: String,
-    },
+}
+
+/// Animatable humanoid properties.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum HumanoidProperty {
+    /// A muscle, by Unity clip property name (`Left Arm Down-Up`, `LeftHand.Index.1 Stretched`; ADR 0014).
+    Muscle(String),
+    /// The body pose: position (0..3) or rotation (3..7) component (ADR 0063).
+    Body(u8),
 }
 
 impl BodyPart {

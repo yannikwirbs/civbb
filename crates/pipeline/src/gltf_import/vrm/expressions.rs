@@ -137,16 +137,19 @@ impl Importer<'_> {
         for (i, (name, binds)) in toggles.into_iter().enumerate() {
             let mut curves: Vec<Curve> = Vec::new();
             for b in binds {
-                let m = &self.meshes[b.mesh as usize];
-                let binding = Binding {
-                    path: self.path(m.node)?,
-                    property: Property::BlendShape(m.blend_shapes[b.shape as usize].name.clone()),
+                // The first shape with the bind's name, as names resolved before typed targets (ADR 0089).
+                let shapes = &self.meshes[b.mesh as usize].blend_shapes;
+                let name = &shapes[b.shape as usize].name;
+                let shape = shapes.iter().position(|s| s.name == *name).unwrap_or(b.shape as usize);
+                let target = Target::Mesh {
+                    mesh: b.mesh,
+                    property: MeshProperty::Weight(shape as u32),
                 };
-                if curves.iter().any(|c| c.binding == binding) {
+                if curves.iter().any(|c| c.target == target) {
                     continue;
                 }
                 curves.push(Curve {
-                    binding,
+                    target,
                     keys: vec![Key {
                         time: 0.0,
                         value: b.weight * 100.0,

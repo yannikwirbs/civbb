@@ -16,6 +16,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::Importer;
+use super::unity_clip::{self, XClip};
 use super::unity_state::{self, XAnimatorParameters, XExpressions};
 
 /// The avatar parts the `X_*` extensions add to a plain glTF import.
@@ -59,7 +60,7 @@ struct XAvatar {
 struct XAnimator {
     animator: Animator,
     #[serde(default)]
-    clips: Vec<Clip>,
+    clips: Vec<XClip>,
 }
 
 /// Newest Unity dialect this module reads (ADRs 0085, 0087). Dialect 1 is the `X_*` shapes of format v25, frozen by
@@ -98,8 +99,13 @@ impl Importer<'_> {
             s.humanoid = Some(self.x_avatar(x)?);
         }
         let mut params = Vec::new();
+        let mut clips = Vec::new();
         if let Some(v) = doc.extension_value("X_animator") {
-            let x: XAnimator = parse("X_animator", v)?;
+            let mut v = v.clone();
+            if let Some(a) = v.get_mut("animator") {
+                unity_clip::mask_nodes(a, &self.nodes, self.caps.string_len);
+            }
+            let x: XAnimator = parse("X_animator", &v)?;
             params = parse::<XAnimatorParameters>("X_animator", &v["animator"])?.parameters;
             let mut animator = x.animator;
             let base = u32::try_from(clip_base).map_err(|_| "X_animator: too many clips")?;
@@ -111,7 +117,7 @@ impl Importer<'_> {
                 }
             }
             s.animator = Some(animator);
-            s.clips = x.clips;
+            clips = x.clips;
         }
         if let Some(v) = doc.extension_value("X_constraints") {
             s.constraints = parse("X_constraints", v)?;
@@ -173,6 +179,17 @@ impl Importer<'_> {
         s.expressions = expressions.map(|x| Expressions {
             menu: unity_state::menu(x.menu, &s.state),
         });
+        let scope = unity_clip::Scope {
+            nodes: &self.nodes,
+            node_meshes: &self.node_meshes,
+            meshes: &self.meshes,
+            state: &s.state,
+            constraints: &s.constraints,
+            string_len: self.caps.string_len,
+        };
+        let (clips, warnings) = unity_clip::lower(clips, &scope);
+        s.clips = clips;
+        self.warnings.extend(warnings);
         Ok(Some(s))
     }
 

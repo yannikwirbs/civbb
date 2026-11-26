@@ -4,6 +4,7 @@
 use civbb_anim::{Target, bind};
 use civbb_core::math::{euler_to_quat, quat_to_euler};
 use civbb_format::Avatar;
+use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Quat, Transform};
@@ -21,7 +22,20 @@ fn node(name: &str, parent: Option<u32>, active: bool) -> Node {
     }
 }
 
-fn curve(path: &str, property: Property, keys: &[(f32, f32)]) -> Curve {
+/// Body (node 1) carries mesh 0, Arm is node 2, Hat node 3.
+const BODY: u32 = 1;
+const ARM: u32 = 2;
+const HAT: u32 = 3;
+
+fn on(node: u32, property: NodeProperty) -> CurveTarget {
+    CurveTarget::Node { node, property }
+}
+
+fn mesh(property: MeshProperty) -> CurveTarget {
+    CurveTarget::Mesh { mesh: 0, property }
+}
+
+fn curve(target: CurveTarget, keys: &[(f32, f32)]) -> Curve {
     // Linear keys.
     let slope = |a: (f32, f32), b: (f32, f32)| (b.1 - a.1) / (b.0 - a.0);
     let keys = (0..keys.len())
@@ -36,13 +50,7 @@ fn curve(path: &str, property: Property, keys: &[(f32, f32)]) -> Curve {
             },
         })
         .collect();
-    Curve {
-        binding: Binding {
-            path: path.into(),
-            property,
-        },
-        keys,
-    }
+    Curve { target, keys }
 }
 
 fn clip(curves: Vec<Curve>) -> Clip {
@@ -97,13 +105,13 @@ fn close(a: &[f32], b: &[f32]) {
 fn binds_targets_with_defaults_and_shares_slots_across_clips() {
     let a = avatar(vec![
         clip(vec![
-            curve("Body/Arm", Property::Position(1), &[(0.0, 1.0), (1.0, 2.0)]),
-            curve("Body", Property::BlendShape("Smile".into()), &[(0.0, 100.0)]),
-            curve("Hat", Property::Active, &[(0.0, 1.0)]),
-            curve("Body", Property::RendererEnabled, &[(0.0, 0.0)]),
-            curve("", Property::Parameter("Fl".into()), &[(0.0, 0.75)]),
+            curve(on(ARM, NodeProperty::Translation(1)), &[(0.0, 1.0), (1.0, 2.0)]),
+            curve(mesh(MeshProperty::Weight(0)), &[(0.0, 100.0)]),
+            curve(on(HAT, NodeProperty::Active), &[(0.0, 1.0)]),
+            curve(mesh(MeshProperty::Visible), &[(0.0, 0.0)]),
+            curve(CurveTarget::Entry(0), &[(0.0, 0.75)]),
         ]),
-        clip(vec![curve("Body/Arm", Property::Position(1), &[(0.0, 3.0)])]),
+        clip(vec![curve(on(ARM, NodeProperty::Translation(1)), &[(0.0, 3.0)])]),
     ]);
     let b = bind(&a);
     assert!(b.unbound.is_empty(), "{:?}", b.unbound);
@@ -135,11 +143,7 @@ fn binds_targets_with_defaults_and_shares_slots_across_clips() {
 #[test]
 fn a_parameter_slot_defaults_to_the_entry_rest() {
     // Lowered Unity content: the entry starts at the expression default, Write Defaults restores the animator's (#115).
-    let mut a = avatar(vec![clip(vec![curve(
-        "",
-        Property::Parameter("Fl".into()),
-        &[(0.0, 0.75)],
-    )])]);
+    let mut a = avatar(vec![clip(vec![curve(CurveTarget::Entry(0), &[(0.0, 0.75)])])]);
     a.state.entries[0].rest = Some(0.5);
     close(&bind(&a).bindings.defaults, &[0.5]);
 }
@@ -147,38 +151,24 @@ fn a_parameter_slot_defaults_to_the_entry_rest() {
 #[test]
 fn reports_what_does_not_bind() {
     let cases = [
-        (curve("Nope", Property::Active, &[(0.0, 1.0)]), "no node at path"),
         (
-            curve("Hat", Property::BlendShape("Smile".into()), &[(0.0, 1.0)]),
-            "no mesh at path",
-        ),
-        (
-            curve("Hat", Property::RendererEnabled, &[(0.0, 1.0)]),
-            "no mesh at path",
-        ),
-        (
-            curve("Body", Property::BlendShape("Frown".into()), &[(0.0, 1.0)]),
-            "no such blendshape",
-        ),
-        (
-            curve("", Property::Parameter("Nope".into()), &[(0.0, 1.0)]),
-            "no such parameter",
-        ),
-        (
-            curve("", Property::Parameter("B".into()), &[(0.0, 1.0)]),
+            curve(CurveTarget::Entry(1), &[(0.0, 1.0)]),
             "only float parameters can be animated",
         ),
-        (curve("Body", Property::Active, &[]), "no keys"),
+        (curve(on(BODY, NodeProperty::Active), &[]), "no keys"),
         (
-            curve("", Property::Muscle("Jaw Close".into()), &[(0.0, 1.0)]),
+            curve(
+                CurveTarget::Humanoid(HumanoidProperty::Muscle("Jaw Close".into())),
+                &[(0.0, 1.0)],
+            ),
             "no muscle frames (#53)",
         ),
         (
-            curve("", Property::RootMotion(0), &[(0.0, 1.0)]),
+            curve(CurveTarget::Humanoid(HumanoidProperty::Body(0)), &[(0.0, 1.0)]),
             "no humanoid with hips, upper arms and upper legs",
         ),
         (
-            curve("Body", Property::Material("_Nope.r".into()), &[(0.0, 1.0)]),
+            curve(mesh(MeshProperty::Material("_Nope.r".into())), &[(0.0, 1.0)]),
             "unknown material property",
         ),
     ];
@@ -219,26 +209,22 @@ fn material_slots_bind_with_the_submesh_material_as_default_and_reject_other_ind
             .to_vec();
         bind(&a)
     };
-    let b = with(curve("Body", Property::MaterialSlot(1), &[(0.0, 2.0)]));
+    let b = with(curve(mesh(MeshProperty::MaterialSlot(1)), &[(0.0, 2.0)]));
     assert!(b.unbound.is_empty(), "{:?}", b.unbound);
     assert_eq!(b.bindings.targets, [Target::MaterialSlot(0, 1)]);
     assert_eq!(b.bindings.defaults, [1.0], "the submesh's own material");
     for (c, reason) in [
         (
-            curve("Body", Property::MaterialSlot(2), &[(0.0, 0.0)]),
+            curve(mesh(MeshProperty::MaterialSlot(2)), &[(0.0, 0.0)]),
             "no such material slot",
         ),
         (
-            curve("Body", Property::MaterialSlot(0), &[(0.0, 3.0)]),
+            curve(mesh(MeshProperty::MaterialSlot(0)), &[(0.0, 3.0)]),
             "material slot key is not a material index",
         ),
         (
-            curve("Body", Property::MaterialSlot(0), &[(0.0, 0.5)]),
+            curve(mesh(MeshProperty::MaterialSlot(0)), &[(0.0, 0.5)]),
             "material slot key is not a material index",
-        ),
-        (
-            curve("Hat", Property::MaterialSlot(0), &[(0.0, 0.0)]),
-            "no mesh at path",
         ),
     ] {
         let b = with(c);
@@ -249,10 +235,10 @@ fn material_slots_bind_with_the_submesh_material_as_default_and_reject_other_ind
 #[test]
 fn duplicate_bindings_keep_the_first_curve() {
     let a = avatar(vec![clip(vec![
-        curve("Hat", Property::Active, &[(0.0, 1.0)]),
-        curve("Hat", Property::Active, &[(0.0, 0.0)]),
-        curve("Body/Arm", Property::Rotation(3), &[(0.0, 1.0)]),
-        curve("Body/Arm", Property::Rotation(3), &[(0.0, 0.0)]),
+        curve(on(HAT, NodeProperty::Active), &[(0.0, 1.0)]),
+        curve(on(HAT, NodeProperty::Active), &[(0.0, 0.0)]),
+        curve(on(ARM, NodeProperty::Rotation(3)), &[(0.0, 1.0)]),
+        curve(on(ARM, NodeProperty::Rotation(3)), &[(0.0, 0.0)]),
     ])]);
     let b = bind(&a);
     let reasons: Vec<_> = b.unbound.iter().map(|u| (u.curve, u.reason)).collect();
@@ -266,8 +252,7 @@ fn duplicate_bindings_keep_the_first_curve() {
 fn partial_quaternion_curves_fill_from_rest_and_normalise() {
     // Only w is animated, from 1 to 0: x, y, z hold the rest rotation; the result is renormalised.
     let a = avatar(vec![clip(vec![curve(
-        "Body/Arm",
-        Property::Rotation(3),
+        on(ARM, NodeProperty::Rotation(3)),
         &[(0.0, 0.0), (1.0, 2.0)],
     )])]);
     let b = bind(&a);
@@ -290,11 +275,10 @@ fn partial_quaternion_curves_fill_from_rest_and_normalise() {
 fn euler_curves_write_the_quaternion_slots() {
     let a = avatar(vec![
         clip(vec![curve(
-            "Body/Arm",
-            Property::EulerRotation(1),
+            on(ARM, NodeProperty::EulerRotation(1)),
             &[(0.0, 0.0), (1.0, 180.0)],
         )]),
-        clip(vec![curve("Body/Arm", Property::Rotation(0), &[(0.0, 0.0)])]),
+        clip(vec![curve(on(ARM, NodeProperty::Rotation(0)), &[(0.0, 0.0)])]),
     ]);
     let b = bind(&a);
     assert!(b.unbound.is_empty());
@@ -310,8 +294,8 @@ fn euler_curves_write_the_quaternion_slots() {
 #[test]
 fn quaternion_curves_win_over_euler_curves_on_one_node() {
     let a = avatar(vec![clip(vec![
-        curve("Body/Arm", Property::EulerRotation(0), &[(0.0, 90.0)]),
-        curve("Body/Arm", Property::Rotation(3), &[(0.0, 1.0)]),
+        curve(on(ARM, NodeProperty::EulerRotation(0)), &[(0.0, 90.0)]),
+        curve(on(ARM, NodeProperty::Rotation(3)), &[(0.0, 1.0)]),
     ])]);
     let b = bind(&a);
     let reasons: Vec<_> = b.unbound.iter().map(|u| (u.curve, u.reason)).collect();
@@ -377,10 +361,8 @@ fn corpus_avatars_bind_completely() {
 }
 
 #[test]
-fn constraint_fields_bind_to_the_first_constraint_of_their_type_on_the_node() {
-    use civbb_format::constraint::{
-        Constraint, ConstraintField as F, ConstraintKind, ConstraintSource, ConstraintType,
-    };
+fn constraint_fields_bind_with_the_stored_values_as_defaults() {
+    use civbb_format::constraint::{Constraint, ConstraintField as F, ConstraintKind, ConstraintSource};
     let constraint = |kind, weight| Constraint {
         kind,
         target: 2,
@@ -395,25 +377,14 @@ fn constraint_fields_bind_to_the_first_constraint_of_their_type_on_the_node() {
         rest: Transform::IDENTITY,
         options: Default::default(),
     };
-    let field = |kind, field| Property::Constraint { kind, field };
+    let field = |field| CurveTarget::Constraint { constraint: 1, field };
     let mut a = avatar(vec![clip(vec![
-        curve("Body/Arm", field(ConstraintType::Rotation, F::Weight), &[(0.0, 0.0)]),
-        curve("Body/Arm", field(ConstraintType::Rotation, F::Active), &[(0.0, 0.0)]),
-        curve(
-            "Body/Arm",
-            field(ConstraintType::Rotation, F::SourceWeight(0)),
-            &[(0.0, 0.0)],
-        ),
-        curve("Body/Arm", field(ConstraintType::Rotation, F::Freeze), &[(0.0, 1.0)]),
-        curve(
-            "Body/Arm",
-            field(ConstraintType::Rotation, F::SourceWeight(1)),
-            &[(0.0, 0.0)],
-        ),
-        curve("Body/Arm", field(ConstraintType::Aim, F::Weight), &[(0.0, 0.0)]),
-        curve("Hat", field(ConstraintType::Position, F::Weight), &[(0.0, 0.0)]),
+        curve(field(F::Weight), &[(0.0, 0.0)]),
+        curve(field(F::Active), &[(0.0, 0.0)]),
+        curve(field(F::SourceWeight(0)), &[(0.0, 0.0)]),
+        curve(field(F::Freeze), &[(0.0, 1.0)]),
+        curve(field(F::SourceWeight(1)), &[(0.0, 0.0)]),
     ])]);
-    // A position constraint first, then two rotation constraints: the first rotation one (index 1) is bound.
     a.constraints = vec![
         constraint(ConstraintKind::Position { offset: [0.0; 3] }, 0.1),
         constraint(ConstraintKind::Rotation { offset: [0.0; 3] }, 0.9),
@@ -432,12 +403,5 @@ fn constraint_fields_bind_to_the_first_constraint_of_their_type_on_the_node() {
     // The stored values are the defaults.
     close(&b.bindings.defaults, &[0.9, 1.0, 0.6, 0.0]);
     let reasons: Vec<_> = b.unbound.iter().map(|u| (u.curve, u.reason)).collect();
-    assert_eq!(
-        reasons,
-        [
-            (4, "no such constraint source"),
-            (5, "no such constraint on the node"),
-            (6, "no such constraint on the node"),
-        ]
-    );
+    assert_eq!(reasons, [(4, "no such constraint source")]);
 }

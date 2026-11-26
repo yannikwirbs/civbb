@@ -580,8 +580,8 @@
               "RightHandIk"
             ],
             "transforms": [
-              "Body",
-              "Prop"
+              6,
+              7
             ]
           },
           "name": "Additive",
@@ -616,12 +616,6 @@
       {
         "curves": [
           {
-            "binding": {
-              "path": "Hips",
-              "property": {
-                "Position": 0
-              }
-            },
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -635,15 +629,17 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Node": {
+                "node": 1,
+                "property": {
+                  "Translation": 0
+                }
+              }
+            }
           },
           {
-            "binding": {
-              "path": "Hips",
-              "property": {
-                "Rotation": 3
-              }
-            },
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -657,15 +653,17 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Node": {
+                "node": 1,
+                "property": {
+                  "Rotation": 3
+                }
+              }
+            }
           },
           {
-            "binding": {
-              "path": "Hips/Spine",
-              "property": {
-                "EulerRotation": 1
-              }
-            },
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -679,15 +677,17 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Node": {
+                "node": 2,
+                "property": {
+                  "EulerRotation": 1
+                }
+              }
+            }
           },
           {
-            "binding": {
-              "path": "Hips/Spine/Head",
-              "property": {
-                "Scale": 2
-              }
-            },
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -701,15 +701,38 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Node": {
+                "node": 3,
+                "property": {
+                  "Scale": 2
+                }
+              }
+            }
           },
           {
-            "binding": {
-              "path": "",
-              "property": {
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ],
+            "target": {
+              "Humanoid": {
                 "Muscle": "Left Arm Down-Up"
               }
-            },
+            }
+          },
+          {
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -723,15 +746,14 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Humanoid": {
+                "Body": 5
+              }
+            }
           },
           {
-            "binding": {
-              "path": "",
-              "property": {
-                "RootMotion": 5
-              }
-            },
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -745,171 +767,17 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
-          },
-          {
-            "binding": {
-              "path": "Body",
-              "property": {
-                "BlendShape": "v_aa"
-              }
-            },
-            "keys": [
-              {
-                "in_tangent": 0.0,
-                "out_tangent": null,
-                "time": 0.0,
-                "value": 0.0
-              },
-              {
-                "in_tangent": 0.0,
-                "out_tangent": 0.25,
-                "time": 0.5,
-                "value": 1.0
-              }
-            ]
-          },
-          {
-            "binding": {
-              "path": "Prop",
-              "property": "Active"
-            },
-            "keys": [
-              {
-                "in_tangent": 0.0,
-                "out_tangent": null,
-                "time": 0.0,
-                "value": 0.0
-              },
-              {
-                "in_tangent": 0.0,
-                "out_tangent": 0.25,
-                "time": 0.5,
-                "value": 1.0
-              }
-            ]
-          },
-          {
-            "binding": {
-              "path": "Body",
-              "property": "RendererEnabled"
-            },
-            "keys": [
-              {
-                "in_tangent": 0.0,
-                "out_tangent": null,
-                "time": 0.0,
-                "value": 0.0
-              },
-              {
-                "in_tangent": 0.0,
-                "out_tangent": 0.25,
-                "time": 0.5,
-                "value": 1.0
-              }
-            ]
-          },
-          {
-            "binding": {
-              "path": "Body",
-              "property": {
-                "Material": "_Color.r"
-              }
-            },
-            "keys": [
-              {
-                "in_tangent": 0.0,
-                "out_tangent": null,
-                "time": 0.0,
-                "value": 0.0
-              },
-              {
-                "in_tangent": 0.0,
-                "out_tangent": 0.25,
-                "time": 0.5,
-                "value": 1.0
-              }
-            ]
-          },
-          {
-            "binding": {
-              "path": "Body",
-              "property": {
-                "MaterialSlot": 0
-              }
-            },
-            "keys": [
-              {
-                "in_tangent": 0.0,
-                "out_tangent": null,
-                "time": 0.0,
-                "value": 0.0
-              },
-              {
-                "in_tangent": 0.0,
-                "out_tangent": null,
-                "time": 0.5,
-                "value": 0.0
-              }
-            ]
-          },
-          {
-            "binding": {
-              "path": "",
-              "property": {
-                "Parameter": "Speed"
-              }
-            },
-            "keys": [
-              {
-                "in_tangent": 0.0,
-                "out_tangent": null,
-                "time": 0.0,
-                "value": 0.0
-              },
-              {
-                "in_tangent": 0.0,
-                "out_tangent": 0.25,
-                "time": 0.5,
-                "value": 1.0
-              }
-            ]
-          },
-          {
-            "binding": {
-              "path": "C1",
-              "property": {
-                "Constraint": {
-                  "field": "Weight",
-                  "kind": "Rotation"
+            ],
+            "target": {
+              "Mesh": {
+                "mesh": 0,
+                "property": {
+                  "Weight": 0
                 }
               }
-            },
-            "keys": [
-              {
-                "in_tangent": 0.0,
-                "out_tangent": null,
-                "time": 0.0,
-                "value": 0.0
-              },
-              {
-                "in_tangent": 0.0,
-                "out_tangent": 0.25,
-                "time": 0.5,
-                "value": 1.0
-              }
-            ]
+            }
           },
           {
-            "binding": {
-              "path": "C1",
-              "property": {
-                "Constraint": {
-                  "field": "Active",
-                  "kind": "Rotation"
-                }
-              }
-            },
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -923,20 +791,15 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Node": {
+                "node": 7,
+                "property": "Active"
+              }
+            }
           },
           {
-            "binding": {
-              "path": "C1",
-              "property": {
-                "Constraint": {
-                  "field": {
-                    "SourceWeight": 0
-                  },
-                  "kind": "Rotation"
-                }
-              }
-            },
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -950,18 +813,15 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Mesh": {
+                "mesh": 0,
+                "property": "Visible"
+              }
+            }
           },
           {
-            "binding": {
-              "path": "C1",
-              "property": {
-                "Constraint": {
-                  "field": "Freeze",
-                  "kind": "Rotation"
-                }
-              }
-            },
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -975,18 +835,41 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Mesh": {
+                "mesh": 0,
+                "property": {
+                  "Material": "_Color.r"
+                }
+              }
+            }
           },
           {
-            "binding": {
-              "path": "Prop",
-              "property": {
-                "Component": {
-                  "component": "AudioSource",
-                  "property": "m_Volume"
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.5,
+                "value": 0.0
+              }
+            ],
+            "target": {
+              "Mesh": {
+                "mesh": 0,
+                "property": {
+                  "MaterialSlot": 0
                 }
               }
-            },
+            }
+          },
+          {
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -1000,7 +883,100 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Entry": 1
+            }
+          },
+          {
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ],
+            "target": {
+              "Constraint": {
+                "constraint": 1,
+                "field": "Weight"
+              }
+            }
+          },
+          {
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ],
+            "target": {
+              "Constraint": {
+                "constraint": 1,
+                "field": "Active"
+              }
+            }
+          },
+          {
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ],
+            "target": {
+              "Constraint": {
+                "constraint": 1,
+                "field": {
+                  "SourceWeight": 0
+                }
+              }
+            }
+          },
+          {
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
+              }
+            ],
+            "target": {
+              "Constraint": {
+                "constraint": 1,
+                "field": "Freeze"
+              }
+            }
           }
         ],
         "length": 0.5,
@@ -1021,12 +997,6 @@
       {
         "curves": [
           {
-            "binding": {
-              "path": "Hips/Spine",
-              "property": {
-                "Rotation": 0
-              }
-            },
             "keys": [
               {
                 "in_tangent": 0.0,
@@ -1040,7 +1010,15 @@
                 "time": 0.5,
                 "value": 1.0
               }
-            ]
+            ],
+            "target": {
+              "Node": {
+                "node": 2,
+                "property": {
+                  "Rotation": 0
+                }
+              }
+            }
           }
         ],
         "length": 1.0,
@@ -3871,5 +3849,7 @@
     },
     "textures": []
   },
-  "warnings": []
+  "warnings": [
+    "X_animator: 1 curves dropped: unsupported component property"
+  ]
 }

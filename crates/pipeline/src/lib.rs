@@ -8,6 +8,7 @@ pub mod lod;
 pub mod merge;
 pub mod package;
 pub mod prune;
+mod renumber;
 pub mod report;
 pub mod texture;
 

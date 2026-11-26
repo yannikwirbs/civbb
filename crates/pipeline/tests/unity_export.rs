@@ -6,7 +6,6 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use civbb_anim::bind::node_paths;
 use civbb_anim::constraint::Scratch;
 use civbb_anim::{Constraints, Target, bind};
 use civbb_core::math::{self, world_poses};
@@ -430,4 +429,17 @@ fn derived_muscle_frames_match_unity_exports() {
         }
     }
     assert!(failures.is_empty(), "{failures:?}");
+}
+
+/// Unity's path of every node, as the recordings name them: names below the root joined by `/`.
+fn node_paths(h: &civbb_format::hierarchy::Hierarchy) -> Vec<String> {
+    let mut paths: Vec<String> = Vec::with_capacity(h.nodes.len());
+    for n in &h.nodes {
+        paths.push(match n.parent {
+            None => String::new(),
+            Some(0) => n.name.clone(),
+            Some(p) => format!("{}/{}", paths[p as usize], n.name),
+        });
+    }
+    paths
 }

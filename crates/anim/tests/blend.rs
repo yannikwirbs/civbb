@@ -148,10 +148,7 @@ fn avatar(motion: Motion) -> Avatar {
         out_tangent: slope,
     };
     let curve = |property, keys| Curve {
-        binding: Binding {
-            path: "A".into(),
-            property,
-        },
+        target: Target::Node { node: 1, property },
         keys,
     };
     let clip = |length, curves| Clip {
@@ -173,15 +170,15 @@ fn avatar(motion: Motion) -> Avatar {
             nodes: vec![node("Root", None), node("A", Some(0))],
         },
         clips: vec![
-            clip(1.0, vec![curve(Property::Position(0), vec![key(0.0, 0.0, 0.0)])]),
+            clip(1.0, vec![curve(NodeProperty::Translation(0), vec![key(0.0, 0.0, 0.0)])]),
             clip(
                 3.0,
                 vec![curve(
-                    Property::Position(0),
+                    NodeProperty::Translation(0),
                     vec![key(0.0, 0.0, 10.0 / 3.0), key(3.0, 10.0, 10.0 / 3.0)],
                 )],
             ),
-            clip(1.0, vec![curve(Property::Position(1), vec![key(0.0, 4.0, 0.0)])]),
+            clip(1.0, vec![curve(NodeProperty::Translation(1), vec![key(0.0, 4.0, 0.0)])]),
         ],
         state: StateTable {
             entries: vec![param("p"), param("q")],

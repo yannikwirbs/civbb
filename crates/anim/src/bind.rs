@@ -1,11 +1,13 @@
-//! Compile-time binding: resolves curve paths to slots in one flat buffer with per-slot defaults (ADR 0007).
+//! Compile-time binding: gives curve targets slots in one flat buffer with per-slot defaults (ADRs 0007, 0089).
 
 use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
-use civbb_format::animator::{Animator, ClipIndex, Curve, Key, Motion, Property};
-use civbb_format::constraint::{ConstraintField, ConstraintType};
-use civbb_format::hierarchy::{Hierarchy, NodeIndex};
+use civbb_format::animator::{
+    Animator, ClipIndex, Curve, HumanoidProperty, Key, MeshProperty, Motion, NodeProperty, Target as CurveTarget,
+};
+use civbb_format::constraint::ConstraintField;
+use civbb_format::hierarchy::NodeIndex;
 use civbb_format::mesh::MeshIndex;
 use civbb_format::state::{EntryIndex, EntryKind};
 
@@ -97,19 +99,6 @@ pub struct Bound {
     pub body: Option<BodyRig>,
 }
 
-/// Unity-style binding path of every node: names below the root joined by `/`; the root's is empty.
-pub fn node_paths(h: &Hierarchy) -> Vec<String> {
-    let mut paths: Vec<String> = Vec::with_capacity(h.nodes.len());
-    for n in &h.nodes {
-        paths.push(match n.parent {
-            None => String::new(),
-            Some(0) => n.name.clone(),
-            Some(p) => format!("{}/{}", paths[p as usize], n.name),
-        });
-    }
-    paths
-}
-
 /// Binds every clip of a validated avatar.
 pub fn bind(avatar: &Avatar) -> Bound {
     let mut b = Binder::new(avatar);
@@ -172,9 +161,6 @@ fn mirrors(animator: &Animator) -> bool {
 
 struct Binder<'a> {
     avatar: &'a Avatar,
-    nodes: HashMap<String, NodeIndex>,
-    meshes: HashMap<NodeIndex, Vec<MeshIndex>>,
-    params: HashMap<&'a str, EntryIndex>,
     rig: Option<Rig>,
     body: Option<BodyRig>,
     slots: HashMap<Target, Slot>,
@@ -193,19 +179,6 @@ struct NodeRotation<'a> {
 
 impl<'a> Binder<'a> {
     fn new(avatar: &'a Avatar) -> Self {
-        let mut nodes = HashMap::new();
-        for (i, path) in node_paths(&avatar.hierarchy).into_iter().enumerate() {
-            // Sibling names should be unique; if not, the first node wins, as Unity's `Transform.Find` does.
-            nodes.entry(path).or_insert(i as NodeIndex);
-        }
-        let mut meshes: HashMap<NodeIndex, Vec<MeshIndex>> = HashMap::new();
-        for (i, m) in avatar.meshes.iter().enumerate() {
-            meshes.entry(m.node).or_default().push(i as MeshIndex);
-        }
-        let mut params = HashMap::new();
-        for (i, e) in avatar.state.entries.iter().enumerate() {
-            params.entry(e.name.as_str()).or_insert(i as EntryIndex);
-        }
         let rest = |n: NodeIndex| avatar.hierarchy.nodes[n as usize].rest.rotation;
         let rig = avatar.humanoid.as_ref().and_then(|h| Rig::new(h, rest));
         let body = avatar
@@ -214,9 +187,6 @@ impl<'a> Binder<'a> {
             .and_then(|h| BodyRig::new(&avatar.hierarchy, h));
         Self {
             avatar,
-            nodes,
-            meshes,
-            params,
             rig,
             body,
             slots: HashMap::new(),
@@ -354,84 +324,64 @@ impl<'a> Binder<'a> {
     }
 
     fn resolve(&self, curve: &Curve) -> Result<Resolved, &'static str> {
-        let b = &curve.binding;
-        if let Property::Parameter(name) = &b.property {
-            let &p = self.params.get(name.as_str()).ok_or("no such parameter")?;
-            return match self.avatar.state.entries[p as usize].kind {
-                EntryKind::Float => Ok(Resolved::Target(Target::Parameter(p))),
-                _ => Err("only float parameters can be animated"),
-            };
-        }
-        if let Property::Muscle(name) = &b.property {
-            let m = muscle::find(name).ok_or("no such muscle")?;
-            let rig = self.rig.as_ref().ok_or("no muscle frames (#53)")?;
-            return match rig.has(MUSCLES[m as usize].bone) {
-                true => Ok(Resolved::Target(Target::Muscle(m))),
-                false => Err("no muscle frame for the muscle's bone"),
-            };
-        }
-        let node = *self.nodes.get(&b.path).ok_or("no node at path")?;
-        let on_node = self.meshes.get(&node).map_or(&[][..], Vec::as_slice);
-        let t = match &b.property {
-            Property::Position(i) => Target::Position(node, *i),
-            Property::Scale(i) => Target::Scale(node, *i),
-            Property::Rotation(i) => return Ok(Resolved::Rotation(node, false, *i as usize)),
-            Property::EulerRotation(i) => return Ok(Resolved::Rotation(node, true, *i as usize)),
-            Property::Active => Target::Active(node),
-            Property::RendererEnabled => Target::RendererEnabled(*on_node.first().ok_or("no mesh at path")?),
-            Property::BlendShape(name) => {
-                if on_node.is_empty() {
-                    return Err("no mesh at path");
+        let t = match &curve.target {
+            CurveTarget::Entry(p) => match self.avatar.state.entries[*p as usize].kind {
+                EntryKind::Float => Target::Parameter(*p),
+                _ => return Err("only float parameters can be animated"),
+            },
+            CurveTarget::Humanoid(HumanoidProperty::Muscle(name)) => {
+                let m = muscle::find(name).ok_or("no such muscle")?;
+                let rig = self.rig.as_ref().ok_or("no muscle frames (#53)")?;
+                if !rig.has(MUSCLES[m as usize].bone) {
+                    return Err("no muscle frame for the muscle's bone");
                 }
-                on_node
-                    .iter()
-                    .find_map(|&m| {
-                        let shapes = &self.avatar.meshes[m as usize].blend_shapes;
-                        let s = shapes.iter().position(|s| s.name == *name)?;
-                        Some(Target::BlendShape(m, s as u32))
-                    })
-                    .ok_or("no such blendshape")?
+                Target::Muscle(m)
             }
-            Property::RootMotion(i) => {
+            CurveTarget::Humanoid(HumanoidProperty::Body(i)) => {
                 self.body
                     .as_ref()
                     .ok_or("no humanoid with hips, upper arms and upper legs")?;
                 Target::Body(*i)
             }
-            Property::Material(name) => {
-                let (field, component) = material::parse(name).ok_or("unknown material property")?;
-                let &mesh = on_node.first().ok_or("no mesh at path")?;
-                renderer_default(self.avatar, mesh, field).ok_or("no material on the renderer has the property")?;
-                Target::Material(mesh, field, component)
-            }
-            Property::MaterialSlot(s) => {
-                let &mesh = on_node.first().ok_or("no mesh at path")?;
-                if *s as usize >= self.avatar.meshes[mesh as usize].submeshes.len() {
-                    return Err("no such material slot");
+            &CurveTarget::Node { node, property } => match property {
+                NodeProperty::Translation(i) => Target::Position(node, i),
+                NodeProperty::Scale(i) => Target::Scale(node, i),
+                NodeProperty::Rotation(i) => return Ok(Resolved::Rotation(node, false, i as usize)),
+                NodeProperty::EulerRotation(i) => return Ok(Resolved::Rotation(node, true, i as usize)),
+                NodeProperty::Active => Target::Active(node),
+            },
+            CurveTarget::Mesh { mesh, property } => {
+                let mesh = *mesh;
+                match property {
+                    MeshProperty::Visible => Target::RendererEnabled(mesh),
+                    MeshProperty::Weight(s) => Target::BlendShape(mesh, *s),
+                    MeshProperty::Material(name) => {
+                        let (field, component) = material::parse(name).ok_or("unknown material property")?;
+                        renderer_default(self.avatar, mesh, field)
+                            .ok_or("no material on the renderer has the property")?;
+                        Target::Material(mesh, field, component)
+                    }
+                    MeshProperty::MaterialSlot(s) => {
+                        if *s as usize >= self.avatar.meshes[mesh as usize].submeshes.len() {
+                            return Err("no such material slot");
+                        }
+                        let n = self.avatar.materials.len() as f32;
+                        if !(curve.keys.iter()).all(|k| k.value >= 0.0 && k.value < n && k.value.fract() == 0.0) {
+                            return Err("material slot key is not a material index");
+                        }
+                        Target::MaterialSlot(mesh, *s)
+                    }
                 }
-                let n = self.avatar.materials.len() as f32;
-                if !curve
-                    .keys
-                    .iter()
-                    .all(|k| k.value >= 0.0 && k.value < n && k.value.fract() == 0.0)
-                {
-                    return Err("material slot key is not a material index");
-                }
-                Target::MaterialSlot(mesh, *s)
             }
-            Property::Constraint { kind, field } => {
-                let (i, c) = (self.avatar.constraints.iter().enumerate())
-                    .find(|(_, c)| c.target == node && ConstraintType::of(&c.kind) == Some(*kind))
-                    .ok_or("no such constraint on the node")?;
+            &CurveTarget::Constraint { constraint, field } => {
+                let c = &self.avatar.constraints[constraint as usize];
                 if let ConstraintField::SourceWeight(s) = field
-                    && *s as usize >= c.sources.len()
+                    && s as usize >= c.sources.len()
                 {
                     return Err("no such constraint source");
                 }
-                Target::Constraint(i as u32, *field)
+                Target::Constraint(constraint, field)
             }
-            Property::Component { .. } => return Err("unsupported component property"),
-            Property::Parameter(_) | Property::Muscle(_) => unreachable!("handled above"),
         };
         Ok(Resolved::Target(t))
     }

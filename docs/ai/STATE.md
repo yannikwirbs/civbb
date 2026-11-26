@@ -133,9 +133,19 @@ What exists, by area. Read the section for the area you touch; update it when th
   parameters get Int 0..255 / Float -1..1 8 bits, VRM weights Float 0..1 8 bits: corpus totals unchanged. Platform values (ADR 0096): `state::Platform`, entries named `platform/...`
   (VRChat's names via `vrchat_name`, renamed by the importer, raised back by the corpus writer and the parity
   hand-off), never synced/saved/external and written by no content (validated; the importer drops driver writes).
-  Still by name: curve targets (#119).
+- Curve targets (ADR 0089 points 1, 2 and 4, #119, format v30): `animator::Target` is `Node {node, property}`
+  (`Translation`, `Rotation`, `EulerRotation`, `Scale`, `Active`), `Mesh {mesh, property}` (`Visible`,
+  `Weight(shape)`, `Material(name)`, `MaterialSlot`), `Humanoid(Muscle(name) | Body)`, `Entry`, `Constraint
+  {constraint, field}`; avatar mask `transforms` are node indices. Units, muscle names and Unity material property
+  names are still Unity's (#120). Dialect 1's path bindings are resolved in `gltf_import/unity_clip.rs` (path to node,
+  the node's mesh, shape by name, entry by name or VRChat built-in name, first constraint of the type on the node;
+  what resolves to nothing is dropped with one `X_animator: N curves dropped: <reason>` warning per reason); the
+  corpus writer raises targets back to paths. Prune, merge and atlas remap targets through `renumber::Renumber`
+  (curves on removed elements go). Merge no longer needs its path rules (a mesh's path its own, curves naming shapes
+  of another mesh). `civbb_anim::bind` checks only what indices cannot say (float entries, muscle frames, material
+  fields, slot keys, constraint sources).
 - Importer layout (health check): `gltf_import.rs` (entry, parsing, URI resolver, buffers, hierarchy) with
-  `gltf_import/{material,mesh,animation,source,unity_material,unity_state}.rs` and `vrm.rs` (entry, humanoid, node constraints,
+  `gltf_import/{material,mesh,animation,source,unity_clip,unity_material,unity_state}.rs` and `vrm.rs` (entry, humanoid, node constraints,
   first person) with `vrm/{springs,mtoon,expressions,meta}.rs`. vrm keeps its own `qmul`/`rotate`/`from_to` (core's
   round differently); the rest of its math is `civbb_core::math`. Validation (`civbb_format::validate`) checks one
   avatar part per method, animator checks in `validate/animator.rs`; PhysBone collider radius and height must be

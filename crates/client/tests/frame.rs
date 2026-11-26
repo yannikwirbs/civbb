@@ -8,7 +8,7 @@ use civbb_client::{Island, Model, frame};
 use civbb_core::math::Pose;
 use civbb_core::{System, jobs};
 use civbb_format::Avatar;
-use civbb_format::animator::{Binding, Property};
+use civbb_format::animator::{MeshProperty, Target};
 use civbb_format::dynamics::ReceiverKind;
 use civbb_format::material::{Material, MaterialModel};
 use civbb_format::state::{Entry, EntryKind};
@@ -131,17 +131,15 @@ fn animated_materials_are_per_island() {
     let params = &avatar.state.entries;
     let name = params.iter().find(|p| p.default == 0.0).unwrap().name.clone();
     // The toggle's on clip also lights up the body's emission.
-    let body = avatar.meshes[0].node as usize;
-    let path = civbb_anim::bind::node_paths(&avatar.hierarchy)[body].clone();
     let on = avatar
         .clips
         .iter_mut()
         .find(|c| c.name == format!("{name}_On"))
         .unwrap();
     let mut emission = on.curves[0].clone();
-    emission.binding = Binding {
-        path,
-        property: Property::Material("_EmissionColor.g".into()),
+    emission.target = Target::Mesh {
+        mesh: 0,
+        property: MeshProperty::Material("_EmissionColor.g".into()),
     };
     emission.keys[0].value = 0.5;
     on.curves.push(emission);
@@ -188,17 +186,15 @@ fn a_toggle_can_swap_a_material_slot_per_island() {
     swapped.name = "swapped".into();
     avatar.materials.push(swapped);
     let index = avatar.materials.len() as u32 - 1;
-    let body = avatar.meshes[0].node as usize;
-    let path = civbb_anim::bind::node_paths(&avatar.hierarchy)[body].clone();
     let on = avatar
         .clips
         .iter_mut()
         .find(|c| c.name == format!("{name}_On"))
         .unwrap();
     let mut slot = on.curves[0].clone();
-    slot.binding = Binding {
-        path,
-        property: Property::MaterialSlot(0),
+    slot.target = Target::Mesh {
+        mesh: 0,
+        property: MeshProperty::MaterialSlot(0),
     };
     slot.keys[0].value = index as f32;
     on.curves.push(slot);
@@ -225,7 +221,7 @@ fn a_toggle_can_swap_a_material_slot_per_island() {
 
 #[test]
 fn a_toggle_can_switch_a_constraint_per_island() {
-    use civbb_format::constraint::{ConstraintField, ConstraintKind, ConstraintType};
+    use civbb_format::constraint::{ConstraintField, ConstraintKind};
     let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());
     // The first corpus constraint becomes a position constraint, so it visibly moves its target off the rest pose.
     let c = &mut avatar.constraints[0];
@@ -234,7 +230,6 @@ fn a_toggle_can_switch_a_constraint_per_island() {
     };
     c.axes = [true; 3];
     let target = c.target as usize;
-    let path = civbb_anim::bind::node_paths(&avatar.hierarchy)[target].clone();
     // A toggle that starts off; its on clip switches the constraint off.
     let params = &avatar.state.entries;
     let name = params.iter().find(|p| p.default == 0.0).unwrap().name.clone();
@@ -244,12 +239,9 @@ fn a_toggle_can_switch_a_constraint_per_island() {
         .find(|c| c.name == format!("{name}_On"))
         .unwrap();
     let mut off = on.curves[0].clone();
-    off.binding = Binding {
-        path,
-        property: Property::Constraint {
-            kind: ConstraintType::Position,
-            field: ConstraintField::Active,
-        },
+    off.target = Target::Constraint {
+        constraint: 0,
+        field: ConstraintField::Active,
     };
     off.keys[0].value = 0.0;
     on.curves.push(off);

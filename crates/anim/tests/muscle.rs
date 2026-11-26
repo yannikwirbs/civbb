@@ -6,6 +6,7 @@ use std::path::Path;
 
 use civbb_anim::muscle::{COUNT, MUSCLES, find};
 use civbb_anim::{Controller, Instance, Rig, Target, bind};
+use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, Node, NodeIndex};
 use civbb_format::math::{Quat, Transform};
@@ -417,7 +418,11 @@ fn key(value: f32) -> Vec<Key> {
     }]
 }
 
-fn muscle_clip(curves: &[(Property, f32)]) -> Clip {
+fn muscle(name: &str) -> CurveTarget {
+    CurveTarget::Humanoid(HumanoidProperty::Muscle(name.into()))
+}
+
+fn muscle_clip(curves: &[(CurveTarget, f32)]) -> Clip {
     Clip {
         name: "c".into(),
         length: 1.0,
@@ -426,10 +431,7 @@ fn muscle_clip(curves: &[(Property, f32)]) -> Clip {
         curves: curves
             .iter()
             .map(|(p, v)| Curve {
-                binding: Binding {
-                    path: String::new(),
-                    property: p.clone(),
-                },
+                target: p.clone(),
                 keys: key(*v),
             })
             .collect(),
@@ -439,10 +441,10 @@ fn muscle_clip(curves: &[(Property, f32)]) -> Clip {
 #[test]
 fn muscle_curves_bind_to_slots_with_zero_defaults() {
     let clip = muscle_clip(&[
-        (Property::Muscle("Left Arm Down-Up".into()), 1.0),
-        (Property::Muscle("Left Arm Up".into()), 1.0),
-        (Property::Muscle("Spine Front-Back".into()), 1.0),
-        (Property::RootMotion(0), 1.0),
+        (muscle("Left Arm Down-Up"), 1.0),
+        (muscle("Left Arm Up"), 1.0),
+        (muscle("Spine Front-Back"), 1.0),
+        (CurveTarget::Humanoid(HumanoidProperty::Body(0)), 1.0),
     ]);
     let a = arm(0.5, about(2, 50.0), vec![clip.clone()]);
     let b = bind(&a);
@@ -502,12 +504,7 @@ fn layer(clip: u32, mask: Option<AvatarMask>) -> Layer {
 
 #[test]
 fn masks_gate_muscles_by_body_part_and_the_pose_follows_the_muscles() {
-    let arm_and_hand = |v| {
-        muscle_clip(&[
-            (Property::Muscle("Left Arm Down-Up".into()), v),
-            (Property::Muscle("Left Hand Down-Up".into()), v),
-        ])
-    };
+    let arm_and_hand = |v| muscle_clip(&[(muscle("Left Arm Down-Up"), v), (muscle("Left Hand Down-Up"), v)]);
     let mut a = arm(0.5, I, vec![arm_and_hand(1.0), arm_and_hand(-1.0)]);
     let only_fingers = AvatarMask {
         body_parts: vec![BodyPart::LeftFingers],
@@ -545,7 +542,7 @@ fn masks_gate_muscles_by_body_part_and_the_pose_follows_the_muscles() {
     let mut b = arm(
         0.5,
         about(2, 50.0),
-        vec![muscle_clip(&[(Property::Muscle("Left Hand Down-Up".into()), 1.0)])],
+        vec![muscle_clip(&[(muscle("Left Hand Down-Up"), 1.0)])],
     );
     b.animator = Some(Animator {
         layers: vec![layer(0, None)],
@@ -574,8 +571,8 @@ fn write_defaults_off_never_holds_muscles() {
     for (tree_clip, expected) in [(1, 0.3), (2, 0.0)] {
         let m = "Left Arm Down-Up";
         let clips = vec![
-            muscle_clip(&[(Property::Muscle(m.into()), 1.0)]),
-            muscle_clip(&[(Property::Muscle(m.into()), 0.6)]),
+            muscle_clip(&[(muscle(m), 1.0)]),
+            muscle_clip(&[(muscle(m), 0.6)]),
             muscle_clip(&[]),
         ];
         let mut a = arm(0.5, I, clips);

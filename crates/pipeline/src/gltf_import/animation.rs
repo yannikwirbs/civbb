@@ -1,9 +1,7 @@
 //! glTF animations to clips: translation, rotation, scale and morph weight channels as Hermite keys, within the caps.
 
-use std::collections::HashMap;
-
-use civbb_format::animator::{Binding, Clip, Curve, Key, Property};
-use civbb_format::hierarchy::NodeIndex;
+use civbb_format::animator::{Clip, Curve, Key, MeshProperty, NodeProperty, Target};
+use civbb_format::mesh::MeshIndex;
 use gltf::animation::{Interpolation, Property as GltfProperty};
 
 use super::Importer;
@@ -13,7 +11,6 @@ impl Importer<'_> {
     pub(super) fn animations(&mut self) -> Result<Vec<Clip>, String> {
         let doc = self.doc;
         let (mut curves_left, mut keys_left) = (self.caps.curves, self.caps.keys);
-        let mut paths: HashMap<NodeIndex, String> = HashMap::new();
         let mut clips = Vec::new();
         for (ai, anim) in doc.animations().enumerate() {
             let mut clip = Clip {
@@ -29,15 +26,17 @@ impl Importer<'_> {
                     ));
                     continue;
                 };
-                let properties: Vec<Property> = match ch.target().property() {
-                    GltfProperty::Translation => (0..3).map(Property::Position).collect(),
-                    GltfProperty::Rotation => (0..4).map(Property::Rotation).collect(),
-                    GltfProperty::Scale => (0..3).map(Property::Scale).collect(),
+                let on_node = |property| Target::Node { node: at, property };
+                let targets: Vec<Target> = match ch.target().property() {
+                    GltfProperty::Translation => (0..3).map(|i| on_node(NodeProperty::Translation(i))).collect(),
+                    GltfProperty::Rotation => (0..4).map(|i| on_node(NodeProperty::Rotation(i))).collect(),
+                    GltfProperty::Scale => (0..3).map(|i| on_node(NodeProperty::Scale(i))).collect(),
                     GltfProperty::MorphTargetWeights => match self.node_meshes.get(&at) {
-                        Some(&mi) => self.meshes[mi]
-                            .blend_shapes
-                            .iter()
-                            .map(|s| Property::BlendShape(s.name.clone()))
+                        Some(&mi) => (0..self.meshes[mi].blend_shapes.len())
+                            .map(|s| Target::Mesh {
+                                mesh: mi as MeshIndex,
+                                property: MeshProperty::Weight(s as u32),
+                            })
                             .collect(),
                         None => return Err(err("morph weights on a node without a mesh".into())),
                     },
@@ -51,42 +50,28 @@ impl Importer<'_> {
                     return Err(err("key times not finite and strictly increasing".into()));
                 }
                 let cubic = s.interpolation() == Interpolation::CubicSpline;
-                let stride = properties.len() * if cubic { 3 } else { 1 };
+                let stride = targets.len() * if cubic { 3 } else { 1 };
                 let max = times.len().saturating_mul(stride);
                 let values = floats(&s.output(), &self.buffers, max).map_err(err)?;
                 if values.len() != max {
                     return Err(err("output count does not match input".into()));
                 }
-                let used = times.len() * properties.len();
+                let used = times.len() * targets.len();
                 keys_left = keys_left
                     .checked_sub(used)
                     .ok_or_else(|| err("key cap exceeded".into()))?;
                 curves_left = curves_left
-                    .checked_sub(properties.len())
+                    .checked_sub(targets.len())
                     .ok_or_else(|| err("curve cap exceeded".into()))?;
-                let path = match paths.get(&at) {
-                    Some(p) => p.clone(),
-                    None => {
-                        let p = self.path(at).map_err(err)?;
-                        paths.insert(at, p.clone());
-                        p
-                    }
-                };
                 // glTF weights are 0 to 1; blendshape curves use Unity's 0 to 100.
                 let scale = if matches!(ch.target().property(), GltfProperty::MorphTargetWeights) {
                     100.0
                 } else {
                     1.0
                 };
-                for (c, property) in properties.into_iter().enumerate() {
+                for (c, target) in targets.into_iter().enumerate() {
                     let keys = keys(&times, &values, c, stride, s.interpolation(), scale);
-                    clip.curves.push(Curve {
-                        binding: Binding {
-                            path: path.clone(),
-                            property,
-                        },
-                        keys,
-                    });
+                    clip.curves.push(Curve { target, keys });
                 }
                 clip.length = clip.length.max(times.last().copied().unwrap_or(0.0));
             }

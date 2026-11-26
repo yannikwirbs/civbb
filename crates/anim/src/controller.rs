@@ -9,7 +9,7 @@ use civbb_format::math::{Quat, Transform};
 use civbb_format::state::{EntryIndex, Platform, StateTable};
 
 use crate::behaviour::{Rng, Tracking, at_rest, coerce, drive, part_index};
-use crate::bind::{Bound, Slot, Target, bind, node_paths};
+use crate::bind::{Bound, Slot, Target, bind};
 use crate::constraint::{Constraints, Scratch};
 use crate::machine::{Ctx, LayerRun};
 use crate::mix::Mixer;
@@ -48,7 +48,6 @@ impl Controller {
     pub fn new(avatar: &Avatar) -> Option<Self> {
         let animator = avatar.animator.clone()?;
         let bound = bind(avatar);
-        let paths = node_paths(&avatar.hierarchy);
         let node_of = |t: &Target| match *t {
             Target::Position(n, _) | Target::Rotation(n, _) | Target::Scale(n, _) | Target::Active(n) => Some(n),
             Target::BlendShape(m, _)
@@ -58,14 +57,13 @@ impl Controller {
             Target::Constraint(i, _) => Some(avatar.constraints[i as usize].target),
             Target::Parameter(_) | Target::Muscle(_) | Target::Body(_) => None,
         };
-        // Muscles follow the mask's body parts; other targets its transform paths, if it lists any.
+        // Muscles follow the mask's body parts; other targets its nodes, if it lists any.
         let masks = animator
             .layers
             .iter()
             .map(|l| {
                 let mask = l.mask.as_ref()?;
-                let allowed: Option<HashSet<&str>> =
-                    mask.transforms.as_ref().map(|t| t.iter().map(String::as_str).collect());
+                let allowed: Option<HashSet<NodeIndex>> = mask.transforms.as_ref().map(|t| t.iter().copied().collect());
                 let targets = &bound.bindings.targets;
                 Some(
                     targets
@@ -76,9 +74,7 @@ impl Controller {
                             }
                             // The body pose follows the mask's Root part (probed in Unity, #52).
                             (Target::Body(_), _) => mask.body_parts.contains(&BodyPart::Root),
-                            (t, Some(allowed)) => {
-                                node_of(t).is_none_or(|n| allowed.contains(paths[n as usize].as_str()))
-                            }
+                            (t, Some(allowed)) => node_of(t).is_none_or(|n| allowed.contains(&n)),
                             (_, None) => true,
                         })
                         .collect(),

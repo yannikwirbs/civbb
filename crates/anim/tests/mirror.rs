@@ -6,6 +6,7 @@ use std::path::Path;
 use civbb_anim::muscle::{COUNT, find, mirror};
 use civbb_anim::{Controller, Instance, Target};
 use civbb_format::Avatar;
+use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, MuscleFrame, Node};
 use civbb_format::math::Transform;
@@ -98,10 +99,7 @@ fn clip(curves: &[(&str, f32)]) -> Clip {
         curves: curves
             .iter()
             .map(|(m, v)| Curve {
-                binding: Binding {
-                    path: String::new(),
-                    property: Property::Muscle((*m).into()),
-                },
+                target: CurveTarget::Humanoid(HumanoidProperty::Muscle((*m).into())),
                 keys: vec![Key {
                     time: 0.0,
                     value: *v,

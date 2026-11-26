@@ -26,7 +26,7 @@ pub use validate::{Caps, validate};
 
 /// Version of the runtime package's data model. Bump on any change to the types in this crate; readers refuse
 /// packages of any other version, which are rebuilt from their kept source (ADR 0087).
-pub const FORMAT_VERSION: u32 = 29;
+pub const FORMAT_VERSION: u32 = 30;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -222,9 +222,9 @@ pub(crate) mod testutil {
                 looping: false,
                 root: None,
                 curves: vec![Curve {
-                    binding: Binding {
-                        path: "Body".into(),
-                        property: Property::BlendShape("vrc.v_aa".into()),
+                    target: Target::Mesh {
+                        mesh: 0,
+                        property: MeshProperty::Weight(0),
                     },
                     keys: vec![Key {
                         time: 0.0,

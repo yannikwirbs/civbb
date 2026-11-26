@@ -10,7 +10,7 @@ Animation runtime: compile-time curve binding, clip sampling, Mecanim state mach
 Internal deps: civbb-core, civbb-format
 
 - `src/behaviour.rs`: Platform values at rest and state behaviours: parameter drivers, tracking, layer and locomotion control.
-- `src/bind.rs`: Compile-time binding: resolves curve paths to slots in one flat buffer with per-slot defaults (ADR 0007).
+- `src/bind.rs`: Compile-time binding: gives curve targets slots in one flat buffer with per-slot defaults (ADRs 0007, 0089).
 - `src/body.rs`: Unity's humanoid body pose (#52): a pose's centre of mass and body orientation from its bones' positions, the
 - `src/clip.rs`: A clip bound to slots, and sampling it into the slot buffer.
 - `src/constraint.rs`: Constraints: ordered by dependency once when compiled, then evaluated in one pass over the local pose (ADR 0018).
@@ -127,6 +127,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/gltf_import/material.rs`: glTF materials and textures: metallic-roughness and unlit materials, texture slots and their images.
 - `src/gltf_import/mesh.rs`: glTF meshes: one format mesh per node (its primitives become submeshes), vertex streams, skins and morph targets.
 - `src/gltf_import/source.rs`: The source package's `X_*` extensions (ADR 0041): humanoid map, viewpoint and face, animator and clips,
+- `src/gltf_import/unity_clip.rs`: Unity dialect 1's clips and avatar masks lowered to typed targets (ADR 0089): `/`-separated node paths and Unity
 - `src/gltf_import/unity_material.rs`: Unity materials from the source package's `X_toon_material` (ADR 0043): the shader family fingerprinted by shader
 - `src/gltf_import/unity_state.rs`: Unity dialect 1's animator and expression parameters lowered to state entries (ADR 0088, 0095).
 - `src/gltf_import/vrm/expressions.rs`: VRM expressions to visemes, blink and a Direct blend tree of toggles, and look-at to eye look.
@@ -141,6 +142,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/merge.rs`: Compiler stage 3 mesh merging: meshes that are always visible together become one skinned mesh, and submeshes
 - `src/package.rs`: Turns imports into runtime packages and summarises avatars for `civbb inspect`.
 - `src/prune.rs`: Compiler stage 3 pruning: skin joints no vertex uses, nodes nothing references and blendshapes nothing drives,
+- `src/renumber.rs`: One remap of curve targets and avatar mask nodes for every stage that renumbers nodes, meshes, blend shapes or
 - `src/report.rs`: The per-avatar report: counts after every compiler stage, the package size and measured times, as JSON and
 - `src/texture.rs`: Compiler stage 4 texture compression: images capped per platform and encoded to KTX2 with Basis Universal, UASTC
 - `tests/cli.rs`: `civbb` end to end: keygen, build (pruning, atlasing, merging, LOD chain, compression; ADRs 0026, 0027, 0029, 0031)
