@@ -2,13 +2,15 @@
 //! Markdown (ADR 0032). [`compile`] runs the stages in order and records it.
 
 use std::fmt::Write;
+use std::path::Path;
+use std::time::Instant;
 
 use civbb_format::cost::{Light, Measured, Parity};
 use civbb_format::package::Platform;
 use civbb_format::{FORMAT_VERSION, SigningKey};
 use serde::Serialize;
 
-use crate::{COMPILER, Imported, Stats, atlas, collapse, compress, lod, merge, package, prune, stats, texture};
+use crate::{COMPILER, Imported, Stats, atlas, collapse, compress_cached, lod, merge, package, prune, stats, texture};
 
 /// The report shape's version: bumped when a key is renamed or removed or changes meaning (ADR 0032).
 pub const REPORT_VERSION: u32 = 1;
@@ -47,19 +49,26 @@ pub struct Stage {
 }
 
 /// Runs every compiler stage on `imported` for `platform`, logs each stage's outcome to `log`, and packages and
-/// signs the result with `key`. Returns the signed package and its report, without timings.
+/// signs the result with `key`, with encoded textures cached in `texture_cache` when given (ADR 0097). Returns the
+/// signed package and its report, without timings.
 pub fn compile(
     mut imported: Imported,
     platform: Platform,
     key: &SigningKey,
+    texture_cache: Option<&Path>,
     mut log: impl FnMut(String),
 ) -> Result<(Vec<u8>, Report), String> {
     let mut stages = Vec::with_capacity(7);
+    // Wall time per stage, its snapshot included, for the log only: the report stays reproducible.
+    let mut times = Vec::with_capacity(7);
+    let mut since = Instant::now();
     let mut snapshot = |stage, i: &Imported| {
         stages.push(Stage {
             stage,
             stats: stats(&i.avatar, &i.blobs),
-        })
+        });
+        times.push(format!("{stage} {:.2}", since.elapsed().as_secs_f64()));
+        since = Instant::now();
     };
     snapshot("source", &imported);
     let pruned = prune(&mut imported.avatar);
@@ -88,20 +97,23 @@ pub fn compile(
     snapshot("lod", &imported);
     log(format!("collapsed {} toggle layers", collapse(&mut imported.avatar)));
     snapshot("collapse", &imported);
-    let c = compress(&mut imported, platform)?;
+    let c = compress_cached(&mut imported, platform, texture_cache)?;
     log(format!(
-        "compressed {} textures to KTX2 ({} UASTC, {} XUASTC, {} capped, {} larger than their source), {} to {} bytes",
+        "compressed {} textures to KTX2 ({} UASTC, {} XUASTC, {} capped, {} larger than their source, {} cached), {} to {} bytes",
         c.textures,
         c.uastc,
         c.textures - c.uastc,
         c.capped,
         c.larger,
+        c.cached,
         c.bytes_before,
         c.bytes_after
     ));
     snapshot("compress", &imported);
     let avatar = imported.avatar.name.clone();
     let bytes = package(imported, platform).encode_signed(key);
+    times.push(format!("package {:.2}", since.elapsed().as_secs_f64()));
+    log(format!("stage seconds: {}", times[1..].join(", ")));
     let report = Report {
         report: REPORT_VERSION,
         avatar,

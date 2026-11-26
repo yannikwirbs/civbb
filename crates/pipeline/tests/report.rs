@@ -17,7 +17,7 @@ fn lean() -> (Vec<u8>, Report) {
         blobs: Default::default(),
         warnings: Vec::new(),
     };
-    compile(imported, Platform::Desktop, &SigningKey::from_bytes(&KEY), |_| {}).unwrap()
+    compile(imported, Platform::Desktop, &SigningKey::from_bytes(&KEY), None, |_| {}).unwrap()
 }
 
 #[test]

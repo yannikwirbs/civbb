@@ -13,7 +13,8 @@ use civbb_pipeline::{Imported, Limits, compile, import, package, stats};
 
 const USAGE: &str = "usage:
   civbb keygen <key-file>
-  civbb build <source.gltf|.glb|.vrm> --key <key-file> [-o <out.civpkg>] [--quest] [--report <r.json> [--measure] | --unstaged]
+  civbb build <source.gltf|.glb|.vrm> --key <key-file> [-o <out.civpkg>] [--quest] [--texture-cache <dir>]
+      [--report <r.json> [--measure] | --unstaged]
   civbb validate <package.civpkg> --key <key-file>
   civbb inspect <source or package.civpkg> [--key <key-file>]
 
@@ -22,7 +23,8 @@ A key file holds a 32-byte Ed25519 seed. Packages are verified against the key t
 times from `civbb-client measure`, which must sit next to `civbb` and be a release build, and FLIP parity of the
 compiled avatar against the import before any stage from `civbb-client parity`, with images of the rest state and
 of every state that is not green in `r.parity/`. --unstaged packages the import without any compiler stage
-(the parity reference; ADR 0048).";
+(the parity reference; ADR 0048). --texture-cache reads and writes encoded textures in <dir>, for reruns
+(the package is the same with or without it; ADR 0097).";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -59,6 +61,7 @@ struct Args {
     report: Option<PathBuf>,
     measure: bool,
     unstaged: bool,
+    texture_cache: Option<PathBuf>,
 }
 
 fn parse(rest: &[String]) -> Result<Args, Error> {
@@ -70,6 +73,7 @@ fn parse(rest: &[String]) -> Result<Args, Error> {
         report: None,
         measure: false,
         unstaged: false,
+        texture_cache: None,
     };
     let mut input = None;
     let mut it = rest.iter();
@@ -81,6 +85,7 @@ fn parse(rest: &[String]) -> Result<Args, Error> {
             "--report" => a.report = Some(it.next().ok_or(Error::Usage)?.into()),
             "--measure" => a.measure = true,
             "--unstaged" => a.unstaged = true,
+            "--texture-cache" => a.texture_cache = Some(it.next().ok_or(Error::Usage)?.into()),
             s if s.starts_with('-') || input.is_some() => return Err(Error::Usage),
             s => input = Some(PathBuf::from(s)),
         }
@@ -118,7 +123,9 @@ fn run(args: &[String]) -> Result<(), Error> {
                 };
                 package(copy, platform).encode_signed(&key)
             });
-            let (bytes, mut report) = compile(imported, platform, &key, |l| println!("{l}"))?;
+            let (bytes, mut report) = compile(imported, platform, &key, a.texture_cache.as_deref(), |l| {
+                println!("{l}")
+            })?;
             fs::write(&out, &bytes).map_err(|e| format!("{}: {e}", out.display()))?;
             println!("wrote {} ({} bytes)", out.display(), bytes.len());
             if let Some(path) = a.report {
@@ -238,12 +245,14 @@ fn import_file(path: &Path) -> Result<Imported, Error> {
     if len > limits.bytes as u64 {
         return Err(format!("{}: {len} bytes exceeds limit {}", path.display(), limits.bytes).into());
     }
+    let start = std::time::Instant::now();
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let dir = path.parent().unwrap_or(Path::new("."));
     let imported = import(&bytes, &limits, dir_resolver(dir, limits.bytes)).map_err(|e| e.to_string())?;
     for w in &imported.warnings {
         eprintln!("warning: {w}");
     }
+    eprintln!("import seconds: {:.2}", start.elapsed().as_secs_f64());
     Ok(imported)
 }
 

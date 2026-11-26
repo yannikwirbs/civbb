@@ -3,12 +3,14 @@
 # the release binaries, then per export: compile the package, run `civbb-client parity`, keep the full report.
 # Prints one line per export with numbers copied from the report unrounded: the overall light, the number of red
 # states, and the rest state's per-view means (and interior means when present). With --against <old out dir>,
-# each line also shows that run's rest view means. Takes ~25 min for all 13 exports: run it in the background.
+# each line also shows that run's rest view means. Encoded textures are cached in corpus/local/texture-cache
+# (ADR 0097): ~15 min for all 13 exports on an empty cache,
+# ~1 min when no texture changed. Run it in the background.
 # Usage: tools/parity.sh [--against <old out dir>] <out dir> [name regex]
 set -u
 against=
 if [ "${1:-}" = --against ]; then against=$2; shift 2; fi
-[ $# -ge 1 ] || { sed -n '2,7p' "$0" >&2; exit 2; }
+[ $# -ge 1 ] || { sed -n '2,9p' "$0" >&2; exit 2; }
 out=$1
 filter=${2:-.}
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -44,7 +46,7 @@ while IFS='|' read -r name _; do
   dir=$out/$name
   mkdir -p "$dir"
   if ! ./target/release/civbb build "corpus/local/unity-glb/$name.glb" --key "$ref/key" -o "$dir/pkg.civpkg" \
-    > "$dir/build.log" 2>&1 < /dev/null; then
+    --texture-cache corpus/local/texture-cache > "$dir/build.log" 2>&1 < /dev/null; then
     echo "$name: build failed ($dir/build.log)"
     continue
   fi

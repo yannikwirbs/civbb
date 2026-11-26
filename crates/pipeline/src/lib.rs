@@ -19,4 +19,4 @@ pub use merge::{Merged, merge};
 pub use package::{COMPILER, Level, Stats, package, stats};
 pub use prune::{Pruned, prune};
 pub use report::{Report, compile};
-pub use texture::{Compressed, compress};
+pub use texture::{Compressed, compress, compress_cached};

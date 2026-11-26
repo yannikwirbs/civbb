@@ -20,7 +20,7 @@ fn compiled(spec: &civbb_corpus::Spec) -> (Avatar, Avatar) {
         blobs: Default::default(),
         warnings: Vec::new(),
     };
-    let (bytes, _) = compile(imported, Platform::Desktop, &SigningKey::from_bytes(&KEY), |_| {}).unwrap();
+    let (bytes, _) = compile(imported, Platform::Desktop, &SigningKey::from_bytes(&KEY), None, |_| {}).unwrap();
     let key = SigningKey::from_bytes(&KEY).verifying_key();
     let pkg = Package::decode_verified(&bytes, &key, &ReadLimits::default()).unwrap();
     (source, pkg.avatar(&ReadLimits::default()).unwrap())

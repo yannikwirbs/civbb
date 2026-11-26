@@ -176,6 +176,11 @@ What exists, by area. Read the section for the area you touch; update it when th
     sources grow). Mips from `civbb_core::mips` (the renderer uses the same for RGBA8), single-threaded per texture
     (reproducible), at most 4 encoder threads (~3 GB per 4096-texel encode), sides capped at 4096 desktop / 2048
     Quest. Booth avatars 0.80 to 1.00x their source texture bytes; HAOLAN builds in ~90 s.
+  - Build log (#128): `import seconds` (stderr) and `stage seconds` per stage. `compress` is nearly all of a build
+    (Yumeka 271.25 of 272 s; every other stage under 0.1 s). `--texture-cache <dir>` (ADR 0097,
+    `compress_cached`) keys each encoded texture by source hash, format, colour space, cap, the source text of
+    `texture.rs` and `core/src/mips.rs` and `texture::ENCODING_DEPENDENCIES` (checked against Cargo.lock);
+    packages are byte-identical with or without it. `tools/parity.sh` uses `corpus/local/texture-cache`.
   - `collapse` (ADR 0028): plain bool toggle layers (two constant clips, zero-duration transitions) become one
     layer per group: a `Start` state, then a Write Defaults on direct tree of 1D trees weighted by `civbb/One`.
     Bloated 48 layers to 1, animator update 2.34 to 2.08 µs. Direct and 1D blend weights no longer allocate.

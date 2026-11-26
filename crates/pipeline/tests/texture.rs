@@ -1,6 +1,6 @@
 //! Texture atlasing and KTX2 compression (ADR 0029): every vertex samples the same texel through the atlas as
 //! before, ineligible materials keep their textures, KTX2 decodes within each codec's error, encoding is
-//! reproducible, caps apply, and on local avatars packages shrink.
+//! reproducible and the same through the cache, caps apply, and on local avatars packages shrink.
 
 use std::collections::BTreeMap;
 use std::io::Cursor;
@@ -16,8 +16,8 @@ use civbb_format::package::Platform;
 use civbb_format::{Avatar, BlobId, Caps, validate};
 use civbb_pipeline::atlas::GUTTER;
 use civbb_pipeline::gltf_import::{Limits, dir_resolver, import};
-use civbb_pipeline::texture::{LADDER, decode, encode_ktx2, max_side};
-use civbb_pipeline::{Imported, atlas, compress, package, prune};
+use civbb_pipeline::texture::{ENCODING_DEPENDENCIES, LADDER, decode, encode_ktx2, max_side};
+use civbb_pipeline::{Imported, atlas, compress, compress_cached, package, prune};
 use image::RgbaImage;
 
 fn valid(i: &Imported) {
@@ -487,6 +487,37 @@ fn compress_is_reproducible() {
     compress(&mut a, Platform::Desktop).unwrap();
     compress(&mut b, Platform::Desktop).unwrap();
     assert_eq!(a.blobs, b.blobs);
+}
+
+#[test]
+fn compress_cached_gives_the_same_bytes_and_hits_on_rerun() {
+    let dir = std::env::temp_dir().join(format!("civbb-texture-cache-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let (mut plain, _, _) = pbr_avatar();
+    compress(&mut plain, Platform::Desktop).unwrap();
+    for hits in [0, 2] {
+        let (mut i, _, _) = pbr_avatar();
+        let c = compress_cached(&mut i, Platform::Desktop, Some(&dir)).unwrap();
+        assert_eq!((c.textures, c.cached), (2, hits));
+        assert_eq!(i.blobs, plain.blobs);
+        assert_eq!(i.avatar, plain.avatar);
+    }
+    // Another platform cap is another key.
+    let (mut i, _, _) = pbr_avatar();
+    assert_eq!(compress_cached(&mut i, Platform::Quest, Some(&dir)).unwrap().cached, 0);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn encoding_dependencies_match_the_lockfile() {
+    let lock = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../Cargo.lock")).unwrap();
+    for (name, version) in ENCODING_DEPENDENCIES {
+        let entry = format!("name = \"{name}\"\nversion = \"{version}\"\n");
+        assert!(
+            lock.replace("\r\n", "\n").contains(&entry),
+            "{name} is not {version} in Cargo.lock: update ENCODING_DEPENDENCIES"
+        );
+    }
 }
 
 #[test]
