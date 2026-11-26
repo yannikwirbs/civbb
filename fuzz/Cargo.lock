@@ -379,6 +379,7 @@ dependencies = [
  "image",
  "serde",
  "serde_json",
+ "windows-sys 0.61.2",
  "winit",
 ]
 
@@ -394,6 +395,7 @@ dependencies = [
 name = "civbb-corpus"
 version = "0.0.0"
 dependencies = [
+ "civbb-anim",
  "civbb-format",
  "serde_json",
 ]

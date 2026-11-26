@@ -25,6 +25,6 @@ fuzz_target!(|data: &[u8]| {
     }
     let limits = ReadLimits::default();
     if let Ok(p) = Package::decode_verified(&data, &key.verifying_key(), &limits) {
-        let _ = p.avatar(&limits);
+        let _ = p.document(&limits);
     }
 });
