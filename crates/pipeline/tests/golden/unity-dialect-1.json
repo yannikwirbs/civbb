@@ -763,9 +763,9 @@
               },
               {
                 "in_tangent": 0.0,
-                "out_tangent": 0.25,
+                "out_tangent": 0.0024999999441206455,
                 "time": 0.5,
-                "value": 1.0
+                "value": 0.009999999776482582
               }
             ],
             "target": {

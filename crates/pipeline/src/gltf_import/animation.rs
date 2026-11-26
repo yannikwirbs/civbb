@@ -63,14 +63,8 @@ impl Importer<'_> {
                 curves_left = curves_left
                     .checked_sub(targets.len())
                     .ok_or_else(|| err("curve cap exceeded".into()))?;
-                // glTF weights are 0 to 1; blendshape curves use Unity's 0 to 100.
-                let scale = if matches!(ch.target().property(), GltfProperty::MorphTargetWeights) {
-                    100.0
-                } else {
-                    1.0
-                };
                 for (c, target) in targets.into_iter().enumerate() {
-                    let keys = keys(&times, &values, c, stride, s.interpolation(), scale);
+                    let keys = keys(&times, &values, c, stride, s.interpolation());
                     clip.curves.push(Curve { target, keys });
                 }
                 clip.length = clip.length.max(times.last().copied().unwrap_or(0.0));
@@ -87,11 +81,11 @@ impl Importer<'_> {
 }
 
 /// Hermite keys for component `c` of a sampler. Linear keys get the segment slopes, step keys infinite tangents.
-fn keys(times: &[f32], values: &[f32], c: usize, stride: usize, interp: Interpolation, scale: f32) -> Vec<Key> {
+fn keys(times: &[f32], values: &[f32], c: usize, stride: usize, interp: Interpolation) -> Vec<Key> {
     let cubic = interp == Interpolation::CubicSpline;
     let comps = if cubic { stride / 3 } else { stride };
     // Cubic spline outputs are (in tangent, value, out tangent) triples per key.
-    let at = |k: usize, part: usize| values[k * stride + part * comps + c] * scale;
+    let at = |k: usize, part: usize| values[k * stride + part * comps + c];
     let value = |k: usize| at(k, if cubic { 1 } else { 0 });
     let slope = |a: usize, b: usize| (value(b) - value(a)) / (times[b] - times[a]);
     (0..times.len())

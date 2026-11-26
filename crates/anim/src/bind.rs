@@ -22,7 +22,7 @@ use crate::muscle::{self, MUSCLES, Rig};
 pub type Slot = u32;
 
 /// What a slot drives. Values are in curve units: metres, quaternion components, scale factors, blendshape
-/// weights 0 to 100, 0/1 flags, parameter values.
+/// weights 0 to 1, 0/1 flags, parameter values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Target {
     /// Local position component.
@@ -397,7 +397,7 @@ impl<'a> Binder<'a> {
             Target::Position(n, i) => a.hierarchy.nodes[n as usize].rest.translation[i as usize],
             Target::Rotation(n, i) => a.hierarchy.nodes[n as usize].rest.rotation[i as usize],
             Target::Scale(n, i) => a.hierarchy.nodes[n as usize].rest.scale[i as usize],
-            Target::BlendShape(m, i) => a.meshes[m as usize].blend_shapes[i as usize].default_weight * 100.0,
+            Target::BlendShape(m, i) => a.meshes[m as usize].blend_shapes[i as usize].default_weight,
             Target::Active(n) => f32::from(u8::from(a.hierarchy.nodes[n as usize].active)),
             Target::RendererEnabled(_) => 1.0,
             Target::Parameter(p) => a.state.entries[p as usize].rest(),

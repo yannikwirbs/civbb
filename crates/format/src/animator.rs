@@ -460,7 +460,7 @@ pub enum NodeProperty {
 pub enum MeshProperty {
     /// Visible flag, 0 or 1.
     Visible,
-    /// Morph target (blendshape) weight, by index into the mesh's blend shapes, 0 to 100 as in Unity.
+    /// Morph target (blendshape) weight, by index into the mesh's blend shapes, 0 to 1.
     Weight(u32),
     /// A material property on the mesh's submeshes that have it, by Unity property name, e.g. `_Color.r`
     /// (`civbb_anim::material`, ADR 0025).

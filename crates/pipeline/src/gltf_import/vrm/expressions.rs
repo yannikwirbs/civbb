@@ -152,7 +152,7 @@ impl Importer<'_> {
                     target,
                     keys: vec![Key {
                         time: 0.0,
-                        value: b.weight * 100.0,
+                        value: b.weight,
                         in_tangent: f32::INFINITY,
                         out_tangent: f32::INFINITY,
                     }],

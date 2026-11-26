@@ -5,7 +5,7 @@
 //! `X_*` extensions (ADR 0041) for what glTF lacks.
 
 use civbb_format::Avatar;
-use civbb_format::animator::{HumanoidProperty, MeshProperty, NodeProperty, Target};
+use civbb_format::animator::{HumanoidProperty, Key, MeshProperty, NodeProperty, Target};
 use civbb_format::constraint::ConstraintType;
 use civbb_format::face::{EyeDriver, ShapeBind};
 use civbb_format::material::MaterialModel;
@@ -154,6 +154,23 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
                 let o = v.as_object_mut().expect("object");
                 o.remove("target");
                 o.insert("binding".into(), binding(a, &paths, &c.target));
+                // Dialect 1's units (the inverse of the importer's conversion).
+                let scale = match c.target {
+                    Target::Mesh {
+                        property: MeshProperty::Weight(_),
+                        ..
+                    } => 100.0,
+                    _ => 1.0,
+                };
+                if scale != 1.0 {
+                    let keys = c.keys.iter().map(|k| Key {
+                        value: k.value * scale,
+                        in_tangent: k.in_tangent * scale,
+                        out_tangent: k.out_tangent * scale,
+                        ..*k
+                    });
+                    o.insert("keys".into(), json!(keys.collect::<Vec<_>>()));
+                }
             }
         }
         ext.insert("X_animator".into(), json!({"animator": x, "clips": clips}));

@@ -37,6 +37,7 @@ struct XBinding {
 }
 
 /// Dialect 1's properties, in its units: Euler degrees applied Z, X, Y, blend shape weights 0 to 100.
+/// [`Unit`] converts them.
 #[derive(Deserialize)]
 enum XProperty {
     Position(u8),
@@ -108,7 +109,10 @@ pub(super) fn lower(clips: Vec<XClip>, s: &Scope) -> (Vec<Clip>, Vec<String>) {
             root: c.root,
             curves: (c.curves.into_iter())
                 .filter_map(|x| match target(x.binding, s, &by_path) {
-                    Ok(target) => Some(Curve { target, keys: x.keys }),
+                    Ok((target, unit)) => Some(Curve {
+                        target,
+                        keys: x.keys.into_iter().map(|k| unit.key(k)).collect(),
+                    }),
                     Err(reason) => {
                         *dropped.entry(reason).or_default() += 1;
                         None
@@ -123,7 +127,38 @@ pub(super) fn lower(clips: Vec<XClip>, s: &Scope) -> (Vec<Clip>, Vec<String>) {
     (clips, warnings)
 }
 
-fn target(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Result<Target, &'static str> {
+/// How a dialect 1 value becomes a native one; keys are linear in it, so tangents convert like values.
+#[derive(Clone, Copy)]
+enum Unit {
+    Same,
+    /// Unity's 0 to 100 to 0 to 1.
+    Percent,
+}
+
+impl Unit {
+    fn key(self, k: Key) -> Key {
+        let f = |v: f32| match self {
+            Unit::Same => v,
+            Unit::Percent => v / 100.0,
+        };
+        Key {
+            time: k.time,
+            value: f(k.value),
+            in_tangent: f(k.in_tangent),
+            out_tangent: f(k.out_tangent),
+        }
+    }
+}
+
+fn target(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Result<(Target, Unit), &'static str> {
+    let unit = match b.property {
+        XProperty::BlendShape(_) => Unit::Percent,
+        _ => Unit::Same,
+    };
+    resolve(b, s, by_path).map(|t| (t, unit))
+}
+
+fn resolve(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Result<Target, &'static str> {
     match b.property {
         XProperty::Parameter(name) => {
             // VRChat's built-ins are platform values under native names (ADR 0096), read-only to content.

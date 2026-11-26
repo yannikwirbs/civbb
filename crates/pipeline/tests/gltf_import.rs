@@ -229,7 +229,7 @@ fn edge_cases_import() {
             property: MeshProperty::Weight(0)
         }
     );
-    assert_eq!(w.keys[1].value, 100.0);
+    assert_eq!(w.keys[1].value, 1.0);
     assert!(w.keys[0].out_tangent.is_infinite());
     let ry = &clip.curves[4];
     assert!(matches!(ry.target, Target::Node { node: 1, .. }));
@@ -282,7 +282,7 @@ fn quantized_attributes_import() {
     assert!(mesh_node.is_some(), "the node's dequantisation scale is kept");
     let keys = &a.clips[0].curves[0].keys;
     assert!(
-        (keys[1].value - 20.0).abs() < 1e-4,
+        (keys[1].value - 0.2).abs() < 1e-6,
         "normalised u8 weight: {}",
         keys[1].value
     );
@@ -737,7 +737,7 @@ fn vrm0_imports() {
     let m = &a.meshes[mesh as usize];
     assert_eq!(a.hierarchy.nodes[m.node as usize].name, "Face");
     assert_eq!(m.blend_shapes[s as usize].name, "Joy");
-    assert_eq!(joy.curves[0].keys[0].value, 50.0);
+    assert_eq!(joy.curves[0].keys[0].value, 0.5);
     assert_eq!(
         a.expressions.as_ref().unwrap().menu.controls.len(),
         1,

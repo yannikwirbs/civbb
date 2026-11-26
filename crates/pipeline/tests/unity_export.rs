@@ -201,7 +201,7 @@ fn clips(l: &Loaded, rec: &Recording) -> HashMap<String, Worst> {
                     .copied()
                     .unwrap_or(0.0);
                 let at = || format!("{} t={} {name}", s.clip, s.time);
-                Worst::note(&mut w.shape, (slots[slot as usize] - unity).abs(), at);
+                Worst::note(&mut w.shape, (slots[slot as usize] * 100.0 - unity).abs(), at);
                 w.compared += 1;
             }
         }

@@ -106,7 +106,7 @@ fn binds_targets_with_defaults_and_shares_slots_across_clips() {
     let a = avatar(vec![
         clip(vec![
             curve(on(ARM, NodeProperty::Translation(1)), &[(0.0, 1.0), (1.0, 2.0)]),
-            curve(mesh(MeshProperty::Weight(0)), &[(0.0, 100.0)]),
+            curve(mesh(MeshProperty::Weight(0)), &[(0.0, 1.0)]),
             curve(on(HAT, NodeProperty::Active), &[(0.0, 1.0)]),
             curve(mesh(MeshProperty::Visible), &[(0.0, 0.0)]),
             curve(CurveTarget::Entry(0), &[(0.0, 0.75)]),
@@ -126,18 +126,18 @@ fn binds_targets_with_defaults_and_shares_slots_across_clips() {
             Target::Parameter(0),
         ]
     );
-    // Rest pose, blendshape weight in curve units (0 to 100), inactive flag, renderer on, parameter default.
-    close(&b.bindings.defaults, &[0.5, 30.0, 0.0, 1.0, 0.25]);
+    // Rest pose, blendshape weight (0 to 1), inactive flag, renderer on, parameter default.
+    close(&b.bindings.defaults, &[0.5, 0.3, 0.0, 1.0, 0.25]);
     assert_eq!(b.clips[1].curves[0].slot, 0);
     assert_eq!(b.clips[0].slots, [0, 1, 2, 3, 4]);
     assert_eq!(b.clips[1].slots, [0]);
 
     let mut out = vec![-1.0; b.bindings.len()];
     b.clips[0].sample(0.5, &mut out);
-    close(&out, &[1.5, 100.0, 1.0, 0.0, 0.75]);
+    close(&out, &[1.5, 1.0, 1.0, 0.0, 0.75]);
     // A clip writes only its own slots.
     b.clips[1].sample(0.0, &mut out);
-    close(&out, &[3.0, 100.0, 1.0, 0.0, 0.75]);
+    close(&out, &[3.0, 1.0, 1.0, 0.0, 0.75]);
 }
 
 #[test]

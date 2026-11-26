@@ -222,7 +222,7 @@ impl Island {
         if let (Some(c), Some(a)) = (&self.model.controller, &self.animator) {
             for (t, &v) in c.bound.bindings.targets.iter().zip(a.pose()) {
                 if let Target::BlendShape(m, s) = *t {
-                    out[m as usize][s as usize] = v / 100.0;
+                    out[m as usize][s as usize] = v;
                 }
             }
         }
