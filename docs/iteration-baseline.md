@@ -167,3 +167,31 @@ Other findings:
 - Most-read files across sessions: `unity_material.rs`, `solver.rs`, `Reference.cs`, `STATE.md` (each re-read in
   2 to 4 sessions, 19 to 53 KB in all).
 - Tool output sizes are already in the transcripts (`toolUseResult`), so a logging hook would duplicate them.
+
+## Changes (2026-11-26)
+
+Each in its own commit with an ADR where it is a process decision. Measured on the reference PC the same day.
+
+| change | before | after |
+| --- | --- | --- |
+| Project settings deny unused tools and the Unity plugin (ADR 0091) | first-call context in this repo 47,262 tokens | 22,631 tokens (-25 k on every call; ~7 % of the measured cost) |
+| Read every session: CLAUDE.md, STATUS.md, LESSONS.md and the pasted prompt; `/continue` replaces `NEXT_PROMPT.md` (ADR 0092) | 21,181 B | 14,927 B (`LESSONS-method.md` and `docs/adr/README.md` read on demand) |
+| Gate tests with cargo-nextest (ADR 0093) | warm gate 19 to 20 s (tests 18.7 s) | 12 s (tests 9.5 s + doctests 1.4 s); a failing test prints 806 B (was 644 B) |
+| `tools/ci.sh` | failed CI job, `gh run view --log-failed`: 100,768 B | 1,173 B; GitHub CI is no longer watched after a push (36 min over 20 sessions) |
+| `tools/parity.sh` | per export: `parity.json` 29,549 B or a hand-written summary that rounded to 3 digits | one 263 B line, numbers copied unrounded |
+| `tools/issue.sh show` | two calls (`gh issue view`, `--comments`: 1,031 + 1,909 B) | one call, 2,721 B |
+| LSP through rust-analyzer (ADR 0094) | references of `Machine::start` with `grep`: 503 B, wrong hits | 123 B, exact (needs ~20 s of indexing after the first call) |
+| Context hook and status line, `tools/context.py` (ADR 0092) | sessions could not see their context size | note past 250 k tokens; 85 ms per Bash/Read/Grep/Glob/Agent call |
+
+Measured and dropped: turning off claude.ai connectors (`ENABLE_CLAUDEAI_MCP_SERVERS=false`) or Chrome changed the
+first-call context by under 10 tokens; a hook logging tool output sizes would duplicate the transcripts; rust-lld was
+already slower (above); no subagent definitions (ADR 0092).
+
+Not measurable yet: tokens and dollars per closed issue. After about five sessions run
+`python tools/session-stats.py --since 2026-11-26` and compare with $9.2 and 28.1 M cache-read tokens per closed
+issue above. The session-shape simulation predicts 8 to 11 % from the 250 k limit alone.
+
+Recommendation, not applied (the owner's setting): thinking is 1.12 M of 2.95 M output tokens and stays in the
+context. Output is 20 % of the cost; trying `medium` effort on two or three sessions of mechanical issues, compared
+by dollars per closed issue with the script, would show whether it saves the estimated 5 to 10 % without more
+failed gates.

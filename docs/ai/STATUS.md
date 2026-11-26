@@ -49,4 +49,5 @@ The newest three; `SESSIONS.md` has them all.
   fixtures, native golden, `civbb_unity_dialect` check). Next: #115.
 - 2026-11-26: session cost. `tools/session-stats.py` baseline (docs/iteration-baseline.md), project settings drop
   unused tools (ADR 0091, first-call context 47 k to 22 k tokens), session shape and `/continue` (ADR 0092),
-  helpers `tools/issue.sh`, `ci.sh`, `parity.sh`, `context.py`. Next: #115.
+  nextest in the gate (ADR 0093, 19 to 12 s), LSP (ADR 0094), helpers `tools/issue.sh`, `ci.sh`, `parity.sh`,
+  `context.py`. Next: #115.

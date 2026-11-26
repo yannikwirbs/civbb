@@ -38,3 +38,6 @@ run that takes minutes.
   from an `ApiProbe` run, then values): the SDK's per-bone `prevVelocity`, its `COLLISION_FRICTION`, Unity's
   `Avatar.GetAxisLength` and `humanDescription.skeleton` each turned an hour of ill-conditioned fitting into one
   clean regression (2026-11-23: #83, #84, #95, #96).
+- Measuring Claude Code itself: `claude -p "..." --model haiku --output-format json --no-session-persistence` gives
+  the usage of a throwaway session (first-call context = input + cache read + cache write). Without a transcript
+  (`--no-session-persistence`) hooks that read `transcript_path` see nothing; `-p` needs `--allowedTools` for Bash.
