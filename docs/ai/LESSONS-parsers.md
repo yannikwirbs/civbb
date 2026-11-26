@@ -34,3 +34,4 @@ Read before working on parsers of untrusted input, fuzz targets or native (`-sys
   height went unchecked (contact volumes were) until 2026-11-24. A structure-aware mutator (avatar to JSON value,
   set a random leaf to 1e39/-1/u32::MAX, cut or empty a random array, back through `validate`) reaches such gaps
   far more often than CBOR byte flips (about 1,800 of 12,000 cases fail validation, against 129 of 4,000).
+- serde `#[serde(flatten)]` silently accepts unknown fields even when the flattened struct has `deny_unknown_fields` (and the outer struct cannot deny them). For a strict parser, take the extra fields out of the JSON object and parse the inner type directly; a test that adds an unknown field catches it.

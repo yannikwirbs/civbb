@@ -132,3 +132,4 @@ Read before working on the Unity Editor, the exporter (`tools/unity-exporter`) o
 - `Arg(name)` helpers that return the next argument miss a value-less flag passed last: test flags with
   `GetCommandLineArgs().Contains`.
 
+- `Constraints.Record`'s `-civbbOut` is a directory (it writes `constraints.json` into it); given a file path it exits 0 and writes nothing. Check the output file exists after any recorder run.

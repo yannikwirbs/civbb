@@ -42,7 +42,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   runtime is the ground truth for #75: `tools/unity-truth/Assets/Editor/VrcConstraints.cs` (73 generated
   constraint-option cases, ADR 0046) and `VrcContacts.cs` (39 contact cases, ADR 0047) run in the SDK host project
   by reflection and write committed goldens (`crates/anim/tests/unity/vrc_constraints.json`,
-  `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. PhysBones too (ADR 0049):
+  `crates/dynamics/tests/unity/vrc_contacts.json`), all replayed exactly. Recorders that embed format JSON
+  (`Constraints`, `VrcConstraints`, `VrcContacts`, and `Goldens` reading the case files) use the v36 shapes (ADR 0102;
+  the two Vrc recorders' edits were not rerun: no SDK project here). PhysBones too (ADR 0049):
   `VrcPhysBones.cs` (88 cases at 60 Hz, 18 at 90 and 30 Hz, `crates/dynamics/tests/unity/vrc_physbones*.json`);
   `tests/vrc_physbone.rs` replays them: within 0.5 mm in 84 of 88 cases at 60 Hz (every version 1.0 case and falloff
   since ADR 0068, fitted to the SDK's per-bone state read by reflection; bones near rest snap onto it, ADR 0069; a collider push slows the velocity by the SDK's friction 0.25 and skips contact at a bone's start, ADR 0070; turns compose down the chain, ADR 0071), the rest
@@ -100,7 +102,15 @@ What exists, by area. Read the section for the area you touch; update it when th
   format type's serde JSON plus `"version": 1`, with glTF indices (mesh references are the node carrying the mesh,
   textures glTF textures), mapped by `gltf_import/native.rs`. `civbb_corpus::gltf::to_source_glb` writes them;
   `corpus_round_trips_through_native_extensions` compares everything but textures. VRM, `X_*` and `CIVBB_*` are
-  mutually exclusive.
+  mutually exclusive. Unknown fields fail everywhere (`CIVBB_materials_toon` takes `order` out, then parses `Toon`;
+  serde `flatten` would accept unknowns).
+- JSON shapes (ADRs 0086 point 3, 0102, format v36): unit enums snake_case strings, data enums `{"type": ...}`
+  objects, named fields instead of newtypes and tuples, `None`s omitted, `deny_unknown_fields`; `HumanBone` stays
+  camelCase (VRM names); a `null` key tangent is a step. Package metadata (`package.rs`, `cost.rs`) untouched.
+- Schemas and spec (ADR 0086, #124): `civbb_pipeline::gltf_import::schemas()` (schemars derives on the format types,
+  plus `version`, root `additionalProperties: false`) -> `docs/spec/schema/*.schema.json`; `tests/schema.rs` fails
+  when stale (`cargo xtask schema` rewrites) and validates the corpus's `CIVBB_*` JSON (`jsonschema` dev-dep).
+  Prose per extension in `docs/spec/` (README: common rules and the caps table).
 - Native toon model (ADRs 0090, 0100, #123, format v35): `Toon` = base colour, shade colour/texture/shift/toony, plus
   optional features `light_clamp` (none: additive ambient), `normal`, `emission`, `matcaps` (list, at most
   `material::MATCAPS` = 2), `rim` (with its ramp), `rim_shade`, `shade` (second band, border), `color_adjust`,
@@ -113,7 +123,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   `X_*` part but `X_toon_material`; never regenerate) import to `tests/golden/unity-dialect-1*.json` (re-bless with
   `CIVBB_BLESS=1` when the native model changes, and read the diff). `asset.extras.civbb_unity_dialect`: absent is
   1, newer refused (`UNITY_DIALECT` in `source.rs`). The native model's redesign (ADRs 0085 to 0090) is M1.1:
-  #115 to #125.
+  #115 to #125. Since v36 the dialect's old serde shapes are rewritten as JSON before parsing
+  (`gltf_import/unity_shapes.rs`, ADR 0102); extend it when a native shape changes again.
 - Curves (ADR 0039): the format stays Hermite; the exporter will bake weighted tangents, split equal key times and
   mirror position x, Euler and quaternion y/z. No Booth clip uses either (28,693 keys).
 - Constraint fields (ADR 0040, 0046, format v10): `Property::Constraint { kind, field }` binds weight, active, source
