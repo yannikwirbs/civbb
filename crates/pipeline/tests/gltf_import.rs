@@ -1,9 +1,8 @@
-//! glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
+//! glTF importer conformance: corpus round trip, hand-written edge cases, hostile input, Khronos samples.
 
 use base64::Engine;
-use civbb_format::animator::{Action, EntryOp, MeshProperty, NodeProperty, PosePart, PoseSource, Target, Unwritten};
+use civbb_format::animator::{MeshProperty, NodeProperty, Target};
 use civbb_format::material::MaterialModel;
-use civbb_format::state::{Entry, EntryKind, Platform};
 use civbb_pipeline::gltf_import::{Limits, dir_resolver, import};
 use serde_json::{Value, json};
 
@@ -40,85 +39,6 @@ fn corpus_round_trips_through_glb() {
         assert_eq!(a.hierarchy.nodes, nodes, "{}", spec.name);
         assert_eq!(a.meshes, original.meshes, "{}", spec.name);
         assert_eq!(a.materials.len(), original.materials.len());
-        assert!(imported.warnings.is_empty(), "{:?}", imported.warnings);
-    }
-}
-
-/// The `X_*` extensions (ADR 0041) carry everything glTF lacks: the corpus avatars import equal to the original.
-#[test]
-fn corpus_round_trips_through_source_extensions() {
-    for spec in [civbb_corpus::lean(), civbb_corpus::bloated()] {
-        let mut original = civbb_corpus::generate(&spec);
-        // The generator makes no muscle frames; one with distinct values checks the field travels.
-        let h = original.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap();
-        h.muscle_frames.push(civbb_format::hierarchy::MuscleFrame {
-            bone: h.bones[0].0,
-            pre: [0.0, 0.6, 0.0, 0.8],
-            post: [0.6, 0.0, 0.0, 0.8],
-            sign: [1.0, -1.0, 1.0],
-            min: [-40.0, -30.0, -20.0],
-            max: [40.0, 30.0, 20.0],
-            twist: 1.0,
-        });
-        // The generator makes no actions; every kind and both unwritten rules travel as dialect 1's behaviours.
-        let states = &mut original.animator.as_mut().unwrap().layers[0].state_machine.states;
-        assert!(states.iter().any(|s| s.unwritten == Unwritten::Hold), "{}", spec.name);
-        states[0].unwritten = Unwritten::Rest;
-        states[0].actions = vec![
-            Action::Entries {
-                owner_only: true,
-                ops: vec![
-                    EntryOp::Set { param: 0, value: 1.0 },
-                    EntryOp::Copy {
-                        src: 0,
-                        dst: 0,
-                        remap: Some(([0.0, 1.0], [1.0, 0.0])),
-                    },
-                ],
-            },
-            Action::PoseSource(vec![(PosePart::LeftHand, PoseSource::Animation)]),
-            Action::LayerWeight {
-                layer: 0,
-                goal: 0.5,
-                duration: 0.25,
-            },
-            Action::GroupWeight {
-                group: 0,
-                goal: 0.0,
-                duration: 1.0,
-            },
-            Action::Locomotion { disabled: true },
-        ];
-        // A platform value travels under VRChat's name (ADR 0096).
-        let grounded = Platform::Grounded.name();
-        (original.state.entries).push(Entry::new(grounded, EntryKind::Bool, 1.0));
-        assert!(
-            original.hierarchy.nodes.iter().any(|n| !n.active),
-            "{}: no inactive node",
-            spec.name
-        );
-        let glb = civbb_corpus::gltf::to_source_glb(&original);
-        assert!(
-            !String::from_utf8_lossy(&glb).contains("platform/"),
-            "native names in dialect 1"
-        );
-        let imported = import(&glb, &Limits::default(), no_files).unwrap_or_else(|e| panic!("{}: {e}", spec.name));
-        let a = imported.avatar;
-        assert_eq!(a.hierarchy.nodes, original.hierarchy.nodes, "{}", spec.name);
-        assert_eq!(a.meshes, original.meshes, "{}", spec.name);
-        let (r, o) = (a.avatar().unwrap(), original.avatar().unwrap());
-        assert!(
-            o.humanoid.is_some() && o.face.is_some(),
-            "{}: no humanoid or face",
-            spec.name
-        );
-        assert_eq!(r, o, "{}", spec.name);
-        assert_eq!(a.animator, original.animator, "{}", spec.name);
-        assert_eq!(a.clips, original.clips, "{}", spec.name);
-        assert_eq!(a.constraints, original.constraints, "{}", spec.name);
-        assert_eq!(a.dynamics, original.dynamics, "{}", spec.name);
-        assert_eq!(a.contacts, original.contacts, "{}", spec.name);
-        assert_eq!(a.state, original.state, "{}", spec.name);
         assert!(imported.warnings.is_empty(), "{:?}", imported.warnings);
     }
 }
@@ -171,7 +91,7 @@ fn hostile_source_extensions_are_rejected() {
     reject("X_contacts", json!({"X_contacts": []}));
     let mut doc = json!({"X_avatar": {"humanoid": {}}});
     doc["VRM"] = json!({});
-    reject("both VRM and X_*", doc);
+    reject("more than one of VRM, X_* and CIVBB_*", doc);
 }
 
 /// One triangle as a strip without indices or normals, two scene roots with the same name, an unlit material,

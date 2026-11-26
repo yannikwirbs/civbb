@@ -1,49 +1,21 @@
 //! Exports an avatar's node, mesh, skin and morph subset as GLB, the importer's test input.
 //!
 //! Morph targets use sparse accessors, so the bloated avatar's 1,200 shape keys stay small. Materials export
-//! their base colour only; textures and animations are left out. [`to_source_glb`] adds the source package's
-//! `X_*` extensions (ADR 0041) for what glTF lacks.
+//! their base colour only; textures and animations are left out. [`to_source_glb`] adds the native `CIVBB_*`
+//! extensions (ADRs 0086, 0101) for what glTF lacks.
 
-use civbb_anim::muscle::unity_bone_name;
+use std::collections::BTreeSet;
+
 use civbb_format::Document;
-use civbb_format::animator::{
-    Action, Animator, EulerOrder, HumanoidProperty, Key, MeshProperty, NodeProperty, Target, Unwritten,
-};
-use civbb_format::constraint::ConstraintType;
+use civbb_format::animator::Target;
 use civbb_format::face::{EyeDriver, ShapeBind};
 use civbb_format::material::MaterialModel;
-use civbb_format::mesh::Mesh;
-use civbb_format::state::{EntryIndex, EntryKind, Platform, SyncMode};
+use civbb_format::mesh::{FirstPerson, Mesh};
 use serde_json::{Value, json};
 
 const FLOAT: u32 = 5126;
 const U16: u32 = 5123;
 const U32: u32 = 5125;
-/// Unity dialect 1's states (the inverse of the importer's lowering): `unwritten` as `write_defaults`, actions as
-/// behaviours.
-fn raise_states(animator: &Animator, x: &mut Value) {
-    for (layer, l) in animator.layers.iter().zip(x["layers"].as_array_mut().expect("array")) {
-        let states = l["state_machine"]["states"].as_array_mut().expect("array");
-        for (state, s) in layer.state_machine.states.iter().zip(states) {
-            let o = s.as_object_mut().expect("object");
-            o.remove("unwritten");
-            o.remove("actions");
-            o.insert("write_defaults".into(), json!(state.unwritten == Unwritten::Rest));
-            let behaviours = state.actions.iter().map(|a| match a {
-                Action::Entries { owner_only, ops } => {
-                    json!({"ParameterDriver": {"local_only": owner_only, "ops": ops}})
-                }
-                Action::PoseSource(parts) => json!({ "TrackingControl": parts }),
-                // Same shape in both.
-                Action::LayerWeight { .. } | Action::GroupWeight { .. } | Action::Locomotion { .. } => json!(a),
-            });
-            o.insert("behaviours".into(), json!(behaviours.collect::<Vec<_>>()));
-        }
-    }
-}
-
-/// VRChat's PhysBone output suffixes, in `ChainOutputs::entries` order (the importer's list).
-const CHAIN_SUFFIXES: [&str; 5] = ["_IsGrabbed", "_IsPosed", "_Angle", "_Stretch", "_Squish"];
 
 #[derive(Default)]
 struct Bin {
@@ -113,215 +85,87 @@ pub fn to_glb(a: &Document) -> Vec<u8> {
     glb(serde_json::to_vec(&doc).expect("json"), bin)
 }
 
-/// As [`to_glb`], plus `extras.active` on inactive nodes and the `X_*` extensions: humanoid map and viewpoint,
-/// animator and clips, constraints, dynamics, contacts and expressions. Node indices are glTF indices, which
-/// [`to_glb`] keeps equal to the avatar's.
+/// As [`to_glb`], plus the native `CIVBB_*` extensions (ADRs 0086, 0101) for what glTF lacks: node activity and
+/// first-person flags, toon materials, the avatar role, state table, behaviour and clips, constraints, dynamics and
+/// contacts. Node indices are glTF indices, which [`to_glb`] keeps equal to the document's; mesh references name the
+/// node carrying the mesh.
 pub fn to_source_glb(a: &Document) -> Vec<u8> {
     let (mut doc, bin) = document(a);
-    for (i, n) in a.hierarchy.nodes.iter().enumerate() {
+    let versioned = |v: Value| {
+        let mut o = serde_json::Map::from_iter([("version".to_owned(), json!(1))]);
+        o.extend(v.as_object().expect("object").clone());
+        Value::Object(o)
+    };
+    let mut used = BTreeSet::new();
+    let mut flags: Vec<serde_json::Map<String, Value>> = vec![serde_json::Map::new(); a.hierarchy.nodes.len()];
+    for (f, n) in flags.iter_mut().zip(&a.hierarchy.nodes) {
         if !n.active {
-            doc["nodes"][i]["extras"] = json!({"active": false});
+            f.insert("active".into(), json!(false));
+        }
+    }
+    for m in a.meshes.iter().filter(|m| m.first_person != FirstPerson::default()) {
+        flags[m.node as usize].insert("first_person".into(), json!(m.first_person));
+    }
+    for (i, f) in flags.into_iter().enumerate().filter(|(_, f)| !f.is_empty()) {
+        doc["nodes"][i]["extensions"] = json!({"CIVBB_node": versioned(Value::Object(f))});
+        used.insert("CIVBB_node");
+    }
+    for (i, m) in a.materials.iter().enumerate() {
+        if let MaterialModel::Toon(t) = &m.model {
+            let mut x = versioned(json!(t));
+            x["order"] = json!(m.order);
+            doc["materials"][i]["extensions"] = json!({"CIVBB_materials_toon": x});
+            used.insert("CIVBB_materials_toon");
+        }
+    }
+    // Mesh references as the node carrying the mesh.
+    let mut a = a.clone();
+    let node_of: Vec<u32> = a.meshes.iter().map(|m| m.node).collect();
+    if let Some(f) = a.avatar_mut().and_then(|r| r.face.as_mut()) {
+        let eyes: Vec<&mut ShapeBind> = match f.eyes.as_mut().map(|e| &mut e.driver) {
+            Some(EyeDriver::Shapes { up, down, left, right }) => {
+                [up, down, left, right].into_iter().flatten().collect()
+            }
+            _ => Vec::new(),
+        };
+        let binds = f
+            .visemes
+            .iter_mut()
+            .flat_map(|(_, b)| b)
+            .chain(&mut f.blink)
+            .chain(eyes);
+        binds.for_each(|b| b.mesh = node_of[b.mesh as usize]);
+    }
+    for c in a.clips.iter_mut().flat_map(|c| &mut c.curves) {
+        if let Target::Mesh { mesh, .. } = &mut c.target {
+            *mesh = node_of[*mesh as usize];
         }
     }
     let mut ext = serde_json::Map::new();
-    if let Some(h) = a.avatar().and_then(|r| r.humanoid.as_ref()) {
-        // Dialect 1 names bones as Unity's `HumanBodyBones`.
-        let bones: serde_json::Map<String, Value> =
-            (h.bones.iter()).map(|(b, n)| (unity_bone_name(*b), json!(n))).collect();
-        let mut frames = json!(h.muscle_frames);
-        for (f, v) in h.muscle_frames.iter().zip(frames.as_array_mut().expect("array")) {
-            v["bone"] = json!(unity_bone_name(f.bone));
-        }
-        let viewpoint = a.avatar().map_or([0.0; 3], |r| r.viewpoint);
-        let mut x = json!({"humanoid": bones, "viewpoint": viewpoint, "muscle_frames": frames});
-        if let Some(face) = a.avatar().and_then(|r| r.face.as_ref()) {
-            // Binds name the glTF node carrying the mesh (ADR 0042); node indices equal the avatar's.
-            let mut face = face.clone();
-            let binds = face.visemes.iter_mut().flat_map(|(_, b)| b.iter_mut());
-            let eye_binds: Vec<&mut ShapeBind> = match face.eyes.as_mut().map(|e| &mut e.driver) {
-                Some(EyeDriver::Shapes { up, down, left, right }) => {
-                    [up, down, left, right].into_iter().flatten().collect()
-                }
-                _ => Vec::new(),
-            };
-            for b in binds.chain(face.blink.iter_mut()).chain(eye_binds) {
-                b.mesh = a.meshes[b.mesh as usize].node;
-            }
-            x["face"] = json!(face);
-        }
-        ext.insert("X_avatar".into(), x);
+    if let Some(r) = a.avatar() {
+        ext.insert("CIVBB_avatar".into(), versioned(json!(r)));
     }
-    // Unity dialect 1's parameters (the inverse of the importer's lowering): every entry an animator parameter with
-    // its rest value as default, every external one an expression parameter, references as names.
-    let entries = &a.state.entries;
-    let name = |e: Option<EntryIndex>| e.map_or("", |i| dialect(&entries[i as usize].name));
-    if let Some(animator) = &a.animator {
-        let mut x = json!(animator);
-        let params = entries
-            .iter()
-            .map(|e| json!({"name": dialect(&e.name), "kind": e.kind, "default": e.rest()}));
-        x["parameters"] = json!(params.collect::<Vec<_>>());
-        raise_states(animator, &mut x);
-        let paths = node_paths(a);
-        for layer in x["layers"].as_array_mut().expect("array") {
-            if let Some(t) = layer.pointer_mut("/mask/transforms").filter(|t| t.is_array()) {
-                let nodes = t.as_array().expect("array").iter().map(|n| n.as_u64().expect("node"));
-                *t = json!(nodes.map(|n| paths[n as usize].as_str()).collect::<Vec<_>>());
-            }
-        }
-        let mut clips = json!(a.clips);
-        for (clip, v) in a.clips.iter().zip(clips.as_array_mut().expect("array")) {
-            for (c, v) in clip.curves.iter().zip(v["curves"].as_array_mut().expect("array")) {
-                let o = v.as_object_mut().expect("object");
-                o.remove("target");
-                o.insert("binding".into(), binding(a, &paths, &c.target));
-                // Dialect 1's units (the inverse of the importer's conversion).
-                let unit: Option<fn(f32) -> f32> = match c.target {
-                    Target::Mesh {
-                        property: MeshProperty::Weight(_),
-                        ..
-                    } => Some(|v| v * 100.0),
-                    Target::Node {
-                        property: NodeProperty::EulerRotation { .. },
-                        ..
-                    } => Some(f32::to_degrees),
-                    _ => None,
-                };
-                if let Some(f) = unit {
-                    let keys = c.keys.iter().map(|k| Key {
-                        value: f(k.value),
-                        in_tangent: f(k.in_tangent),
-                        out_tangent: f(k.out_tangent),
-                        ..*k
-                    });
-                    o.insert("keys".into(), json!(keys.collect::<Vec<_>>()));
-                }
-            }
-        }
-        ext.insert("X_animator".into(), json!({"animator": x, "clips": clips}));
+    if !a.state.entries.is_empty() {
+        ext.insert("CIVBB_state".into(), versioned(json!(a.state)));
+    }
+    if a.animator.is_some() || !a.clips.is_empty() {
+        let x = json!({"animator": a.animator, "clips": a.clips});
+        ext.insert("CIVBB_behaviour".into(), versioned(x));
     }
     if !a.constraints.is_empty() {
-        ext.insert("X_constraints".into(), json!(a.constraints));
+        let x = json!({"constraints": a.constraints});
+        ext.insert("CIVBB_constraints".into(), versioned(x));
     }
     if !a.dynamics.chains.is_empty() || !a.dynamics.colliders.is_empty() {
-        let mut x = json!(a.dynamics);
-        let chains = x["chains"].as_array_mut().expect("array");
-        for (c, v) in a.dynamics.chains.iter().zip(chains) {
-            // The prefix the outputs' names share; an avatar from dialect 1 has no other kind.
-            let names = c.outputs.entries().map(&name);
-            let prefix = (names.iter().zip(CHAIN_SUFFIXES)).find_map(|(n, s)| n.strip_suffix(s));
-            let o = v.as_object_mut().expect("object");
-            o.remove("outputs");
-            o.insert("parameter".into(), json!(prefix));
-        }
-        ext.insert("X_dynamics".into(), x);
+        ext.insert("CIVBB_dynamics".into(), versioned(json!(a.dynamics)));
     }
     if !a.contacts.senders.is_empty() || !a.contacts.receivers.is_empty() {
-        let mut x = json!(a.contacts);
-        for (r, v) in a
-            .contacts
-            .receivers
-            .iter()
-            .zip(x["receivers"].as_array_mut().expect("array"))
-        {
-            v["parameter"] = json!(name(r.parameter));
-        }
-        ext.insert("X_contacts".into(), x);
+        ext.insert("CIVBB_contacts".into(), versioned(json!(a.contacts)));
     }
-    if let Some(e) = a.avatar().and_then(|r| r.expressions.as_ref()) {
-        let external = entries.iter().filter(|e| e.external && e.kind != EntryKind::Trigger);
-        let params = external.map(|e| {
-            let synced = e.sync == SyncMode::Owner;
-            json!({"name": e.name, "kind": e.kind, "default": e.default, "saved": e.saved, "synced": synced})
-        });
-        let mut menu = json!(e.menu);
-        menu_names(&mut menu, &name);
-        ext.insert(
-            "X_expressions".into(),
-            json!({"parameters": params.collect::<Vec<_>>(), "menu": menu}),
-        );
-    }
-    doc["extensionsUsed"] = json!(ext.keys().collect::<Vec<_>>());
+    used.extend(ext.keys().map(String::as_str));
+    doc["extensionsUsed"] = json!(used);
     doc["extensions"] = Value::Object(ext);
     glb(serde_json::to_vec(&doc).expect("json"), bin)
-}
-
-/// Each node's dialect 1 path: names below the root joined by `/`, the root's empty.
-fn node_paths(a: &Document) -> Vec<String> {
-    let mut paths: Vec<String> = Vec::with_capacity(a.hierarchy.nodes.len());
-    for n in &a.hierarchy.nodes {
-        paths.push(match n.parent {
-            None => String::new(),
-            Some(0) => n.name.clone(),
-            Some(p) => format!("{}/{}", paths[p as usize], n.name),
-        });
-    }
-    paths
-}
-
-/// A curve target as dialect 1's binding (the inverse of the importer's resolution): a path and a Unity property.
-fn binding(a: &Document, paths: &[String], t: &Target) -> Value {
-    let (path, property) = match t {
-        Target::Node { node, property } => {
-            let p = match *property {
-                NodeProperty::Translation(i) => json!({"Position": i}),
-                NodeProperty::Rotation(i) => json!({"Rotation": i}),
-                NodeProperty::EulerRotation {
-                    axis,
-                    order: EulerOrder::Zxy,
-                } => json!({"EulerRotation": axis}),
-                NodeProperty::Scale(i) => json!({"Scale": i}),
-                NodeProperty::Active => json!("Active"),
-            };
-            (paths[*node as usize].as_str(), p)
-        }
-        Target::Mesh { mesh, property } => {
-            let m = &a.meshes[*mesh as usize];
-            let p = match property {
-                MeshProperty::Visible => json!("RendererEnabled"),
-                MeshProperty::Weight(s) => json!({"BlendShape": m.blend_shapes[*s as usize].name}),
-                // Unity names depend on the shader family, and V-up offsets on two curves at once.
-                MeshProperty::Material { .. } => unimplemented!("the corpus generates no material curves"),
-                MeshProperty::MaterialSlot(s) => json!({"MaterialSlot": s}),
-            };
-            (paths[m.node as usize].as_str(), p)
-        }
-        &Target::Humanoid(HumanoidProperty::Muscle { bone, axis }) => {
-            let m = civbb_anim::muscle::index(bone, axis).expect("a muscle");
-            ("", json!({"Muscle": civbb_anim::muscle::MUSCLES[m as usize].name}))
-        }
-        Target::Humanoid(HumanoidProperty::Body(i)) => ("", json!({"RootMotion": i})),
-        Target::Entry(e) => ("", json!({"Parameter": dialect(&a.state.entries[*e as usize].name)})),
-        Target::Constraint { constraint, field } => {
-            let c = &a.constraints[*constraint as usize];
-            let kind = ConstraintType::of(&c.kind).expect("an animatable constraint");
-            (
-                paths[c.target as usize].as_str(),
-                json!({"Constraint": {"kind": kind, "field": field}}),
-            )
-        }
-    };
-    json!({"path": path, "property": property})
-}
-
-/// An entry's name in dialect 1: platform values under VRChat's names.
-fn dialect(name: &str) -> &str {
-    Platform::from_name(name).map_or(name, |p| p.vrchat_name())
-}
-
-/// A serialised menu's entry references as dialect 1's names.
-fn menu_names<'a>(menu: &mut Value, name: &dyn Fn(Option<EntryIndex>) -> &'a str) {
-    let index = |v: &Value| v.as_u64().map(|i| i as EntryIndex);
-    for c in menu["controls"].as_array_mut().expect("array") {
-        c["parameter"] = index(&c["parameter"]).map_or(Value::Null, |i| json!(name(Some(i))));
-        let subs: Vec<&str> = (c["sub_parameters"].as_array().expect("array").iter())
-            .map(|v| name(index(v)))
-            .collect();
-        c["sub_parameters"] = json!(subs);
-        if let Some(sub) = c["kind"].get_mut("SubMenu") {
-            menu_names(sub, name);
-        }
-    }
 }
 
 fn document(a: &Document) -> (Value, Vec<u8>) {

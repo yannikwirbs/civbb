@@ -128,6 +128,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/gltf_import/animation.rs`: glTF animations to clips: translation, rotation, scale and morph weight channels as Hermite keys, within the caps.
 - `src/gltf_import/material.rs`: glTF materials and textures: metallic-roughness and unlit materials, texture slots and their images.
 - `src/gltf_import/mesh.rs`: glTF meshes: one format mesh per node (its primitives become submeshes), vertex streams, skins and morph targets.
+- `src/gltf_import/native.rs`: The native `CIVBB_*` extensions (ADRs 0086, 0101): document parts at the root, node flags on nodes, toon
 - `src/gltf_import/source.rs`: The source package's `X_*` extensions (ADR 0041): humanoid map, viewpoint and face, animator and clips,
 - `src/gltf_import/unity_clip/material.rs`: Unity material curves lowered to native material fields (ADR 0099): property names by the renderer's shader
 - `src/gltf_import/unity_clip.rs`: Unity dialect 1's clips and avatar masks lowered to typed targets (ADR 0089): `/`-separated node paths and Unity
@@ -151,10 +152,11 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `tests/cli.rs`: `civbb` end to end: keygen, build (pruning, atlasing, merging, LOD chain, compression; ADRs 0026, 0027, 0029, 0031)
 - `tests/collapse.rs`: Toggle collapsing (ADR 0028): the corpus avatars' toggle layers become one direct blend tree layer, layers that
 - `tests/common/mod.rs`: Shared by the stage tests: validity, stepping islands through an avatar's states, and what an avatar shows.
-- `tests/gltf_import.rs`: glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
+- `tests/gltf_import.rs`: glTF importer conformance: corpus round trip, hand-written edge cases, hostile input, Khronos samples.
 - `tests/lod.rs`: LOD chain (ADR 0031): levels fall in triangles within their error caps, keep submesh borders and UV seams, keep
 - `tests/material_records.rs`: The material records the renderer uploads (`civbb_render::material::pack`), pinned so a restructuring of the
 - `tests/merge.rs`: Mesh merging (ADR 0027): meshes always visible together merge and same-material submeshes join, everything
+- `tests/native_import.rs`: The native `CIVBB_*` extensions (ADRs 0086, 0101): the generated corpus round-trips through them, and
 - `tests/parity.rs`: FLIP parity on a device (ADR 0033): the lean and bloated corpus avatars after every compiler stage render like
 - `tests/prune.rs`: Pruning (ADR 0026): unused skin joints, unreferenced nodes and undriven blendshapes go; everything referenced,
 - `tests/report.rs`: The per-avatar report (ADR 0032): the lean corpus avatar's counts per stage against a golden JSON, the package
@@ -194,7 +196,7 @@ Internal deps: civbb-core, civbb-format
 
 Deterministic generator of synthetic test avatars (lean control and deliberately bloated), CC0.
 
-Internal deps: civbb-anim, civbb-format
+Internal deps: civbb-format
 
 - `src/gltf.rs`: Exports an avatar's node, mesh, skin and morph subset as GLB, the importer's test input.
 - `src/lib.rs`: Deterministic synthetic avatars: a lean control and a deliberately bloated worst case (design doc §21).
@@ -311,6 +313,7 @@ Internal deps: none
 - `docs/adr/0098-sync-encoding-per-entry.md`: 0098: The sync encoding of a state entry: ranges, unranged values and the exact midpoint
 - `docs/adr/0099-native-material-curves.md`: 0099: Material curves drive native fields; Unity's unanimated vector components are baked into materials
 - `docs/adr/0100-toon-features-presence.md`: 0100: When a toon feature is present, and what an absent one means
+- `docs/adr/0101-civbb-extension-layout.md`: 0101: CIVBB_* extensions: document parts at the root, glTF indices, node flags and toon materials local
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

@@ -19,6 +19,7 @@ use gltf::json::validation::Checked;
 mod animation;
 mod material;
 mod mesh;
+mod native;
 mod source;
 mod unity_clip;
 mod unity_material;
@@ -119,9 +120,18 @@ pub fn import(
     let mut clips = im.animations()?;
     let vrm = im.vrm(&mut clips)?;
     let source = im.source(clips.len())?;
-    if vrm.is_some() && source.is_some() {
-        return Err(ImportError("both VRM and X_* extensions present".into()));
+    let native = im.native(clips.len())?;
+    if [vrm.is_some(), source.is_some(), native.is_some()]
+        .iter()
+        .filter(|&&x| x)
+        .count()
+        > 1
+    {
+        return Err(ImportError(
+            "more than one of VRM, X_* and CIVBB_* extensions present".into(),
+        ));
     }
+    im.native_nodes_and_materials()?;
     let mut avatar = Document {
         name: vrm.as_ref().and_then(|v| v.name.clone()).unwrap_or(name),
         hierarchy: Hierarchy {
@@ -163,6 +173,15 @@ pub fn import(
         avatar.dynamics = s.dynamics;
         avatar.contacts = s.contacts;
         avatar.state = s.state;
+    }
+    if let Some(n) = native {
+        avatar.role = n.role;
+        avatar.animator = n.animator;
+        avatar.clips.extend(n.clips);
+        avatar.constraints = n.constraints;
+        avatar.dynamics = n.dynamics;
+        avatar.contacts = n.contacts;
+        avatar.state = n.state;
     }
     let validate = |avatar: &Document| {
         civbb_format::validate(avatar, &limits.caps, |id| im.blobs.contains_key(&id)).map_err(|errors| {

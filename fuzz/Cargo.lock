@@ -395,7 +395,6 @@ dependencies = [
 name = "civbb-corpus"
 version = "0.0.0"
 dependencies = [
- "civbb-anim",
  "civbb-format",
  "serde_json",
 ]

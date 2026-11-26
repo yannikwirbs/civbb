@@ -232,7 +232,7 @@ impl Importer<'_> {
     }
 
     /// A glTF node index from an extension as a hierarchy index.
-    fn x_node(&self, ext: &str, i: NodeIndex) -> Result<NodeIndex, String> {
+    pub(super) fn x_node(&self, ext: &str, i: NodeIndex) -> Result<NodeIndex, String> {
         self.map
             .get(i as usize)
             .copied()

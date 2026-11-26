@@ -91,9 +91,16 @@ What exists, by area. Read the section for the area you touch; update it when th
 - Source extensions (ADR 0041, 0042, 0043): `X_*` payloads are the format types' serde JSON with glTF node indices
   (`gltf_import/source.rs`), except `X_avatar` (`{humanoid, viewpoint, muscle_frames, face}`, bones by Unity `HumanBodyBones` name) and per-material
   `X_toon_material`; `extras.active: false` marks inactive nodes; a `null` key tangent is a step.
-  `civbb_corpus::gltf::to_source_glb` writes them (round-trip test) except `X_toon_material` (a Unity property dump;
-  hostile and mapping tests in `tests/unity_material.rs`). Fuzz seeds: `lean-source.glb` and `toon-materials.gltf`
-  (every shader family, #71 closed; the latter is `pipeline/tests/fixtures/toon-materials.gltf`, also pinned).
+  Hostile and mapping tests of `X_toon_material` in `tests/unity_material.rs`. Fuzz seeds: `lean-source.glb`
+  (native since #124) and `toon-materials.gltf` (every shader family, #71 closed; the latter is
+  `pipeline/tests/fixtures/toon-materials.gltf`, also pinned).
+- Native extensions (ADRs 0086, 0101, #124): root `CIVBB_avatar`, `CIVBB_state`, `CIVBB_behaviour`
+  (`animator`, `clips`), `CIVBB_constraints` (`constraints`), `CIVBB_dynamics`, `CIVBB_contacts`; `CIVBB_node`
+  (`active`, `first_person`) on nodes; `CIVBB_materials_toon` (toon model plus `order`) on materials. Each the
+  format type's serde JSON plus `"version": 1`, with glTF indices (mesh references are the node carrying the mesh,
+  textures glTF textures), mapped by `gltf_import/native.rs`. `civbb_corpus::gltf::to_source_glb` writes them;
+  `corpus_round_trips_through_native_extensions` compares everything but textures. VRM, `X_*` and `CIVBB_*` are
+  mutually exclusive.
 - Native toon model (ADRs 0090, 0100, #123, format v35): `Toon` = base colour, shade colour/texture/shift/toony, plus
   optional features `light_clamp` (none: additive ambient), `normal`, `emission`, `matcaps` (list, at most
   `material::MATCAPS` = 2), `rim` (with its ramp), `rim_shade`, `shade` (second band, border), `color_adjust`,

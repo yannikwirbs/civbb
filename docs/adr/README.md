@@ -22,3 +22,4 @@ them in whole or in part. Read an ADR together with the ones that supersede part
 - 0085: points 1 and 5 of 0041.
 - 0092: the session start, end and handover parts of 0044.
 - 0099: the constant curves of 0089 point 3 (unanimated vector components are baked) and 0025's flat name table.
+- 0101: the node-level placement of 0086 point 4 (components stay root lists).
