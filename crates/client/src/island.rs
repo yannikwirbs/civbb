@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use civbb_anim::behaviour::coerce;
-use civbb_anim::material::{self, Field};
+use civbb_anim::material;
 use civbb_anim::{Constraints, Controller, Instance, Slot, Target};
 use civbb_core::math::{Pose, world_poses_into};
 use civbb_core::{Counters, System};
@@ -11,7 +11,7 @@ use civbb_dynamics::contact::Participant;
 use civbb_dynamics::{ContactRig, ContactState, State};
 use civbb_format::Avatar;
 use civbb_format::hierarchy::NodeIndex;
-use civbb_format::material::Material;
+use civbb_format::material::{Material, MaterialField};
 use civbb_format::math::Transform;
 use civbb_format::mesh::MeshIndex;
 use civbb_format::state::{EntryIndex, EntryKind};
@@ -50,8 +50,8 @@ struct AnimatedRenderer {
     materials: Vec<Material>,
     /// Their avatar material indices.
     indices: Vec<u32>,
-    /// The slot of each bound field component.
-    slots: Vec<(Field, u8, Slot)>,
+    /// Each bound field component: field, component, sRGB-encoded, slot.
+    slots: Vec<(MaterialField, u8, bool, Slot)>,
 }
 
 impl Model {
@@ -82,7 +82,7 @@ impl Model {
             .iter()
             .flat_map(|c| c.bound.bindings.targets.iter().enumerate())
         {
-            let Target::Material(mesh, field, component) = *t else {
+            let Target::Material(mesh, field, component, srgb) = *t else {
                 continue;
             };
             let i = match renderers.iter().position(|r| r.mesh == mesh) {
@@ -103,7 +103,7 @@ impl Model {
                     renderers.len() - 1
                 }
             };
-            renderers[i].slots.push((field, component, slot as Slot));
+            renderers[i].slots.push((field, component, srgb, slot as Slot));
         }
         renderers.sort_by_key(|r| r.mesh);
         let mut swaps = vec![Vec::new(); avatar.meshes.len()];
@@ -243,8 +243,14 @@ impl Island {
         let mut out = out.iter_mut();
         for r in &m.renderers {
             for mat in out.by_ref().take(r.materials.len()) {
-                for &(field, component, slot) in &r.slots {
-                    material::set(mat, field, component, pose[slot as usize]);
+                for &(field, component, srgb, slot) in &r.slots {
+                    let v = pose[slot as usize];
+                    let v = if srgb && component < 3 {
+                        material::to_linear(v)
+                    } else {
+                        v
+                    };
+                    material::set(mat, field, component, v);
                 }
             }
         }

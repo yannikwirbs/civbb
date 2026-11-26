@@ -316,7 +316,7 @@ fn eligible(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> (Vec<Option<Size>>
     for c in a.clips.iter().flat_map(|c| &c.curves) {
         if let Target::Mesh {
             mesh,
-            property: MeshProperty::Material(_) | MeshProperty::MaterialSlot(_),
+            property: MeshProperty::Material { .. } | MeshProperty::MaterialSlot(_),
         } = c.target
         {
             animated[mesh as usize] = true;

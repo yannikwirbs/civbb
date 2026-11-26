@@ -10,7 +10,7 @@ use civbb_core::{System, jobs};
 use civbb_format::Avatar;
 use civbb_format::animator::{MeshProperty, Target};
 use civbb_format::dynamics::ReceiverKind;
-use civbb_format::material::{Material, MaterialModel};
+use civbb_format::material::{Material, MaterialField, MaterialModel};
 use civbb_format::state::{Entry, EntryKind};
 
 const DT: f32 = 1.0 / 90.0;
@@ -139,7 +139,11 @@ fn animated_materials_are_per_island() {
     let mut emission = on.curves[0].clone();
     emission.target = Target::Mesh {
         mesh: 0,
-        property: MeshProperty::Material("_EmissionColor.g".into()),
+        property: MeshProperty::Material {
+            field: MaterialField::Emission,
+            component: 1,
+            srgb: true,
+        },
     };
     emission.keys[0].value = 0.5;
     on.curves.push(emission);

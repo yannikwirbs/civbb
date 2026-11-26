@@ -259,7 +259,8 @@ fn binding(a: &Avatar, paths: &[String], t: &Target) -> Value {
             let p = match property {
                 MeshProperty::Visible => json!("RendererEnabled"),
                 MeshProperty::Weight(s) => json!({"BlendShape": m.blend_shapes[*s as usize].name}),
-                MeshProperty::Material(name) => json!({"Material": name}),
+                // Unity names depend on the shader family, and V-up offsets on two curves at once.
+                MeshProperty::Material { .. } => unimplemented!("the corpus generates no material curves"),
                 MeshProperty::MaterialSlot(s) => json!({"MaterialSlot": s}),
             };
             (paths[m.node as usize].as_str(), p)

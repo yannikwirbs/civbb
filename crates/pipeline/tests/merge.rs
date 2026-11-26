@@ -8,7 +8,7 @@ use civbb_format::Avatar;
 use civbb_format::animator::{Clip, Curve, Key, MeshProperty, NodeProperty, Target};
 use civbb_format::face::{Face, ShapeBind};
 use civbb_format::hierarchy::{Hierarchy, Node};
-use civbb_format::material::{AlphaMode, Material, MaterialModel, Unlit};
+use civbb_format::material::{AlphaMode, Material, MaterialField, MaterialModel, Unlit};
 use civbb_format::math::{Mat4, Quat, Transform, Vec3};
 use civbb_format::mesh::{BlendShape, FirstPerson, Mesh, ShapeDelta, Skin, Submesh};
 use civbb_pipeline::gltf_import::{Limits, dir_resolver, import};
@@ -146,7 +146,11 @@ fn avatar() -> Avatar {
                 }),
                 curve(Target::Mesh {
                     mesh: 4,
-                    property: MeshProperty::Material("_Color.r".into()),
+                    property: MeshProperty::Material {
+                        field: MaterialField::BaseColor,
+                        component: 0,
+                        srgb: true,
+                    },
                 }),
             ],
         }],
@@ -205,7 +209,11 @@ fn merges_meshes_that_show_together_and_keeps_the_rest_apart() {
             },
             Target::Mesh {
                 mesh: 3,
-                property: MeshProperty::Material("_Color.r".into())
+                property: MeshProperty::Material {
+                    field: MaterialField::BaseColor,
+                    component: 0,
+                    srgb: true,
+                }
             },
         ]
     );

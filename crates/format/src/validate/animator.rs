@@ -43,11 +43,13 @@ impl V {
                             MeshProperty::Weight(s) => {
                                 let shapes = a.meshes.get(*mesh as usize).map_or(0, |m| m.blend_shapes.len());
                                 self.index(*s as usize, shapes, cp, "blend shape");
+                                true
                             }
-                            MeshProperty::Material(s) => self.string(s, cp),
-                            MeshProperty::Visible | MeshProperty::MaterialSlot(_) => {}
+                            MeshProperty::Material { field, component, srgb } => {
+                                *component < field.components() && (!srgb || field.is_color())
+                            }
+                            MeshProperty::Visible | MeshProperty::MaterialSlot(_) => true,
                         }
-                        true
                     }
                     Target::Humanoid(HumanoidProperty::Muscle { axis, .. }) => *axis < 3,
                     Target::Humanoid(HumanoidProperty::Body(i)) => *i < 7,

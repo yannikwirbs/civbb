@@ -185,9 +185,12 @@ impl Importer<'_> {
             meshes: &self.meshes,
             state: &s.state,
             constraints: &s.constraints,
+            materials: &self.materials,
+            families: &self.families,
             string_len: self.caps.string_len,
         };
-        let (clips, warnings) = unity_clip::lower(clips, &scope);
+        let (clips, warnings, bakes) = unity_clip::lower(clips, &scope);
+        unity_clip::bake(&bakes, &mut self.meshes, &mut self.materials);
         s.clips = clips;
         self.warnings.extend(warnings);
         Ok(Some(s))

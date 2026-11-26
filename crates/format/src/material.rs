@@ -20,6 +20,66 @@ pub struct Material {
     pub render_queue: i32,
 }
 
+/// A material field curves can animate (ADR 0099), in the units the material stores it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MaterialField {
+    /// Base colour (PBR, Toon) or colour (Unlit), linear RGBA.
+    BaseColor,
+    /// Emission colour, linear RGB.
+    Emission,
+    /// Toon shade colour, linear RGB.
+    ShadeColor,
+    /// Toon rim colour, linear RGB.
+    RimColor,
+    /// Toon outline colour, linear RGB.
+    OutlineColor,
+    /// PBR metallic.
+    Metallic,
+    /// PBR roughness.
+    Roughness,
+    /// Normal map strength.
+    NormalScale,
+    /// Alpha cutoff of a masked material.
+    Cutoff,
+    /// Toon shade shift.
+    ShadeShift,
+    /// Toon shade toony.
+    ShadeToony,
+    /// Toon rim power.
+    RimPower,
+    /// Toon matcap strength.
+    MatcapStrength,
+    /// The base colour texture's [`TextureSlot::scale_offset`].
+    BaseColorTransform,
+    /// Toon clamped light's lower bound.
+    LightMin,
+    /// Toon clamped light's upper bound.
+    LightMax,
+}
+
+impl MaterialField {
+    /// Number of components: 4 for the base colour and the texture transform, 3 for the other colours, else 1.
+    pub fn components(self) -> u8 {
+        match self {
+            MaterialField::BaseColor | MaterialField::BaseColorTransform => 4,
+            f if f.is_color() => 3,
+            _ => 1,
+        }
+    }
+
+    /// Colours, whose curves may be sRGB-encoded.
+    pub fn is_color(self) -> bool {
+        matches!(
+            self,
+            MaterialField::BaseColor
+                | MaterialField::Emission
+                | MaterialField::ShadeColor
+                | MaterialField::RimColor
+                | MaterialField::OutlineColor
+        )
+    }
+}
+
 /// Alpha handling.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AlphaMode {

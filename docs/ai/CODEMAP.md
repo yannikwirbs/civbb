@@ -19,7 +19,7 @@ Internal deps: civbb-core, civbb-format
 - `src/frames.rs`: Unity's muscle frames derived from a humanoid's rest pose (#53, ADR 0064), for sources that carry none (glTF,
 - `src/lib.rs`: Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles and constraints (design
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
-- `src/material.rs`: Animated material properties: Unity shader property names mapped to native material fields, read and written in
+- `src/material.rs`: Animated material fields (ADRs 0025, 0099): a [`MaterialField`] of a material read and written in the units the
 - `src/mix.rs`: Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
 - `src/muscle.rs`: Humanoid muscles: Unity's muscle table, and muscle values to human bones' local rotations (ADR 0014).
@@ -31,7 +31,7 @@ Internal deps: civbb-core, civbb-format
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
 - `tests/golden.rs`: Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
-- `tests/material.rs`: Material curves (ADR 0025): Unity property names to native fields, Unity's units (sRGB colours, smoothness, V-up
+- `tests/material.rs`: Material curves (ADRs 0025, 0099): native fields read and written as stored, the sRGB transfer, per-renderer slots
 - `tests/mirror.rs`: Humanoid mirroring (ADR 0060): the muscle map against Unity's recording (`tools/unity-truth/Assets/Editor/Mirror.cs`
 - `tests/muscle.rs`: Humanoid muscles (ADR 0014): the table against Unity's, hand-derived muscle space, poses recorded from Unity's
 - `tests/muscle_frames.rs`: Muscle frames derived from a rest pose against Unity's `AvatarBuilder` (#53, ADR 0064): the generated humanoid
@@ -127,6 +127,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/gltf_import/material.rs`: glTF materials and textures: metallic-roughness and unlit materials, texture slots and their images.
 - `src/gltf_import/mesh.rs`: glTF meshes: one format mesh per node (its primitives become submeshes), vertex streams, skins and morph targets.
 - `src/gltf_import/source.rs`: The source package's `X_*` extensions (ADR 0041): humanoid map, viewpoint and face, animator and clips,
+- `src/gltf_import/unity_clip/material.rs`: Unity material curves lowered to native material fields (ADR 0099): property names by the renderer's shader
 - `src/gltf_import/unity_clip.rs`: Unity dialect 1's clips and avatar masks lowered to typed targets (ADR 0089): `/`-separated node paths and Unity
 - `src/gltf_import/unity_material.rs`: Unity materials from the source package's `X_toon_material` (ADR 0043): the shader family fingerprinted by shader
 - `src/gltf_import/unity_state.rs`: Unity dialect 1's animator and expression parameters lowered to state entries (ADR 0088, 0095).
@@ -305,6 +306,7 @@ Internal deps: none
 - `docs/adr/0096-platform-values.md`: 0096: Platform values: the `platform/` namespace, VRChat's units, lowered built-ins
 - `docs/adr/0097-texture-cache.md`: 0097: An opt-in cache of encoded textures, keyed by everything the bytes depend on
 - `docs/adr/0098-sync-encoding-per-entry.md`: 0098: The sync encoding of a state entry: ranges, unranged values and the exact midpoint
+- `docs/adr/0099-native-material-curves.md`: 0099: Material curves drive native fields; Unity's unanimated vector components are baked into materials
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

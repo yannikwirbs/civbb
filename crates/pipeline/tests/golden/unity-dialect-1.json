@@ -846,7 +846,11 @@
               "Mesh": {
                 "mesh": 0,
                 "property": {
-                  "Material": "_Color.r"
+                  "Material": {
+                    "component": 0,
+                    "field": "BaseColor",
+                    "srgb": true
+                  }
                 }
               }
             }
@@ -3568,9 +3572,9 @@
           "Pbr": {
             "base_color": [
               1.0,
-              1.0,
-              1.0,
-              1.0
+              0.0,
+              0.0,
+              0.0
             ],
             "base_color_tex": null,
             "emissive": [

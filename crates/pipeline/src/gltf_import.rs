@@ -97,6 +97,7 @@ pub fn import(
         node_meshes: HashMap::new(),
         meshes: Vec::new(),
         materials: Vec::new(),
+        families: Vec::new(),
         default_material: None,
         textures: Vec::new(),
         texture_map: HashMap::new(),
@@ -266,6 +267,8 @@ pub(crate) struct Importer<'a> {
     node_meshes: HashMap<NodeIndex, usize>,
     meshes: Vec<Mesh>,
     materials: Vec<Material>,
+    /// Each material's Unity shader family (`X_toon_material`); missing or `None` for the others.
+    families: Vec<Option<unity_material::Family>>,
     default_material: Option<u32>,
     textures: Vec<Texture>,
     texture_map: HashMap<(usize, bool), Option<u32>>,

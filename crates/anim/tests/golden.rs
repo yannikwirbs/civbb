@@ -1,16 +1,17 @@
 //! Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 //!
 //! A case is a small controller (nodes, parameters, clips, layers) plus frames: parameter changes, then expected
-//! values (`"<node>.x|y|z|active"`, a material's property as its shader receives it in curve units
+//! values (`"<node>.x|y|z|active"`, a material's property as its shader receives it in Unity's units
 //! `"<node>:<material>:<property>"`, `null` when the material lacks it) and current states (`"<layer>": "<state>"`).
-//! Material curves target `"<node>:<property>"`. Every expectation is Unity's:
+//! Material curves target `"<node>:<property>"` by Unity name and are lowered as the importer does (ADR 0099). Every
+//! expectation is Unity's:
 //! `tools/unity-truth/Assets/Editor/Goldens.cs` plays the cases and records `tests/unity/goldens.json` (#54), which
 //! `golden_cases` checks them against.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use civbb_anim::material::{self, to_linear};
+use civbb_anim::material::{self, to_linear, to_srgb};
 use civbb_anim::{Controller, Instance, Target};
 use civbb_format::Avatar;
 use civbb_format::animator::Target as CurveTarget;
@@ -18,7 +19,7 @@ use civbb_format::animator::*;
 use civbb_format::blob::BlobId;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::material::{
-    AlphaMode, ColorSpace, ImageFormat, Material, MaterialModel, Pbr, Texture, TextureSlot, Unlit,
+    AlphaMode, ColorSpace, ImageFormat, Material, MaterialField, MaterialModel, Pbr, Texture, TextureSlot, Unlit,
 };
 use civbb_format::math::Transform;
 use civbb_format::mesh::{Mesh, Submesh};
@@ -199,7 +200,7 @@ impl Case {
             rest: Transform::IDENTITY,
             active: n.active,
         }));
-        let clips = self
+        let clips: Vec<Clip> = self
             .clips
             .iter()
             .map(|(name, c)| Clip {
@@ -281,6 +282,7 @@ impl Case {
                 ..Mesh::default()
             });
         }
+        bake(&clips, &meshes, &mut materials);
         let textures = if materials.is_empty() {
             Vec::new()
         } else {
@@ -384,6 +386,67 @@ fn unity_material(spec: &BTreeMap<String, Value>) -> Material {
     }
 }
 
+/// The native field and component of the Unity material properties the cases use, as the importer lowers them
+/// (ADR 0099).
+fn unity_property(prop: &str) -> (MaterialField, u8) {
+    let (base, c) = prop.rsplit_once('.').unwrap_or((prop, "x"));
+    let c = "xyzw"
+        .find(c)
+        .or_else(|| "rgba".find(c))
+        .unwrap_or_else(|| panic!("bad component {prop}")) as u8;
+    match base {
+        "_Color" => (MaterialField::BaseColor, c),
+        "_Metallic" => (MaterialField::Metallic, 0),
+        "_MainTex_ST" => (MaterialField::BaseColorTransform, c),
+        _ => panic!("unsupported material property {prop}"),
+    }
+}
+
+/// What the importer bakes (ADR 0099): components of an animated field that no curve animates are 0 in the
+/// renderer's materials, in Unity's units (so the stored V offset is 1 with Unity's V scale and V offset both 0).
+fn bake(clips: &[Clip], meshes: &[Mesh], materials: &mut [Material]) {
+    for (mi, mesh) in meshes.iter().enumerate() {
+        let mut animated: Vec<(MaterialField, [bool; 4])> = Vec::new();
+        for c in clips.iter().flat_map(|c| &c.curves) {
+            if let CurveTarget::Mesh {
+                mesh,
+                property: MeshProperty::Material { field, component, .. },
+            } = c.target
+                && mesh as usize == mi
+            {
+                match animated.iter_mut().find(|a| a.0 == field) {
+                    Some(a) => a.1[component as usize] = true,
+                    None => {
+                        let mut a = [false; 4];
+                        a[component as usize] = true;
+                        animated.push((field, a));
+                    }
+                }
+            }
+        }
+        for (field, a) in animated {
+            for c in (0..field.components()).filter(|&c| !a[c as usize]) {
+                let v = if field == MaterialField::BaseColorTransform && c == 3 {
+                    1.0
+                } else {
+                    0.0
+                };
+                for s in &mesh.submeshes {
+                    let m = &mut materials[s.material as usize];
+                    // Unity's V offset stays when its V scale becomes 0.
+                    if field == MaterialField::BaseColorTransform
+                        && c == 1
+                        && let Some(st) = material::get(m, field)
+                    {
+                        material::set(m, field, 3, st[3] + st[1]);
+                    }
+                    material::set(m, field, c, v);
+                }
+            }
+        }
+    }
+}
+
 /// The index of the node named `name`: spec nodes follow the root.
 fn node_index(nodes: &[NodeSpec], name: &str) -> u32 {
     let i = nodes.iter().position(|n| n.name == name);
@@ -396,10 +459,27 @@ fn curve(nodes: &[NodeSpec], target: &str, keys: &[(f32, f32)]) -> Curve {
         Some((name, prop)) => {
             let n = node_index(nodes, name) as usize - 1;
             let mesh = nodes[..n].iter().filter(|n| !n.materials.is_empty()).count() as u32;
-            CurveTarget::Mesh {
+            let (field, component) = unity_property(prop);
+            assert!(
+                prop != "_MainTex_ST.y",
+                "the harness lowers V offsets without a V scale curve only"
+            );
+            let target = CurveTarget::Mesh {
                 mesh,
-                property: MeshProperty::Material(prop.into()),
+                property: MeshProperty::Material {
+                    field,
+                    component,
+                    srgb: field.is_color(),
+                },
+            };
+            // Unity's V offset is from the bottom: stored, it is 1 - V scale (no curve: 0) - offset.
+            let mut c = curve_keys(target, keys);
+            if field == MaterialField::BaseColorTransform && component == 3 {
+                for k in &mut c.keys {
+                    (k.value, k.in_tangent, k.out_tangent) = (1.0 - k.value, -k.in_tangent, -k.out_tangent);
+                }
             }
+            return c;
         }
         None => {
             let (name, prop) = target
@@ -418,6 +498,11 @@ fn curve(nodes: &[NodeSpec], target: &str, keys: &[(f32, f32)]) -> Curve {
             }
         }
     };
+    curve_keys(target, keys)
+}
+
+/// Keys with linear tangents.
+fn curve_keys(target: CurveTarget, keys: &[(f32, f32)]) -> Curve {
     let slope = |i: usize, j: usize| (keys[j].1 - keys[i].1) / (keys[j].0 - keys[i].0);
     Curve {
         target,
@@ -457,8 +542,8 @@ fn value(c: &Controller, a: &Avatar, i: &Instance, key: &str) -> f32 {
     }
 }
 
-/// What material `<index>` of the renderer at `<node>` receives for `<property>` after the step, in curve units: the
-/// avatar's material with every slot of the renderer set, as `Island::materials` applies them (ADR 0025).
+/// What material `<index>` of the renderer at `<node>` receives for `<property>` after the step, in Unity's units: the
+/// avatar's material with every slot of the renderer set, as `Island::materials` applies them (ADRs 0025, 0099).
 fn material_value(c: &Controller, a: &Avatar, i: &Instance, key: &str) -> Option<f32> {
     let mut parts = key.splitn(3, ':');
     let (path, index, prop) = (parts.next().unwrap(), parts.next().unwrap(), parts.next().unwrap());
@@ -467,14 +552,22 @@ fn material_value(c: &Controller, a: &Avatar, i: &Instance, key: &str) -> Option
     let sub = &a.meshes[mesh].submeshes[index.parse::<usize>().unwrap()];
     let mut m = a.materials[sub.material as usize].clone();
     for (slot, t) in c.bound.bindings.targets.iter().enumerate() {
-        if let Target::Material(on, field, component) = *t
+        if let Target::Material(on, field, component, srgb) = *t
             && on as usize == mesh
         {
-            material::set(&mut m, field, component, i.pose()[slot]);
+            let v = i.pose()[slot];
+            let v = if srgb && component < 3 { to_linear(v) } else { v };
+            material::set(&mut m, field, component, v);
         }
     }
-    let (field, component) = material::parse(prop).unwrap_or_else(|| panic!("unknown property {prop}"));
-    material::get(&m, field).map(|v| v[component as usize])
+    // Back to Unity's units: sRGB-encoded colours, the V offset from the bottom.
+    let (field, c) = unity_property(prop);
+    let v = material::get(&m, field)?;
+    Some(match (field, c) {
+        (MaterialField::BaseColor, 0..3) => to_srgb(v[c as usize]),
+        (MaterialField::BaseColorTransform, 3) => 1.0 - v[1] - v[3],
+        _ => v[c as usize],
+    })
 }
 
 fn run(path: &Path, unity: &Value) {

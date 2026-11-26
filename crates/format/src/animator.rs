@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::hierarchy::{HumanBone, NodeIndex};
+use crate::material::MaterialField;
 use crate::mesh::MeshIndex;
 use crate::state::EntryIndex;
 
@@ -475,9 +476,18 @@ pub enum MeshProperty {
     Visible,
     /// Morph target (blendshape) weight, by index into the mesh's blend shapes, 0 to 1.
     Weight(u32),
-    /// A material property on the mesh's submeshes that have it, by Unity property name, e.g. `_Color.r`
-    /// (`civbb_anim::material`, ADR 0025).
-    Material(String),
+    /// A component of a material field, overridden on every submesh of this mesh instance whose material has the
+    /// field; its default is the value in the first submesh's material, 0 when that material lacks the field (ADRs
+    /// 0025, 0067, 0099).
+    Material {
+        /// The field.
+        field: MaterialField,
+        /// Component, below [`MaterialField::components`].
+        component: u8,
+        /// Colour keys are sRGB-encoded and decoded when applied (values above 1 by the power 2.2); only for
+        /// [`MaterialField::is_color`] fields. Without it colours are linear.
+        srgb: bool,
+    },
     /// The material of a submesh: key values are indices into [`Avatar::materials`](crate::Avatar::materials),
     /// held until the next key.
     MaterialSlot(u8),

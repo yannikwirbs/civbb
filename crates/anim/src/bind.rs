@@ -9,6 +9,7 @@ use civbb_format::animator::{
 };
 use civbb_format::constraint::ConstraintField;
 use civbb_format::hierarchy::NodeIndex;
+use civbb_format::material::MaterialField;
 use civbb_format::mesh::MeshIndex;
 use civbb_format::state::{EntryIndex, EntryKind};
 
@@ -16,7 +17,7 @@ use civbb_core::math::quat_to_euler_zxy;
 
 use crate::body::{BodyRig, RootMotion};
 use crate::clip::{BodyCurves, BoundClip, BoundCurve, EulerCurves};
-use crate::material::{self, Field};
+use crate::material;
 use crate::muscle::{self, MUSCLES, Rig};
 
 /// Index into the slot buffer.
@@ -42,8 +43,9 @@ pub enum Target {
     Parameter(EntryIndex),
     /// Humanoid muscle, by index into [`MUSCLES`].
     Muscle(u8),
-    /// Component of a material field on every material of a renderer that has the field (ADR 0025).
-    Material(MeshIndex, Field, u8),
+    /// Component of a material field on every material of a renderer that has the field (ADRs 0025, 0099); sRGB-encoded
+    /// when the flag is set.
+    Material(MeshIndex, MaterialField, u8, bool),
     /// The material a submesh draws with, as an index into [`Avatar::materials`] (values round to the nearest).
     MaterialSlot(MeshIndex, u8),
     /// A field of a constraint, by index into [`Avatar::constraints`] (ADR 0040).
@@ -117,23 +119,6 @@ pub fn bind(avatar: &Avatar) -> Bound {
             .collect();
         for m in counterparts {
             b.slot(Target::Muscle(m));
-        }
-    }
-    // Unity writes a renderer's vector property whole: components no curve animates are 0 (ADR 0067).
-    let vectors: Vec<(MeshIndex, Field)> = (b.targets.iter())
-        .filter_map(|t| match *t {
-            Target::Material(m, f, _) if f.is_vector() => Some((m, f)),
-            _ => None,
-        })
-        .collect();
-    for (m, f) in vectors {
-        for c in 0..4 {
-            let t = Target::Material(m, f, c);
-            if !b.slots.contains_key(&t) {
-                b.slots.insert(t, b.targets.len() as Slot);
-                b.targets.push(t);
-                b.defaults.push(0.0);
-            }
         }
     }
     Bound {
@@ -361,11 +346,10 @@ impl<'a> Binder<'a> {
                 match property {
                     MeshProperty::Visible => Target::RendererEnabled(mesh),
                     MeshProperty::Weight(s) => Target::BlendShape(mesh, *s),
-                    MeshProperty::Material(name) => {
-                        let (field, component) = material::parse(name).ok_or("unknown material property")?;
+                    &MeshProperty::Material { field, component, srgb } => {
                         renderer_default(self.avatar, mesh, field)
-                            .ok_or("no material on the renderer has the property")?;
-                        Target::Material(mesh, field, component)
+                            .ok_or("no material on the renderer has the field")?;
+                        Target::Material(mesh, field, component, srgb)
                     }
                     MeshProperty::MaterialSlot(s) => {
                         if *s as usize >= self.avatar.meshes[mesh as usize].submeshes.len() {
@@ -411,7 +395,10 @@ impl<'a> Binder<'a> {
             Target::Muscle(_) => 0.0,
             // The rest pose's body: hips that are not animated stay where they rest (ADR 0063).
             Target::Body(i) => self.body.as_ref().expect("bound").rest[i as usize],
-            Target::Material(m, f, c) => renderer_default(a, m, f).expect("bound")[c as usize],
+            Target::Material(m, f, c, srgb) => {
+                let v = renderer_default(a, m, f).expect("bound")[c as usize];
+                if srgb && c < 3 { material::to_srgb(v) } else { v }
+            }
             Target::MaterialSlot(m, s) => a.meshes[m as usize].submeshes[s as usize].material as f32,
             Target::Constraint(i, field) => {
                 let c = &a.constraints[i as usize];
@@ -440,8 +427,8 @@ impl<'a> Binder<'a> {
 }
 
 /// A renderer's default for a material field: its first material's value, or 0 when that material lacks the field,
-/// as Unity reads it from the renderer's material 0 (ADR 0067). `None` when no material of the renderer has it.
-fn renderer_default(avatar: &Avatar, mesh: MeshIndex, field: Field) -> Option<[f32; 4]> {
+/// as Unity reads it from the renderer's material 0 (ADRs 0067, 0099). `None` when no material of the renderer has it.
+fn renderer_default(avatar: &Avatar, mesh: MeshIndex, field: MaterialField) -> Option<[f32; 4]> {
     let get = |s: &civbb_format::mesh::Submesh| material::get(&avatar.materials[s.material as usize], field);
     let submeshes = &avatar.meshes[mesh as usize].submeshes;
     submeshes.iter().find_map(get)?;

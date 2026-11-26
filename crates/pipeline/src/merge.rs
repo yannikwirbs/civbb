@@ -50,7 +50,7 @@ pub fn merge(a: &mut Avatar) -> Merged {
             } => toggled[node as usize] = true,
             Target::Mesh {
                 mesh,
-                property: MeshProperty::Visible | MeshProperty::Material(_) | MeshProperty::MaterialSlot(_),
+                property: MeshProperty::Visible | MeshProperty::Material { .. } | MeshProperty::MaterialSlot(_),
             } => renderer[mesh as usize] = true,
             _ => {}
         }

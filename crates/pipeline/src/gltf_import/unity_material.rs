@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 
 use civbb_anim::material::to_linear;
 use civbb_format::material::{
-    AlphaMode, ColorSpace, Matcap, MatcapBlend, Material, MaterialModel, Pbr, RimRamp, RimShade, ShadeBands,
-    TextureSlot, Toon, ToonLight, Unlit,
+    AlphaMode, ColorSpace, Matcap, MatcapBlend, Material, MaterialField, MaterialModel, Pbr, RimRamp, RimShade,
+    ShadeBands, TextureSlot, Toon, ToonLight, Unlit,
 };
 use civbb_format::math::Vec3;
 use serde::Deserialize;
@@ -165,6 +165,53 @@ fn lil_multi(x: &XToonMaterial) -> bool {
     file.unwrap_or(&x.shader).to_ascii_lowercase().contains("multi")
 }
 
+/// Whether a family's shaders read a property.
+type Reads = fn(Family) -> bool;
+
+/// Unity property names material curves animate, the native field each drives and the families whose shaders read
+/// it (ADR 0099). Materials of an unknown family, or not from Unity, read every name.
+#[rustfmt::skip]
+const CURVE_NAMES: &[(&str, MaterialField, Reads)] = {
+    use Family as Fa;
+    use MaterialField as F;
+    &[
+        ("_Color", F::BaseColor, |f| !matches!(f, Fa::Uts2)),
+        ("_BaseColor", F::BaseColor, |f| matches!(f, Fa::Uts2)),
+        ("_EmissionColor", F::Emission, |f| matches!(f, Fa::Standard | Fa::LilToon(_) | Fa::Poiyomi | Fa::MToon)),
+        ("_Emissive_Color", F::Emission, |f| matches!(f, Fa::Uts2)),
+        ("_ShadeColor", F::ShadeColor, |f| matches!(f, Fa::MToon)),
+        ("_ShadowColor", F::ShadeColor, |f| matches!(f, Fa::LilToon(_))),
+        ("_1st_ShadeColor", F::ShadeColor, |f| matches!(f, Fa::Uts2)),
+        ("_RimColor", F::RimColor, |f| matches!(f, Fa::LilToon(_) | Fa::MToon)),
+        ("_RimLightColor", F::RimColor, |f| matches!(f, Fa::Poiyomi | Fa::Uts2)),
+        ("_OutlineColor", F::OutlineColor, |f| matches!(f, Fa::LilToon(_) | Fa::MToon)),
+        ("_LineColor", F::OutlineColor, |f| matches!(f, Fa::Poiyomi)),
+        ("_Outline_Color", F::OutlineColor, |f| matches!(f, Fa::Uts2)),
+        ("_Metallic", F::Metallic, |f| matches!(f, Fa::Standard)),
+        ("_Glossiness", F::Roughness, |f| matches!(f, Fa::Standard)),
+        ("_Smoothness", F::Roughness, |_| false), // URP
+        ("_BumpScale", F::NormalScale, |f| matches!(f, Fa::Standard | Fa::LilToon(_) | Fa::MToon)),
+        ("_Cutoff", F::Cutoff, |_| true),
+        ("_ShadeShift", F::ShadeShift, |f| matches!(f, Fa::MToon)),
+        ("_ShadeToony", F::ShadeToony, |f| matches!(f, Fa::MToon)),
+        ("_RimFresnelPower", F::RimPower, |f| matches!(f, Fa::MToon)),
+        ("_MatCapBlend", F::MatcapStrength, |f| matches!(f, Fa::LilToon(_))),
+        ("_MainTex_ST", F::BaseColorTransform, |_| true),
+        ("_LightMinLimit", F::LightMin, |f| matches!(f, Fa::LilToon(_))),
+        ("_LightMaxLimit", F::LightMax, |f| matches!(f, Fa::LilToon(_))),
+    ]
+};
+
+/// The native field a Unity material property (without its component suffix) animates on a material of `family`;
+/// `None` for a material not from Unity. Smoothness names drive roughness (the importer converts the keys).
+pub(super) fn curve_field(family: Option<Family>, name: &str) -> Option<MaterialField> {
+    let (_, field, reads) = CURVE_NAMES.iter().find(|(n, _, _)| *n == name)?;
+    match family {
+        None | Some(Family::Unknown) => Some(*field),
+        Some(f) => reads(f).then_some(*field),
+    }
+}
+
 /// The family of a saved material: its shader GUID, then its shader name, then marker properties (a material keeps
 /// the properties of shaders it used before, so a GUID or name wins over markers).
 pub fn family(x: &XToonMaterial) -> Family {
@@ -315,6 +362,8 @@ impl Importer<'_> {
                 continue;
             };
             let x = XToonMaterial::deserialize(v).map_err(|e| format!("X_toon_material: material {i}: {e}"))?;
+            self.families.resize(self.materials.len(), None);
+            self.families[i] = Some(family(&x));
             let name = self.materials[i].name.clone();
             self.materials[i] = Material {
                 name,

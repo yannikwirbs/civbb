@@ -173,8 +173,15 @@ fn reports_what_does_not_bind() {
             "no humanoid with hips, upper arms and upper legs",
         ),
         (
-            curve(mesh(MeshProperty::Material("_Nope.r".into())), &[(0.0, 1.0)]),
-            "unknown material property",
+            curve(
+                mesh(MeshProperty::Material {
+                    field: civbb_format::material::MaterialField::ShadeColor,
+                    component: 0,
+                    srgb: true,
+                }),
+                &[(0.0, 1.0)],
+            ),
+            "no material on the renderer has the field",
         ),
     ];
     for (c, reason) in cases {

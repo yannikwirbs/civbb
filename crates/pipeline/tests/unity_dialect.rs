@@ -8,6 +8,7 @@ use std::path::Path;
 
 use civbb_format::animator::{Behaviour, DriverOp, MeshProperty, NodeProperty, Target};
 use civbb_format::constraint::ConstraintField;
+use civbb_format::material::{MaterialField, MaterialModel};
 use civbb_format::state::{EntryKind, Range, SyncMode};
 use civbb_pipeline::gltf_import::{Limits, import};
 use serde_json::{Value, json};
@@ -222,4 +223,59 @@ fn unity_bindings_resolve_by_path_or_are_dropped() {
         .map(|&n| a.hierarchy.nodes[n as usize].name.as_str())
         .collect();
     assert_eq!(names, ["Body", "Prop"]);
+}
+
+/// Unity material curves lower to native fields (ADR 0099): smoothness to roughness, colours flagged sRGB, the
+/// V-up texture offset to the stored one (`1 - v_scale - v_offset`, the V scale 0 where no curve animates it), and
+/// the components of an animated field that no curve animates baked as 0 into the renderer's material.
+#[test]
+fn unity_material_curves_lower_to_native_fields() {
+    let mut doc: Value = serde_json::from_slice(&fixture("unity-dialect-1.gltf")).unwrap();
+    let x = &mut doc["extensions"]["X_animator"];
+    let key = |v: f32| json!([{"time": 0.0, "value": v, "in_tangent": 0.5, "out_tangent": 0.5}]);
+    let curves = x["clips"][1]["curves"].as_array_mut().unwrap();
+    curves.clear();
+    for (name, v) in [
+        ("_Glossiness", 0.25),
+        ("_Color.g", 0.5),
+        ("_MainTex_ST.w", 0.25),
+        ("_EmissionColor.a", 1.0),
+        ("_Color", 1.0),
+        ("_Nope", 1.0),
+    ] {
+        curves.push(json!({"binding": {"path": "Body", "property": {"Material": name}}, "keys": key(v)}));
+    }
+    let imported = import(&serde_json::to_vec(&doc).unwrap(), &Limits::default(), no_files).unwrap();
+    let a = &imported.avatar;
+    let material = |field, component, srgb| Target::Mesh {
+        mesh: 0,
+        property: MeshProperty::Material { field, component, srgb },
+    };
+    let got: Vec<(Target, f32, f32)> = (a.clips.last().unwrap().curves.iter())
+        .map(|c| (c.target.clone(), c.keys[0].value, c.keys[0].out_tangent))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (material(MaterialField::Roughness, 0, false), 0.75, -0.5),
+            (material(MaterialField::BaseColor, 1, true), 0.5, 0.5),
+            (material(MaterialField::BaseColorTransform, 3, false), 0.75, -0.5),
+        ]
+    );
+    let dropped: Vec<&str> = (imported.warnings.iter())
+        .filter_map(|w| w.strip_prefix("X_animator: "))
+        .collect();
+    assert_eq!(
+        dropped,
+        [
+            "2 curves dropped: no such material field component",
+            "1 curves dropped: unknown material property",
+            "1 curves dropped: unsupported component property", // another clip's
+        ]
+    );
+    // `_Color.g` here and `_Color.r` in the other clip: Unity writes blue and alpha as 0.
+    let MaterialModel::Pbr(p) = &a.materials[a.meshes[0].submeshes[0].material as usize].model else {
+        panic!("a PBR material");
+    };
+    assert_eq!(p.base_color, [1.0, 1.0, 0.0, 0.0]);
 }

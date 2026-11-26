@@ -133,11 +133,15 @@ What exists, by area. Read the section for the area you touch; update it when th
   parameters get Int 0..255 / Float -1..1 8 bits, VRM weights Float 0..1 8 bits: corpus totals unchanged. Platform values (ADR 0096): `state::Platform`, entries named `platform/...`
   (VRChat's names via `vrchat_name`, renamed by the importer, raised back by the corpus writer and the parity
   hand-off), never synced/saved/external and written by no content (validated; the importer drops driver writes).
-- Curve targets (ADR 0089 points 1, 2 and 4, #119, format v30): `animator::Target` is `Node {node, property}`
-  (`Translation`, `Rotation`, `EulerRotation`, `Scale`, `Active`), `Mesh {mesh, property}` (`Visible`,
-  `Weight(shape)`, `Material(name)`, `MaterialSlot`), `Humanoid(Muscle(name) | Body)`, `Entry`, `Constraint
-  {constraint, field}`; avatar mask `transforms` are node indices. Units, muscle names and Unity material property
-  names are still Unity's (#120). Dialect 1's path bindings are resolved in `gltf_import/unity_clip.rs` (path to node,
+- Curve targets (ADRs 0089, 0099, #119, #120, format v31): `animator::Target` is `Node {node, property}`
+  (`Translation`, `Rotation`, `EulerRotation {axis, order}` in radians, `EulerOrder::Zxy` only, `Scale`, `Active`),
+  `Mesh {mesh, property}` (`Visible`, `Weight(shape)` 0..1, `Material {field: MaterialField, component, srgb}`,
+  `MaterialSlot`), `Humanoid(Muscle {bone, axis} | Body)`, `Entry`, `Constraint {constraint, field}`; avatar mask
+  `transforms` are node indices. The Unity importer converts units (degrees, 0..100, smoothness to roughness, V-up
+  offsets to stored ones per clip) and maps material names per shader family (`unity_material::curve_field`,
+  `Importer::families`); components of an animated material field that no clip animates are baked into the
+  renderer's materials (`unity_clip/material.rs`, ADR 0099). The corpus writer raises units back and refuses
+  material curves. Dialect 1's path bindings are resolved in `gltf_import/unity_clip.rs` (path to node,
   the node's mesh, shape by name, entry by name or VRChat built-in name, first constraint of the type on the node;
   what resolves to nothing is dropped with one `X_animator: N curves dropped: <reason>` warning per reason); the
   corpus writer raises targets back to paths. Prune, merge and atlas remap targets through `renumber::Renumber`
@@ -271,13 +275,12 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 ## Runtime (`core`, `anim`, `dynamics`, `client`)
 
-- Animated materials (ADR 0025): `civbb_anim::material` maps Unity property names (`_Color`, `_EmissionColor`,
-  `_MainTex_ST`, `_Glossiness`, MToon/lilToon/Poiyomi/UTS2 names) to native fields in Unity's units (sRGB colours,
-  smoothness, V-up offsets); `Target::Material(mesh, field, component)` per renderer. `Model::animated_materials`
+- Animated materials (ADRs 0025, 0099): `civbb_anim::material` reads and writes a `MaterialField` as stored;
+  `Target::Material(mesh, field, component, srgb)` per renderer, `srgb` slots decoded with `to_linear` when applied. `Model::animated_materials`
   and `Island::materials` give each island its own records for animated renderers; the viewer rewrites changed
   records through `Forward::add`'s upload pass. As recorded (ADR 0067): defaults from the renderer's material 0 (0
-  when it lacks the field), vectors written whole (components no curve animates are 0), animated colours converted
-  from gamma even when `[HDR]` (an `[HDR]` default still round-trips, #93).
+  when it lacks the field), components no curve animates are 0 (baked by the importer, ADR 0099), animated colours
+  converted from gamma even when `[HDR]` (an `[HDR]` default still round-trips, #93).
 - `civbb-core`: shared math, `jobs::islands` (one rayon job per avatar), per-system `Counters`. `civbb-client`:
   `Model`/`Island` (animator, constraints, IK stub, dynamics, world poses) and `frame::step` with the contact pass
   feeding next frame's parameters (ADR 0020); `civbb-client bench [--package <pkg> --key <key>]` prints JSON (#23,

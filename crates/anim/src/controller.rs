@@ -52,7 +52,7 @@ impl Controller {
             Target::Position(n, _) | Target::Rotation(n, _) | Target::Scale(n, _) | Target::Active(n) => Some(n),
             Target::BlendShape(m, _)
             | Target::RendererEnabled(m)
-            | Target::Material(m, _, _)
+            | Target::Material(m, _, _, _)
             | Target::MaterialSlot(m, _) => Some(avatar.meshes[m as usize].node),
             Target::Constraint(i, _) => Some(avatar.constraints[i as usize].target),
             Target::Parameter(_) | Target::Muscle(_) | Target::Body(_) => None,

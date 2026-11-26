@@ -8,7 +8,7 @@ use std::io::Cursor;
 use civbb_format::animator::{Clip, Curve, Key, MeshProperty, Target};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::material::{
-    AlphaMode, ColorSpace, ImageFormat, Material, MaterialModel, Pbr, Texture, TextureSlot, Unlit,
+    AlphaMode, ColorSpace, ImageFormat, Material, MaterialField, MaterialModel, Pbr, Texture, TextureSlot, Unlit,
 };
 use civbb_format::math::Transform;
 use civbb_format::mesh::{Mesh, Submesh};
@@ -183,7 +183,11 @@ fn avatar() -> Imported {
                 curves: vec![Curve {
                     target: Target::Mesh {
                         mesh: 1,
-                        property: MeshProperty::Material("_Color.r".into()),
+                        property: MeshProperty::Material {
+                            field: MaterialField::BaseColor,
+                            component: 0,
+                            srgb: true,
+                        },
                     },
                     keys: vec![key(0.0), key(1.0)],
                 }],

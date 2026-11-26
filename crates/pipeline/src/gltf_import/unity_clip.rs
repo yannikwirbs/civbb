@@ -9,10 +9,17 @@ use civbb_format::animator::{
 };
 use civbb_format::constraint::{Constraint, ConstraintField, ConstraintType};
 use civbb_format::hierarchy::{Node, NodeIndex};
+use civbb_format::material::{Material, MaterialField};
 use civbb_format::mesh::{Mesh, MeshIndex};
 use civbb_format::state::{Platform, StateTable};
 use serde::Deserialize;
 use serde_json::Value;
+
+use super::unity_material::Family;
+
+mod material;
+
+pub(super) use material::{Bake, bake};
 
 /// A clip as dialect 1 writes it (`X_animator.clips`).
 #[derive(Deserialize)]
@@ -72,6 +79,9 @@ pub(super) struct Scope<'a> {
     pub meshes: &'a [Mesh],
     pub state: &'a StateTable,
     pub constraints: &'a [Constraint],
+    pub materials: &'a [Material],
+    /// Each material's shader family, where it came from Unity.
+    pub families: &'a [Option<Family>],
     /// Longest name a path can match, in bytes.
     pub string_len: usize,
 }
@@ -92,8 +102,9 @@ fn paths(nodes: &[Node], max: usize) -> Vec<Option<String>> {
     paths
 }
 
-/// Clips with typed targets, and one warning per reason curves were dropped for.
-pub(super) fn lower(clips: Vec<XClip>, s: &Scope) -> (Vec<Clip>, Vec<String>) {
+/// Clips with typed targets, one warning per reason curves were dropped for, and the material values the clips imply
+/// ([`bake`] them).
+pub(super) fn lower(clips: Vec<XClip>, s: &Scope) -> (Vec<Clip>, Vec<String>, Vec<Bake>) {
     // Paths resolve to the first node with that path, as Unity's `Transform.Find` does.
     let mut by_path: HashMap<String, NodeIndex> = HashMap::new();
     for (i, p) in paths(s.nodes, s.string_len).into_iter().enumerate() {
@@ -102,7 +113,7 @@ pub(super) fn lower(clips: Vec<XClip>, s: &Scope) -> (Vec<Clip>, Vec<String>) {
         }
     }
     let mut dropped: BTreeMap<&'static str, usize> = BTreeMap::new();
-    let clips = clips
+    let mut clips: Vec<Clip> = clips
         .into_iter()
         .map(|c| Clip {
             name: c.name,
@@ -123,10 +134,11 @@ pub(super) fn lower(clips: Vec<XClip>, s: &Scope) -> (Vec<Clip>, Vec<String>) {
                 .collect(),
         })
         .collect();
+    let bakes = material::finish(&mut clips, s.meshes, s.materials, &mut dropped);
     let warnings = (dropped.into_iter())
         .map(|(reason, n)| format!("X_animator: {n} curves dropped: {reason}"))
         .collect();
-    (clips, warnings)
+    (clips, warnings, bakes)
 }
 
 /// How a dialect 1 value becomes a native one; keys are linear in it, so tangents convert like values.
@@ -136,6 +148,8 @@ enum Unit {
     /// Unity's 0 to 100 to 0 to 1.
     Percent,
     Degrees,
+    /// Smoothness to roughness.
+    OneMinus,
 }
 
 impl Unit {
@@ -144,10 +158,15 @@ impl Unit {
             Unit::Same => v,
             Unit::Percent => v / 100.0,
             Unit::Degrees => v.to_radians(),
+            Unit::OneMinus => -v,
         };
         Key {
             time: k.time,
-            value: f(k.value),
+            value: if let Unit::OneMinus = self {
+                1.0 - k.value
+            } else {
+                f(k.value)
+            },
             in_tangent: f(k.in_tangent),
             out_tangent: f(k.out_tangent),
         }
@@ -160,7 +179,19 @@ fn target(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Resul
         XProperty::EulerRotation(_) => Unit::Degrees,
         _ => Unit::Same,
     };
-    resolve(b, s, by_path).map(|t| (t, unit))
+    let t = resolve(b, s, by_path)?;
+    let unit = match t {
+        Target::Mesh {
+            property:
+                MeshProperty::Material {
+                    field: MaterialField::Roughness,
+                    ..
+                },
+            ..
+        } => Unit::OneMinus,
+        _ => unit,
+    };
+    Ok((t, unit))
 }
 
 fn resolve(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Result<Target, &'static str> {
@@ -204,7 +235,7 @@ fn resolve(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Resu
             let i = shapes.iter().position(|x| x.name == name).ok_or("no such blendshape")?;
             on_mesh(MeshProperty::Weight(i as u32))
         }
-        XProperty::Material(name) => on_mesh(MeshProperty::Material(name)),
+        XProperty::Material(name) => material::target(&name, mesh.ok_or("no mesh at path")?, s.meshes, s.families),
         XProperty::MaterialSlot(i) => on_mesh(MeshProperty::MaterialSlot(i)),
         XProperty::Constraint { kind, field } => {
             let i = (s.constraints.iter())

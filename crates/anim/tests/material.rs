@@ -1,12 +1,12 @@
-//! Material curves (ADR 0025): Unity property names to native fields, Unity's units (sRGB colours, smoothness, V-up
-//! offsets), per-renderer slots defaulting from the renderer's material 0, whole vectors, unbound reports.
+//! Material curves (ADRs 0025, 0099): native fields read and written as stored, the sRGB transfer, per-renderer slots
+//! defaulting from the renderer's first material, unbound reports.
 
-use civbb_anim::material::{self, Field, to_linear, to_srgb};
+use civbb_anim::material::{self, to_linear, to_srgb};
 use civbb_anim::{Target, bind};
 use civbb_format::Avatar;
 use civbb_format::animator::{Clip, Curve, Key, MeshProperty, Target as CurveTarget};
 use civbb_format::hierarchy::{Hierarchy, Node};
-use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr, TextureSlot, Unlit};
+use civbb_format::material::{AlphaMode, Material, MaterialField as F, MaterialModel, Pbr, TextureSlot, Unlit};
 use civbb_format::math::Transform;
 use civbb_format::mesh::{Mesh, Submesh};
 
@@ -49,11 +49,11 @@ fn pbr() -> Material {
 }
 
 /// A material curve on the `Body` renderer (mesh 0).
-fn curve(name: &str, value: f32) -> Curve {
+fn curve(field: F, component: u8, srgb: bool, value: f32) -> Curve {
     Curve {
         target: CurveTarget::Mesh {
             mesh: 0,
-            property: MeshProperty::Material(name.into()),
+            property: MeshProperty::Material { field, component, srgb },
         },
         keys: vec![Key {
             time: 0.0,
@@ -104,31 +104,34 @@ fn close(a: &[f32], b: &[f32]) {
 }
 
 #[test]
-fn names_parse_to_fields_and_components() {
-    assert_eq!(material::parse("_Color.r"), Some((Field::BaseColor, 0)));
-    assert_eq!(material::parse("_BaseColor.a"), Some((Field::BaseColor, 3)));
-    assert_eq!(material::parse("_EmissionColor.b"), Some((Field::Emission, 2)));
-    assert_eq!(material::parse("_MainTex_ST.w"), Some((Field::MainTexSt, 3)));
-    assert_eq!(material::parse("_Glossiness"), Some((Field::Smoothness, 0)));
-    assert_eq!(material::parse("_LineColor.g"), Some((Field::OutlineColor, 1)));
-    assert_eq!(material::parse("_LightMaxLimit"), Some((Field::LightMax, 0)));
-    assert_eq!(material::parse("_LightMinLimit"), Some((Field::LightMin, 0)));
-    // Vectors need a component, scalars must not have one, unknown names and suffixes bind to nothing.
-    for bad in ["_Color", "_Metallic.x", "_Color.q", "_Nope.r", "", "."] {
-        assert_eq!(material::parse(bad), None, "{bad}");
-    }
-}
-
-#[test]
-fn values_are_in_unity_units() {
+fn fields_read_and_write_as_stored() {
     let mut m = pbr();
-    // Linear colours read sRGB-encoded; alpha stays linear.
-    close(&material::get(&m, Field::BaseColor).unwrap(), &[1.0, 0.0, 0.0, 1.0]);
-    assert!(material::set(&mut m, Field::BaseColor, 1, 0.5));
+    close(&material::get(&m, F::BaseColor).unwrap(), &[1.0, 0.0, 0.0, 1.0]);
+    assert!(material::set(&mut m, F::BaseColor, 1, 0.5));
+    close(&material::get(&m, F::BaseColor).unwrap(), &[1.0, 0.5, 0.0, 1.0]);
+    close(&material::get(&m, F::Roughness).unwrap()[..1], &[0.25]);
+    close(
+        &material::get(&m, F::BaseColorTransform).unwrap(),
+        &[2.0, 0.5, 0.25, 0.125],
+    );
+    material::set(&mut m, F::BaseColorTransform, 3, 0.5);
     let MaterialModel::Pbr(p) = &m.model else {
         unreachable!()
     };
-    close(&p.base_color, &[1.0, to_linear(0.5), 0.0, 1.0]);
+    close(&p.base_color_tex.unwrap().scale_offset, &[2.0, 0.5, 0.25, 0.5]);
+    // Cutoff lives on masked materials only; fields a model lacks are absent.
+    close(&material::get(&m, F::Cutoff).unwrap()[..1], &[0.5]);
+    assert_eq!(material::get(&unlit(), F::Cutoff), None);
+    assert_eq!(material::get(&unlit(), F::BaseColorTransform), None, "no texture");
+    assert!(!material::set(&mut unlit(), F::ShadeColor, 0, 1.0));
+    // A component past an RGB colour's three is accepted and ignored.
+    let before = m.clone();
+    assert!(material::set(&mut m, F::Emission, 3, 0.5));
+    assert_eq!(m, before);
+}
+
+#[test]
+fn srgb_curves_decode_as_unity_does() {
     close(&[to_linear(0.5)], &[0.214_041_14]);
     close(&[to_srgb(to_linear(0.7))], &[0.7]);
     // HDR: Unity's `Mathf.GammaToLinearSpace` raises values above 1 to 2.2 (measured: 32 gives 2048).
@@ -136,77 +139,35 @@ fn values_are_in_unity_units() {
     // An animated colour reaches the shader converted so, `[HDR]` or not; alpha unconverted (rendered in Unity
     // 2022.3, linear project, #54: 0.2 gave 0.033105, an `[HDR]` 5 gave 34.493, alpha 0.5 stayed 0.5).
     assert!((to_linear(0.2) - 0.033_105).abs() < 1e-6 && (to_linear(5.0) - 34.493).abs() < 1e-3);
-    // Smoothness is one minus roughness.
-    close(&material::get(&m, Field::Smoothness).unwrap()[..1], &[0.75]);
-    material::set(&mut m, Field::Smoothness, 0, 0.1);
-    let MaterialModel::Pbr(p) = &m.model else {
-        unreachable!()
-    };
-    close(&[p.roughness], &[0.9]);
-    // Unity's V offset is from the bottom: ours is 1 - scale - offset, and stays put when the V scale changes.
-    close(&material::get(&m, Field::MainTexSt).unwrap(), &[2.0, 0.5, 0.25, 0.375]);
-    material::set(&mut m, Field::MainTexSt, 1, 0.25);
-    close(&material::get(&m, Field::MainTexSt).unwrap(), &[2.0, 0.25, 0.25, 0.375]);
-    material::set(&mut m, Field::MainTexSt, 3, 0.5);
-    let MaterialModel::Pbr(p) = &m.model else {
-        unreachable!()
-    };
-    close(&p.base_color_tex.unwrap().scale_offset, &[2.0, 0.25, 0.25, 0.25]);
-    // Cutoff lives on masked materials only; fields a model lacks are absent.
-    close(&material::get(&m, Field::Cutoff).unwrap()[..1], &[0.5]);
-    assert_eq!(material::get(&unlit(), Field::Cutoff), None);
-    assert_eq!(material::get(&unlit(), Field::MainTexSt), None, "no texture");
-    assert!(!material::set(&mut unlit(), Field::ShadeColor, 0, 1.0));
-    // Alpha on an RGB colour is accepted and ignored.
-    let before = m.clone();
-    assert!(material::set(&mut m, Field::Emission, 3, 0.5));
-    assert_eq!(m, before);
 }
 
 #[test]
 fn curves_bind_per_renderer_with_the_first_materials_default() {
     let b = bind(&avatar(vec![
-        curve("_Color.g", 1.0),
-        curve("_Metallic", 0.0),
-        curve("_MainTex_ST.w", 0.0),
+        curve(F::BaseColor, 1, true, 1.0),
+        curve(F::BaseColor, 3, true, 1.0),
+        curve(F::Metallic, 0, false, 0.0),
+        curve(F::BaseColorTransform, 3, false, 0.0),
     ]));
     assert!(b.unbound.is_empty(), "{:?}", b.unbound);
-    // Unity writes a vector property whole: the components no curve animates get slots too, at 0 (ADR 0067).
     assert_eq!(
         b.bindings.targets,
         [
-            Target::Material(0, Field::BaseColor, 1),
-            Target::Material(0, Field::Metallic, 0),
-            Target::Material(0, Field::MainTexSt, 3),
-            Target::Material(0, Field::BaseColor, 0),
-            Target::Material(0, Field::BaseColor, 2),
-            Target::Material(0, Field::BaseColor, 3),
-            Target::Material(0, Field::MainTexSt, 0),
-            Target::Material(0, Field::MainTexSt, 1),
-            Target::Material(0, Field::MainTexSt, 2),
+            Target::Material(0, F::BaseColor, 1, true),
+            Target::Material(0, F::BaseColor, 3, true),
+            Target::Material(0, F::Metallic, 0, false),
+            Target::Material(0, F::BaseColorTransform, 3, false),
         ]
     );
-    // Defaults come from the renderer's first material (the Unlit one), sRGB-encoded; the PBR-only fields default
-    // to 0 because that material lacks them, as Unity reads material 0 (ADR 0067).
-    close(
-        &b.bindings.defaults,
-        &[to_srgb(0.5), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-    );
+    // Defaults come from the renderer's first material (the Unlit one), sRGB-encoded where the curve is, alpha
+    // linear; the PBR-only fields default to 0 because that material lacks them, as Unity reads material 0 (ADR 0067).
+    close(&b.bindings.defaults, &[to_srgb(0.5), 0.8, 0.0, 0.0]);
 }
 
 #[test]
 fn curves_without_a_target_are_reported() {
-    let cases = [
-        (curve("_Nope.r", 1.0), "unknown material property"),
-        (
-            curve("_ShadeColor.r", 1.0),
-            "no material on the renderer has the property",
-        ),
-    ];
-    for (c, reason) in cases {
-        let b = bind(&avatar(vec![c]));
-        let reasons: Vec<_> = b.unbound.iter().map(|u| u.reason).collect();
-        assert_eq!(reasons, [reason]);
-        assert!(b.bindings.is_empty());
-    }
+    let b = bind(&avatar(vec![curve(F::ShadeColor, 0, true, 1.0)]));
+    let reasons: Vec<_> = b.unbound.iter().map(|u| u.reason).collect();
+    assert_eq!(reasons, ["no material on the renderer has the field"]);
+    assert!(b.bindings.is_empty());
 }
