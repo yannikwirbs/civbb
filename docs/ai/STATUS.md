@@ -7,13 +7,11 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#120 (ADR 0089 points 1 and 3: native units in curve targets). Targets are typed now (#119, format v30), so #120
-changes values only: radians and `rotation_euler` axis order (Unity's Z, X, Y lowered in
-`gltf_import/unity_clip.rs`), weights 0..1, native muscle identifiers, material curves as native fields with
-`srgb`, explicit constant curves for unanimated vector components (today `civbb_anim::bind` adds them). The importer
-gets the Unity material name table (`civbb_anim::material::parse`) per fingerprinted family. Then #121 to #125 in
-number order (events are Phase 2, #127). Parity reruns are ~1 min with a warm texture cache (ADR 0097); last full
-run `corpus/local/unity-ref/scores/s119`.
+#121 (ADR 0085: native actions and the per-state unwritten rule), then #122 to #125 in number order (events are
+Phase 2, #127). #120 is done (ADR 0099, format v31): curve targets carry native units, muscle `{bone, axis}`,
+`EulerOrder::Zxy`, `MaterialField` with `srgb`; #122's VRM bone names will rename muscle targets through
+`HumanBone`'s serialisation. Parity reruns are ~1 min with a warm texture cache (ADR 0097); last full run
+`corpus/local/unity-ref/scores/s120`.
 
 ## Now
 
@@ -22,12 +20,13 @@ run `corpus/local/unity-ref/scores/s119`.
   first, then ECS client runtime, desktop mode/locomotion/IK, OpenXR, protocol/instance server/nodes, voice,
   minimal hub and join flow, avatar fidelity (#109, #107, #110, #92, #93, #94, #77), Phase 1 gate (#61, #62, #63,
   #104). Milestones without issues get them filed from their design doc sections by the session that starts them.
-- **M1.1 (#100) is designed**: ADRs 0085 to 0090, design doc §9. Done: #113 to #119 (state table ADR 0095, chain
-  outputs, platform values ADR 0096, sync encoding ADR 0098, typed curve targets; format v30: packages in
-  corpus/local need `civbb build` again). #128: build-stage timings and the texture cache (ADR 0097).
+- **M1.1 (#100) is designed**: ADRs 0085 to 0090, design doc §9. Done: #113 to #120 (state table ADR 0095, chain
+  outputs, platform values ADR 0096, sync encoding ADR 0098, typed curve targets, native curve units and material
+  fields ADR 0099; format v31: packages in corpus/local need `civbb build` again). #128: build-stage timings and the texture cache (ADR 0097).
 - Parity rerun after any change to materials, dynamics or the renderer: `tools/parity.sh --against <last run>
   <out dir>` (~1 min with a warm texture cache). The ADR 0084 table must not regress; Yumeka's rest worst view is 0.1197, 0.0003
-  under red. Last full run: `corpus/local/unity-ref/scores/s119` (#119), every report identical to s118.
+  under red. Last full run: `corpus/local/unity-ref/scores/s120` (#120): every report identical to s119 but
+  Cokoro_Quest, which improves (red states 9 to 7).
 - Session cost: ADRs 0091 and 0092 (2026-11-26). After about five sessions, compare `python
   tools/session-stats.py --since 2026-11-26` with the baseline in `docs/iteration-baseline.md` ($9.2 and 28 M
   cache-read tokens per closed issue) and record the result there.
@@ -41,13 +40,13 @@ run `corpus/local/unity-ref/scores/s119`.
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-26 (3): #116 chain outputs (`Chain::outputs`, one entry per output, written by `Island::step`; format v27)
-  and #117 platform values (`state::Platform`, `platform/` names, read-only to content, ADR 0096; format v28).
-  Parity s116 and s117 equal to s115. #128 filed (parity
-  is build-bound). Next: #128, then #118.
 - 2026-11-26 (4): #128 per-stage build timings (`compress` is ~all of a build) and an opt-in texture cache (ADR
   0097; parity rerun 15 min cold, 1 min 12 s warm, byte-identical packages); #118 sync encoding per entry
   (`Entry::range`, `sync_bits`/`encode`/`decode`, ADR 0098, format v29; corpus totals unchanged). Next: #119.
 - 2026-11-26 (5): #119 typed curve targets (`animator::Target`: node, mesh, humanoid, entry, constraint by index;
   masks by node; format v30). Unity paths resolved by `gltf_import/unity_clip.rs`, unresolvable curves dropped with
   a warning; prune, merge and atlas remap through `renumber::Renumber`; `node_paths` left `civbb-anim`. Next: #120.
+- 2026-11-26 (6): #120 native curve units (format v31, ADR 0099): weights 0..1, Euler radians with
+  `EulerOrder::Zxy`, muscles `{bone, axis}`, material curves on `MaterialField` with `srgb`; Unity names per shader
+  family, smoothness and V-up offsets converted, unanimated vector components baked into materials. Parity s120:
+  Cokoro_Quest red states 9 to 7, the rest identical. Next: #121.

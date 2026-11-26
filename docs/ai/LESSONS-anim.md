@@ -85,3 +85,7 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   own hand colliders in play mode (#92), although the chain lists no colliders.
 - `VrcPhysBones.cs` cases take `boneAxis` and `rootRotation` settings (not PhysBone fields) for chains that hang
   like a real avatar's; append new cases at the end of the list.
+- Unit conversions of material curves couple components: Unity's V offset is measured from the bottom, so the stored
+  offset is `1 - v_scale - v_offset`. Zeroing (baking) a V scale must add the old scale to the stored offset, or the
+  `material_first_default` golden reads 1.2 for 0.2. And a slot's default is a Write Defaults value: a value Unity
+  holds where no clip writes cannot become a constant curve; bake it into the material (ADR 0099).
