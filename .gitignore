@@ -14,3 +14,5 @@
 /tools/unity-truth/Packages/packages-lock.json
 /tools/unity-truth/ProjectSettings/*
 !/tools/unity-truth/ProjectSettings/ProjectVersion.txt
+.claude/settings.local.json
+.claude/*.lock

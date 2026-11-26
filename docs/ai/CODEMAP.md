@@ -293,6 +293,7 @@ Internal deps: none
 - `docs/adr/0088-state-table-and-events.md`: 0088: One state table per document, read and written by reference; events as a separate channel
 - `docs/adr/0089-native-animation-targets.md`: 0089: Curves target native properties by reference, in native units; Unity bindings are resolved by the importer
 - `docs/adr/0090-materials-as-native-features.md`: 0090: Materials are native models with named features; shader families are lowered into them by table
+- `docs/adr/0091-project-claude-settings-trim-fixed-context.md`: 0091: Project Claude Code settings drop tools this repo never uses
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
 - `docs/ai/LESSONS-parsers.md`: Lessons: parsers and fuzzing

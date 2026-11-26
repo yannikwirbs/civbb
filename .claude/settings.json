@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "deny": ["Artifact", "PowerShell", "ReportFindings", "ListAgents", "ScheduleWakeup"]
+  },
+  "enabledPlugins": {
+    "unity@claude-plugins-official": false
+  }
+}
