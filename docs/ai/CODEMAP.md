@@ -296,6 +296,7 @@ Internal deps: none
 - `docs/adr/0091-project-claude-settings-trim-fixed-context.md`: 0091: Project Claude Code settings drop tools this repo never uses
 - `docs/adr/0092-session-shape-and-handover.md`: 0092: Sessions end at a chain's end or 250 k tokens of context; the handover is STATUS.md's Next and `/continue`
 - `docs/adr/0093-gate-runs-tests-with-nextest.md`: 0093: The gate runs tests with cargo-nextest when it is installed
+- `docs/adr/0094-rust-navigation-through-lsp.md`: 0094: Sessions navigate Rust through the LSP tool
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

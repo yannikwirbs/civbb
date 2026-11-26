@@ -7,7 +7,7 @@ CIVBB is a social VR platform on a custom Rust + Vulkan engine. The product spec
 1. Read `docs/ai/STATUS.md` (milestone, **Next**, blockers) and `docs/ai/LESSONS.md` (general gotchas).
 2. `tools/ci.sh`: GitHub CI of the last push. If it is red, fix that first.
 3. `tools/issue.sh show <N>` for the issue STATUS.md's Next names (`tools/issue.sh queue` lists the milestone). Before working in an area, read its section of `docs/ai/STATE.md` (`grep -n '^## '`, then by range) and its `docs/ai/LESSONS-<topic>.md` (listed in LESSONS.md).
-4. Find code with `grep -n <word> docs/ai/CODEMAP.md` (one line per file: its job). Open files by range, not whole.
+4. Find code with `grep -n <word> docs/ai/CODEMAP.md` (one line per file: its job). For Rust definitions, references and callers use the LSP tool (rust-analyzer, ADR 0094): call it once early, because it indexes for about 30 s after its first call and answers "no references" until then. Open files by range, not whole.
 
 ## Session shape (ADR 0092)
 
