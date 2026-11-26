@@ -26,7 +26,7 @@ pub use validate::{Caps, validate};
 
 /// Version of the runtime package's data model. Bump on any change to the types in this crate; readers refuse
 /// packages of any other version, which are rebuilt from their kept source (ADR 0087).
-pub const FORMAT_VERSION: u32 = 26;
+pub const FORMAT_VERSION: u32 = 27;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -268,7 +268,10 @@ pub(crate) mod testutil {
                     max_squish: Graded::constant(0.0),
                     allow_grab: true,
                     allow_posing: true,
-                    parameter: Some("Tail".into()),
+                    outputs: ChainOutputs {
+                        angle: Some(1),
+                        ..ChainOutputs::default()
+                    },
                 }],
                 colliders: vec![Collider {
                     node: 1,

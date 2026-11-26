@@ -197,7 +197,7 @@ impl V {
         if let Some(e) = &a.expressions {
             self.expressions(e, a.textures.len(), entries);
         }
-        self.dynamics(&a.dynamics, nodes);
+        self.dynamics(&a.dynamics, nodes, entries);
         self.contacts(&a.contacts, nodes, entries);
         self.constraints(&a.constraints, nodes);
     }
@@ -522,7 +522,7 @@ impl V {
         self.cap(controls, self.caps.menu_controls, "expressions.menu controls");
     }
 
-    fn dynamics(&mut self, d: &Dynamics, nodes: usize) {
+    fn dynamics(&mut self, d: &Dynamics, nodes: usize, entries: usize) {
         let colliders = d.colliders.len();
         self.cap(d.chains.len(), self.caps.chains, "dynamics.chains");
         self.cap(colliders, self.caps.colliders, "dynamics.colliders");
@@ -565,8 +565,8 @@ impl V {
             for g in graded {
                 self.graded(g, p);
             }
-            if let Some(s) = &ch.parameter {
-                self.string(s, p);
+            for e in ch.outputs.entries().into_iter().flatten() {
+                self.index(e as usize, entries, p, "entry");
             }
         }
         for (i, col) in d.colliders.iter().enumerate() {
@@ -831,6 +831,7 @@ mod tests {
             }),
             ("contacts[0]", |a| a.contacts.receivers[0].parameter = Some(2)),
             ("dynamics.chains[0]", |a| a.dynamics.chains[0].colliders[0] = 4),
+            ("dynamics.chains[0]", |a| a.dynamics.chains[0].outputs.squish = Some(2)),
             ("dynamics.colliders[0]", |a| a.dynamics.colliders[0].node = 40),
             ("contacts[0]", |a| a.contacts.receivers[0].volume.node = 40),
             ("contacts[0]", |a| a.contacts.receivers[0].volume.component = Some(40)),

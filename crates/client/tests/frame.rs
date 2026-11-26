@@ -62,6 +62,30 @@ fn receiver_values_reach_parameters_on_the_next_frame() {
     assert_eq!(islands[0].animator_mut().unwrap().params[p], 1.0);
 }
 
+/// Chain outputs (ADR 0088) write their entries by index: the bloated corpus's first tail reports its angle.
+#[test]
+fn chain_outputs_reach_their_entries() {
+    let avatar = civbb_corpus::generate(&civbb_corpus::bloated());
+    let outputs = avatar.dynamics.chains[0].outputs.clone();
+    let (angle, grabbed) = (outputs.angle.unwrap() as usize, outputs.is_grabbed.unwrap() as usize);
+    let mut i = island(&avatar, 0, true);
+    let mut c = Default::default();
+    i.step(DT, &mut c);
+    assert_eq!(
+        i.animator_mut().unwrap().params[angle],
+        0.0,
+        "no angle before the first dynamics step"
+    );
+    // Swing the avatar sideways so the tail lags behind its rest direction.
+    for f in 1..30 {
+        i.origin.pos = [f as f32 * 0.05, 0.0, 0.0];
+        i.step(DT, &mut c);
+    }
+    let params = &i.animator_mut().unwrap().params;
+    assert!(params[angle] > 0.0 && params[angle] <= 1.0, "angle {}", params[angle]);
+    assert_eq!(params[grabbed], 0.0);
+}
+
 #[test]
 fn every_system_reports_per_island_and_the_contact_pass_once() {
     let avatar = civbb_corpus::generate(&civbb_corpus::lean());

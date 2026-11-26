@@ -49,7 +49,7 @@ fn chain(root: u32) -> Chain {
         max_squish: g(0.0),
         allow_grab: true,
         allow_posing: true,
-        parameter: None,
+        outputs: Default::default(),
     }
 }
 

@@ -43,6 +43,7 @@ fn avatar() -> Avatar {
     chain.root = 8;
     chain.ignore.clear();
     chain.colliders.clear();
+    chain.outputs = Default::default();
     let mut a = Avatar {
         hierarchy: Hierarchy {
             nodes: vec![

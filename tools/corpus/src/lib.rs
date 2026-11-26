@@ -547,7 +547,7 @@ pub fn generate(spec: &Spec) -> Avatar {
                 max_squish: graded(0.1),
                 allow_grab: true,
                 allow_posing: true,
-                parameter: Some(format!("Tail_{t}")),
+                outputs: Default::default(),
             });
         }
         let material = materials.len() as u32;
@@ -712,6 +712,20 @@ pub fn generate(spec: &Spec) -> Avatar {
             sub_parameters: vec![],
         })
         .collect();
+
+    // The first tail reports grabs and its angle, as a PhysBone with the prefix `Tail_0` writes `Tail_0_IsGrabbed`
+    // and `Tail_0_Angle` when the animator declares them; it drives nothing.
+    if let Some(chain) = dynamics.chains.first_mut() {
+        for (name, kind) in [
+            ("Tail_0_IsGrabbed", EntryKind::Bool),
+            ("Tail_0_Angle", EntryKind::Float),
+        ] {
+            entries.push(Entry::new(name, kind, 0.0));
+        }
+        let n = entries.len() as EntryIndex;
+        chain.outputs.is_grabbed = Some(n - 2);
+        chain.outputs.angle = Some(n - 1);
+    }
 
     let volume = |node, radius| ContactVolume {
         node,

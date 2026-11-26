@@ -188,7 +188,7 @@ fn chain(root: NodeIndex, ignore: Vec<NodeIndex>, endpoint: Vec3, p: &Params, co
         max_squish: constant(0.0),
         allow_grab: true,
         allow_posing: true,
-        parameter: None,
+        outputs: Default::default(),
     }
 }
 

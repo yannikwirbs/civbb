@@ -2202,7 +2202,13 @@
             "value": 0.10000000149011612
           },
           "multi_child": "Ignore",
-          "parameter": "Tail",
+          "outputs": {
+            "angle": null,
+            "is_grabbed": null,
+            "is_posed": null,
+            "squish": null,
+            "stretch": null
+          },
           "pull": {
             "curve": [],
             "value": 0.20000000298023224
@@ -2281,7 +2287,13 @@
             "value": 0.10000000149011612
           },
           "multi_child": "First",
-          "parameter": "Tail",
+          "outputs": {
+            "angle": null,
+            "is_grabbed": null,
+            "is_posed": null,
+            "squish": null,
+            "stretch": null
+          },
           "pull": {
             "curve": [],
             "value": 0.20000000298023224
@@ -2360,7 +2372,13 @@
             "value": 0.10000000149011612
           },
           "multi_child": "Average",
-          "parameter": "Tail",
+          "outputs": {
+            "angle": null,
+            "is_grabbed": null,
+            "is_posed": null,
+            "squish": null,
+            "stretch": null
+          },
           "pull": {
             "curve": [],
             "value": 0.20000000298023224
@@ -2443,7 +2461,13 @@
             "value": 0.10000000149011612
           },
           "multi_child": "Ignore",
-          "parameter": "Tail",
+          "outputs": {
+            "angle": null,
+            "is_grabbed": null,
+            "is_posed": null,
+            "squish": null,
+            "stretch": null
+          },
           "pull": {
             "curve": [],
             "value": 0.20000000298023224

@@ -350,10 +350,11 @@ impl State {
                 out.squish = out.squish.max(((1.0 - ratio) / rig.max_squish[k]).clamp(0.0, 1.0));
             }
         }
-        if let Some(k) = range.last().filter(|&k| !rig.pinned[k]) {
-            let now = normalize(sub(pos[k], pos[rig.parent[k] as usize]));
-            let cos = dot(normalize(rest[k]), now).clamp(-1.0, 1.0);
-            out.angle = cos.acos().to_degrees() / 180.0;
+        // Before the first step both are zero and the angle stays 0.
+        if let Some(k) = range.last().filter(|&k| !rig.pinned[k])
+            && let (Some(now), Some(rest)) = (unit(sub(pos[k], pos[rig.parent[k] as usize])), unit(rest[k]))
+        {
+            out.angle = dot(rest, now).clamp(-1.0, 1.0).acos().to_degrees() / 180.0;
         }
         out
     }

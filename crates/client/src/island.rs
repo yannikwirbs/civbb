@@ -29,12 +29,17 @@ pub struct Model {
     /// Per mesh, each blendshape's default weight (0 to 1).
     shapes: Vec<Vec<f32>>,
     /// Per contact receiver, the state entry its value goes to; `None` without one or without an animator.
-    receivers: Vec<Option<(EntryIndex, EntryKind)>>,
+    receivers: Vec<Option<Written>>,
+    /// Chains that write state entries, each with its entry per output (grabbed, posed, angle, stretch, squish).
+    chain_outputs: Vec<(usize, [Option<Written>; 5])>,
     /// Renderers with animated material properties, by mesh index.
     renderers: Vec<AnimatedRenderer>,
     /// Per mesh, the animator slot of each submesh whose material it swaps; empty for most meshes.
     swaps: Vec<Vec<(u8, Slot)>>,
 }
+
+/// A state entry a system writes, with its kind to coerce the value to.
+type Written = (EntryIndex, EntryKind);
 
 /// A renderer whose material properties the animator drives: each island shows its own copy of its materials
 /// (ADR 0025).
@@ -60,6 +65,16 @@ impl Model {
             .map(|r| {
                 let (c, p) = (controller.as_ref()?, r.parameter?);
                 Some((p, c.state.entries[p as usize].kind))
+            })
+            .collect();
+        let chain_outputs = (avatar.dynamics.chains.iter().enumerate())
+            .filter_map(|(i, ch)| {
+                let c = controller.as_ref()?;
+                let outputs = ch
+                    .outputs
+                    .entries()
+                    .map(|e| e.map(|e| (e, c.state.entries[e as usize].kind)));
+                outputs.iter().any(Option::is_some).then_some((i, outputs))
             })
             .collect();
         let mut renderers: Vec<AnimatedRenderer> = Vec::new();
@@ -115,6 +130,7 @@ impl Model {
                 .map(|m| m.blend_shapes.iter().map(|s| s.default_weight).collect())
                 .collect(),
             receivers,
+            chain_outputs,
             renderers,
             swaps,
         }
@@ -255,7 +271,7 @@ impl Island {
     }
 
     /// Runs the avatar's systems for `dt` seconds in pipeline order, reporting each one's time to `counters`:
-    /// last frame's receiver values into their parameters and the animator, constraints, IK, dynamics, then world
+    /// last frame's receiver values and chain outputs into their parameters and the animator, constraints, IK, dynamics, then world
     /// placements and activity for the contact pass.
     pub fn step(&mut self, dt: f32, counters: &mut Counters) {
         let Self {
@@ -279,6 +295,21 @@ impl Island {
                 for (r, &v) in m.receivers.iter().zip(contacts.values()) {
                     if let &Some((p, kind)) = r {
                         a.params[p as usize] = coerce(kind, v);
+                    }
+                }
+                for (chain, outputs) in &m.chain_outputs {
+                    let p = chains.params(&m.chains, *chain);
+                    let values = [
+                        p.is_grabbed as u8 as f32,
+                        p.is_posed as u8 as f32,
+                        p.angle,
+                        p.stretch,
+                        p.squish,
+                    ];
+                    for (&o, v) in outputs.iter().zip(values) {
+                        if let Some((e, kind)) = o {
+                            a.params[e as usize] = coerce(kind, v);
+                        }
                     }
                 }
                 a.update(c, dt);

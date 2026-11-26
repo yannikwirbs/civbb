@@ -119,8 +119,23 @@ impl Importer<'_> {
                 self.constraint_nodes(c)?;
             }
         }
+        let expressions: Option<XExpressions> = (doc.extension_value("X_expressions"))
+            .map(|v| parse("X_expressions", v))
+            .transpose()?;
+        s.state = unity_state::lower(params, expressions.as_ref());
         if let Some(v) = doc.extension_value("X_dynamics") {
-            s.dynamics = parse("X_dynamics", v)?;
+            let mut v = v.clone();
+            let chains = v.get_mut("chains").and_then(Value::as_array_mut);
+            for c in chains.into_iter().flatten() {
+                let c = c.as_object_mut().ok_or("X_dynamics: a chain is not an object")?;
+                let prefix = c.remove("parameter").ok_or("X_dynamics: a chain has no parameter")?;
+                let outputs = unity_state::chain_outputs(prefix.as_str(), &s.state);
+                c.insert(
+                    "outputs".into(),
+                    serde_json::to_value(outputs).map_err(|e| e.to_string())?,
+                );
+            }
+            s.dynamics = parse("X_dynamics", &v)?;
             for c in &mut s.dynamics.chains {
                 c.root = self.x_node("X_dynamics", c.root)?;
                 for n in &mut c.ignore {
@@ -131,10 +146,6 @@ impl Importer<'_> {
                 c.node = self.x_node("X_dynamics", c.node)?;
             }
         }
-        let expressions: Option<XExpressions> = (doc.extension_value("X_expressions"))
-            .map(|v| parse("X_expressions", v))
-            .transpose()?;
-        s.state = unity_state::lower(params, expressions.as_ref());
         if let Some(v) = doc.extension_value("X_contacts") {
             let mut v = v.clone();
             let receivers = v.get_mut("receivers").and_then(Value::as_array_mut);

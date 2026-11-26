@@ -77,8 +77,30 @@ pub struct Chain {
     pub allow_grab: bool,
     /// Posing (leaving grabbed bones in place) allowed.
     pub allow_posing: bool,
-    /// Animator parameter prefix receiving `_IsGrabbed`, `_Angle`, `_Stretch` etc.
-    pub parameter: Option<String>,
+    /// State entries the chain writes every frame.
+    pub outputs: ChainOutputs,
+}
+
+/// The state entries a chain writes after each frame (ADR 0088); `None` writes nothing.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ChainOutputs {
+    /// 1 while any bone is grabbed.
+    pub is_grabbed: Option<EntryIndex>,
+    /// 1 while the chain is posed.
+    pub is_posed: Option<EntryIndex>,
+    /// The tip bone's angle from its rest direction, 0 to 1 for 0 to 180 degrees.
+    pub angle: Option<EntryIndex>,
+    /// How close the most stretched bone is to its max stretch, 0 to 1.
+    pub stretch: Option<EntryIndex>,
+    /// How close the most squished bone is to its max squish, 0 to 1.
+    pub squish: Option<EntryIndex>,
+}
+
+impl ChainOutputs {
+    /// The entries in field order: grabbed, posed, angle, stretch, squish.
+    pub fn entries(&self) -> [Option<EntryIndex>; 5] {
+        [self.is_grabbed, self.is_posed, self.angle, self.stretch, self.squish]
+    }
 }
 
 /// Root behaviour with several children.

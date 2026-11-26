@@ -14,6 +14,8 @@ use serde_json::{Value, json};
 const FLOAT: u32 = 5126;
 const U16: u32 = 5123;
 const U32: u32 = 5125;
+/// VRChat's PhysBone output suffixes, in `ChainOutputs::entries` order (the importer's list).
+const CHAIN_SUFFIXES: [&str; 5] = ["_IsGrabbed", "_IsPosed", "_Angle", "_Stretch", "_Squish"];
 
 #[derive(Default)]
 struct Bin {
@@ -143,7 +145,17 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
         ext.insert("X_constraints".into(), json!(a.constraints));
     }
     if !a.dynamics.chains.is_empty() || !a.dynamics.colliders.is_empty() {
-        ext.insert("X_dynamics".into(), json!(a.dynamics));
+        let mut x = json!(a.dynamics);
+        let chains = x["chains"].as_array_mut().expect("array");
+        for (c, v) in a.dynamics.chains.iter().zip(chains) {
+            // The prefix the outputs' names share; an avatar from dialect 1 has no other kind.
+            let names = c.outputs.entries().map(&name);
+            let prefix = (names.iter().zip(CHAIN_SUFFIXES)).find_map(|(n, s)| n.strip_suffix(s));
+            let o = v.as_object_mut().expect("object");
+            o.remove("outputs");
+            o.insert("parameter".into(), json!(prefix));
+        }
+        ext.insert("X_dynamics".into(), x);
     }
     if !a.contacts.senders.is_empty() || !a.contacts.receivers.is_empty() {
         let mut x = json!(a.contacts);

@@ -1,7 +1,8 @@
 //! Unity dialect 1's animator and expression parameters lowered to state entries (ADR 0088, 0095).
 //!
-//! Names in the menu and contact receivers become entry references.
+//! Names in the menu, contact receivers and PhysBone prefixes become entry references.
 
+use civbb_format::dynamics::ChainOutputs;
 use civbb_format::expressions::{Control, ControlKind, Menu};
 use civbb_format::state::{Entry, EntryKind, StateTable, SyncMode};
 use serde::Deserialize;
@@ -103,6 +104,25 @@ pub(super) fn lower(animator: Vec<XParameter>, expressions: Option<&XExpressions
         }
     }
     StateTable { entries }
+}
+
+/// The suffixes VRChat appends to a PhysBone's parameter prefix, in [`ChainOutputs::entries`] order.
+const CHAIN_SUFFIXES: [&str; 5] = ["_IsGrabbed", "_IsPosed", "_Angle", "_Stretch", "_Squish"];
+
+/// A chain's outputs from its parameter prefix: `<prefix>_IsGrabbed` and so on, each `None` when no entry has the
+/// name (VRChat writes only parameters the animator declares).
+pub(super) fn chain_outputs(prefix: Option<&str>, state: &StateTable) -> ChainOutputs {
+    let Some(prefix) = prefix.filter(|p| !p.is_empty()) else {
+        return ChainOutputs::default();
+    };
+    let [is_grabbed, is_posed, angle, stretch, squish] = CHAIN_SUFFIXES.map(|s| state.find(&format!("{prefix}{s}")));
+    ChainOutputs {
+        is_grabbed,
+        is_posed,
+        angle,
+        stretch,
+        squish,
+    }
 }
 
 /// The menu with its parameter names resolved; an empty or unknown name is `None`, which writes nothing in VRChat

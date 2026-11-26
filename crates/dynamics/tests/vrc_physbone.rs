@@ -185,7 +185,7 @@ impl Case {
             max_squish: g("maxSquish"),
             allow_grab: false,
             allow_posing: false,
-            parameter: None,
+            outputs: Default::default(),
         };
         Avatar {
             hierarchy: Hierarchy { nodes },
