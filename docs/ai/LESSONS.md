@@ -48,3 +48,4 @@ Add a line to the matching file whenever something costs more than one attempt.
   to the commit and drops your uncommitted edits. Revert the mutation with the inverse edit.
 - Renaming a field with `sed -E 's/\bname\b/new/'` across files also renames same-named fields of other types
   (`local_only` of drivers and of contact receivers): build right after and revert the hits the compiler names.
+- `fuzz/` is its own workspace and the gate never builds it: a format API change that passes `cargo xtask ci` can still break the fuzz CI job. Run `cargo check --manifest-path fuzz/Cargo.toml --bins` after renaming or moving format types.

@@ -93,7 +93,14 @@ What exists, by area. Read the section for the area you touch; update it when th
   `X_toon_material`; `extras.active: false` marks inactive nodes; a `null` key tangent is a step.
   `civbb_corpus::gltf::to_source_glb` writes them (round-trip test) except `X_toon_material` (a Unity property dump;
   hostile and mapping tests in `tests/unity_material.rs`). Fuzz seeds: `lean-source.glb` and `toon-materials.gltf`
-  (every shader family, #71 closed).
+  (every shader family, #71 closed; the latter is `pipeline/tests/fixtures/toon-materials.gltf`, also pinned).
+- Native toon model (ADRs 0090, 0100, #123, format v35): `Toon` = base colour, shade colour/texture/shift/toony, plus
+  optional features `light_clamp` (none: additive ambient), `normal`, `emission`, `matcaps` (list, at most
+  `material::MATCAPS` = 2), `rim` (with its ramp), `rim_shade`, `shade` (second band, border), `color_adjust`,
+  `outline`. Family tables set a feature where the source has it on; curves on an absent feature's fields do
+  nothing. `Material::order` is the offset within the alpha pass, `Material::queue()` the sort key.
+  `tests/material_records.rs` pins `civbb_render::material::pack` output (golden for generated content;
+  `CIVBB_RECORDS=<parity dir>` ignored test dumps compiled exports and local VRMs to diff two runs).
 - Unity dialect 1 (ADR 0085, #114): the `X_*` shapes as format v25 wrote them are now an import dialect, not the
   native format. Frozen fixtures `pipeline/tests/fixtures/unity-dialect-1*.gltf` (generated, every variant of every
   `X_*` part but `X_toon_material`; never regenerate) import to `tests/golden/unity-dialect-1*.json` (re-bless with
@@ -263,7 +270,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   outline colour times the outline texture. Material records are 164 words (toon: light model and bounds, matcap blend, tint and mask, rim
   shade, shadow bands, rim ramp, tone correction; ADRs 0050 to 0054, 0057, 0058). Matcaps add, multiply or replace
   (Poiyomi: towards the matcap lit as the colour is), each with an unlit emission weight; a toon has up to two
-  (`Toon::second_matcap`, format v25, #106). A mesh without UV1 reads UV0 there, as Unity does (`scene.rs`).
+  (`Toon::matcaps`, ADR 0090). A mesh without UV1 reads UV0 there, as Unity does (`scene.rs`).
 - The viewer's title and `--frames` summary report draws and skinned meshes of the last frame. KTX2 textures are
   checked (header, level index, one 2D image) and transcoded to BC7 by the pure-Rust `basisu` crate (ETC1S, UASTC
   and XUASTC); the renderer uploads BC7 levels and device selection requires BC textures. RGBA8 textures get CPU
