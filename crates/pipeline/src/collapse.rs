@@ -7,8 +7,8 @@ use std::collections::{HashMap, HashSet};
 use civbb_anim::Target;
 use civbb_format::Avatar;
 use civbb_format::animator::{
-    Animator, Behaviour, BlendTree, BlendTreeKind, COMPILER_PARAMETER_PREFIX, Clip, ClipIndex, ConditionMode, DriverOp,
-    Layer, LayerBlending, Motion, State, StateMachine, Transition, TransitionDest,
+    Action, Animator, BlendTree, BlendTreeKind, COMPILER_PARAMETER_PREFIX, Clip, ClipIndex, ConditionMode, EntryOp,
+    Layer, LayerBlending, Motion, State, StateMachine, Transition, TransitionDest, Unwritten,
 };
 use civbb_format::state::{Entry, EntryIndex, EntryKind};
 
@@ -54,26 +54,26 @@ pub fn collapse(a: &mut Avatar) -> usize {
             _ => None,
         })
         .collect();
-    let behaviours = |li: usize| an.layers[li].state_machine.states.iter().flat_map(|s| &s.behaviours);
+    let actions = |li: usize| an.layers[li].state_machine.states.iter().flat_map(|s| &s.actions);
     let weighted: HashSet<u32> = (0..n)
-        .flat_map(behaviours)
+        .flat_map(actions)
         .filter_map(|b| match b {
-            Behaviour::LayerWeight { layer, .. } => Some(*layer),
+            Action::LayerWeight { layer, .. } => Some(*layer),
             _ => None,
         })
         .collect();
     // Parameters a driver in each layer sets; they change mid-update, so layer order decides who sees them.
     let driven: Vec<HashSet<EntryIndex>> = (0..n)
         .map(|li| {
-            behaviours(li)
+            actions(li)
                 .filter_map(|b| match b {
-                    Behaviour::ParameterDriver { ops, .. } => Some(ops),
+                    Action::Entries { ops, .. } => Some(ops),
                     _ => None,
                 })
                 .flatten()
                 .map(|op| match *op {
-                    DriverOp::Set { param, .. } | DriverOp::Add { param, .. } | DriverOp::Random { param, .. } => param,
-                    DriverOp::Copy { dst, .. } => dst,
+                    EntryOp::Set { param, .. } | EntryOp::Add { param, .. } | EntryOp::Random { param, .. } => param,
+                    EntryOp::Copy { dst, .. } => dst,
                 })
                 .collect()
         })
@@ -134,9 +134,9 @@ pub fn collapse(a: &mut Avatar) -> usize {
         .layers
         .iter_mut()
         .flat_map(|l| &mut l.state_machine.states)
-        .flat_map(|s| &mut s.behaviours)
+        .flat_map(|s| &mut s.actions)
     {
-        if let Behaviour::LayerWeight { layer, .. } = b {
+        if let Action::LayerWeight { layer, .. } = b {
             *layer = map[*layer as usize];
         }
     }
@@ -145,7 +145,7 @@ pub fn collapse(a: &mut Avatar) -> usize {
     if wd_off && !any_wd_off(an) {
         let l = &mut an.layers[map[groups[0].1[0].layer] as usize];
         l.state_machine.states.push(State {
-            write_defaults: false,
+            unwritten: Unwritten::Hold,
             mirror: false,
             mirror_param: None,
             ..state("Hold", None, Vec::new())
@@ -156,7 +156,7 @@ pub fn collapse(a: &mut Avatar) -> usize {
 
 /// The toggle a layer is, if it is one: an override layer at weight 1 without a mask, two states each playing a
 /// constant clip with one zero-duration transition to the other on the same bool (`If` from off, `IfNot` from on),
-/// no exit times, entry or any-state transitions, and no behaviours.
+/// no exit times, entry or any-state transitions, and no actions.
 fn toggle(an: &Animator, entries: &[Entry], clips: &[Clip], li: usize) -> Option<Toggle> {
     let l = &an.layers[li];
     let sm = &l.state_machine;
@@ -175,7 +175,7 @@ fn toggle(an: &Animator, entries: &[Entry], clips: &[Clip], li: usize) -> Option
             return None;
         };
         let [c] = t.conditions.as_slice() else { return None };
-        if !st.behaviours.is_empty()
+        if !st.actions.is_empty()
             || st.mirror
             || st.mirror_param.is_some()
             || t.dest != TransitionDest::State(1 - s as u32)
@@ -275,11 +275,11 @@ fn state(name: &str, motion: Option<Motion>, transitions: Vec<Transition>) -> St
         cycle_offset: 0.0,
         cycle_offset_param: None,
         time_param: None,
-        write_defaults: true,
+        unwritten: Unwritten::Rest,
         mirror: false,
         mirror_param: None,
         transitions,
-        behaviours: Vec::new(),
+        actions: Vec::new(),
     }
 }
 
@@ -287,7 +287,7 @@ fn any_wd_off(an: &Animator) -> bool {
     an.layers
         .iter()
         .flat_map(|l| &l.state_machine.states)
-        .any(|s| !s.write_defaults)
+        .any(|s| s.unwritten == Unwritten::Hold)
 }
 
 /// Appends every clip a motion plays.

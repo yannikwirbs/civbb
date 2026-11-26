@@ -10,18 +10,18 @@ The avatar animation runtime (design doc §7 "Animation"). Engine crate: depends
 - `motion`: what a state plays: blend tree weights (1D, 2D simple directional, freeform cartesian and polar
   gradient bands, direct; ADR 0009), synced times and lengths.
 - `machine`: per-layer Mecanim state machines (entry, any-state, exit, exit time, interruption, triggers; ADR 0008).
-- `behaviour`: legacy built-in parameters and state behaviours (drivers, tracking, layer and locomotion control;
-  ADR 0011).
+- `action`: platform values at rest and state actions (entry operations, pose sources, layer and group weights,
+  locomotion; ADRs 0011, 0085).
 - `muscle`: Unity's 95 humanoid muscles and muscle space: muscle values to local bone rotations through each bone's
   muscle frame, and back (ADR 0014, verified against Unity recordings).
 - `constraint`: position, rotation, scale, parent, aim and look-at constraints, ordered by dependency at load and
   applied in one pass (ADR 0018, verified against Unity recordings).
 - `mix` and `controller`: a `Controller` (compiled, shared) and per-avatar `Instance`s that update parameters,
-  layers and the pose, with Write Defaults on, off and mixed (ADR 0010); `Instance::write_nodes` writes the pose
+  layers and the pose, with `unwritten` rules `Rest`, `Hold` and mixed (ADR 0010); `Instance::write_nodes` writes the pose
   into node transforms and activity.
 
 Conformance: `tests/curve.rs` (key semantics), `tests/machine.rs` (state machine), `tests/blend.rs` (weights),
-`tests/behaviour.rs` (built-ins and behaviours), `tests/muscle.rs` and `tests/constraint.rs` (muscle space and
+`tests/action.rs` (platform values and actions), `tests/muscle.rs` and `tests/constraint.rs` (muscle space and
 constraints against `tests/unity/*.json`, recorded by `tools/unity-truth`),
 `tests/golden/*.json` run by `tests/golden.rs` (frame-by-frame cases citing their sources).
 

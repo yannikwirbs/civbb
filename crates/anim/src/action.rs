@@ -1,6 +1,6 @@
-//! Platform values at rest and state behaviours: parameter drivers, tracking, layer and locomotion control.
+//! Platform values at rest and state actions: entry operations, pose sources, layer weights and locomotion.
 
-use civbb_format::animator::{DriverOp, TrackingMode, TrackingPart};
+use civbb_format::animator::{EntryOp, PosePart, PoseSource};
 use civbb_format::state::{Entry, EntryKind, Platform};
 
 /// A platform value's value for an avatar standing still on the ground at its own scale, which an instance starts
@@ -40,13 +40,13 @@ impl Rng {
     }
 }
 
-/// Applies parameter driver operations in order.
-pub fn drive(ops: &[DriverOp], decls: &[Entry], params: &mut [f32], rng: &mut Rng) {
+/// Applies entry operations in order.
+pub fn drive(ops: &[EntryOp], decls: &[Entry], params: &mut [f32], rng: &mut Rng) {
     for op in ops {
         let (dst, v) = match *op {
-            DriverOp::Set { param, value } => (param, value),
-            DriverOp::Add { param, value } => (param, params[param as usize] + value),
-            DriverOp::Random {
+            EntryOp::Set { param, value } => (param, value),
+            EntryOp::Add { param, value } => (param, params[param as usize] + value),
+            EntryOp::Random {
                 param,
                 min,
                 max,
@@ -61,7 +61,7 @@ pub fn drive(ops: &[DriverOp], decls: &[Entry], params: &mut [f32], rng: &mut Rn
                 };
                 (param, v)
             }
-            DriverOp::Copy { src, dst, remap } => {
+            EntryOp::Copy { src, dst, remap } => {
                 let v = params[src as usize];
                 let v = match remap {
                     Some(([a, b], [c, d])) if b != a => c + (v - a) / (b - a) * (d - c),
@@ -75,10 +75,10 @@ pub fn drive(ops: &[DriverOp], decls: &[Entry], params: &mut [f32], rng: &mut Rn
     }
 }
 
-/// Who drives each body part (tracking control), in [`TrackingPart`] order.
-pub type Tracking = [TrackingMode; 10];
+/// Where each body part takes its pose from, in [`PosePart`] order.
+pub type PoseSources = [PoseSource; 10];
 
-/// The index of a part in [`Tracking`].
-pub fn part_index(p: TrackingPart) -> usize {
+/// The index of a part in [`PoseSources`].
+pub fn part_index(p: PosePart) -> usize {
     p as usize
 }

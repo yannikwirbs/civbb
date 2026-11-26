@@ -1,7 +1,7 @@
 //! Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles and constraints (design
 //! doc §7).
 
-pub mod behaviour;
+pub mod action;
 pub mod bind;
 pub mod body;
 pub mod clip;

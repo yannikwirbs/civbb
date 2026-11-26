@@ -1,4 +1,4 @@
-//! Animator data with Mecanim semantics: layers, state machines, blend trees, transitions, clips.
+//! Behaviour as a layered state machine (ADR 0085): layers, state machines, blend trees, transitions, actions, clips.
 //!
 //! Parameters are entries of the document's state table (`crate::state`).
 //!
@@ -17,11 +17,10 @@ pub type ClipIndex = u32;
 /// Index into [`StateMachine::states`].
 pub type StateIndex = u32;
 
-/// An animator controller. Legacy playable layers (Base, Additive, Gesture, Action, FX) are merged into one
-/// layer list in that order, each tagged with its [`LayerGroup`].
+/// An animator: one layer list in evaluation order, each layer tagged with its [`LayerGroup`].
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Animator {
-    /// Layer groups (legacy playable layers), weighted as a whole.
+    /// Layer groups, each weighted as a whole.
     pub groups: Vec<LayerGroup>,
     /// Layers, evaluated in order.
     pub layers: Vec<Layer>,
@@ -30,7 +29,7 @@ pub struct Animator {
 /// Prefix of the state entries the compiler adds (`civbb/One`, ADR 0028); no creator state toggles them.
 pub const COMPILER_PARAMETER_PREFIX: &str = "civbb/";
 
-/// A group of layers with a shared weight (a legacy playable layer).
+/// A group of layers with a shared weight.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LayerGroup {
     /// Name, e.g. `FX`.
@@ -46,12 +45,12 @@ pub struct Layer {
     pub name: String,
     /// Index into [`Animator::groups`].
     pub group: u32,
-    /// Initial weight, 0 to 1. Unity ignores the weight of a controller's first layer and uses 1.
+    /// Initial weight, 0 to 1. A group's first layer always plays at weight 1.
     pub weight: f32,
     /// How the layer combines with the layers below.
     pub blending: LayerBlending,
     /// Which bones and transforms the layer may write; `None` writes everything.
-    pub mask: Option<AvatarMask>,
+    pub mask: Option<Mask>,
     /// The layer's states.
     pub state_machine: StateMachine,
 }
@@ -64,16 +63,16 @@ pub enum LayerBlending {
     Additive,
 }
 
-/// Unity avatar mask: humanoid body parts plus an optional node allowlist.
+/// A layer mask: humanoid body parts plus an optional node allowlist.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct AvatarMask {
+pub struct Mask {
     /// Enabled humanoid body parts.
     pub body_parts: Vec<BodyPart>,
     /// Nodes the layer may animate (curves on their meshes and constraints too); `None` allows all.
     pub transforms: Option<Vec<NodeIndex>>,
 }
 
-/// Humanoid body parts of an avatar mask.
+/// Humanoid body parts of a layer mask.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BodyPart {
@@ -120,11 +119,11 @@ pub struct State {
     pub cycle_offset: f32,
     /// Parameter replacing `cycle_offset`.
     pub cycle_offset_param: Option<EntryIndex>,
-    /// Parameter driving normalised time directly (Unity "Motion Time").
+    /// Parameter driving normalised time directly.
     pub time_param: Option<EntryIndex>,
-    /// Write Defaults: animated properties not in this state's motion revert to their defaults.
-    pub write_defaults: bool,
-    /// Plays humanoid muscles mirrored left to right (Unity "Mirror"; ADR 0060).
+    /// What the state does to targets its layer animates and its motion does not.
+    pub unwritten: Unwritten,
+    /// Plays humanoid muscles mirrored left to right (ADR 0060).
     #[serde(default)]
     pub mirror: bool,
     /// Bool parameter replacing `mirror`.
@@ -132,8 +131,17 @@ pub struct State {
     pub mirror_param: Option<EntryIndex>,
     /// Outgoing transitions, checked in order.
     pub transitions: Vec<Transition>,
-    /// State behaviours run on enter.
-    pub behaviours: Vec<Behaviour>,
+    /// Actions run on enter, in order.
+    pub actions: Vec<Action>,
+}
+
+/// What a state does to targets its layer animates and its motion does not (ADR 0085).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Unwritten {
+    /// They keep the value last written.
+    Hold,
+    /// They return to their rest values. A state without a motion writes nothing (ADR 0065).
+    Rest,
 }
 
 /// What a state or blend tree child plays.
@@ -152,7 +160,7 @@ pub struct BlendTree {
     pub kind: BlendTreeKind,
     /// Children.
     pub children: Vec<ChildMotion>,
-    /// Normalise child weights for `Direct` trees (Unity "Normalized Blend Values").
+    /// Normalise child weights for `Direct` trees.
     pub normalize: bool,
 }
 
@@ -232,7 +240,7 @@ pub struct Condition {
     pub threshold: f32,
 }
 
-/// Condition comparisons, as in Unity.
+/// Condition comparisons.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConditionMode {
@@ -244,7 +252,7 @@ pub enum ConditionMode {
     NotEqual,
 }
 
-/// Transition interruption sources, as in Unity.
+/// Which transitions may interrupt a running transition.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InterruptionSource {
@@ -255,18 +263,18 @@ pub enum InterruptionSource {
     DestinationThenSource,
 }
 
-/// State behaviours with legacy equivalents (design doc §7).
+/// What a state does on enter (ADR 0085).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum Behaviour {
-    /// Changes parameters on state enter.
-    ParameterDriver {
+pub enum Action {
+    /// Changes state entries.
+    Entries {
         /// Run only for the avatar's owner.
-        local_only: bool,
+        owner_only: bool,
         /// Operations, in order.
-        ops: Vec<DriverOp>,
+        ops: Vec<EntryOp>,
     },
-    /// Switches body parts between tracking and animation.
-    TrackingControl(Vec<(TrackingPart, TrackingMode)>),
+    /// Sets where body parts take their pose from.
+    PoseSource(Vec<(PosePart, PoseSource)>),
     /// Blends a layer's weight.
     LayerWeight {
         /// Target layer.
@@ -276,7 +284,7 @@ pub enum Behaviour {
         /// Blend time in seconds.
         duration: f32,
     },
-    /// Blends a layer group's weight (legacy playable layer control).
+    /// Blends a layer group's weight.
     GroupWeight {
         /// Target group.
         group: u32,
@@ -292,10 +300,10 @@ pub enum Behaviour {
     },
 }
 
-/// Parameter driver operations.
+/// Operations on state entries.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub enum DriverOp {
+pub enum EntryOp {
     Set {
         param: EntryIndex,
         value: f32,
@@ -319,10 +327,10 @@ pub enum DriverOp {
     },
 }
 
-/// Body parts under tracking control.
+/// Body parts with a pose source.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TrackingPart {
+pub enum PosePart {
     Head,
     LeftHand,
     RightHand,
@@ -335,11 +343,12 @@ pub enum TrackingPart {
     Mouth,
 }
 
-/// Who drives a body part.
-#[allow(missing_docs)]
+/// Where a body part takes its pose from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TrackingMode {
+pub enum PoseSource {
+    /// The user's tracking (or the locomotion and IK standing in for it).
     Tracking,
+    /// The animator.
     Animation,
 }
 
@@ -359,12 +368,12 @@ pub struct Clip {
     pub curves: Vec<Curve>,
 }
 
-/// A humanoid clip's root-motion settings (Unity's `AnimationClipSettings`, ADR 0063). Avatars run with root motion
+/// A humanoid clip's root-motion settings (ADR 0063). Avatars run with root motion
 /// discarded, so what is not baked into the pose is lost: the body pose plays relative to a root that follows the
 /// body (or, keeping the original, follows its change since the clip's start).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct RootSettings {
-    /// The body's yaw stays in the pose ("Root Transform Rotation: Bake Into Pose").
+    /// The body's yaw stays in the pose.
     pub bake_orientation: bool,
     /// The body's height stays in the pose.
     pub bake_position_y: bool,
@@ -380,7 +389,7 @@ pub struct RootSettings {
     pub loop_pose: bool,
     /// Root rotation offset, degrees about +Y in the format's coordinates.
     pub orientation_offset: f32,
-    /// Root height offset ("Root Transform Position (Y) Offset"), in body position units.
+    /// Root height offset, in body position units.
     pub level: f32,
 }
 
@@ -393,7 +402,7 @@ pub struct Curve {
     pub keys: Vec<Key>,
 }
 
-/// A Hermite key, as in Unity. Infinite tangents mean a constant (stepped) segment. JSON has no infinity
+/// A Hermite key. Infinite tangents mean a constant (stepped) segment. JSON has no infinity
 /// (`serde_json` writes `null`), so a `null` tangent reads as +infinity (ADR 0041).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -465,7 +474,7 @@ pub enum NodeProperty {
 /// Orders of Euler rotations. One so far; others come with an importer whose source uses them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EulerOrder {
-    /// About Z, then X, then Y (`q = qy qx qz`; Unity's `localEulerAnglesRaw`, ADR 0007).
+    /// About Z, then X, then Y (`q = qy qx qz`, ADR 0007).
     Zxy,
 }
 

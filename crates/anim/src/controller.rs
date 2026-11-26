@@ -3,12 +3,12 @@
 use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
-use civbb_format::animator::{Animator, Behaviour, BodyPart, State, TrackingMode};
+use civbb_format::animator::{Action, Animator, BodyPart, PoseSource, State, Unwritten};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform};
 use civbb_format::state::{EntryIndex, Platform, StateTable};
 
-use crate::behaviour::{Rng, Tracking, at_rest, coerce, drive, part_index};
+use crate::action::{PoseSources, Rng, at_rest, coerce, drive, part_index};
 use crate::bind::{Bound, Slot, Target, bind};
 use crate::constraint::{Constraints, Scratch};
 use crate::machine::{Ctx, LayerRun};
@@ -144,11 +144,11 @@ pub struct Instance {
     pub layer_weights: Vec<f32>,
     /// Group weights.
     pub group_weights: Vec<f32>,
-    /// Who drives each body part, set by tracking control behaviours.
-    pub tracking: Tracking,
-    /// Locomotion disabled by a locomotion control behaviour.
+    /// Where each body part takes its pose from, set by pose source actions.
+    pub pose_sources: PoseSources,
+    /// Locomotion disabled by a locomotion action.
     pub locomotion_disabled: bool,
-    /// The avatar's owner runs this instance; local-only drivers run only then.
+    /// The avatar's owner runs this instance; owner-only actions run only then.
     local: bool,
     blends: Vec<Blend>,
     rng: Rng,
@@ -158,7 +158,7 @@ pub struct Instance {
     mixer: Mixer,
 }
 
-/// A layer or group weight moving linearly to a goal (layer control behaviours).
+/// A layer or group weight moving linearly to a goal (layer and group weight actions).
 struct Blend {
     group: bool,
     index: u32,
@@ -178,7 +178,7 @@ impl Instance {
             params: c.start.clone(),
             layer_weights: a.layers.iter().map(|l| l.weight).collect(),
             group_weights: a.groups.iter().map(|g| g.weight).collect(),
-            tracking: [TrackingMode::Tracking; 10],
+            pose_sources: [PoseSource::Tracking; 10],
             locomotion_disabled: false,
             local,
             blends: Vec::new(),
@@ -274,7 +274,7 @@ impl Instance {
         self.runs[i].as_ref()
     }
 
-    /// Advances every layer by `dt` seconds, takes transitions, runs entered states' behaviours and evaluates the
+    /// Advances every layer by `dt` seconds, takes transitions, runs entered states' actions and evaluates the
     /// pose, starting from defaults or, with any Write Defaults off state, from the last pose. Animated parameters
     /// take their new values at the end, so conditions see them next frame.
     pub fn update(&mut self, c: &Controller, dt: f32) {
@@ -301,7 +301,7 @@ impl Instance {
                 s
             });
             if let Some(s) = started {
-                self.behave(c, &layer.state_machine.states[s as usize].behaviours);
+                self.behave(c, &layer.state_machine.states[s as usize].actions);
             }
             let run = self.runs[li].as_mut().expect("started above");
             // An interrupted cross-fade continues from the pose last output, before this frame's advance
@@ -315,7 +315,7 @@ impl Instance {
                 .select(&ctx, &self.params)
                 .map(|t| run.fire(&ctx, &mut self.params, t, snapshot));
             if let Some(s) = entered {
-                self.behave(c, &layer.state_machine.states[s as usize].behaviours);
+                self.behave(c, &layer.state_machine.states[s as usize].actions);
             }
             let lw = if c.first_in_group[li] {
                 1.0
@@ -338,23 +338,23 @@ impl Instance {
         }
     }
 
-    /// Runs a state's behaviours on entering it.
-    fn behave(&mut self, c: &Controller, behaviours: &[Behaviour]) {
-        for b in behaviours {
+    /// Runs a state's actions on entering it.
+    fn behave(&mut self, c: &Controller, actions: &[Action]) {
+        for b in actions {
             match b {
-                Behaviour::ParameterDriver { local_only, ops } => {
-                    if self.local || !local_only {
+                Action::Entries { owner_only, ops } => {
+                    if self.local || !owner_only {
                         drive(ops, &c.state.entries, &mut self.params, &mut self.rng);
                     }
                 }
-                Behaviour::TrackingControl(parts) => {
+                Action::PoseSource(parts) => {
                     for &(part, mode) in parts {
-                        self.tracking[part_index(part)] = mode;
+                        self.pose_sources[part_index(part)] = mode;
                     }
                 }
-                &Behaviour::LayerWeight { layer, goal, duration } => self.start_blend(false, layer, goal, duration),
-                &Behaviour::GroupWeight { group, goal, duration } => self.start_blend(true, group, goal, duration),
-                Behaviour::Locomotion { disabled } => self.locomotion_disabled = *disabled,
+                &Action::LayerWeight { layer, goal, duration } => self.start_blend(false, layer, goal, duration),
+                &Action::GroupWeight { group, goal, duration } => self.start_blend(true, group, goal, duration),
+                Action::Locomotion { disabled } => self.locomotion_disabled = *disabled,
             }
         }
     }
@@ -398,8 +398,8 @@ impl Instance {
     }
 }
 
-/// Whether a state writes defaults: Write Defaults on and a motion. Unity's states without a motion write nothing,
-/// so they hold like Write Defaults off (recorded in Unity 2022.3 and 6000.3, #54).
+/// Whether a state writes rest values: `unwritten` is `Rest` and it has a motion. States without a motion write
+/// nothing, so they hold (recorded in Unity 2022.3 and 6000.3, #54).
 pub(crate) fn writes_defaults(s: &State) -> bool {
-    s.write_defaults && s.motion.is_some()
+    s.unwritten == Unwritten::Rest && s.motion.is_some()
 }

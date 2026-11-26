@@ -1,7 +1,7 @@
 //! glTF importer conformance: corpus round trips, hand-written edge cases, hostile input, Khronos samples.
 
 use base64::Engine;
-use civbb_format::animator::{MeshProperty, NodeProperty, Target};
+use civbb_format::animator::{Action, EntryOp, MeshProperty, NodeProperty, PosePart, PoseSource, Target, Unwritten};
 use civbb_format::material::MaterialModel;
 use civbb_format::state::{Entry, EntryKind, Platform};
 use civbb_pipeline::gltf_import::{Limits, dir_resolver, import};
@@ -60,6 +60,35 @@ fn corpus_round_trips_through_source_extensions() {
             max: [40.0, 30.0, 20.0],
             twist: 1.0,
         });
+        // The generator makes no actions; every kind and both unwritten rules travel as dialect 1's behaviours.
+        let states = &mut original.animator.as_mut().unwrap().layers[0].state_machine.states;
+        assert!(states.iter().any(|s| s.unwritten == Unwritten::Hold), "{}", spec.name);
+        states[0].unwritten = Unwritten::Rest;
+        states[0].actions = vec![
+            Action::Entries {
+                owner_only: true,
+                ops: vec![
+                    EntryOp::Set { param: 0, value: 1.0 },
+                    EntryOp::Copy {
+                        src: 0,
+                        dst: 0,
+                        remap: Some(([0.0, 1.0], [1.0, 0.0])),
+                    },
+                ],
+            },
+            Action::PoseSource(vec![(PosePart::LeftHand, PoseSource::Animation)]),
+            Action::LayerWeight {
+                layer: 0,
+                goal: 0.5,
+                duration: 0.25,
+            },
+            Action::GroupWeight {
+                group: 0,
+                goal: 0.0,
+                duration: 1.0,
+            },
+            Action::Locomotion { disabled: true },
+        ];
         // A platform value travels under VRChat's name (ADR 0096).
         let grounded = Platform::Grounded.name();
         (original.state.entries).push(Entry::new(grounded, EntryKind::Bool, 1.0));
@@ -321,7 +350,9 @@ fn khronos_quantized_samples_match_originals() {
 /// and one glTF animation both move.
 #[test]
 fn source_extensions_map_nodes_and_clips() {
-    use civbb_format::animator::{Animator, Clip, Layer, LayerBlending, LayerGroup, Motion, State, StateMachine};
+    use civbb_format::animator::{
+        Animator, Clip, Layer, LayerBlending, LayerGroup, Motion, State, StateMachine, Unwritten,
+    };
     use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
     use civbb_format::hierarchy::HumanBone;
     use civbb_format::math::Transform;
@@ -346,11 +377,11 @@ fn source_extensions_map_nodes_and_clips() {
         cycle_offset: 0.0,
         cycle_offset_param: None,
         time_param: None,
-        write_defaults: true,
+        unwritten: Unwritten::Rest,
         mirror: false,
         mirror_param: None,
         transitions: Vec::new(),
-        behaviours: Vec::new(),
+        actions: Vec::new(),
     };
     let animator = Animator {
         groups: vec![LayerGroup {

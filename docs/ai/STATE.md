@@ -148,6 +148,12 @@ What exists, by area. Read the section for the area you touch; update it when th
   (curves on removed elements go). Merge no longer needs its path rules (a mesh's path its own, curves naming shapes
   of another mesh). `civbb_anim::bind` checks only what indices cannot say (float entries, muscle frames, material
   fields, slot keys, constraint sources).
+- Actions and unwritten rules (ADR 0085 point 4, #121, format v32): `State::unwritten` is `Unwritten::Hold | Rest`
+  (Write Defaults off / on; a state without a motion still writes nothing), `State::actions` are `Action::Entries
+  {owner_only, ops: Vec<EntryOp>}` (set, add, random, copy), `PoseSource(Vec<(PosePart, PoseSource)>)`,
+  `LayerWeight`, `GroupWeight`, `Locomotion`; the layer mask is `animator::Mask`. Dialect 1's `write_defaults` and
+  `behaviours` are rewritten by `unity_state::lower_states` (forked `XBehaviour`) before parsing; the corpus writer
+  raises them back (`raise_states`). Runtime: `civbb_anim::action` (was `behaviour`), `Instance::pose_sources`.
 - Importer layout (health check): `gltf_import.rs` (entry, parsing, URI resolver, buffers, hierarchy) with
   `gltf_import/{material,mesh,animation,source,unity_clip,unity_material,unity_state}.rs` and `vrm.rs` (entry, humanoid, node constraints,
   first person) with `vrm/{springs,mtoon,expressions,meta}.rs`. vrm keeps its own `qmul`/`rotate`/`from_to` (core's
@@ -293,7 +299,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
   human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056), the start time does not reach one and a transition fired at its exit time starts with the overshoot elapsed; the first update advances like any other; a Write Defaults on state without a motion writes nothing (ADR 0065, recorded); instances start entries at `Entry::default` (`Controller::start`; the expression default for lowered Unity content,
   #85) and Write Defaults restores a curve-written entry to `Entry::rest` (the animator default, ADR 0095) and platform
-  values standing on the ground (`behaviour::at_rest`, `Instance::set_platform`, ADR 0055). Material slots swap per island
+  values standing on the ground (`action::at_rest`, `Instance::set_platform`, ADR 0055). Material slots swap per island
   (`Target::MaterialSlot`, `Island::submesh_materials`, a per-submesh override in `MeshData::draws`; ADR 0059).
   Mirrored states and blend tree children map muscles as Unity records (`muscle::mirror`, exclusive or; ADR 0060). `civbb-dynamics`: PhysBone chains as the SDK
   steps them (ADR 0049, 0068: fixed 1/60 s steps counted in f32, between them the shown direction blended from the

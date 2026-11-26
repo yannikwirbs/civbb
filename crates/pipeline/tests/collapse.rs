@@ -7,8 +7,8 @@ use std::sync::Arc;
 use civbb_client::{Island, Model, frame};
 use civbb_core::math::Pose;
 use civbb_format::animator::{
-    Behaviour, Condition, ConditionMode, DriverOp, InterruptionSource, Key, Layer, LayerBlending, Motion, State,
-    StateMachine, Transition, TransitionDest,
+    Action, Condition, ConditionMode, EntryOp, InterruptionSource, Key, Layer, LayerBlending, Motion, State,
+    StateMachine, Transition, TransitionDest, Unwritten,
 };
 use civbb_format::state::{Entry, EntryKind};
 use civbb_format::{Avatar, Caps, validate};
@@ -102,7 +102,7 @@ fn layers_that_are_not_plain_toggles_stay() {
         ordered_interruption: true,
         can_transition_to_self: false,
     };
-    let state = |name: &str, transition, behaviours| State {
+    let state = |name: &str, transition, actions| State {
         name: name.into(),
         motion: None,
         speed: 1.0,
@@ -110,11 +110,11 @@ fn layers_that_are_not_plain_toggles_stay() {
         cycle_offset: 0.0,
         cycle_offset_param: None,
         time_param: None,
-        write_defaults: false,
+        unwritten: Unwritten::Hold,
         mirror: false,
         mirror_param: None,
         transitions: vec![transition],
-        behaviours,
+        actions,
     };
     an.layers.insert(
         2,
@@ -131,11 +131,11 @@ fn layers_that_are_not_plain_toggles_stay() {
                         "Set",
                         go(0, ConditionMode::IfNot),
                         vec![
-                            Behaviour::ParameterDriver {
-                                local_only: false,
-                                ops: vec![DriverOp::Set { param: p, value: 1.0 }],
+                            Action::Entries {
+                                owner_only: false,
+                                ops: vec![EntryOp::Set { param: p, value: 1.0 }],
                             },
-                            Behaviour::LayerWeight {
+                            Action::LayerWeight {
                                 layer: 2,
                                 goal: 1.0,
                                 duration: 0.0,
@@ -161,7 +161,7 @@ fn layers_that_are_not_plain_toggles_stay() {
         .collect();
     assert_eq!(names, ["Toggles", "Driver", "Outfit_5"]);
     let driver = &a.animator.as_ref().unwrap().layers[1].state_machine.states[1];
-    assert!(matches!(driver.behaviours[1], Behaviour::LayerWeight { layer: 1, .. }));
+    assert!(matches!(driver.actions[1], Action::LayerWeight { layer: 1, .. }));
 }
 
 fn key(time: f32, value: f32) -> Key {

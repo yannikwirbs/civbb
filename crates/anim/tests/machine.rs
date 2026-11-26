@@ -55,11 +55,11 @@ fn state(clip: u32) -> State {
         cycle_offset: 0.0,
         cycle_offset_param: None,
         time_param: None,
-        write_defaults: true,
+        unwritten: Unwritten::Rest,
         mirror: false,
         mirror_param: None,
         transitions: Vec::new(),
-        behaviours: Vec::new(),
+        actions: Vec::new(),
     }
 }
 
@@ -548,7 +548,7 @@ fn layers_override_by_weight_and_add_deltas_within_masks() {
     close(x(&i), 2.5);
 
     // Masked to `B` only, the override layer cannot write `A`.
-    over.mask = Some(AvatarMask {
+    over.mask = Some(Mask {
         body_parts: Vec::new(),
         transforms: Some(vec![2]),
     });

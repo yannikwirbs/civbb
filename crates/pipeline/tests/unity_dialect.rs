@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use civbb_format::animator::{Behaviour, DriverOp, MeshProperty, NodeProperty, Target};
+use civbb_format::animator::{Action, EntryOp, MeshProperty, NodeProperty, Target};
 use civbb_format::constraint::ConstraintField;
 use civbb_format::material::{MaterialField, MaterialModel};
 use civbb_format::state::{EntryKind, Range, SyncMode};
@@ -141,7 +141,7 @@ fn vrchat_builtins_lower_to_platform_values() {
     );
     assert_eq!(a.expressions.unwrap().menu.controls[0].parameter, None);
     let state = &a.animator.unwrap().layers[0].state_machine.states[1];
-    let Behaviour::ParameterDriver { ops, .. } = &state.behaviours[0] else {
+    let Action::Entries { ops, .. } = &state.actions[0] else {
         panic!("not a driver")
     };
     assert_eq!(
@@ -149,7 +149,7 @@ fn vrchat_builtins_lower_to_platform_values() {
         before + 1,
         "the write to Grounded is dropped, the read of GestureLeft kept"
     );
-    assert!(matches!(ops[before], DriverOp::Copy { src: 8, dst: 0, .. }));
+    assert!(matches!(ops[before], EntryOp::Copy { src: 8, dst: 0, .. }));
     assert!(
         imported.warnings.iter().any(|w| w.contains("1 driver operations")),
         "{:?}",

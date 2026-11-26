@@ -1,12 +1,14 @@
-//! Unity dialect 1's animator and expression parameters lowered to state entries (ADR 0088, 0095).
+//! Unity dialect 1's animator and expression parameters lowered to state entries (ADR 0088, 0095), and its state
+//! behaviours and Write Defaults to native actions and `unwritten` rules (ADR 0085).
 //!
 //! Names in the menu, contact receivers and PhysBone prefixes become entry references.
 
-use civbb_format::animator::{Animator, Behaviour, DriverOp};
+use civbb_format::animator::{Action, Animator, EntryOp, PosePart, PoseSource, Unwritten};
 use civbb_format::dynamics::ChainOutputs;
 use civbb_format::expressions::{Control, ControlKind, Menu};
 use civbb_format::state::{Entry, EntryIndex, EntryKind, PLATFORM_NAMESPACE, Platform, Range, StateTable, SyncMode};
 use serde::Deserialize;
+use serde_json::Value;
 
 /// An animator parameter as dialect 1 writes it (`X_animator.animator.parameters`).
 #[derive(Deserialize)]
@@ -125,20 +127,68 @@ pub(super) fn lower(animator: Vec<XParameter>, expressions: Option<&XExpressions
     StateTable { entries }
 }
 
+/// A state behaviour as dialect 1 writes it (`X_animator.animator.layers[].state_machine.states[].behaviours`).
+#[derive(Deserialize)]
+enum XBehaviour {
+    ParameterDriver { local_only: bool, ops: Vec<EntryOp> },
+    TrackingControl(Vec<(PosePart, PoseSource)>),
+    LayerWeight { layer: u32, goal: f32, duration: f32 },
+    GroupWeight { group: u32, goal: f32, duration: f32 },
+    Locomotion { disabled: bool },
+}
+
+impl From<XBehaviour> for Action {
+    fn from(b: XBehaviour) -> Self {
+        match b {
+            XBehaviour::ParameterDriver { local_only, ops } => Action::Entries {
+                owner_only: local_only,
+                ops,
+            },
+            XBehaviour::TrackingControl(parts) => Action::PoseSource(parts),
+            XBehaviour::LayerWeight { layer, goal, duration } => Action::LayerWeight { layer, goal, duration },
+            XBehaviour::GroupWeight { group, goal, duration } => Action::GroupWeight { group, goal, duration },
+            XBehaviour::Locomotion { disabled } => Action::Locomotion { disabled },
+        }
+    }
+}
+
+/// Rewrites dialect 1's states (`X_animator.animator.layers[].state_machine.states`) in native shape: Write Defaults
+/// on as `unwritten: Rest`, off as `Hold`; behaviours as actions.
+pub(super) fn lower_states(animator: &mut Value) -> Result<(), String> {
+    let err = |e: serde_json::Error| format!("X_animator: {e}");
+    let layers = animator.get_mut("layers").and_then(Value::as_array_mut);
+    let states = (layers.into_iter().flatten())
+        .filter_map(|l| l.pointer_mut("/state_machine/states").and_then(Value::as_array_mut))
+        .flatten();
+    for s in states.filter_map(Value::as_object_mut) {
+        if let Some(wd) = s.remove("write_defaults") {
+            let wd = wd.as_bool().ok_or("X_animator: write_defaults is not a bool")?;
+            let unwritten = if wd { Unwritten::Rest } else { Unwritten::Hold };
+            s.insert("unwritten".into(), serde_json::to_value(unwritten).map_err(err)?);
+        }
+        if let Some(b) = s.remove("behaviours") {
+            let b = Vec::<XBehaviour>::deserialize(&b).map_err(err)?;
+            let actions: Vec<Action> = b.into_iter().map(Action::from).collect();
+            s.insert("actions".into(), serde_json::to_value(actions).map_err(err)?);
+        }
+    }
+    Ok(())
+}
+
 /// Removes parameter driver operations that write a platform value, returning how many: VRChat sets its built-ins
 /// every frame over whatever a driver wrote.
 pub(super) fn drop_platform_writes(animator: &mut Animator, state: &StateTable) -> usize {
     let platform = |e: EntryIndex| state.entries[e as usize].name.starts_with(PLATFORM_NAMESPACE);
     let mut dropped = 0;
     let states = animator.layers.iter_mut().flat_map(|l| &mut l.state_machine.states);
-    for b in states.flat_map(|s| &mut s.behaviours) {
-        if let Behaviour::ParameterDriver { ops, .. } = b {
+    for b in states.flat_map(|s| &mut s.actions) {
+        if let Action::Entries { ops, .. } = b {
             let before = ops.len();
             ops.retain(|op| match *op {
-                DriverOp::Set { param, .. } | DriverOp::Add { param, .. } | DriverOp::Random { param, .. } => {
+                EntryOp::Set { param, .. } | EntryOp::Add { param, .. } | EntryOp::Random { param, .. } => {
                     !platform(param)
                 }
-                DriverOp::Copy { dst, .. } => !platform(dst),
+                EntryOp::Copy { dst, .. } => !platform(dst),
             });
             dropped += before - ops.len();
         }

@@ -44,8 +44,9 @@ pub struct Entry {
     /// The values an int or float takes, which decide its sync encoding (ADR 0098); `None`: unbounded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<Range>,
-    /// Value Write Defaults restores where an animation curve writes this entry, when it is not `default` (lowered
-    /// Unity content: the animator parameter's default, while `default` is the expression parameter's).
+    /// Value a state with `unwritten: Rest` restores where an animation curve writes this entry, when it is not
+    /// `default` (lowered Unity content: the animator parameter's default, while `default` is the expression
+    /// parameter's).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rest: Option<f32>,
     /// Who sends it over the network.
@@ -71,7 +72,7 @@ impl Entry {
         }
     }
 
-    /// The value Write Defaults restores where a curve writes this entry.
+    /// The value a state with `unwritten: Rest` restores where a curve writes this entry.
     pub fn rest(&self) -> f32 {
         self.rest.unwrap_or(self.default)
     }

@@ -1,10 +1,10 @@
 //! Validation of clips and animator controllers: curves and keys, layers, states, transitions, blend trees and
-//! behaviours.
+//! actions.
 
 use crate::Avatar;
 use crate::animator::{
-    Animator, Behaviour, BlendTreeKind, DriverOp, HumanoidProperty, MeshProperty, Motion, NodeProperty, Target,
-    Transition, TransitionDest,
+    Action, Animator, BlendTreeKind, EntryOp, HumanoidProperty, MeshProperty, Motion, NodeProperty, Target, Transition,
+    TransitionDest,
 };
 
 use super::V;
@@ -117,27 +117,23 @@ impl V {
                 if let Some(m) = &s.motion {
                     self.motion(m, 0, params, clips, &sp);
                 }
-                for b in &s.behaviours {
+                for b in &s.actions {
                     match b {
-                        Behaviour::ParameterDriver { ops, .. } => {
+                        Action::Entries { ops, .. } => {
                             for op in ops {
                                 let (a, b) = match *op {
-                                    DriverOp::Set { param, .. }
-                                    | DriverOp::Add { param, .. }
-                                    | DriverOp::Random { param, .. } => (param, param),
-                                    DriverOp::Copy { src, dst, .. } => (src, dst),
+                                    EntryOp::Set { param, .. }
+                                    | EntryOp::Add { param, .. }
+                                    | EntryOp::Random { param, .. } => (param, param),
+                                    EntryOp::Copy { src, dst, .. } => (src, dst),
                                 };
                                 self.index(a as usize, params, sp, "driver parameter");
                                 self.written(b, sp, "driver parameter");
                             }
                         }
-                        Behaviour::LayerWeight { layer, .. } => {
-                            self.index(*layer as usize, a.layers.len(), sp, "layer")
-                        }
-                        Behaviour::GroupWeight { group, .. } => {
-                            self.index(*group as usize, a.groups.len(), sp, "group")
-                        }
-                        Behaviour::TrackingControl(_) | Behaviour::Locomotion { .. } => {}
+                        Action::LayerWeight { layer, .. } => self.index(*layer as usize, a.layers.len(), sp, "layer"),
+                        Action::GroupWeight { group, .. } => self.index(*group as usize, a.groups.len(), sp, "group"),
+                        Action::PoseSource(_) | Action::Locomotion { .. } => {}
                     }
                 }
             }

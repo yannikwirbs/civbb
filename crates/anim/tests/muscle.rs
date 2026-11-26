@@ -485,15 +485,15 @@ fn state(clip: u32) -> State {
         cycle_offset: 0.0,
         cycle_offset_param: None,
         time_param: None,
-        write_defaults: true,
+        unwritten: Unwritten::Rest,
         mirror: false,
         mirror_param: None,
         transitions: Vec::new(),
-        behaviours: Vec::new(),
+        actions: Vec::new(),
     }
 }
 
-fn layer(clip: u32, mask: Option<AvatarMask>) -> Layer {
+fn layer(clip: u32, mask: Option<Mask>) -> Layer {
     Layer {
         name: format!("l{clip}"),
         group: 0,
@@ -513,11 +513,11 @@ fn layer(clip: u32, mask: Option<AvatarMask>) -> Layer {
 fn masks_gate_muscles_by_body_part_and_the_pose_follows_the_muscles() {
     let arm_and_hand = |v| muscle_clip(&[(muscle("Left Arm Down-Up"), v), (muscle("Left Hand Down-Up"), v)]);
     let mut a = arm(0.5, I, vec![arm_and_hand(1.0), arm_and_hand(-1.0)]);
-    let only_fingers = AvatarMask {
+    let only_fingers = Mask {
         body_parts: vec![BodyPart::LeftFingers],
         transforms: None,
     };
-    let left_arm = AvatarMask {
+    let left_arm = Mask {
         body_parts: vec![BodyPart::LeftArm],
         transforms: Some(Vec::new()),
     };
@@ -593,7 +593,7 @@ fn write_defaults_off_never_holds_muscles() {
             cycle_offset: 0.0,
         };
         let mut first = state(0);
-        first.write_defaults = false;
+        first.unwritten = Unwritten::Hold;
         first.transitions = vec![Transition {
             dest: TransitionDest::State(1),
             conditions: vec![Condition {
@@ -611,7 +611,7 @@ fn write_defaults_off_never_holds_muscles() {
             can_transition_to_self: false,
         }];
         let mut tree = state(0);
-        tree.write_defaults = false;
+        tree.unwritten = Unwritten::Hold;
         tree.motion = Some(Motion::BlendTree(Box::new(BlendTree {
             kind: BlendTreeKind::Simple1D { param: 0 },
             children: vec![child(tree_clip, 0.0), child(2, 1.0)],

@@ -1,5 +1,5 @@
-//! Platform values (ADR 0096) and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
-//! layer and group weight control, tracking and locomotion control.
+//! Platform values (ADR 0096) and state actions (ADR 0011): names and types, entry operations, owner-only actions,
+//! layer and group weights, pose sources and locomotion.
 
 use civbb_anim::{Controller, Instance};
 use civbb_format::Avatar;
@@ -16,7 +16,7 @@ fn platform(p: Platform, kind: EntryKind) -> Entry {
     param(p.name(), kind)
 }
 
-fn state(behaviours: Vec<Behaviour>, transitions: Vec<Transition>) -> State {
+fn state(actions: Vec<Action>, transitions: Vec<Transition>) -> State {
     State {
         name: String::new(),
         motion: None,
@@ -25,11 +25,11 @@ fn state(behaviours: Vec<Behaviour>, transitions: Vec<Transition>) -> State {
         cycle_offset: 0.0,
         cycle_offset_param: None,
         time_param: None,
-        write_defaults: true,
+        unwritten: Unwritten::Rest,
         mirror: false,
         mirror_param: None,
         transitions,
-        behaviours,
+        actions,
     }
 }
 
@@ -148,8 +148,8 @@ fn instances_start_at_the_entry_defaults_in_their_types() {
     assert_eq!(Instance::new(&c, false).params, [0.5, 1.0, 2.0, 0.25, 1.0]);
 }
 
-fn driver(local_only: bool, ops: Vec<DriverOp>) -> Behaviour {
-    Behaviour::ParameterDriver { local_only, ops }
+fn driver(owner_only: bool, ops: Vec<EntryOp>) -> Action {
+    Action::Entries { owner_only, ops }
 }
 
 #[test]
@@ -163,38 +163,38 @@ fn parameter_drivers_run_on_enter_in_order() {
         param("local", EntryKind::Float),
     ];
     let ops = vec![
-        DriverOp::Set { param: 0, value: 2.0 },
-        DriverOp::Add { param: 0, value: 0.5 },
+        EntryOp::Set { param: 0, value: 2.0 },
+        EntryOp::Add { param: 0, value: 0.5 },
         // 2.5 in 0..5 maps to 5 in 0..10.
-        DriverOp::Copy {
+        EntryOp::Copy {
             src: 0,
             dst: 1,
             remap: Some(([0.0, 5.0], [0.0, 10.0])),
         },
-        DriverOp::Random {
+        EntryOp::Random {
             param: 2,
             min: 0.0,
             max: 0.0,
             chance: 1.0,
         },
-        DriverOp::Random {
+        EntryOp::Random {
             param: 3,
             min: 3.0,
             max: 3.0,
             chance: 0.0,
         },
-        DriverOp::Random {
+        EntryOp::Random {
             param: 4,
             min: 2.0,
             max: 4.0,
             chance: 0.0,
         },
     ];
-    let behaviours = vec![
+    let actions = vec![
         driver(false, ops),
-        driver(true, vec![DriverOp::Set { param: 5, value: 1.0 }]),
+        driver(true, vec![EntryOp::Set { param: 5, value: 1.0 }]),
     ];
-    let c = controller(params, vec![layer(vec![state(behaviours, vec![])], 0)]);
+    let c = controller(params, vec![layer(vec![state(actions, vec![])], 0)]);
     for local in [true, false] {
         let mut i = Instance::new(&c, local);
         i.update(&c, 0.1);
@@ -226,7 +226,7 @@ fn random_ints_cover_their_inclusive_range() {
         ordered_interruption: true,
         can_transition_to_self: true,
     };
-    let random = DriverOp::Random {
+    let random = EntryOp::Random {
         param: 0,
         min: 0.0,
         max: 2.0,
@@ -264,18 +264,18 @@ fn layer_and_group_weight_control_blend_to_their_goals() {
         can_transition_to_self: false,
     };
     let control = vec![
-        Behaviour::LayerWeight {
+        Action::LayerWeight {
             layer: 1,
             goal: 0.0,
             duration: 1.0,
         },
-        Behaviour::GroupWeight {
+        Action::GroupWeight {
             group: 1,
             goal: 0.25,
             duration: 0.0,
         },
-        Behaviour::TrackingControl(vec![(TrackingPart::LeftHand, TrackingMode::Animation)]),
-        Behaviour::Locomotion { disabled: true },
+        Action::PoseSource(vec![(PosePart::LeftHand, PoseSource::Animation)]),
+        Action::Locomotion { disabled: true },
     ];
     let base = layer(vec![state(vec![], vec![go]), state(control, vec![])], 0);
     let other = layer(vec![state(vec![], vec![])], 0);
@@ -285,8 +285,8 @@ fn layer_and_group_weight_control_blend_to_their_goals() {
     i.params[0] = 1.0;
     i.update(&c, 0.1);
     assert_eq!((i.layer_weights[1], i.group_weights[1]), (1.0, 0.25));
-    assert_eq!(i.tracking[TrackingPart::LeftHand as usize], TrackingMode::Animation);
-    assert_eq!(i.tracking[TrackingPart::Head as usize], TrackingMode::Tracking);
+    assert_eq!(i.pose_sources[PosePart::LeftHand as usize], PoseSource::Animation);
+    assert_eq!(i.pose_sources[PosePart::Head as usize], PoseSource::Tracking);
     assert!(i.locomotion_disabled);
     i.update(&c, 0.5);
     assert!((i.layer_weights[1] - 0.5).abs() < 1e-6);

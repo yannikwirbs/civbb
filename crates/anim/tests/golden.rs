@@ -234,11 +234,11 @@ impl Case {
                         cycle_offset: 0.0,
                         cycle_offset_param: None,
                         time_param: None,
-                        write_defaults: s.wd,
+                        unwritten: if s.wd { Unwritten::Rest } else { Unwritten::Hold },
                         mirror: false,
                         mirror_param: None,
                         transitions: s.transitions.iter().map(|t| self.transition(t, index(&t.to))).collect(),
-                        behaviours: Vec::new(),
+                        actions: Vec::new(),
                     })
                     .collect();
                 Layer {
@@ -250,7 +250,7 @@ impl Case {
                     } else {
                         LayerBlending::Override
                     },
-                    mask: l.mask.as_ref().map(|t| AvatarMask {
+                    mask: l.mask.as_ref().map(|t| Mask {
                         body_parts: Vec::new(),
                         transforms: Some(t.iter().map(|name| node_index(&self.nodes, name)).collect()),
                     }),

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use civbb_anim::behaviour::coerce;
+use civbb_anim::action::coerce;
 use civbb_anim::material;
 use civbb_anim::{Constraints, Controller, Instance, Slot, Target};
 use civbb_core::math::{Pose, world_poses_into};

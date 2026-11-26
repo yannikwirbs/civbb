@@ -5,7 +5,9 @@
 //! `X_*` extensions (ADR 0041) for what glTF lacks.
 
 use civbb_format::Avatar;
-use civbb_format::animator::{EulerOrder, HumanoidProperty, Key, MeshProperty, NodeProperty, Target};
+use civbb_format::animator::{
+    Action, Animator, EulerOrder, HumanoidProperty, Key, MeshProperty, NodeProperty, Target, Unwritten,
+};
 use civbb_format::constraint::ConstraintType;
 use civbb_format::face::{EyeDriver, ShapeBind};
 use civbb_format::material::MaterialModel;
@@ -16,6 +18,29 @@ use serde_json::{Value, json};
 const FLOAT: u32 = 5126;
 const U16: u32 = 5123;
 const U32: u32 = 5125;
+/// Unity dialect 1's states (the inverse of the importer's lowering): `unwritten` as `write_defaults`, actions as
+/// behaviours.
+fn raise_states(animator: &Animator, x: &mut Value) {
+    for (layer, l) in animator.layers.iter().zip(x["layers"].as_array_mut().expect("array")) {
+        let states = l["state_machine"]["states"].as_array_mut().expect("array");
+        for (state, s) in layer.state_machine.states.iter().zip(states) {
+            let o = s.as_object_mut().expect("object");
+            o.remove("unwritten");
+            o.remove("actions");
+            o.insert("write_defaults".into(), json!(state.unwritten == Unwritten::Rest));
+            let behaviours = state.actions.iter().map(|a| match a {
+                Action::Entries { owner_only, ops } => {
+                    json!({"ParameterDriver": {"local_only": owner_only, "ops": ops}})
+                }
+                Action::PoseSource(parts) => json!({ "TrackingControl": parts }),
+                // Same shape in both.
+                Action::LayerWeight { .. } | Action::GroupWeight { .. } | Action::Locomotion { .. } => json!(a),
+            });
+            o.insert("behaviours".into(), json!(behaviours.collect::<Vec<_>>()));
+        }
+    }
+}
+
 /// VRChat's PhysBone output suffixes, in `ChainOutputs::entries` order (the importer's list).
 const CHAIN_SUFFIXES: [&str; 5] = ["_IsGrabbed", "_IsPosed", "_Angle", "_Stretch", "_Squish"];
 
@@ -141,6 +166,7 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
             .iter()
             .map(|e| json!({"name": dialect(&e.name), "kind": e.kind, "default": e.rest()}));
         x["parameters"] = json!(params.collect::<Vec<_>>());
+        raise_states(animator, &mut x);
         let paths = node_paths(a);
         for layer in x["layers"].as_array_mut().expect("array") {
             if let Some(t) = layer.pointer_mut("/mask/transforms").filter(|t| t.is_array()) {

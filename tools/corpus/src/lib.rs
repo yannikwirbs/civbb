@@ -651,11 +651,11 @@ pub fn generate(spec: &Spec) -> Avatar {
             cycle_offset: 0.0,
             cycle_offset_param: None,
             time_param: None,
-            write_defaults: false,
+            unwritten: Unwritten::Hold,
             mirror: false,
             mirror_param: None,
             transitions: vec![transition],
-            behaviours: vec![],
+            actions: vec![],
         };
         animator.layers.push(Layer {
             name,

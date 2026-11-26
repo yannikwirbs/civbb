@@ -9,7 +9,7 @@ Animation runtime: compile-time curve binding, clip sampling, Mecanim state mach
 
 Internal deps: civbb-core, civbb-format
 
-- `src/behaviour.rs`: Platform values at rest and state behaviours: parameter drivers, tracking, layer and locomotion control.
+- `src/action.rs`: Platform values at rest and state actions: entry operations, pose sources, layer weights and locomotion.
 - `src/bind.rs`: Compile-time binding: gives curve targets slots in one flat buffer with per-slot defaults (ADRs 0007, 0089).
 - `src/body.rs`: Unity's humanoid body pose (#52): a pose's centre of mass and body orientation from its bones' positions, the
 - `src/clip.rs`: A clip bound to slots, and sampling it into the slot buffer.
@@ -23,7 +23,7 @@ Internal deps: civbb-core, civbb-format
 - `src/mix.rs`: Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
 - `src/muscle.rs`: Humanoid muscles: Unity's muscle table, and muscle values to human bones' local rotations (ADR 0014).
-- `tests/behaviour.rs`: Platform values (ADR 0096) and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
+- `tests/action.rs`: Platform values (ADR 0096) and state actions (ADR 0011): names and types, entry operations, owner-only actions,
 - `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order,
 - `tests/blend.rs`: Blend tree weights, hand-derived (ADR 0009): 1D, 2D simple directional, freeform cartesian and polar gradient
 - `tests/body_pose.rs`: Unity's humanoid body pose (#52) against `HumanPoseHandler` recordings on the generated test skeleton, plain and
@@ -94,7 +94,7 @@ Content format: avatar data model and signed, content-addressed runtime packages
 
 Internal deps: none
 
-- `src/animator.rs`: Animator data with Mecanim semantics: layers, state machines, blend trees, transitions, clips.
+- `src/animator.rs`: Behaviour as a layered state machine (ADR 0085): layers, state machines, blend trees, transitions, actions, clips.
 - `src/avatar.rs`: The avatar root type tying every part of an avatar together.
 - `src/blob.rs`: Content addresses: BLAKE3 hashes identifying blobs.
 - `src/cbor.rs`: CBOR encoding helpers with bounded decoding for untrusted input.
@@ -130,7 +130,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/gltf_import/unity_clip/material.rs`: Unity material curves lowered to native material fields (ADR 0099): property names by the renderer's shader
 - `src/gltf_import/unity_clip.rs`: Unity dialect 1's clips and avatar masks lowered to typed targets (ADR 0089): `/`-separated node paths and Unity
 - `src/gltf_import/unity_material.rs`: Unity materials from the source package's `X_toon_material` (ADR 0043): the shader family fingerprinted by shader
-- `src/gltf_import/unity_state.rs`: Unity dialect 1's animator and expression parameters lowered to state entries (ADR 0088, 0095).
+- `src/gltf_import/unity_state.rs`: Unity dialect 1's animator and expression parameters lowered to state entries (ADR 0088, 0095), and its state
 - `src/gltf_import/vrm/expressions.rs`: VRM expressions to visemes, blink and a Direct blend tree of toggles, and look-at to eye look.
 - `src/gltf_import/vrm/meta.rs`: VRM `meta` (0.x and 1.0) to the format's creator, licence and permission fields.
 - `src/gltf_import/vrm/mtoon.rs`: VRM MToon materials (0.x `materialProperties`, 1.0 `VRMC_materials_mtoon`) to the Toon model.

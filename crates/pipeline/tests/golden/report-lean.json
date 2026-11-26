@@ -1,13 +1,13 @@
 {
   "avatar": "lean",
   "compiler": "civbb-pipeline 0.0.0",
-  "format_version": 31,
+  "format_version": 32,
   "parity": null,
   "platform": "Desktop",
   "report": 1,
   "stages": [
     {
-      "animator_bytes": 1678,
+      "animator_bytes": 1662,
       "blend_shapes": 15,
       "bones": 22,
       "chains": 0,
@@ -45,7 +45,7 @@
       "visemes": 15
     },
     {
-      "animator_bytes": 1678,
+      "animator_bytes": 1662,
       "blend_shapes": 15,
       "bones": 22,
       "chains": 0,
@@ -83,7 +83,7 @@
       "visemes": 15
     },
     {
-      "animator_bytes": 1678,
+      "animator_bytes": 1662,
       "blend_shapes": 15,
       "bones": 22,
       "chains": 0,
@@ -121,7 +121,7 @@
       "visemes": 15
     },
     {
-      "animator_bytes": 1678,
+      "animator_bytes": 1662,
       "blend_shapes": 15,
       "bones": 22,
       "chains": 0,
@@ -159,7 +159,7 @@
       "visemes": 15
     },
     {
-      "animator_bytes": 1678,
+      "animator_bytes": 1662,
       "blend_shapes": 15,
       "bones": 22,
       "chains": 0,
@@ -205,7 +205,7 @@
       "visemes": 15
     },
     {
-      "animator_bytes": 1196,
+      "animator_bytes": 1188,
       "blend_shapes": 15,
       "bones": 22,
       "chains": 0,
@@ -251,7 +251,7 @@
       "visemes": 15
     },
     {
-      "animator_bytes": 1196,
+      "animator_bytes": 1188,
       "blend_shapes": 15,
       "bones": 22,
       "chains": 0,

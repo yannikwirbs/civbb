@@ -104,6 +104,7 @@ impl Importer<'_> {
             let mut v = v.clone();
             if let Some(a) = v.get_mut("animator") {
                 unity_clip::mask_nodes(a, &self.nodes, self.caps.string_len);
+                unity_state::lower_states(a)?;
             }
             let x: XAnimator = parse("X_animator", &v)?;
             params = parse::<XAnimatorParameters>("X_animator", &v["animator"])?.parameters;

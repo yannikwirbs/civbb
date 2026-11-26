@@ -26,7 +26,7 @@ pub use validate::{Caps, validate};
 
 /// Version of the runtime package's data model. Bump on any change to the types in this crate; readers refuse
 /// packages of any other version, which are rebuilt from their kept source (ADR 0087).
-pub const FORMAT_VERSION: u32 = 31;
+pub const FORMAT_VERSION: u32 = 32;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -352,11 +352,11 @@ pub(crate) mod testutil {
             cycle_offset: 0.0,
             cycle_offset_param: None,
             time_param: None,
-            write_defaults: false,
+            unwritten: Unwritten::Hold,
             mirror: false,
             mirror_param: None,
             transitions: vec![],
-            behaviours: vec![],
+            actions: vec![],
         };
         let mut off = state("Off", None);
         off.transitions.push(transition);
@@ -376,9 +376,9 @@ pub(crate) mod testutil {
                 normalize: false,
             }))),
         );
-        on.behaviours.push(Behaviour::ParameterDriver {
-            local_only: true,
-            ops: vec![DriverOp::Copy {
+        on.actions.push(Action::Entries {
+            owner_only: true,
+            ops: vec![EntryOp::Copy {
                 src: 0,
                 dst: 0,
                 remap: Some(([0.0, 1.0], [1.0, 0.0])),
@@ -394,7 +394,7 @@ pub(crate) mod testutil {
                 group: 0,
                 weight: 1.0,
                 blending: LayerBlending::Override,
-                mask: Some(AvatarMask {
+                mask: Some(Mask {
                     body_parts: vec![BodyPart::Head],
                     transforms: None,
                 }),
