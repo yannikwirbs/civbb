@@ -3,7 +3,7 @@
 
 use civbb_anim::motion::{gradient_bands, length, simple_1d, simple_directional, weights};
 use civbb_anim::{Controller, Instance};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::Transform;
@@ -140,7 +140,7 @@ fn direct_weights_come_from_parameters_and_may_be_normalised() {
 }
 
 /// Node `A`; clip 0 holds A.x at 0 (length 1 s), clip 1 ramps A.x 0 -> 10 (length 3 s), clip 2 holds A.y at 4.
-fn avatar(motion: Motion) -> Avatar {
+fn avatar(motion: Motion) -> Document {
     let key = |time, value, slope| Key {
         time,
         value,
@@ -165,7 +165,7 @@ fn avatar(motion: Motion) -> Avatar {
         active: true,
     };
     let param = |name: &str| Entry::new(name, EntryKind::Float, 0.0);
-    Avatar {
+    Document {
         hierarchy: Hierarchy {
             nodes: vec![node("Root", None), node("A", Some(0))],
         },
@@ -215,7 +215,7 @@ fn avatar(motion: Motion) -> Avatar {
                 },
             }],
         }),
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 

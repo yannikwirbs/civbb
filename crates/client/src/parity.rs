@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use civbb_anim::{Controller, Instance};
 use civbb_core::math::Pose;
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::COMPILER_PARAMETER_PREFIX;
 use civbb_format::cost::{Light, Parity, Region, Rig, RigView, StateParity, Thresholds, ViewScore};
 use civbb_format::math::{Mat4, Vec3};
@@ -50,7 +50,7 @@ pub const DT: f32 = 1.0 / 60.0;
 /// One side of a comparison: a validated avatar and its decoded textures.
 pub struct Side<'a> {
     /// The avatar.
-    pub avatar: &'a Avatar,
+    pub avatar: &'a Document,
     /// Its textures, from [`view::decode_textures`].
     pub textures: &'a [Option<TextureImage>],
 }
@@ -135,7 +135,7 @@ pub struct HandoffState {
 }
 
 /// The hand-off for a Unity reference render of `avatar` (ADR 0048).
-pub fn handoff(avatar: &Avatar) -> Handoff {
+pub fn handoff(avatar: &Document) -> Handoff {
     let len = LIGHT_TOWARDS.iter().map(|x| x * x).sum::<f32>().sqrt();
     let rest = HandoffState {
         name: "rest".into(),
@@ -166,7 +166,7 @@ pub fn handoff(avatar: &Avatar) -> Handoff {
 /// Each state entry of an avatar with an animator, with the value a fresh local instance starts it at
 /// (`Controller::start`; a platform value's `at_rest`). Platform values go under VRChat's names, as Unity sets
 /// them (ADR 0096).
-fn start(avatar: &Avatar) -> Vec<(String, f32)> {
+fn start(avatar: &Document) -> Vec<(String, f32)> {
     let Some(c) = Controller::new(avatar) else {
         return Vec::new();
     };
@@ -177,7 +177,7 @@ fn start(avatar: &Avatar) -> Vec<(String, f32)> {
 
 /// Each state entry with the value away from its start it takes in [`states`]. Entries the compiler added are left
 /// out, so a compiled avatar has its import's states.
-pub fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
+pub fn toggles(avatar: &Document) -> Vec<(String, f32)> {
     start(avatar)
         .into_iter()
         .filter(|(p, _)| !p.starts_with(COMPILER_PARAMETER_PREFIX))
@@ -188,7 +188,7 @@ pub fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
 /// Steps one island per avatar through the same states: rest, then each of `params` set (by entry name, VRChat's for
 /// a platform value; [`toggles`] of the first avatar, or a hand-off's states) on top of the state before, [`FRAMES_PER_STATE`] frames each.
 /// Calls `check` with the state number, its name (`rest`, `Hat=1`) and the islands after each.
-pub fn states(avatars: &[&Avatar], params: &[(String, f32)], mut check: impl FnMut(usize, &str, &[Island])) {
+pub fn states(avatars: &[&Document], params: &[(String, f32)], mut check: impl FnMut(usize, &str, &[Island])) {
     let mut islands: Vec<Island> = avatars
         .iter()
         .map(|a| Island::new(Arc::new(Model::new(a)), 1, true, Pose::IDENTITY))
@@ -219,7 +219,7 @@ pub fn states(avatars: &[&Avatar], params: &[(String, f32)], mut check: impl FnM
 
 /// The rig for an avatar: front, left, back and right, level with the centre of its [`rest_bounds`], each as far
 /// away as the bounds need to fill 90 % of the image (height or width across the view) from their near side.
-pub fn rig(avatar: &Avatar) -> Rig {
+pub fn rig(avatar: &Document) -> Rig {
     let (lo, hi) = rest_bounds(avatar);
     let centre: [f32; 3] = std::array::from_fn(|k| (lo[k] + hi[k]) / 2.0);
     let size: [f32; 3] = std::array::from_fn(|k| (hi[k] - lo[k]).max(0.01));
@@ -254,7 +254,7 @@ pub fn rig(avatar: &Avatar) -> Rig {
 
 /// The world-space bounds of what the avatar shows at rest: the vertices of meshes on active nodes after
 /// [`FRAMES_PER_STATE`] frames, skinned and with shape weights applied. All zero when nothing shows.
-pub fn rest_bounds(avatar: &Avatar) -> (Vec3, Vec3) {
+pub fn rest_bounds(avatar: &Document) -> (Vec3, Vec3) {
     let mut island = Island::new(Arc::new(Model::new(avatar)), 1, true, Pose::IDENTITY);
     for _ in 0..FRAMES_PER_STATE {
         frame::step(std::slice::from_mut(&mut island), |_, _| true, DT);
@@ -274,7 +274,7 @@ pub fn rest_bounds(avatar: &Avatar) -> (Vec3, Vec3) {
 }
 
 /// Every mesh's vertices in world space after the island's shape weights and skinning, as the GPU places them.
-pub fn placed(avatar: &Avatar, island: &Island) -> Vec<Vec<Vec3>> {
+pub fn placed(avatar: &Document, island: &Island) -> Vec<Vec<Vec3>> {
     let mut weights = Vec::new();
     island.shape_weights(&mut weights);
     let world = island.world();
@@ -344,7 +344,7 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
     {
         eprintln!("civbb-client: {}: {e}", dir.display());
     }
-    let avatars: Vec<&Avatar> = sides.iter().map(|s| s.avatar).collect();
+    let avatars: Vec<&Document> = sides.iter().map(|s| s.avatar).collect();
     // Against Unity, exactly the states it rendered.
     let params = match &reference {
         Reference::Package(r) => toggles(r.avatar),

@@ -4,7 +4,7 @@
 use civbb_client::cull::{Frustum, MeshBounds};
 use civbb_client::parity::{placed, states, toggles};
 use civbb_client::view::skin_matrices;
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_render::View;
 
 /// Every vertex the GPU would place, in every parity state (toggles move meshes, shapes and bones), lies in its
@@ -12,7 +12,7 @@ use civbb_render::View;
 #[test]
 fn bounds_hold_every_skinned_vertex() {
     for (name, spec) in [("lean", civbb_corpus::lean()), ("bloated", civbb_corpus::bloated())] {
-        let avatar: Avatar = civbb_corpus::generate(&spec);
+        let avatar: Document = civbb_corpus::generate(&spec);
         let bounds: Vec<MeshBounds> = avatar.meshes.iter().map(MeshBounds::new).collect();
         let shaped = avatar.meshes.iter().filter(|m| !m.blend_shapes.is_empty()).count();
         assert!(shaped > 0, "{name}: no blendshapes to check the padding with");
@@ -47,7 +47,7 @@ fn bounds_hold_every_skinned_vertex() {
 /// grow with the matrix too.
 #[test]
 fn shape_padding_covers_deltas() {
-    let avatar: Avatar = civbb_corpus::generate(&civbb_corpus::bloated());
+    let avatar: Document = civbb_corpus::generate(&civbb_corpus::bloated());
     const S: f32 = 2.5;
     let identity = [S, 0.0, 0.0, 0.0, 0.0, S, 0.0, 0.0, 0.0, 0.0, S, 0.0, 0.0, 0.0, 0.0, 1.0];
     let mut escaped = 0;

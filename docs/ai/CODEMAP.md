@@ -95,16 +95,17 @@ Content format: avatar data model and signed, content-addressed runtime packages
 Internal deps: none
 
 - `src/animator.rs`: Behaviour as a layered state machine (ADR 0085): layers, state machines, blend trees, transitions, actions, clips.
-- `src/avatar.rs`: The avatar root type tying every part of an avatar together.
+- `src/avatar.rs`: The avatar role: what a document needs to be worn (ADR 0085 point 5).
 - `src/blob.rs`: Content addresses: BLAKE3 hashes identifying blobs.
 - `src/cbor.rs`: CBOR encoding helpers with bounded decoding for untrusted input.
 - `src/constraint.rs`: Transform constraints (position, rotation, scale, parent, aim, look-at) with Unity's semantics (ADR 0018).
 - `src/cost.rs`: Cost profile: counted and measured CPU, GPU, memory and network cost of content (design doc §8).
+- `src/document.rs`: The document root: parts shared by every kind of content, and the role saying which kind it is (ADR 0085).
 - `src/dynamics.rs`: Bone dynamics (PhysBone-compatible chains and colliders) and contact senders and receivers.
 - `src/expressions.rs`: Expression menu (design doc §7).
 - `src/face.rs`: Face setup: blendshapes driven by lip sync, automatic blinking and eye look (design doc §7, `X_avatar`).
 - `src/hierarchy.rs`: Node hierarchy (bones and other transforms) and the humanoid bone mapping.
-- `src/lib.rs`: CIVBB content format: the avatar data model and signed, content-addressed runtime packages (design doc §9).
+- `src/lib.rs`: CIVBB content format: the document model and signed, content-addressed runtime packages (design doc §9).
 - `src/material.rs`: Materials (PBR, Toon, Unlit models) and texture references.
 - `src/math.rs`: Plain math types used by the format: vectors, quaternions and transforms as arrays.
 - `src/mesh.rs`: Meshes: vertex streams, skinning, submeshes and sparse blendshapes.
@@ -112,6 +113,7 @@ Internal deps: none
 - `src/package.rs`: Runtime packages: a signed CBOR manifest followed by the BLAKE3-addressed blobs it lists.
 - `src/state.rs`: The document's state table (ADR 0088): typed entries every reader and writer references by index.
 - `src/validate/animator.rs`: Validation of clips and animator controllers: curves and keys, layers, states, transitions, blend trees and
+- `src/validate/avatar.rs`: Validation of the avatar role: humanoid map, viewpoint, face, expression menu and metadata.
 - `src/validate.rs`: Structural validation and hard caps for untrusted avatars. After [`validate`] passes, every index is in range.
 
 ## `crates/pipeline` (civbb-pipeline)
@@ -136,7 +138,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/gltf_import/vrm/mtoon.rs`: VRM MToon materials (0.x `materialProperties`, 1.0 `VRMC_materials_mtoon`) to the Toon model.
 - `src/gltf_import/vrm/springs.rs`: VRM spring bones (0.x `secondaryAnimation`, 1.0 `VRMC_springBone`) to chains and colliders (ADR 0006).
 - `src/gltf_import/vrm.rs`: VRM 0.x (`VRM`) and 1.0 (`VRMC_vrm`, `VRMC_springBone`, `VRMC_materials_mtoon`, `VRMC_node_constraint`) to native
-- `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
+- `src/gltf_import.rs`: glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Document`],
 - `src/lib.rs`: Content compiler: imports glTF/VRM sources into the format model and builds runtime packages (design doc §9).
 - `src/lod.rs`: Compiler stage 3 LOD chain: up to three simplified levels per mesh from meshoptimizer, weighing where skinning and
 - `src/main.rs`: `civbb`: build, validate and inspect avatar packages from the command line (design doc §9, creator tooling).

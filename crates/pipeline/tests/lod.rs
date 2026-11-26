@@ -6,7 +6,7 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::material::{AlphaMode, Material, MaterialModel, Unlit};
 use civbb_format::math::{Mat4, Transform};
@@ -27,7 +27,7 @@ fn translation(t: [f32; 3]) -> Mat4 {
 
 /// A flat 16 by 16 grid: rows below 8 draw material 0, the rest material 1; a UV seam at column 4 (its vertices
 /// doubled); columns up to 7 skinned to joint A, from 8 to joint B; shape `Wave` lifts columns from 12.
-fn grid() -> Avatar {
+fn grid() -> Document {
     let side = CELLS + 1;
     let node = |name: &str, parent, x: f32| Node {
         name: name.into(),
@@ -108,7 +108,7 @@ fn grid() -> Avatar {
         double_sided: false,
         render_queue: 2000,
     };
-    Avatar {
+    Document {
         hierarchy: Hierarchy {
             nodes: vec![
                 node("Root", None, 0.0),
@@ -118,7 +118,7 @@ fn grid() -> Avatar {
         },
         meshes: vec![m],
         materials: vec![material.clone(), material],
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 
@@ -257,7 +257,7 @@ fn local_avatars_keep_their_look() {
 }
 
 /// Builds the chain on a pruned, merged avatar and checks it.
-fn check(mut a: Avatar, name: &str) {
+fn check(mut a: Document, name: &str) {
     let before = a.clone();
     let l = lod(&mut a);
     valid(&a);
@@ -270,7 +270,7 @@ fn check(mut a: Avatar, name: &str) {
 /// Errors within their caps, triangles falling by at least [`KEEP`] per level, and per submesh, with vertices welded
 /// across UV seams: every level still draws each edge the full mesh has open (material boundaries, open edges) and
 /// opens no other, except where three or more triangles shared it (seams and closed surfaces stay closed; ADR 0031).
-fn chain(a: &Avatar, l: &Lods, name: &str) {
+fn chain(a: &Document, l: &Lods, name: &str) {
     for (k, (_, cap)) in LEVELS.iter().enumerate() {
         assert!(
             l.error[k] <= cap * 1.0001,
@@ -348,15 +348,15 @@ fn edges(m: &Mesh, indices: &[u32], submeshes: &[Submesh]) -> Vec<Edges> {
 
 /// Steps the full avatar and one per level through the same states: each level's vertices land exactly where the
 /// full mesh's same vertices do.
-fn skins_alike(a: &Avatar, name: &str) {
-    let levels: Vec<Avatar> = (1..=LEVELS.len())
-        .map(|k| Avatar {
+fn skins_alike(a: &Document, name: &str) {
+    let levels: Vec<Document> = (1..=LEVELS.len())
+        .map(|k| Document {
             meshes: a.meshes.iter().map(|m| m.level(k)).collect(),
             ..a.clone()
         })
         .collect();
     levels.iter().for_each(valid);
-    let all: Vec<&Avatar> = std::iter::once(a).chain(&levels).collect();
+    let all: Vec<&Document> = std::iter::once(a).chain(&levels).collect();
     states(&all, |state, islands| {
         let full = placed(a, &islands[0]);
         for (k, level) in levels.iter().enumerate() {

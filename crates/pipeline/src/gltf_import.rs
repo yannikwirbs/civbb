@@ -1,4 +1,4 @@
-//! glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Avatar`],
+//! glTF 2.0 importer: nodes, meshes, skins, morph targets, materials, textures and animations to a format [`Document`],
 //! plus VRM 0.x and 1.0 extensions or the source package's `X_*` extensions (ADR 0041) when present.
 //!
 //! Input is untrusted. Every count is checked against [`Caps`] before allocating, the total input against
@@ -12,8 +12,8 @@ use civbb_format::hierarchy::{Hierarchy, Node, NodeIndex};
 use civbb_format::material::{Material, Texture};
 use civbb_format::math::Transform;
 use civbb_format::mesh::Mesh;
-use civbb_format::{Avatar, BlobId, Caps};
-use gltf::Document;
+use civbb_format::{Avatar, BlobId, Caps, Document, Role};
+use gltf::Document as Gltf;
 use gltf::json::validation::Checked;
 
 mod animation;
@@ -47,7 +47,7 @@ impl Default for Limits {
 #[derive(Debug)]
 pub struct Imported {
     /// The avatar. Humanoid, face, dynamics, animator and expressions come only from VRM or `X_*` extensions.
-    pub avatar: Avatar,
+    pub avatar: Document,
     /// Encoded images by id.
     pub blobs: BTreeMap<BlobId, Vec<u8>>,
     /// Things skipped or approximated.
@@ -122,7 +122,7 @@ pub fn import(
     if vrm.is_some() && source.is_some() {
         return Err(ImportError("both VRM and X_* extensions present".into()));
     }
-    let mut avatar = Avatar {
+    let mut avatar = Document {
         name: vrm.as_ref().and_then(|v| v.name.clone()).unwrap_or(name),
         hierarchy: Hierarchy {
             nodes: std::mem::take(&mut im.nodes),
@@ -132,32 +132,39 @@ pub fn import(
         textures: std::mem::take(&mut im.textures),
         clips,
         ..match vrm {
-            Some(v) => Avatar {
-                humanoid: Some(v.humanoid),
-                face: v.face,
+            Some(v) => Document {
                 dynamics: v.dynamics,
                 animator: v.animator,
-                expressions: v.expressions,
                 state: v.state,
-                meta: v.meta,
                 constraints: v.constraints,
-                ..Avatar::default()
+                role: Role::Avatar(Avatar {
+                    humanoid: Some(v.humanoid),
+                    viewpoint: v.viewpoint,
+                    face: v.face,
+                    expressions: v.expressions,
+                    meta: v.meta,
+                }),
+                ..Document::default()
             },
-            None => Avatar::default(),
+            None => Document::default(),
         }
     };
     if let Some(s) = source {
-        avatar.humanoid = s.humanoid;
+        avatar.role = Role::Avatar(Avatar {
+            humanoid: s.humanoid,
+            viewpoint: s.viewpoint,
+            face: s.face,
+            expressions: s.expressions,
+            meta: None,
+        });
         avatar.animator = s.animator;
         avatar.clips.extend(s.clips);
         avatar.constraints = s.constraints;
         avatar.dynamics = s.dynamics;
         avatar.contacts = s.contacts;
-        avatar.expressions = s.expressions;
-        avatar.face = s.face;
         avatar.state = s.state;
     }
-    let validate = |avatar: &Avatar| {
+    let validate = |avatar: &Document| {
         civbb_format::validate(avatar, &limits.caps, |id| im.blobs.contains_key(&id)).map_err(|errors| {
             let list: Vec<String> = errors.iter().map(ToString::to_string).collect();
             ImportError(format!("invalid result: {}", list.join("; ")))
@@ -165,10 +172,12 @@ pub fn import(
     };
     validate(&avatar)?;
     // Humanoids without Unity's muscle frames (glTF, VRM) get them derived from the rest pose (#53, ADR 0064).
-    if let Some(h) = avatar.humanoid.as_ref().filter(|h| h.muscle_frames.is_empty()) {
+    let humanoid = avatar.avatar().and_then(|r| r.humanoid.as_ref());
+    if let Some(h) = humanoid.filter(|h| h.muscle_frames.is_empty()) {
         let frames = civbb_anim::frames::derive(&avatar.hierarchy, h);
         if !frames.is_empty() {
-            avatar.humanoid.as_mut().expect("checked").muscle_frames = frames;
+            let r = avatar.avatar_mut().expect("checked");
+            r.humanoid.as_mut().expect("checked").muscle_frames = frames;
             validate(&avatar)?;
         }
     }
@@ -215,7 +224,7 @@ fn parse(bytes: &[u8]) -> Result<gltf::Gltf, String> {
         );
     }
     Ok(gltf::Gltf {
-        document: Document::from_json(json).map_err(|e| e.to_string())?,
+        document: Gltf::from_json(json).map_err(|e| e.to_string())?,
         blob: unchecked.blob,
     })
 }
@@ -254,7 +263,7 @@ fn percent_decode(s: &str) -> Option<String> {
 }
 
 pub(crate) struct Importer<'a> {
-    pub(crate) doc: &'a Document,
+    pub(crate) doc: &'a Gltf,
     resolve: &'a dyn Fn(&str) -> Option<Vec<u8>>,
     caps: Caps,
     /// Bytes still allowed from external files and data URIs.

@@ -9,7 +9,7 @@ use civbb_core::math::{Pose, world_poses_into};
 use civbb_core::{Counters, System};
 use civbb_dynamics::contact::Participant;
 use civbb_dynamics::{ContactRig, ContactState, State};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::material::{Material, MaterialField};
 use civbb_format::math::Transform;
@@ -56,7 +56,7 @@ struct AnimatedRenderer {
 
 impl Model {
     /// Compiles a validated avatar.
-    pub fn new(avatar: &Avatar) -> Self {
+    pub fn new(avatar: &Document) -> Self {
         let controller = Controller::new(avatar);
         let contacts = ContactRig::new(avatar);
         let receivers = contacts
@@ -258,7 +258,7 @@ impl Island {
 
     /// The material index each submesh of `mesh` draws with after the last step, into `out`, when the animator
     /// swaps any of its material slots; `out` is left empty otherwise. A blend of indices rounds to the nearest.
-    pub fn submesh_materials(&self, avatar: &Avatar, mesh: MeshIndex, out: &mut Vec<u32>) {
+    pub fn submesh_materials(&self, avatar: &Document, mesh: MeshIndex, out: &mut Vec<u32>) {
         out.clear();
         let swaps = &self.model.swaps[mesh as usize];
         let Some(a) = self.animator.as_ref().filter(|_| !swaps.is_empty()) else {

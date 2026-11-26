@@ -4,7 +4,7 @@
 
 use civbb_anim::Constraints;
 use civbb_anim::constraint::Scratch;
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::constraint::{Constraint, ConstraintField};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Quat, Transform};
@@ -54,12 +54,12 @@ fn vrchat_sdk_recordings_match() {
     assert!(r.stable, "the recording skipped or repeated a frame");
     let mut failures = Vec::new();
     for case in &r.cases {
-        let avatar = Avatar {
+        let avatar = Document {
             hierarchy: Hierarchy {
                 nodes: case.nodes.clone(),
             },
             constraints: case.constraints.clone(),
-            ..Avatar::default()
+            ..Document::default()
         };
         civbb_format::validate(&avatar, &Default::default(), |_| true).unwrap();
         let constraints = Constraints::new(&avatar);

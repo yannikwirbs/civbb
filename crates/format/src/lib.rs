@@ -1,4 +1,4 @@
-//! CIVBB content format: the avatar data model and signed, content-addressed runtime packages (design doc §9).
+//! CIVBB content format: the document model and signed, content-addressed runtime packages (design doc §9).
 
 pub mod animator;
 pub mod avatar;
@@ -6,6 +6,7 @@ pub mod blob;
 pub mod cbor;
 pub mod constraint;
 pub mod cost;
+pub mod document;
 pub mod dynamics;
 pub mod expressions;
 pub mod face;
@@ -20,13 +21,14 @@ pub mod validate;
 
 pub use avatar::Avatar;
 pub use blob::BlobId;
+pub use document::{Document, Role};
 pub use ed25519_dalek::{SigningKey, VerifyingKey};
 pub use package::{Package, ReadLimits};
 pub use validate::{Caps, validate};
 
 /// Version of the runtime package's data model. Bump on any change to the types in this crate; readers refuse
 /// packages of any other version, which are rebuilt from their kept source (ADR 0087).
-pub const FORMAT_VERSION: u32 = 32;
+pub const FORMAT_VERSION: u32 = 33;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -43,33 +45,18 @@ pub(crate) mod testutil {
     use crate::*;
 
     /// A tiny skinned, morphing, textured avatar touching every type.
-    pub fn sample_avatar() -> Avatar {
+    pub fn sample_avatar() -> Document {
         let node = |name: &str, parent| Node {
             name: name.into(),
             parent,
             rest: Transform::IDENTITY,
             active: true,
         };
-        Avatar {
+        Document {
             name: "sample".into(),
             hierarchy: hierarchy::Hierarchy {
                 nodes: vec![node("Armature", None), node("Hips", Some(0))],
             },
-            humanoid: Some(Humanoid {
-                bones: vec![(HumanBone::Hips, 1)],
-                viewpoint: [0.0, 1.5, 0.1],
-                human_scale: 1.0,
-                center_of_mass: None,
-                muscle_frames: vec![MuscleFrame {
-                    bone: HumanBone::Hips,
-                    pre: [0.0, 0.0, 0.0, 1.0],
-                    post: [0.0, 0.0, 0.0, 1.0],
-                    sign: [1.0; 3],
-                    min: [0.0; 3],
-                    max: [0.0; 3],
-                    twist: 1.0,
-                }],
-            }),
             meshes: vec![Mesh {
                 name: "Body".into(),
                 node: 0,
@@ -101,43 +88,6 @@ pub(crate) mod testutil {
                 }],
                 ..Mesh::default()
             }],
-            face: Some(Face {
-                visemes: vec![(
-                    Viseme::Aa,
-                    vec![ShapeBind {
-                        mesh: 0,
-                        shape: 0,
-                        weight: 1.0,
-                    }],
-                )],
-                blink: vec![],
-                eyes: Some(EyeLook {
-                    driver: EyeDriver::Bones {
-                        left: Some(1),
-                        right: None,
-                    },
-                    horizontal_inner: RangeMap {
-                        input_max: 90.0,
-                        output_scale: 10.0,
-                    },
-                    horizontal_outer: RangeMap {
-                        input_max: 90.0,
-                        output_scale: 10.0,
-                    },
-                    vertical_down: RangeMap {
-                        input_max: 90.0,
-                        output_scale: 10.0,
-                    },
-                    vertical_up: RangeMap {
-                        input_max: 90.0,
-                        output_scale: 10.0,
-                    },
-                }),
-            }),
-            meta: Some(meta::Meta {
-                authors: vec!["CIVBB".into()],
-                ..meta::Meta::default()
-            }),
             materials: vec![Material {
                 name: "Skin".into(),
                 model: MaterialModel::Toon(Toon {
@@ -234,18 +184,6 @@ pub(crate) mod testutil {
                     }],
                 }],
             }],
-            expressions: Some(Expressions {
-                menu: Menu {
-                    controls: vec![Control {
-                        name: "Toggle".into(),
-                        icon: None,
-                        kind: ControlKind::Toggle,
-                        parameter: Some(0),
-                        value: 1.0,
-                        sub_parameters: vec![],
-                    }],
-                },
-            }),
             dynamics: Dynamics {
                 chains: vec![Chain {
                     root: 1,
@@ -324,6 +262,72 @@ pub(crate) mod testutil {
                 rest: Transform::IDENTITY,
                 options: Default::default(),
             }],
+            role: Role::Avatar(Avatar {
+                humanoid: Some(Humanoid {
+                    bones: vec![(HumanBone::Hips, 1)],
+                    human_scale: 1.0,
+                    center_of_mass: None,
+                    muscle_frames: vec![MuscleFrame {
+                        bone: HumanBone::Hips,
+                        pre: [0.0, 0.0, 0.0, 1.0],
+                        post: [0.0, 0.0, 0.0, 1.0],
+                        sign: [1.0; 3],
+                        min: [0.0; 3],
+                        max: [0.0; 3],
+                        twist: 1.0,
+                    }],
+                }),
+                viewpoint: [0.0, 1.5, 0.1],
+                face: Some(Face {
+                    visemes: vec![(
+                        Viseme::Aa,
+                        vec![ShapeBind {
+                            mesh: 0,
+                            shape: 0,
+                            weight: 1.0,
+                        }],
+                    )],
+                    blink: vec![],
+                    eyes: Some(EyeLook {
+                        driver: EyeDriver::Bones {
+                            left: Some(1),
+                            right: None,
+                        },
+                        horizontal_inner: RangeMap {
+                            input_max: 90.0,
+                            output_scale: 10.0,
+                        },
+                        horizontal_outer: RangeMap {
+                            input_max: 90.0,
+                            output_scale: 10.0,
+                        },
+                        vertical_down: RangeMap {
+                            input_max: 90.0,
+                            output_scale: 10.0,
+                        },
+                        vertical_up: RangeMap {
+                            input_max: 90.0,
+                            output_scale: 10.0,
+                        },
+                    }),
+                }),
+                expressions: Some(Expressions {
+                    menu: Menu {
+                        controls: vec![Control {
+                            name: "Toggle".into(),
+                            icon: None,
+                            kind: ControlKind::Toggle,
+                            parameter: Some(0),
+                            value: 1.0,
+                            sub_parameters: vec![],
+                        }],
+                    },
+                }),
+                meta: Some(meta::Meta {
+                    authors: vec!["CIVBB".into()],
+                    ..meta::Meta::default()
+                }),
+            }),
         }
     }
 
@@ -411,13 +415,13 @@ pub(crate) mod testutil {
     #[test]
     fn avatar_cbor_round_trip() {
         let a = sample_avatar();
-        let back: Avatar = cbor::from_slice(&cbor::to_vec(&a), usize::MAX).unwrap();
+        let back: Document = cbor::from_slice(&cbor::to_vec(&a), usize::MAX).unwrap();
         assert_eq!(a, back);
     }
 
     #[test]
     fn decode_rejects_oversized_input() {
         let bytes = cbor::to_vec(&sample_avatar());
-        assert!(cbor::from_slice::<Avatar>(&bytes, bytes.len() - 1).is_err());
+        assert!(cbor::from_slice::<Document>(&bytes, bytes.len() - 1).is_err());
     }
 }

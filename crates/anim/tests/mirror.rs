@@ -5,12 +5,13 @@ use std::path::Path;
 
 use civbb_anim::muscle::{COUNT, find, mirror, property};
 use civbb_anim::{Controller, Instance, Target};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, MuscleFrame, Node};
 use civbb_format::math::Transform;
 use civbb_format::state::{Entry, EntryIndex, EntryKind, StateTable};
+use civbb_format::{Avatar, Role};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -41,7 +42,7 @@ fn the_mirror_map_matches_unity() {
 }
 
 /// Hips with the spine and both upper arms under it, every bone with a frame, the bool entry `m` at 1, and `animator`.
-fn humanoid(clips: Vec<Clip>, animator: Animator) -> Avatar {
+fn humanoid(clips: Vec<Clip>, animator: Animator) -> Document {
     let bones = [
         HumanBone::Hips,
         HumanBone::Spine,
@@ -50,7 +51,7 @@ fn humanoid(clips: Vec<Clip>, animator: Animator) -> Avatar {
     ];
     let names = ["Root", "Hips", "Spine", "LeftArm", "RightArm"];
     let parents = [None, Some(0), Some(1), Some(1), Some(1)];
-    Avatar {
+    Document {
         state: StateTable {
             entries: vec![Entry::new("m", EntryKind::Bool, 1.0)],
         },
@@ -66,27 +67,30 @@ fn humanoid(clips: Vec<Clip>, animator: Animator) -> Avatar {
                 })
                 .collect(),
         },
-        humanoid: Some(Humanoid {
-            bones: bones.iter().enumerate().map(|(i, b)| (*b, i as u32 + 1)).collect(),
+        role: Role::Avatar(Avatar {
+            humanoid: Some(Humanoid {
+                bones: bones.iter().enumerate().map(|(i, b)| (*b, i as u32 + 1)).collect(),
+                human_scale: 0.0,
+                center_of_mass: None,
+                muscle_frames: bones
+                    .iter()
+                    .map(|&bone| MuscleFrame {
+                        bone,
+                        pre: Transform::IDENTITY.rotation,
+                        post: Transform::IDENTITY.rotation,
+                        sign: [1.0; 3],
+                        min: [-60.0; 3],
+                        max: [60.0; 3],
+                        twist: 0.5,
+                    })
+                    .collect(),
+            }),
             viewpoint: [0.0; 3],
-            human_scale: 0.0,
-            center_of_mass: None,
-            muscle_frames: bones
-                .iter()
-                .map(|&bone| MuscleFrame {
-                    bone,
-                    pre: Transform::IDENTITY.rotation,
-                    post: Transform::IDENTITY.rotation,
-                    sign: [1.0; 3],
-                    min: [-60.0; 3],
-                    max: [60.0; 3],
-                    twist: 0.5,
-                })
-                .collect(),
+            ..Default::default()
         }),
         clips,
         animator: Some(animator),
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 
@@ -148,7 +152,7 @@ fn animator(motion: Motion, mirror: bool, mirror_param: Option<EntryIndex>) -> A
 }
 
 /// The muscles named, after one update of `a`.
-fn play(a: &Avatar, names: &[&str]) -> Vec<f32> {
+fn play(a: &Document, names: &[&str]) -> Vec<f32> {
     let c = Controller::new(a).unwrap();
     let mut i = Instance::new(&c, true);
     i.update(&c, 1.0 / 60.0);

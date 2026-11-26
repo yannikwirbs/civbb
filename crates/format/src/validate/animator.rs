@@ -1,7 +1,7 @@
 //! Validation of clips and animator controllers: curves and keys, layers, states, transitions, blend trees and
 //! actions.
 
-use crate::Avatar;
+use crate::Document;
 use crate::animator::{
     Action, Animator, BlendTreeKind, EntryOp, HumanoidProperty, MeshProperty, Motion, NodeProperty, Target, Transition,
     TransitionDest,
@@ -11,7 +11,7 @@ use super::V;
 
 impl V {
     /// After [`V::state`]: curves on entries are checked against the platform values.
-    pub(super) fn clips(&mut self, a: &Avatar) {
+    pub(super) fn clips(&mut self, a: &Document) {
         let (c, clips) = (self.caps, &a.clips);
         self.cap(clips.len(), c.clips, "clips");
         let (mut curves, mut keys) = (0, 0);

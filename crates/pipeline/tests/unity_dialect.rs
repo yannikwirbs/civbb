@@ -100,7 +100,10 @@ fn unity_parameters_lower_to_state_entries() {
     };
     assert_eq!((e[1].range, e[1].sync_bits()), (Some(speed), 8));
     assert_eq!(e[3].range, None);
-    assert_eq!(a.expressions.unwrap().menu.controls[0].parameter, None);
+    assert_eq!(
+        a.avatar().unwrap().expressions.as_ref().unwrap().menu.controls[0].parameter,
+        None
+    );
     assert_eq!(a.contacts.receivers[0].parameter, None);
 }
 
@@ -139,7 +142,10 @@ fn vrchat_builtins_lower_to_platform_values() {
             .iter()
             .all(|e| e.sync == SyncMode::None && !e.saved && !e.external)
     );
-    assert_eq!(a.expressions.unwrap().menu.controls[0].parameter, None);
+    assert_eq!(
+        a.avatar().unwrap().expressions.as_ref().unwrap().menu.controls[0].parameter,
+        None
+    );
     let state = &a.animator.unwrap().layers[0].state_machine.states[1];
     let Action::Entries { ops, .. } = &state.actions[0] else {
         panic!("not a driver")

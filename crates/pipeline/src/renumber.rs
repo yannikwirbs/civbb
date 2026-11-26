@@ -1,7 +1,7 @@
 //! One remap of curve targets and avatar mask nodes for every stage that renumbers nodes, meshes, blend shapes or
 //! materials (ADR 0089 point 4).
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{Curve, MeshProperty, Target};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::mesh::MeshIndex;
@@ -21,7 +21,7 @@ pub(crate) struct Renumber {
 
 impl Renumber {
     /// Remaps every curve target and avatar mask node; a curve or mask node whose element was removed goes with it.
-    pub(crate) fn apply(&self, a: &mut Avatar) {
+    pub(crate) fn apply(&self, a: &mut Document) {
         for clip in &mut a.clips {
             clip.curves.retain_mut(|c| self.curve(c));
         }

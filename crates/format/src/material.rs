@@ -109,7 +109,7 @@ pub enum MaterialModel {
 /// A texture used by a material slot.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TextureSlot {
-    /// Index into [`crate::Avatar::textures`].
+    /// Index into [`crate::Document::textures`].
     pub texture: u32,
     /// Which UV set to sample (0 or 1).
     pub uv_set: u8,

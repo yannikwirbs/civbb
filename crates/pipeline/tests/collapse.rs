@@ -11,21 +11,21 @@ use civbb_format::animator::{
     StateMachine, Transition, TransitionDest, Unwritten,
 };
 use civbb_format::state::{Entry, EntryKind};
-use civbb_format::{Avatar, Caps, validate};
+use civbb_format::{Caps, Document, validate};
 use civbb_pipeline::collapse;
 
-fn valid(a: &Avatar) {
+fn valid(a: &Document) {
     if let Err(e) = validate(a, &Caps::default(), |_| true) {
         panic!("{e:?}");
     }
 }
 
-fn bloated() -> Avatar {
+fn bloated() -> Document {
     civbb_corpus::generate(&civbb_corpus::bloated())
 }
 
 /// Collapses a copy, checks it stays valid and behaves the same, and returns how many layers went.
-fn collapsed(before: &Avatar) -> (Avatar, usize) {
+fn collapsed(before: &Document) -> (Document, usize) {
     let mut a = before.clone();
     let removed = collapse(&mut a);
     valid(&a);
@@ -174,22 +174,22 @@ fn key(time: f32, value: f32) -> Key {
 }
 
 /// The clip a corpus toggle layer's state plays.
-fn layer_clip(a: &Avatar, layer: usize, state: usize) -> usize {
+fn layer_clip(a: &Document, layer: usize, state: usize) -> usize {
     match a.animator.as_ref().unwrap().layers[layer].state_machine.states[state].motion {
         Some(Motion::Clip(c)) => c as usize,
         _ => unreachable!("corpus toggles play clips"),
     }
 }
 
-fn toggle_param(a: &Avatar, layer: usize) -> usize {
+fn toggle_param(a: &Document, layer: usize) -> usize {
     a.animator.as_ref().unwrap().layers[layer].state_machine.states[0].transitions[0].conditions[0].param as usize
 }
 
 /// Steps islands of both avatars through the same frames, some bools set before the first, then random flips and
 /// frame times, and compares every slot of the animator's pose, node activity and local transforms, and the
 /// parameters `before` declares.
-fn same_pose(before: &Avatar, after: &Avatar) {
-    let island = |a: &Avatar| Island::new(Arc::new(Model::new(a)), 1, true, Pose::IDENTITY);
+fn same_pose(before: &Document, after: &Document) {
+    let island = |a: &Document| Island::new(Arc::new(Model::new(a)), 1, true, Pose::IDENTITY);
     let (mut b, mut a) = (island(before), island(after));
     let bools: Vec<usize> = (before.state.entries.iter())
         .enumerate()

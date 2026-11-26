@@ -8,26 +8,27 @@ use civbb_format::face::{Face, ShapeBind};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Mat4, Transform};
 use civbb_format::mesh::{BlendShape, Mesh, Skin};
-use civbb_format::{Avatar, Caps, validate};
+use civbb_format::{Avatar, Role};
+use civbb_format::{Caps, Document, validate};
 use civbb_pipeline::{Pruned, prune};
 
 const IDENTITY: Mat4 = [
     1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
 ];
 
-fn valid(a: &Avatar) {
+fn valid(a: &Document) {
     if let Err(e) = validate(a, &Caps::default(), |_| true) {
         panic!("{e:?}");
     }
 }
 
-fn names(a: &Avatar) -> Vec<&str> {
+fn names(a: &Document) -> Vec<&str> {
     a.hierarchy.nodes.iter().map(|n| n.name.as_str()).collect()
 }
 
 /// Root; Body (mesh skinned to Hips and Spare, only Hips weighted); Hips; Spare (unused joint); Lone (nothing);
 /// Group/Target (a constraint targets it); Toggle (a clip animates it); Tail/Tip (a chain on Tail); Group/Gone.
-fn avatar() -> Avatar {
+fn avatar() -> Document {
     let node = |name: &str, parent: Option<u32>| Node {
         name: name.into(),
         parent,
@@ -44,7 +45,7 @@ fn avatar() -> Avatar {
     chain.ignore.clear();
     chain.colliders.clear();
     chain.outputs = Default::default();
-    let mut a = Avatar {
+    let mut a = Document {
         hierarchy: Hierarchy {
             nodes: vec![
                 node("Root", None),      // 0
@@ -81,13 +82,16 @@ fn avatar() -> Avatar {
             ],
             ..Mesh::default()
         }],
-        face: Some(Face {
-            blink: vec![ShapeBind {
-                mesh: 0,
-                shape: 5,
-                weight: 1.0,
-            }],
-            ..Face::default()
+        role: Role::Avatar(Avatar {
+            face: Some(Face {
+                blink: vec![ShapeBind {
+                    mesh: 0,
+                    shape: 5,
+                    weight: 1.0,
+                }],
+                ..Face::default()
+            }),
+            ..Default::default()
         }),
         clips: vec![Clip {
             name: "c".into(),
@@ -130,7 +134,7 @@ fn avatar() -> Avatar {
             rest: Transform::IDENTITY,
             options: Default::default(),
         }],
-        ..Avatar::default()
+        ..Document::default()
     };
     a.dynamics.chains.push(chain);
     a
@@ -168,7 +172,7 @@ fn prunes_what_nothing_references_and_remaps_the_rest() {
     // Animated, resting at a weight, face tracking (any case) and face-bound shapes stay.
     let shapes: Vec<_> = a.meshes[0].blend_shapes.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(shapes, ["Smile", "Rest", "jawopen", "Blink"]);
-    assert_eq!(a.face.as_ref().unwrap().blink[0].shape, 3);
+    assert_eq!(a.avatar().and_then(|r| r.face.as_ref()).unwrap().blink[0].shape, 3);
     // Curve targets follow their renumbered node (Toggle 7 to 5) and shape (Smile 1 to 0), ADR 0089.
     let targets: Vec<_> = a.clips[0].curves.iter().map(|c| c.target.clone()).collect();
     assert_eq!(

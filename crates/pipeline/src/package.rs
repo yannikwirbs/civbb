@@ -5,7 +5,7 @@ use std::fmt;
 
 use civbb_format::material::MaterialModel;
 use civbb_format::package::{ContentKind, Header, Platform};
-use civbb_format::{Avatar, BlobId, FORMAT_VERSION, Package, cbor};
+use civbb_format::{BlobId, Document, FORMAT_VERSION, Package, cbor};
 
 use serde::Serialize;
 
@@ -14,7 +14,7 @@ use crate::Imported;
 /// Compiler name and version recorded in every manifest, so old content can be found and recompiled.
 pub const COMPILER: &str = concat!("civbb-pipeline ", env!("CARGO_PKG_VERSION"));
 
-/// Packages an import for `platform`: its texture blobs plus the avatar as root. No compile or measure stages yet.
+/// Packages an import for `platform`: its texture blobs plus the document as root. No compile or measure stages yet.
 pub fn package(imported: Imported, platform: Platform) -> Package {
     Package {
         header: Header {
@@ -27,7 +27,7 @@ pub fn package(imported: Imported, platform: Platform) -> Package {
         },
         blobs: imported.blobs,
     }
-    .with_avatar(&imported.avatar)
+    .with_document(&imported.avatar)
 }
 
 /// Counts that describe an avatar's size (the report's keys, ADR 0032).
@@ -81,7 +81,7 @@ pub struct Level {
 }
 
 /// Counts everything in `a`, with texture bytes from `blobs`. Bones are the distinct nodes any skin uses as a joint.
-pub fn stats(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> Stats {
+pub fn stats(a: &Document, blobs: &BTreeMap<BlobId, Vec<u8>>) -> Stats {
     let bones: HashSet<u32> = a
         .meshes
         .iter()
@@ -92,8 +92,11 @@ pub fn stats(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> Stats {
     let mut s = Stats {
         nodes: a.hierarchy.nodes.len(),
         bones: bones.len(),
-        human_bones: a.humanoid.as_ref().map_or(0, |h| h.bones.len()),
-        visemes: a.face.as_ref().map_or(0, |f| f.visemes.len()),
+        human_bones: a
+            .avatar()
+            .and_then(|r| r.humanoid.as_ref())
+            .map_or(0, |h| h.bones.len()),
+        visemes: a.avatar().and_then(|r| r.face.as_ref()).map_or(0, |f| f.visemes.len()),
         meshes: a.meshes.len(),
         skinned_meshes: a.meshes.iter().filter(|m| m.skin.is_some()).count(),
         draws: a.meshes.iter().map(|m| m.submeshes.len()).sum(),

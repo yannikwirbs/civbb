@@ -4,7 +4,7 @@
 
 use civbb_anim::Constraints;
 use civbb_anim::constraint::Scratch;
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::constraint::{Constraint, ConstraintField, ConstraintKind, ConstraintSource};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Quat, Transform, Vec3};
@@ -38,12 +38,12 @@ fn unity_recordings_match() {
     assert!(r.cases.len() >= 40);
     let mut failures = Vec::new();
     for case in &r.cases {
-        let avatar = Avatar {
+        let avatar = Document {
             hierarchy: Hierarchy {
                 nodes: case.nodes.clone(),
             },
             constraints: case.constraints.clone(),
-            ..Avatar::default()
+            ..Document::default()
         };
         civbb_format::validate(&avatar, &Default::default(), |_| true).unwrap();
         let mut locals: Vec<Transform> = case.nodes.iter().map(|n| n.rest).collect();
@@ -99,8 +99,8 @@ fn position(target: u32, source: u32) -> Constraint {
 }
 
 /// Root with children A (1, 0, 0), B (0, 2, 0), C (0, 0, 3), and D under C at (0, 1, 0).
-fn avatar(constraints: Vec<Constraint>) -> Avatar {
-    Avatar {
+fn avatar(constraints: Vec<Constraint>) -> Document {
+    Document {
         hierarchy: Hierarchy {
             nodes: vec![
                 node("Root", None, [0.0; 3]),
@@ -111,17 +111,17 @@ fn avatar(constraints: Vec<Constraint>) -> Avatar {
             ],
         },
         constraints,
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 
-fn run(a: &Avatar) -> Vec<Vec3> {
+fn run(a: &Document) -> Vec<Vec3> {
     let mut locals: Vec<Transform> = a.hierarchy.nodes.iter().map(|n| n.rest).collect();
     Constraints::new(a).evaluate(&mut locals, &mut Default::default());
     locals.iter().map(|l| l.translation).collect()
 }
 
-fn targets(a: &Avatar) -> Vec<u32> {
+fn targets(a: &Document) -> Vec<u32> {
     Constraints::new(a).list.iter().map(|c| c.target).collect()
 }
 
@@ -199,7 +199,7 @@ const Y: usize = 1;
 const Z: usize = 2;
 
 /// Root with children S (the source) and T (the target, at the origin), rests given; one constraint on T from S.
-fn rest_pair(kind: ConstraintKind, source_rest: Quat, target_rest: Quat, weight: f32) -> (Avatar, Vec<Transform>) {
+fn rest_pair(kind: ConstraintKind, source_rest: Quat, target_rest: Quat, weight: f32) -> (Document, Vec<Transform>) {
     let mut s = node("S", Some(0), [1.0, 0.0, 0.0]);
     s.rest.rotation = source_rest;
     let mut t = node("T", Some(0), [0.0; 3]);
@@ -208,18 +208,18 @@ fn rest_pair(kind: ConstraintKind, source_rest: Quat, target_rest: Quat, weight:
     c.kind = kind;
     c.weight = weight;
     c.rest.rotation = target_rest;
-    let a = Avatar {
+    let a = Document {
         hierarchy: Hierarchy {
             nodes: vec![node("Root", None, [0.0; 3]), s, t],
         },
         constraints: vec![c],
-        ..Avatar::default()
+        ..Document::default()
     };
     let locals = a.hierarchy.nodes.iter().map(|n| n.rest).collect();
     (a, locals)
 }
 
-fn rest_run(a: &Avatar, mut locals: Vec<Transform>, source_rotation: Quat) -> Quat {
+fn rest_run(a: &Document, mut locals: Vec<Transform>, source_rotation: Quat) -> Quat {
     locals[1].rotation = source_rotation;
     Constraints::new(a).evaluate(&mut locals, &mut Default::default());
     locals[2].rotation
@@ -273,7 +273,7 @@ fn rest_aim_turns_the_axis_at_the_source_by_the_shortest_rotation() {
 
 /// Runs `a` frame by frame on one island's scratch, with `frame` changing the animated values or the pose first.
 fn frames(
-    a: &Avatar,
+    a: &Document,
     n: usize,
     mut frame: impl FnMut(usize, &Constraints, &mut Scratch, &mut [Transform]),
 ) -> Vec<Vec<Vec3>> {

@@ -5,7 +5,7 @@
 use civbb_core::math::{Pose, length, normalize, sub};
 use civbb_dynamics::rig::eval;
 use civbb_dynamics::{Rig, State};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::dynamics::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Transform, Vec3};
@@ -54,23 +54,23 @@ fn chain(root: u32) -> Chain {
 }
 
 /// Root, Base at (0, 1, 0), then `bones` 0.1 m bones along +X, chain rooted at Base.
-fn avatar(bones: usize, c: Chain) -> Avatar {
+fn avatar(bones: usize, c: Chain) -> Document {
     let mut nodes = vec![node("Root", None, [0.0; 3]), node("Base", Some(0), [0.0, 1.0, 0.0])];
     for i in 0..bones {
         nodes.push(node(&format!("B{i}"), Some(nodes.len() as u32 - 1), [0.1, 0.0, 0.0]));
     }
-    Avatar {
+    Document {
         hierarchy: Hierarchy { nodes },
         dynamics: Dynamics {
             chains: vec![Chain { root: 1, ..c }],
             colliders: Vec::new(),
         },
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 
 /// Runs `seconds` at `hz` with the avatar at `origin(t)`; returns the last frame's local pose.
-fn run(a: &Avatar, s: &mut State, rig: &Rig, seconds: f32, hz: f32, origin: impl Fn(f32) -> Vec3) -> Vec<Transform> {
+fn run(a: &Document, s: &mut State, rig: &Rig, seconds: f32, hz: f32, origin: impl Fn(f32) -> Vec3) -> Vec<Transform> {
     let frames = (seconds * hz).round() as u32;
     let mut locals = Vec::new();
     for f in 0..=frames {
@@ -84,7 +84,7 @@ fn run(a: &Avatar, s: &mut State, rig: &Rig, seconds: f32, hz: f32, origin: impl
     locals
 }
 
-fn world(a: &Avatar, locals: &[Transform]) -> Vec<Pose> {
+fn world(a: &Document, locals: &[Transform]) -> Vec<Pose> {
     let mut w: Vec<Pose> = Vec::new();
     for (i, n) in a.hierarchy.nodes.iter().enumerate() {
         let p = n.parent.map_or(Pose::IDENTITY, |p| w[p as usize]);
@@ -94,7 +94,7 @@ fn world(a: &Avatar, locals: &[Transform]) -> Vec<Pose> {
 }
 
 /// Degrees below horizontal of the bone from node `from` to node `to`.
-fn droop(a: &Avatar, locals: &[Transform], from: usize, to: usize) -> f32 {
+fn droop(a: &Document, locals: &[Transform], from: usize, to: usize) -> f32 {
     let w = world(a, locals);
     let d = normalize(sub(w[to].pos, w[from].pos));
     (-d[1]).asin().to_degrees()

@@ -64,7 +64,7 @@ fn bench_runs_a_verified_package() {
         },
         blobs: Default::default(),
     }
-    .with_avatar(&civbb_corpus::generate(&civbb_corpus::lean()));
+    .with_document(&civbb_corpus::generate(&civbb_corpus::lean()));
     std::fs::write(
         dir.join("lean.civpkg"),
         package.encode_signed(&SigningKey::from_bytes(&[5; 32])),

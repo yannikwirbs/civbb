@@ -88,13 +88,11 @@ pub enum HumanBone {
     RightLittleDistal,
 }
 
-/// Maps humanoid bones to nodes and holds the avatar's viewpoint.
+/// Maps humanoid bones to nodes.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Humanoid {
     /// Each mapped humanoid bone and its node. A bone appears at most once.
     pub bones: Vec<(HumanBone, NodeIndex)>,
-    /// Eye position in avatar space, used for first-person view and eye-height calibration.
-    pub viewpoint: Vec3,
     /// Muscle frames of mapped bones, at most one each; empty when the source has none (glTF and VRM, #53).
     pub muscle_frames: Vec<MuscleFrame>,
     /// Metres per body position unit (Unity's `Animator.humanScale`, the T-pose's centre-of-mass height; ADR 0063);

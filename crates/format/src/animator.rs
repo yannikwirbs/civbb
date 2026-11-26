@@ -12,7 +12,7 @@ use crate::material::MaterialField;
 use crate::mesh::MeshIndex;
 use crate::state::EntryIndex;
 
-/// Index into [`crate::Avatar::clips`].
+/// Index into [`crate::Document::clips`].
 pub type ClipIndex = u32;
 /// Index into [`StateMachine::states`].
 pub type StateIndex = u32;
@@ -430,7 +430,7 @@ pub enum Target {
         /// Animated property.
         property: NodeProperty,
     },
-    /// A property of a mesh instance in [`Avatar::meshes`](crate::Avatar::meshes).
+    /// A property of a mesh instance in [`Document::meshes`](crate::Document::meshes).
     Mesh {
         /// Mesh index.
         mesh: MeshIndex,
@@ -441,7 +441,7 @@ pub enum Target {
     Humanoid(HumanoidProperty),
     /// The value of a state entry (a float entry; ADR 0088).
     Entry(EntryIndex),
-    /// A field of a constraint in [`Avatar::constraints`](crate::Avatar::constraints) (ADR 0040).
+    /// A field of a constraint in [`Document::constraints`](crate::Document::constraints) (ADR 0040).
     Constraint {
         /// Constraint index.
         constraint: u32,
@@ -497,7 +497,7 @@ pub enum MeshProperty {
         /// [`MaterialField::is_color`] fields. Without it colours are linear.
         srgb: bool,
     },
-    /// The material of a submesh: key values are indices into [`Avatar::materials`](crate::Avatar::materials),
+    /// The material of a submesh: key values are indices into [`Document::materials`](crate::Document::materials),
     /// held until the next key.
     MaterialSlot(u8),
 }

@@ -5,7 +5,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use civbb_anim::{Target, bind};
 use civbb_core::math::{euler_to_quat, quat_to_euler};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, HumanBone, Node};
@@ -66,12 +66,12 @@ fn clip(curves: Vec<Curve>) -> Clip {
 }
 
 /// Root, `Body` (mesh with `Smile` at rest 0.3), `Body/Arm` (rest 45 degrees about Z), `Hat` (inactive).
-fn avatar(clips: Vec<Clip>) -> Avatar {
+fn avatar(clips: Vec<Clip>) -> Document {
     let mut arm = node("Arm", Some(1), true);
     arm.rest.rotation = ARM_REST;
     arm.rest.translation = [0.0, 0.5, 0.0];
     let param = |name: &str, kind| Entry::new(name, kind, 0.25);
-    Avatar {
+    Document {
         hierarchy: Hierarchy {
             nodes: vec![
                 node("Root", None, true),
@@ -95,7 +95,7 @@ fn avatar(clips: Vec<Clip>) -> Avatar {
         },
         animator: Some(Animator::default()),
         clips,
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 

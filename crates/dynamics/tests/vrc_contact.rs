@@ -6,7 +6,7 @@
 use civbb_core::math::Pose;
 use civbb_dynamics::contact::{Participant, step};
 use civbb_dynamics::{ContactRig, ContactState};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::dynamics::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Quat, Transform, Vec3};
@@ -86,7 +86,7 @@ fn volume(node: u32, component: Option<u32>, s: &Shape) -> ContactVolume {
     }
 }
 
-fn avatar(case: &Case) -> Avatar {
+fn avatar(case: &Case) -> Document {
     let tags = vec![case.name.clone()];
     // One root, as validation wants; the test gives world poses directly.
     let node = |name: &str| Node {
@@ -95,7 +95,7 @@ fn avatar(case: &Case) -> Avatar {
         rest: Transform::IDENTITY,
         active: true,
     };
-    Avatar {
+    Document {
         hierarchy: Hierarchy {
             nodes: vec![node("S"), node("R"), node("C")],
         },
@@ -117,7 +117,7 @@ fn avatar(case: &Case) -> Avatar {
                 face: case.face,
             }],
         },
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 

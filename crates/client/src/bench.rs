@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use civbb_core::math::Pose;
 use civbb_core::{Counters, System, jobs};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::cost::Pinned;
 use serde::Serialize;
 
@@ -79,7 +79,7 @@ pub struct Run {
 }
 
 /// The corpus avatar called `name`.
-pub fn avatar(name: &str) -> Option<Avatar> {
+pub fn avatar(name: &str) -> Option<Document> {
     let spec = match name {
         "lean" => civbb_corpus::lean(),
         "bloated" => civbb_corpus::bloated(),
@@ -98,7 +98,7 @@ pub fn doubling(max: usize) -> Vec<usize> {
 }
 
 /// Runs the benchmark with `avatar` on every island; `None` if a worker pool cannot be built.
-pub fn run(cfg: &Config, avatar: &Avatar) -> Option<Report> {
+pub fn run(cfg: &Config, avatar: &Document) -> Option<Report> {
     let model = Arc::new(Model::new(avatar));
     let mut runs: Vec<Run> = Vec::with_capacity(cfg.threads.len());
     for &threads in &cfg.threads {

@@ -4,7 +4,7 @@
 //! their base colour only; textures and animations are left out. [`to_source_glb`] adds the source package's
 //! `X_*` extensions (ADR 0041) for what glTF lacks.
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{
     Action, Animator, EulerOrder, HumanoidProperty, Key, MeshProperty, NodeProperty, Target, Unwritten,
 };
@@ -107,7 +107,7 @@ impl Bin {
 }
 
 /// The avatar as a GLB file. Each node may carry at most one mesh.
-pub fn to_glb(a: &Avatar) -> Vec<u8> {
+pub fn to_glb(a: &Document) -> Vec<u8> {
     let (doc, bin) = document(a);
     glb(serde_json::to_vec(&doc).expect("json"), bin)
 }
@@ -115,7 +115,7 @@ pub fn to_glb(a: &Avatar) -> Vec<u8> {
 /// As [`to_glb`], plus `extras.active` on inactive nodes and the `X_*` extensions: humanoid map and viewpoint,
 /// animator and clips, constraints, dynamics, contacts and expressions. Node indices are glTF indices, which
 /// [`to_glb`] keeps equal to the avatar's.
-pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
+pub fn to_source_glb(a: &Document) -> Vec<u8> {
     let (mut doc, bin) = document(a);
     for (i, n) in a.hierarchy.nodes.iter().enumerate() {
         if !n.active {
@@ -123,7 +123,7 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
         }
     }
     let mut ext = serde_json::Map::new();
-    if let Some(h) = &a.humanoid {
+    if let Some(h) = a.avatar().and_then(|r| r.humanoid.as_ref()) {
         let bones: serde_json::Map<String, Value> = h
             .bones
             .iter()
@@ -138,8 +138,8 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
                 )
             })
             .collect();
-        let mut x = json!({"humanoid": bones, "viewpoint": h.viewpoint, "muscle_frames": h.muscle_frames});
-        if let Some(face) = &a.face {
+        let mut x = json!({"humanoid": bones, "viewpoint": a.avatar().map_or([0.0; 3], |r| r.viewpoint), "muscle_frames": h.muscle_frames});
+        if let Some(face) = a.avatar().and_then(|r| r.face.as_ref()) {
             // Binds name the glTF node carrying the mesh (ADR 0042); node indices equal the avatar's.
             let mut face = face.clone();
             let binds = face.visemes.iter_mut().flat_map(|(_, b)| b.iter_mut());
@@ -233,7 +233,7 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
         }
         ext.insert("X_contacts".into(), x);
     }
-    if let Some(e) = &a.expressions {
+    if let Some(e) = a.avatar().and_then(|r| r.expressions.as_ref()) {
         let external = entries.iter().filter(|e| e.external && e.kind != EntryKind::Trigger);
         let params = external.map(|e| {
             let synced = e.sync == SyncMode::Owner;
@@ -252,7 +252,7 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
 }
 
 /// Each node's dialect 1 path: names below the root joined by `/`, the root's empty.
-fn node_paths(a: &Avatar) -> Vec<String> {
+fn node_paths(a: &Document) -> Vec<String> {
     let mut paths: Vec<String> = Vec::with_capacity(a.hierarchy.nodes.len());
     for n in &a.hierarchy.nodes {
         paths.push(match n.parent {
@@ -265,7 +265,7 @@ fn node_paths(a: &Avatar) -> Vec<String> {
 }
 
 /// A curve target as dialect 1's binding (the inverse of the importer's resolution): a path and a Unity property.
-fn binding(a: &Avatar, paths: &[String], t: &Target) -> Value {
+fn binding(a: &Document, paths: &[String], t: &Target) -> Value {
     let (path, property) = match t {
         Target::Node { node, property } => {
             let p = match *property {
@@ -329,7 +329,7 @@ fn menu_names<'a>(menu: &mut Value, name: &dyn Fn(Option<EntryIndex>) -> &'a str
     }
 }
 
-fn document(a: &Avatar) -> (Value, Vec<u8>) {
+fn document(a: &Document) -> (Value, Vec<u8>) {
     let mut bin = Bin::default();
     let mut nodes: Vec<Value> = a
         .hierarchy

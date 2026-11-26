@@ -11,7 +11,8 @@ use civbb_format::animator::*;
 use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, Node, NodeIndex};
 use civbb_format::math::{Quat, Transform};
 use civbb_format::state::{Entry, EntryKind};
-use civbb_format::{Avatar, Caps, validate};
+use civbb_format::{Avatar, Role};
+use civbb_format::{Caps, Document, validate};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -120,7 +121,7 @@ fn check_recording(file: &str) {
     let r: Recording = load(file);
     let t: Table = load("muscles.json");
     let bone = |a: &RecordedAxes| human_bone(&t.bones[a.bone]);
-    let avatar = Avatar {
+    let avatar = Document {
         hierarchy: civbb_format::hierarchy::Hierarchy {
             nodes: r
                 .nodes
@@ -137,42 +138,45 @@ fn check_recording(file: &str) {
                 })
                 .collect(),
         },
-        humanoid: Some(Humanoid {
-            bones: r.axes.iter().map(|a| (bone(a), a.node)).collect(),
+        role: Role::Avatar(Avatar {
+            humanoid: Some(Humanoid {
+                bones: r.axes.iter().map(|a| (bone(a), a.node)).collect(),
+                human_scale: 0.0,
+                center_of_mass: None,
+                muscle_frames: r
+                    .axes
+                    .iter()
+                    .map(|a| {
+                        let b = bone(a);
+                        let (min, max) = default_limits(b);
+                        let twist = match b {
+                            HumanBone::LeftUpperArm | HumanBone::RightUpperArm => r.twist[0],
+                            HumanBone::LeftLowerArm | HumanBone::RightLowerArm => r.twist[1],
+                            HumanBone::LeftUpperLeg | HumanBone::RightUpperLeg => r.twist[2],
+                            HumanBone::LeftLowerLeg | HumanBone::RightLowerLeg => r.twist[3],
+                            _ => 1.0,
+                        };
+                        // Mirroring X keeps twists and flips Y and Z swings.
+                        MuscleFrame {
+                            bone: b,
+                            pre: mirror(a.pre),
+                            post: mirror(a.post),
+                            sign: [a.sign[0], -a.sign[1], -a.sign[2]],
+                            min,
+                            max,
+                            twist,
+                        }
+                    })
+                    .collect(),
+            }),
             viewpoint: [0.0, 1.6, 0.1],
-            human_scale: 0.0,
-            center_of_mass: None,
-            muscle_frames: r
-                .axes
-                .iter()
-                .map(|a| {
-                    let b = bone(a);
-                    let (min, max) = default_limits(b);
-                    let twist = match b {
-                        HumanBone::LeftUpperArm | HumanBone::RightUpperArm => r.twist[0],
-                        HumanBone::LeftLowerArm | HumanBone::RightLowerArm => r.twist[1],
-                        HumanBone::LeftUpperLeg | HumanBone::RightUpperLeg => r.twist[2],
-                        HumanBone::LeftLowerLeg | HumanBone::RightLowerLeg => r.twist[3],
-                        _ => 1.0,
-                    };
-                    // Mirroring X keeps twists and flips Y and Z swings.
-                    MuscleFrame {
-                        bone: b,
-                        pre: mirror(a.pre),
-                        post: mirror(a.post),
-                        sign: [a.sign[0], -a.sign[1], -a.sign[2]],
-                        min,
-                        max,
-                        twist,
-                    }
-                })
-                .collect(),
+            ..Default::default()
         }),
-        ..Avatar::default()
+        ..Document::default()
     };
     validate(&avatar, &Caps::default(), |_| true).unwrap();
     let rest = |n: NodeIndex| avatar.hierarchy.nodes[n as usize].rest.rotation;
-    let rig = Rig::new(avatar.humanoid.as_ref().unwrap(), rest).unwrap();
+    let rig = Rig::new(avatar.avatar().and_then(|r| r.humanoid.as_ref()).unwrap(), rest).unwrap();
 
     for (i, (ours, unity)) in rig.rest.iter().zip(&r.rest.muscles).enumerate() {
         assert!(
@@ -243,7 +247,7 @@ fn about(axis: usize, degrees: f32) -> Quat {
 
 /// Root, Hips, LeftUpperArm, LeftLowerArm, LeftHand at nodes 0 to 4; identity frames with default limits, signs 1,
 /// arm twist share `twist`. The upper arm rests at `arm_rest`.
-fn arm(twist: f32, arm_rest: Quat, clips: Vec<Clip>) -> Avatar {
+fn arm(twist: f32, arm_rest: Quat, clips: Vec<Clip>) -> Document {
     let bones = [
         HumanBone::Hips,
         HumanBone::LeftUpperArm,
@@ -251,7 +255,7 @@ fn arm(twist: f32, arm_rest: Quat, clips: Vec<Clip>) -> Avatar {
         HumanBone::LeftHand,
     ];
     let names = ["Root", "Hips", "UpperArm", "LowerArm", "Hand"];
-    Avatar {
+    Document {
         hierarchy: civbb_format::hierarchy::Hierarchy {
             nodes: names
                 .iter()
@@ -267,34 +271,37 @@ fn arm(twist: f32, arm_rest: Quat, clips: Vec<Clip>) -> Avatar {
                 })
                 .collect(),
         },
-        humanoid: Some(Humanoid {
-            bones: bones.iter().enumerate().map(|(i, b)| (*b, i as u32 + 1)).collect(),
+        role: Role::Avatar(Avatar {
+            humanoid: Some(Humanoid {
+                bones: bones.iter().enumerate().map(|(i, b)| (*b, i as u32 + 1)).collect(),
+                human_scale: 0.0,
+                center_of_mass: None,
+                muscle_frames: bones
+                    .iter()
+                    .map(|&bone| {
+                        let (min, max) = default_limits(bone);
+                        MuscleFrame {
+                            bone,
+                            pre: I,
+                            post: I,
+                            sign: [1.0; 3],
+                            min,
+                            max,
+                            twist: if bone.twist_child().is_some() { twist } else { 1.0 },
+                        }
+                    })
+                    .collect(),
+            }),
             viewpoint: [0.0; 3],
-            human_scale: 0.0,
-            center_of_mass: None,
-            muscle_frames: bones
-                .iter()
-                .map(|&bone| {
-                    let (min, max) = default_limits(bone);
-                    MuscleFrame {
-                        bone,
-                        pre: I,
-                        post: I,
-                        sign: [1.0; 3],
-                        min,
-                        max,
-                        twist: if bone.twist_child().is_some() { twist } else { 1.0 },
-                    }
-                })
-                .collect(),
+            ..Default::default()
         }),
         clips,
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 
-fn rig(a: &Avatar) -> Rig {
-    Rig::new(a.humanoid.as_ref().unwrap(), |n| {
+fn rig(a: &Document) -> Rig {
+    Rig::new(a.avatar().and_then(|r| r.humanoid.as_ref()).unwrap(), |n| {
         a.hierarchy.nodes[n as usize].rest.rotation
     })
     .unwrap()
@@ -338,14 +345,14 @@ fn a_muscle_turns_its_axis_by_max_above_zero_and_min_below() {
 #[test]
 fn the_frame_sign_flips_an_axis() {
     let mut a = arm(0.5, I, Vec::new());
-    a.humanoid.as_mut().unwrap().muscle_frames[1].sign = [1.0, 1.0, -1.0];
+    a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().muscle_frames[1].sign = [1.0, 1.0, -1.0];
     same(pose_of(&rig(&a), &[("Left Arm Down-Up", 1.0)])[&2], about(2, -100.0));
 }
 
 #[test]
 fn pre_and_post_carry_muscle_space_into_the_nodes() {
     let mut a = arm(0.5, I, Vec::new());
-    let f = &mut a.humanoid.as_mut().unwrap().muscle_frames[1];
+    let f = &mut a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().muscle_frames[1];
     f.pre = about(1, 90.0);
     f.post = about(0, 90.0);
     // pre * Rz(100) * post⁻¹ with h = sqrt(1/2), s = sin 50, c = cos 50:
@@ -360,7 +367,7 @@ fn pre_and_post_carry_muscle_space_into_the_nodes() {
 #[test]
 fn the_hips_frame_places_nothing() {
     let mut a = arm(0.5, I, Vec::new());
-    let f = &mut a.humanoid.as_mut().unwrap().muscle_frames[0];
+    let f = &mut a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().muscle_frames[0];
     assert_eq!(f.bone, HumanBone::Hips);
     f.pre = about(0, 90.0);
     let r = rig(&a);
@@ -372,7 +379,7 @@ fn the_hips_frame_places_nothing() {
 #[test]
 fn swing_combines_y_and_z_by_half_angle_tangents() {
     let mut a = arm(0.5, I, Vec::new());
-    let f = &mut a.humanoid.as_mut().unwrap().muscle_frames[3];
+    let f = &mut a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().muscle_frames[3];
     f.max = [0.0, 90.0, 90.0];
     // Hand In-Out is Y, Down-Up is Z: tan(45) = 1 on both gives (0, 1, 1, 1) normalised, a 109.47 degree turn
     // about (0, 1, 1), not a 90 degree turn about each axis in turn.
@@ -470,7 +477,11 @@ fn muscle_curves_bind_to_slots_with_zero_defaults() {
     );
 
     let mut a = arm(0.5, I, vec![clip]);
-    a.humanoid.as_mut().unwrap().muscle_frames.clear();
+    a.avatar_mut()
+        .and_then(|r| r.humanoid.as_mut())
+        .unwrap()
+        .muscle_frames
+        .clear();
     let b = bind(&a);
     assert!(b.bindings.is_empty() && b.rig.is_none());
     assert_eq!(b.unbound[0].reason, "no muscle frames (#53)");

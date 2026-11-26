@@ -23,6 +23,7 @@ use super::unity_state::{self, XAnimatorParameters, XExpressions};
 #[derive(Default)]
 pub(super) struct Source {
     pub humanoid: Option<Humanoid>,
+    pub viewpoint: Vec3,
     pub animator: Option<Animator>,
     pub clips: Vec<Clip>,
     pub constraints: Vec<Constraint>,
@@ -96,7 +97,9 @@ impl Importer<'_> {
                 self.face_meshes(&mut face)?;
                 s.face = Some(face);
             }
-            s.humanoid = Some(self.x_avatar(x)?);
+            let (h, viewpoint) = self.x_avatar(x)?;
+            s.humanoid = Some(h);
+            s.viewpoint = viewpoint;
         }
         let mut params = Vec::new();
         let mut clips = Vec::new();
@@ -223,7 +226,8 @@ impl Importer<'_> {
             .ok_or_else(|| format!("{ext}: node {i} is not in the scene"))
     }
 
-    fn x_avatar(&mut self, x: XAvatar) -> Result<Humanoid, String> {
+    /// The humanoid map and the viewpoint.
+    fn x_avatar(&mut self, x: XAvatar) -> Result<(Humanoid, Vec3), String> {
         let mut h = Humanoid::default();
         for (name, node) in &x.humanoid {
             let bone: HumanBone = parse("X_avatar", &Value::String(name.clone()))?;
@@ -240,7 +244,7 @@ impl Importer<'_> {
         h.muscle_frames = x.muscle_frames;
         h.human_scale = x.human_scale;
         h.center_of_mass = x.center_of_mass;
-        h.viewpoint = match (x.viewpoint, h.node(HumanBone::Head)) {
+        let viewpoint = match (x.viewpoint, h.node(HumanBone::Head)) {
             (Some(v), _) => v,
             (None, Some(head)) => {
                 let t = self.world()[head as usize].0;
@@ -252,7 +256,7 @@ impl Importer<'_> {
                 [0.0; 3]
             }
         };
-        Ok(h)
+        Ok((h, viewpoint))
     }
 
     /// Maps a face's glTF node indices: binds' mesh nodes to format meshes, eye bones to hierarchy nodes.

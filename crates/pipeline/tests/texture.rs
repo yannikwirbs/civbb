@@ -13,7 +13,7 @@ use civbb_format::material::{
 use civbb_format::math::Transform;
 use civbb_format::mesh::{Mesh, Submesh};
 use civbb_format::package::Platform;
-use civbb_format::{Avatar, BlobId, Caps, validate};
+use civbb_format::{BlobId, Caps, Document, validate};
 use civbb_pipeline::atlas::GUTTER;
 use civbb_pipeline::gltf_import::{Limits, dir_resolver, import};
 use civbb_pipeline::texture::{ENCODING_DEPENDENCIES, LADDER, decode, encode_ktx2, max_side};
@@ -160,7 +160,7 @@ fn avatar() -> Imported {
         out_tangent: 0.0,
     };
     Imported {
-        avatar: Avatar {
+        avatar: Document {
             name: "atlas".into(),
             hierarchy: Hierarchy {
                 nodes: vec![node("Root", None), node("Body", Some(0)), node("Glow", Some(0))],
@@ -192,7 +192,7 @@ fn avatar() -> Imported {
                     keys: vec![key(0.0), key(1.0)],
                 }],
             }],
-            ..Avatar::default()
+            ..Document::default()
         },
         blobs,
         warnings: Vec::new(),

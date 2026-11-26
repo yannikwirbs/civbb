@@ -3,7 +3,7 @@
 
 use civbb_anim::material::{self, to_linear, to_srgb};
 use civbb_anim::{Target, bind};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{Clip, Curve, Key, MeshProperty, Target as CurveTarget};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::material::{AlphaMode, Material, MaterialField as F, MaterialModel, Pbr, TextureSlot, Unlit};
@@ -65,7 +65,7 @@ fn curve(field: F, component: u8, srgb: bool, value: f32) -> Curve {
 }
 
 /// Root, `Body` (a renderer with an Unlit then a PBR submesh), `Hat` (no renderer).
-fn avatar(curves: Vec<Curve>) -> Avatar {
+fn avatar(curves: Vec<Curve>) -> Document {
     let node = |name: &str, parent| Node {
         name: String::from(name),
         parent,
@@ -77,7 +77,7 @@ fn avatar(curves: Vec<Curve>) -> Avatar {
         index_count: 0,
         material,
     };
-    Avatar {
+    Document {
         hierarchy: Hierarchy {
             nodes: vec![node("Root", None), node("Body", Some(0)), node("Hat", Some(0))],
         },
@@ -95,7 +95,7 @@ fn avatar(curves: Vec<Curve>) -> Avatar {
             root: None,
             curves,
         }],
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 

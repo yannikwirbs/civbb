@@ -2,7 +2,7 @@
 //! layer and group weights, pose sources and locomotion.
 
 use civbb_anim::{Controller, Instance};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::Transform;
@@ -50,7 +50,7 @@ fn layer(states: Vec<State>, group: u32) -> Layer {
 }
 
 fn controller(entries: Vec<Entry>, layers: Vec<Layer>) -> Controller {
-    let a = Avatar {
+    let a = Document {
         state: StateTable { entries },
         hierarchy: Hierarchy {
             nodes: vec![Node {
@@ -69,7 +69,7 @@ fn controller(entries: Vec<Entry>, layers: Vec<Layer>) -> Controller {
                 .collect(),
             layers,
         }),
-        ..Avatar::default()
+        ..Document::default()
     };
     civbb_format::validate(&a, &civbb_format::Caps::default(), |_| true).unwrap();
     Controller::new(&a).unwrap()

@@ -29,6 +29,7 @@ mod springs;
 pub(super) struct Vrm {
     pub name: Option<String>,
     pub humanoid: Humanoid,
+    pub viewpoint: Vec3,
     pub face: Option<Face>,
     pub dynamics: Dynamics,
     pub animator: Option<Animator>,
@@ -53,7 +54,7 @@ impl Importer<'_> {
             r.rotation = qmul([0.0, 1.0, 0.0, 0.0], r.rotation);
             r.translation = [-r.translation[0], r.translation[1], -r.translation[2]];
         }
-        let humanoid = self.vrm_humanoid(root, v1);
+        let (humanoid, viewpoint) = self.vrm_humanoid(root, v1);
         let dynamics = if v1 {
             doc.extension_value("VRMC_springBone")
                 .map(|s| self.springs_v1(s))
@@ -77,6 +78,7 @@ impl Importer<'_> {
         let mut vrm = Vrm {
             name: title.as_str().filter(|s| !s.is_empty()).map(str::to_owned),
             humanoid,
+            viewpoint,
             face: None,
             dynamics,
             animator: None,
@@ -146,7 +148,8 @@ impl Importer<'_> {
         index(v).and_then(|i| self.map.get(i).copied().flatten())
     }
 
-    fn vrm_humanoid(&mut self, root: &Value, v1: bool) -> Humanoid {
+    /// The humanoid map and the viewpoint.
+    fn vrm_humanoid(&mut self, root: &Value, v1: bool) -> (Humanoid, Vec3) {
         let bones: Vec<(String, &Value)> = if v1 {
             let map = root["humanoid"]["humanBones"].as_object();
             map.into_iter()
@@ -183,14 +186,17 @@ impl Importer<'_> {
             let bone = self.vrm_node(&fp["firstPersonBone"]).or(h.node(HumanBone::Head));
             (bone, xyz(&fp["firstPersonBoneOffset"], [0.0, 0.06, 0.0]))
         };
-        match bone {
+        let viewpoint = match bone {
             Some(b) => {
                 let (t, r, s) = world[b as usize];
-                h.viewpoint = add(t, rotate(r, [offset[0] * s[0], offset[1] * s[1], offset[2] * s[2]]));
+                add(t, rotate(r, [offset[0] * s[0], offset[1] * s[1], offset[2] * s[2]]))
             }
-            None => self.warnings.push("VRM has no head bone; viewpoint at origin".into()),
-        }
-        h
+            None => {
+                self.warnings.push("VRM has no head bone; viewpoint at origin".into());
+                [0.0; 3]
+            }
+        };
+        (h, viewpoint)
     }
 
     /// World translation, rotation and scale of every node (scale and rotation composed per axis, which is exact

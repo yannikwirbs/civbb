@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::hierarchy::NodeIndex;
 use crate::math::{Mat4, Vec3};
 
-/// Index into [`crate::Avatar::meshes`].
+/// Index into [`crate::Document::meshes`].
 pub type MeshIndex = u32;
 
 /// A triangle mesh attached to a node. All vertex streams have the same length, or are empty when optional.
@@ -128,7 +128,7 @@ pub struct Submesh {
     pub first_index: u32,
     /// Number of indices, a multiple of 3.
     pub index_count: u32,
-    /// Index into [`crate::Avatar::materials`].
+    /// Index into [`crate::Document::materials`].
     pub material: u32,
 }
 

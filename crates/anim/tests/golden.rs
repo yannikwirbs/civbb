@@ -13,7 +13,7 @@ use std::path::Path;
 
 use civbb_anim::material::{self, to_linear, to_srgb};
 use civbb_anim::{Controller, Instance, Target};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
 use civbb_format::blob::BlobId;
@@ -187,7 +187,7 @@ impl Case {
         }
     }
 
-    fn avatar(&self) -> Avatar {
+    fn avatar(&self) -> Document {
         let mut nodes = vec![Node {
             name: "Root".into(),
             parent: None,
@@ -293,7 +293,7 @@ impl Case {
                 blob: BlobId([0; 32]),
             }]
         };
-        Avatar {
+        Document {
             hierarchy: Hierarchy { nodes },
             meshes,
             materials,
@@ -311,7 +311,7 @@ impl Case {
                 layers,
             }),
             clips,
-            ..Avatar::default()
+            ..Document::default()
         }
     }
 
@@ -518,7 +518,7 @@ fn curve_keys(target: CurveTarget, keys: &[(f32, f32)]) -> Curve {
 }
 
 /// The current value of `"<node>.<property>"`: its slot, or the node's rest value when nothing animates it.
-fn value(c: &Controller, a: &Avatar, i: &Instance, key: &str) -> f32 {
+fn value(c: &Controller, a: &Document, i: &Instance, key: &str) -> f32 {
     let (path, prop) = key.rsplit_once('.').unwrap_or_else(|| panic!("bad key {key}"));
     let node = a
         .hierarchy
@@ -544,7 +544,7 @@ fn value(c: &Controller, a: &Avatar, i: &Instance, key: &str) -> f32 {
 
 /// What material `<index>` of the renderer at `<node>` receives for `<property>` after the step, in Unity's units: the
 /// avatar's material with every slot of the renderer set, as `Island::materials` applies them (ADRs 0025, 0099).
-fn material_value(c: &Controller, a: &Avatar, i: &Instance, key: &str) -> Option<f32> {
+fn material_value(c: &Controller, a: &Document, i: &Instance, key: &str) -> Option<f32> {
     let mut parts = key.splitn(3, ':');
     let (path, index, prop) = (parts.next().unwrap(), parts.next().unwrap(), parts.next().unwrap());
     let node = a.hierarchy.nodes.iter().position(|n| n.name == path).unwrap() as u32;

@@ -1,6 +1,6 @@
 //! Compiles an avatar's chains into one flat particle list, parents first, with per-particle parameters (ADR 0049).
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::dynamics::{Chain, Collider, Graded, ImmobileType, Integration, Limit, MultiChild, Version};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Vec3};
@@ -107,7 +107,7 @@ pub struct Rig {
 
 impl Rig {
     /// Compiles every chain of a validated avatar.
-    pub fn new(avatar: &Avatar) -> Self {
+    pub fn new(avatar: &Document) -> Self {
         let nodes = &avatar.hierarchy.nodes;
         let mut children: Vec<Vec<NodeIndex>> = vec![Vec::new(); nodes.len()];
         for (i, n) in nodes.iter().enumerate() {

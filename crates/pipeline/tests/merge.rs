@@ -4,13 +4,14 @@
 
 mod common;
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{Clip, Curve, Key, MeshProperty, NodeProperty, Target};
 use civbb_format::face::{Face, ShapeBind};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::material::{AlphaMode, Material, MaterialField, MaterialModel, Unlit};
 use civbb_format::math::{Mat4, Quat, Transform, Vec3};
 use civbb_format::mesh::{BlendShape, FirstPerson, Mesh, ShapeDelta, Skin, Submesh};
+use civbb_format::{Avatar, Role};
 use civbb_pipeline::gltf_import::{Limits, dir_resolver, import};
 use civbb_pipeline::{Merged, merge, prune};
 use common::{same_look, valid};
@@ -23,7 +24,7 @@ const IDENTITY: Mat4 = [
 /// animated); Body (skinned, `Smile`, face-bound); Hat (rigid, also `Smile`); Glow (animated material); Veil
 /// (blended); Hidden (inactive, never animated); Visor (third person only). Every mesh draws material 0 twice
 /// except Veil.
-fn avatar() -> Avatar {
+fn avatar() -> Document {
     let node = |name: &str, parent: Option<u32>, translation: Vec3, rotation: Quat, active: bool| Node {
         name: name.into(),
         parent,
@@ -95,7 +96,7 @@ fn avatar() -> Avatar {
     };
     let mut visor = mesh("Visor", 10, false, None, 0);
     visor.first_person = FirstPerson::ThirdPersonOnly;
-    Avatar {
+    Document {
         hierarchy: Hierarchy {
             nodes: vec![
                 node("Root", None, [0.0; 3], still, true),
@@ -122,13 +123,16 @@ fn avatar() -> Avatar {
             visor,
         ],
         materials: vec![material(AlphaMode::Opaque), material(AlphaMode::Blend)],
-        face: Some(Face {
-            blink: vec![ShapeBind {
-                mesh: 1,
-                shape: 0,
-                weight: 1.0,
-            }],
-            ..Face::default()
+        role: Role::Avatar(Avatar {
+            face: Some(Face {
+                blink: vec![ShapeBind {
+                    mesh: 1,
+                    shape: 0,
+                    weight: 1.0,
+                }],
+                ..Face::default()
+            }),
+            ..Default::default()
         }),
         clips: vec![Clip {
             name: "c".into(),
@@ -154,7 +158,7 @@ fn avatar() -> Avatar {
                 }),
             ],
         }],
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 
@@ -218,9 +222,9 @@ fn merges_meshes_that_show_together_and_keeps_the_rest_apart() {
         ]
     );
     assert_eq!(a.meshes[3..6], before.meshes[4..7]);
-    assert_eq!(a.face.as_ref().unwrap().blink[0].mesh, 0);
-    assert_eq!(a.face.as_ref().unwrap().blink[0].shape, 1);
-    let bound = |a: &Avatar| civbb_anim::bind(a).unbound.len();
+    assert_eq!(a.avatar().and_then(|r| r.face.as_ref()).unwrap().blink[0].mesh, 0);
+    assert_eq!(a.avatar().and_then(|r| r.face.as_ref()).unwrap().blink[0].shape, 1);
+    let bound = |a: &Document| civbb_anim::bind(a).unbound.len();
     assert_eq!(bound(&a), bound(&before));
     same_look(&before, &a, "hand-built");
 

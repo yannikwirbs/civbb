@@ -67,7 +67,7 @@ pub struct RangeMap {
 /// One blendshape at a weight.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ShapeBind {
-    /// Index into [`crate::Avatar::meshes`].
+    /// Index into [`crate::Document::meshes`].
     pub mesh: MeshIndex,
     /// Index into that mesh's blend shapes.
     pub shape: u32,

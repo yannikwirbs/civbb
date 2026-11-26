@@ -7,7 +7,7 @@ use std::sync::Arc;
 use civbb_client::{Island, Model, frame};
 use civbb_core::math::Pose;
 use civbb_core::{System, jobs};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{MeshProperty, Target};
 use civbb_format::dynamics::ReceiverKind;
 use civbb_format::material::{Material, MaterialField, MaterialModel};
@@ -15,7 +15,7 @@ use civbb_format::state::{Entry, EntryKind};
 
 const DT: f32 = 1.0 / 90.0;
 
-fn island(avatar: &Avatar, id: u64, local: bool) -> Island {
+fn island(avatar: &Document, id: u64, local: bool) -> Island {
     let origin = Pose {
         pos: [id as f32 * 2.0, 0.0, 0.0],
         ..Pose::IDENTITY

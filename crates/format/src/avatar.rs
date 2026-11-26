@@ -1,49 +1,24 @@
-//! The avatar root type tying every part of an avatar together.
+//! The avatar role: what a document needs to be worn (ADR 0085 point 5).
 
 use serde::{Deserialize, Serialize};
 
-use crate::animator::{Animator, Clip};
-use crate::constraint::Constraint;
-use crate::dynamics::{Contacts, Dynamics};
 use crate::expressions::Expressions;
 use crate::face::Face;
-use crate::hierarchy::{Hierarchy, Humanoid};
-use crate::material::{Material, Texture};
-use crate::mesh::Mesh;
+use crate::hierarchy::Humanoid;
+use crate::math::Vec3;
 use crate::meta::Meta;
-use crate::state::StateTable;
 
-/// A complete avatar. Cross references are indices into the vectors here; `validate` checks them.
+/// The parts only an avatar has. Node, mesh and entry references index the owning [`crate::Document`].
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Avatar {
-    /// Display name.
-    pub name: String,
-    /// All transform nodes.
-    pub hierarchy: Hierarchy,
     /// Humanoid mapping; `None` for non-humanoid avatars.
     pub humanoid: Option<Humanoid>,
-    /// Meshes.
-    pub meshes: Vec<Mesh>,
+    /// Eye position in avatar space, used for first-person view and eye-height calibration.
+    pub viewpoint: Vec3,
     /// Lip sync, blink and eye look; `None` for avatars without a face.
     pub face: Option<Face>,
-    /// Creator and licence metadata; `None` when the source has none.
-    pub meta: Option<Meta>,
-    /// Materials referenced by submeshes.
-    pub materials: Vec<Material>,
-    /// Textures referenced by materials; pixels live in blobs.
-    pub textures: Vec<Texture>,
-    /// Shared state: animator parameters, menu and network values (ADR 0088).
-    pub state: StateTable,
-    /// Animator controller; `None` plays the rest pose.
-    pub animator: Option<Animator>,
-    /// Clips referenced by the animator.
-    pub clips: Vec<Clip>,
     /// Expression menu.
     pub expressions: Option<Expressions>,
-    /// Bone dynamics.
-    pub dynamics: Dynamics,
-    /// Contacts.
-    pub contacts: Contacts,
-    /// Constraints in evaluation order.
-    pub constraints: Vec<Constraint>,
+    /// Creator and licence metadata; `None` when the source has none.
+    pub meta: Option<Meta>,
 }

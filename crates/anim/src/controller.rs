@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{Action, Animator, BodyPart, PoseSource, State, Unwritten};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform};
@@ -45,7 +45,7 @@ pub struct Controller {
 
 impl Controller {
     /// Compiles a validated avatar's animator; `None` if it has none.
-    pub fn new(avatar: &Avatar) -> Option<Self> {
+    pub fn new(avatar: &Document) -> Option<Self> {
         let animator = avatar.animator.clone()?;
         let bound = bind(avatar);
         let node_of = |t: &Target| match *t {

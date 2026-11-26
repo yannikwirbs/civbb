@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{MeshProperty, Target};
 use civbb_format::constraint::{ConstraintKind, WorldUp};
 use civbb_format::face::EyeDriver;
@@ -23,7 +23,7 @@ pub struct Pruned {
 }
 
 /// Prunes a validated avatar in place; it stays valid and animates, simulates and draws as before.
-pub fn prune(a: &mut Avatar) -> Pruned {
+pub fn prune(a: &mut Document) -> Pruned {
     let joints = prune_joints(a);
     let shapes = prune_shapes(a);
     let nodes = prune_nodes(a);
@@ -192,7 +192,7 @@ const FACE_TRACKING: &[&str] = &[
 ];
 
 /// Removes joints no vertex weights from each skin. Skins whose vertices use every joint, or none, are kept.
-fn prune_joints(a: &mut Avatar) -> usize {
+fn prune_joints(a: &mut Document) -> usize {
     let mut removed = 0;
     for m in &mut a.meshes {
         let Some(skin) = &mut m.skin else { continue };
@@ -231,7 +231,7 @@ fn prune_joints(a: &mut Avatar) -> usize {
 
 /// Removes blendshapes that rest at 0 and nothing drives: no clip curve targets them, the face
 /// setup does not bind them and their name is not a face-tracking name.
-fn prune_shapes(a: &mut Avatar) -> usize {
+fn prune_shapes(a: &mut Document) -> usize {
     let animated: HashSet<(u32, u32)> = (a.clips.iter().flat_map(|c| &c.curves))
         .filter_map(|c| match c.target {
             Target::Mesh {
@@ -242,7 +242,7 @@ fn prune_shapes(a: &mut Avatar) -> usize {
         })
         .collect();
     let mut bound = HashSet::new();
-    if let Some(face) = &a.face {
+    if let Some(face) = a.avatar().and_then(|r| r.face.as_ref()) {
         let mut binds: Vec<_> = face.visemes.iter().flat_map(|(_, b)| b).chain(&face.blink).collect();
         if let Some(EyeDriver::Shapes { up, down, left, right }) = face.eyes.as_ref().map(|e| &e.driver) {
             binds.extend(up.iter().chain(down).chain(left).chain(right));
@@ -273,7 +273,7 @@ fn prune_shapes(a: &mut Avatar) -> usize {
         retain(&mut m.blend_shapes, &keep);
         maps.push(map);
     }
-    if let Some(face) = &mut a.face {
+    if let Some(face) = a.avatar_mut().and_then(|r| r.face.as_mut()) {
         let mut binds: Vec<_> = face
             .visemes
             .iter_mut()
@@ -297,7 +297,7 @@ fn prune_shapes(a: &mut Avatar) -> usize {
 
 /// Removes nodes that nothing references and that have no referenced descendant, so every kept node keeps its
 /// path, parent and world placement. Descendants of a chain root are referenced: the chain simulates them.
-fn prune_nodes(a: &mut Avatar) -> usize {
+fn prune_nodes(a: &mut Document) -> usize {
     let n = a.hierarchy.nodes.len();
     let mut keep = vec![false; n];
     keep[0] = true;
@@ -350,17 +350,21 @@ fn prune_nodes(a: &mut Avatar) -> usize {
 }
 
 /// Calls `f` on every node reference outside the hierarchy itself.
-fn for_each_node(a: &mut Avatar, mut f: impl FnMut(&mut NodeIndex)) {
+fn for_each_node(a: &mut Document, mut f: impl FnMut(&mut NodeIndex)) {
     for m in &mut a.meshes {
         f(&mut m.node);
         if let Some(skin) = &mut m.skin {
             skin.joints.iter_mut().for_each(&mut f);
         }
     }
-    if let Some(h) = &mut a.humanoid {
+    if let Some(h) = a.avatar_mut().and_then(|r| r.humanoid.as_mut()) {
         h.bones.iter_mut().for_each(|(_, n)| f(n));
     }
-    if let Some(EyeDriver::Bones { left, right }) = a.face.as_mut().and_then(|f| f.eyes.as_mut()).map(|e| &mut e.driver)
+    if let Some(EyeDriver::Bones { left, right }) = a
+        .avatar_mut()
+        .and_then(|r| r.face.as_mut())
+        .and_then(|f| f.eyes.as_mut())
+        .map(|e| &mut e.driver)
     {
         left.iter_mut().chain(right).for_each(&mut f);
     }

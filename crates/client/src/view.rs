@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use civbb_core::math::{Pose, mat4_mul};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::material::{ColorSpace, ImageFormat, Material};
 use civbb_format::math::{Mat4, Vec3};
 use civbb_format::mesh::Mesh;
@@ -33,7 +33,7 @@ const MAX_TEXTURE_SIDE: u32 = 8192;
 /// What to show and for how long.
 pub struct Config {
     /// The avatar, validated.
-    pub avatar: Avatar,
+    pub avatar: Document,
     /// Its texture images, decoded by [`decode_textures`].
     pub textures: Vec<Option<TextureImage>>,
     /// Copies in the grid.
@@ -85,7 +85,7 @@ pub enum Texels {
 /// Decodes the avatar's texture blobs with bounded sizes: PNG and JPEG to RGBA8, KTX2 transcoded to BC7; `blob`
 /// returns a blob's bytes. Textures that are missing, too large or broken are `None` and draw untextured.
 pub fn decode_textures<'b>(
-    avatar: &Avatar,
+    avatar: &Document,
     blob: impl Fn(civbb_format::BlobId) -> Option<&'b [u8]>,
 ) -> Vec<Option<TextureImage>> {
     avatar
@@ -340,7 +340,7 @@ pub fn skin_matrices(mesh: &Mesh, world: &[Pose], out: &mut Vec<Mat4>) {
 }
 
 /// The avatar's bind-pose bounds: lowest and highest corner over every mesh's vertices.
-pub(crate) fn bounds(avatar: &Avatar) -> (Vec3, Vec3) {
+pub(crate) fn bounds(avatar: &Document) -> (Vec3, Vec3) {
     let mut lo = [f32::MAX; 3];
     let mut hi = [f32::MIN; 3];
     for p in avatar.meshes.iter().flat_map(|m| &m.positions) {
@@ -374,7 +374,7 @@ pub(crate) struct Gpu {
 impl Gpu {
     pub(crate) fn new(
         renderer: &Renderer,
-        avatar: &Avatar,
+        avatar: &Document,
         model: &Model,
         textures: &[Option<TextureImage>],
         copies: u32,
@@ -504,7 +504,7 @@ struct Viewer {
     gpu: Option<Gpu>,
     renderer: Option<Renderer>,
     window: Option<winit::window::Window>,
-    avatar: Avatar,
+    avatar: Document,
     textures: Vec<Option<TextureImage>>,
     model: Arc<Model>,
     islands: Vec<Island>,
@@ -693,7 +693,7 @@ pub(crate) const BACKGROUND: [f32; 4] = [0.08, 0.09, 0.11, 1.0];
 pub(crate) fn draw(
     renderer: &mut Renderer,
     gpu: &Gpu,
-    avatar: &Avatar,
+    avatar: &Document,
     islands: &[Island],
     s: &mut Scratch,
     eye: Vec3,

@@ -5,7 +5,7 @@
 use civbb_core::math::{Pose, euler_to_quat};
 use civbb_dynamics::contact::{Participant, segment_distance, step};
 use civbb_dynamics::{ContactRig, ContactState};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::dynamics::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Transform, Vec3};
@@ -47,8 +47,8 @@ fn receiver(shape: ContactShape, kind: ReceiverKind) -> ContactReceiver {
 }
 
 /// An avatar of one root node carrying `senders` and `receivers`.
-fn avatar(senders: Vec<ContactSender>, receivers: Vec<ContactReceiver>) -> Avatar {
-    Avatar {
+fn avatar(senders: Vec<ContactSender>, receivers: Vec<ContactReceiver>) -> Document {
+    Document {
         hierarchy: Hierarchy {
             nodes: vec![Node {
                 name: "Root".into(),
@@ -58,7 +58,7 @@ fn avatar(senders: Vec<ContactSender>, receivers: Vec<ContactReceiver>) -> Avata
             }],
         },
         contacts: Contacts { senders, receivers },
-        ..Avatar::default()
+        ..Document::default()
     }
 }
 
@@ -72,7 +72,7 @@ struct Scene {
 }
 
 impl Scene {
-    fn new(avatars: &[Avatar]) -> Self {
+    fn new(avatars: &[Document]) -> Self {
         let rigs: Vec<ContactRig> = avatars.iter().map(ContactRig::new).collect();
         Self {
             states: rigs.iter().map(ContactState::new).collect(),

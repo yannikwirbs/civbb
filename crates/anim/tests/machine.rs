@@ -3,7 +3,7 @@
 
 use civbb_anim::machine::From;
 use civbb_anim::{Controller, Instance};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::Transform;
@@ -111,7 +111,7 @@ fn layer(states: Vec<State>) -> Layer {
 }
 
 /// Params 0..4 are bools `b0`..`b3`, 4 is trigger `t`, 5 is float `f`.
-fn avatar(layers: Vec<Layer>, clips: Vec<Clip>) -> Avatar {
+fn avatar(layers: Vec<Layer>, clips: Vec<Clip>) -> Document {
     let node = |name: &str, parent| Node {
         name: name.into(),
         parent,
@@ -129,14 +129,14 @@ fn avatar(layers: Vec<Layer>, clips: Vec<Clip>) -> Avatar {
             weight: 1.0,
         })
         .collect();
-    let a = Avatar {
+    let a = Document {
         hierarchy: Hierarchy {
             nodes: vec![node("Root", None), node("A", Some(0)), node("B", Some(0))],
         },
         state: StateTable { entries },
         animator: Some(Animator { groups, layers }),
         clips,
-        ..Avatar::default()
+        ..Document::default()
     };
     civbb_format::validate(&a, &civbb_format::Caps::default(), |_| true).expect("valid test avatar");
     a
@@ -151,7 +151,7 @@ fn single(states: Vec<State>, looping: bool) -> (Controller, Instance) {
     ))
 }
 
-fn run(a: Avatar) -> (Controller, Instance) {
+fn run(a: Document) -> (Controller, Instance) {
     let c = Controller::new(&a).expect("animator");
     let i = Instance::new(&c, true);
     (c, i)

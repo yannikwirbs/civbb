@@ -3,7 +3,7 @@
 //! outlines around a cube (ADR 0034); and the bloated corpus avatar drawn without validation errors. Skips without a
 //! Vulkan device.
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::material::{
     AlphaMode, Matcap, MatcapBlend, Material, MaterialModel, Pbr, RimRamp, RimShade, ShadeBands, TextureSlot, Toon,
     ToonLight, Unlit,
@@ -742,7 +742,7 @@ fn tone_correction_scales_the_base_texture() {
 #[test]
 fn draws_the_bloated_avatar() {
     let Some(ctx) = context() else { return };
-    let avatar: Avatar = civbb_corpus::generate(&civbb_corpus::bloated());
+    let avatar: Document = civbb_corpus::generate(&civbb_corpus::bloated());
     let mut scene = Scene::new(
         &ctx,
         Capacity::for_meshes(&avatar.meshes, 1, avatar.materials.len() as u32),

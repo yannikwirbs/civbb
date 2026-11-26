@@ -11,192 +11,6 @@
       "chains": [],
       "colliders": []
     },
-    "expressions": null,
-    "face": {
-      "blink": [
-        {
-          "mesh": 0,
-          "shape": 1,
-          "weight": 1.0
-        }
-      ],
-      "eyes": {
-        "driver": {
-          "Bones": {
-            "left": 4,
-            "right": null
-          }
-        },
-        "horizontal_inner": {
-          "input_max": 30.0,
-          "output_scale": 0.800000011920929
-        },
-        "horizontal_outer": {
-          "input_max": 30.0,
-          "output_scale": 0.800000011920929
-        },
-        "vertical_down": {
-          "input_max": 30.0,
-          "output_scale": 0.800000011920929
-        },
-        "vertical_up": {
-          "input_max": 30.0,
-          "output_scale": 0.800000011920929
-        }
-      },
-      "visemes": [
-        [
-          "Sil",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.0
-            }
-          ]
-        ],
-        [
-          "Pp",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.06666667014360428
-            }
-          ]
-        ],
-        [
-          "Ff",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.13333334028720856
-            }
-          ]
-        ],
-        [
-          "Th",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.20000000298023224
-            }
-          ]
-        ],
-        [
-          "Dd",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.2666666805744171
-            }
-          ]
-        ],
-        [
-          "Kk",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.3333333432674408
-            }
-          ]
-        ],
-        [
-          "Ch",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.4000000059604645
-            }
-          ]
-        ],
-        [
-          "Ss",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.46666666865348816
-            }
-          ]
-        ],
-        [
-          "Nn",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.5333333611488342
-            }
-          ]
-        ],
-        [
-          "Rr",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.6000000238418579
-            }
-          ]
-        ],
-        [
-          "Aa",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.6666666865348816
-            }
-          ]
-        ],
-        [
-          "E",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.7333333492279053
-            }
-          ]
-        ],
-        [
-          "I",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.800000011920929
-            }
-          ]
-        ],
-        [
-          "O",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.8666666746139526
-            }
-          ]
-        ],
-        [
-          "U",
-          [
-            {
-              "mesh": 0,
-              "shape": 0,
-              "weight": 0.9333333373069763
-            }
-          ]
-        ]
-      ]
-    },
     "hierarchy": {
       "nodes": [
         {
@@ -868,70 +682,6 @@
         }
       ]
     },
-    "humanoid": {
-      "bones": [
-        [
-          "Hips",
-          1
-        ],
-        [
-          "Spine",
-          2
-        ],
-        [
-          "Head",
-          3
-        ],
-        [
-          "LeftEye",
-          4
-        ],
-        [
-          "RightEye",
-          5
-        ]
-      ],
-      "center_of_mass": null,
-      "human_scale": 0.0,
-      "muscle_frames": [
-        {
-          "bone": "Spine",
-          "max": [
-            40.0,
-            30.0,
-            20.0
-          ],
-          "min": [
-            -40.0,
-            -30.0,
-            -20.0
-          ],
-          "post": [
-            0.6000000238418579,
-            0.0,
-            0.0,
-            0.800000011920929
-          ],
-          "pre": [
-            0.0,
-            0.6000000238418579,
-            0.0,
-            0.800000011920929
-          ],
-          "sign": [
-            1.0,
-            -1.0,
-            1.0
-          ],
-          "twist": 1.0
-        }
-      ],
-      "viewpoint": [
-        0.0,
-        1.4500000476837158,
-        0.07999999821186066
-      ]
-    },
     "materials": [
       {
         "alpha": "Opaque",
@@ -1150,8 +900,262 @@
         "uv1": []
       }
     ],
-    "meta": null,
     "name": "Armature",
+    "role": {
+      "Avatar": {
+        "expressions": null,
+        "face": {
+          "blink": [
+            {
+              "mesh": 0,
+              "shape": 1,
+              "weight": 1.0
+            }
+          ],
+          "eyes": {
+            "driver": {
+              "Bones": {
+                "left": 4,
+                "right": null
+              }
+            },
+            "horizontal_inner": {
+              "input_max": 30.0,
+              "output_scale": 0.800000011920929
+            },
+            "horizontal_outer": {
+              "input_max": 30.0,
+              "output_scale": 0.800000011920929
+            },
+            "vertical_down": {
+              "input_max": 30.0,
+              "output_scale": 0.800000011920929
+            },
+            "vertical_up": {
+              "input_max": 30.0,
+              "output_scale": 0.800000011920929
+            }
+          },
+          "visemes": [
+            [
+              "Sil",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.0
+                }
+              ]
+            ],
+            [
+              "Pp",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.06666667014360428
+                }
+              ]
+            ],
+            [
+              "Ff",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.13333334028720856
+                }
+              ]
+            ],
+            [
+              "Th",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.20000000298023224
+                }
+              ]
+            ],
+            [
+              "Dd",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.2666666805744171
+                }
+              ]
+            ],
+            [
+              "Kk",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.3333333432674408
+                }
+              ]
+            ],
+            [
+              "Ch",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.4000000059604645
+                }
+              ]
+            ],
+            [
+              "Ss",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.46666666865348816
+                }
+              ]
+            ],
+            [
+              "Nn",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.5333333611488342
+                }
+              ]
+            ],
+            [
+              "Rr",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.6000000238418579
+                }
+              ]
+            ],
+            [
+              "Aa",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.6666666865348816
+                }
+              ]
+            ],
+            [
+              "E",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.7333333492279053
+                }
+              ]
+            ],
+            [
+              "I",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.800000011920929
+                }
+              ]
+            ],
+            [
+              "O",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.8666666746139526
+                }
+              ]
+            ],
+            [
+              "U",
+              [
+                {
+                  "mesh": 0,
+                  "shape": 0,
+                  "weight": 0.9333333373069763
+                }
+              ]
+            ]
+          ]
+        },
+        "humanoid": {
+          "bones": [
+            [
+              "Hips",
+              1
+            ],
+            [
+              "Spine",
+              2
+            ],
+            [
+              "Head",
+              3
+            ],
+            [
+              "LeftEye",
+              4
+            ],
+            [
+              "RightEye",
+              5
+            ]
+          ],
+          "center_of_mass": null,
+          "human_scale": 0.0,
+          "muscle_frames": [
+            {
+              "bone": "Spine",
+              "max": [
+                40.0,
+                30.0,
+                20.0
+              ],
+              "min": [
+                -40.0,
+                -30.0,
+                -20.0
+              ],
+              "post": [
+                0.6000000238418579,
+                0.0,
+                0.0,
+                0.800000011920929
+              ],
+              "pre": [
+                0.0,
+                0.6000000238418579,
+                0.0,
+                0.800000011920929
+              ],
+              "sign": [
+                1.0,
+                -1.0,
+                1.0
+              ],
+              "twist": 1.0
+            }
+          ]
+        },
+        "meta": null,
+        "viewpoint": [
+          0.0,
+          1.4500000476837158,
+          0.07999999821186066
+        ]
+      }
+    },
     "state": {
       "entries": []
     },

@@ -9,7 +9,7 @@ use std::path::Path;
 use civbb_anim::constraint::Scratch;
 use civbb_anim::{Constraints, Target, bind};
 use civbb_core::math::{self, world_poses};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::hierarchy::HumanBone;
 use civbb_format::math::{Quat, Transform};
 use civbb_pipeline::gltf_import::{Limits, import};
@@ -92,7 +92,7 @@ impl Worst {
 }
 
 struct Loaded {
-    avatar: Avatar,
+    avatar: Document,
     /// Recorded path index to hierarchy node, for unambiguous paths.
     node: Vec<Option<usize>>,
 }
@@ -115,7 +115,10 @@ fn clips(l: &Loaded, rec: &Recording) -> HashMap<String, Worst> {
     let a = &l.avatar;
     let bound = bind(a);
     let targets = &bound.bindings.targets;
-    let hips = a.humanoid.as_ref().and_then(|h| h.node(HumanBone::Hips));
+    let hips = a
+        .avatar()
+        .and_then(|r| r.humanoid.as_ref())
+        .and_then(|h| h.node(HumanBone::Hips));
     let rest: Vec<Transform> = a.hierarchy.nodes.iter().map(|n| n.rest).collect();
     let mut out: HashMap<String, Worst> = HashMap::new();
     for s in &rec.clips {
@@ -335,7 +338,9 @@ fn exported_standard_senders_sit_on_their_bones() {
         }
         let bytes = std::fs::read(&path).unwrap();
         let avatar = import(&bytes, &Limits::default(), |_| None).unwrap().avatar;
-        let Some(h) = &avatar.humanoid else { continue };
+        let Some(h) = avatar.avatar().and_then(|r| r.humanoid.as_ref()) else {
+            continue;
+        };
         let senders = &avatar.contacts.senders;
         assert!(
             senders.iter().any(|s| s.tags.iter().any(|t| t == "Torso")),
@@ -386,7 +391,9 @@ fn derived_muscle_frames_match_unity_exports() {
                 }
             }
         });
-        let Some(h) = &avatar.humanoid else { continue };
+        let Some(h) = avatar.avatar().and_then(|r| r.humanoid.as_ref()) else {
+            continue;
+        };
         let derived = civbb_anim::frames::derive(&avatar.hierarchy, h);
         let (mut worst, mut at) = (0.0f32, String::new());
         for f in &h.muscle_frames {

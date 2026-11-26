@@ -1,7 +1,7 @@
 //! Compiler stage 3 LOD chain: up to three simplified levels per mesh from meshoptimizer, weighing where skinning and
 //! shapes move each vertex, with submesh borders locked, in a vertex order that makes each level a prefix (ADR 0031).
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::math::Mat4;
 use civbb_format::mesh::{Lod, Mesh, Submesh};
 use meshopt::{SimplifyOptions, VertexDataAdapter, simplify_scale, simplify_with_attributes_and_locks, typed_to_bytes};
@@ -30,7 +30,7 @@ pub struct Lods {
 }
 
 /// Builds the chain for every mesh of a validated, merged avatar in place; level 0 looks as before.
-pub fn lod(a: &mut Avatar) -> Lods {
+pub fn lod(a: &mut Document) -> Lods {
     let mut out = Lods::default();
     for m in &mut a.meshes {
         let scale = build(m);

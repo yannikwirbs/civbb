@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use civbb_core::math::{Pose, length, sub};
 use civbb_dynamics::{Rig, State};
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::dynamics::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Quat, Transform, Vec3};
@@ -87,7 +87,7 @@ impl Case {
 
     /// Root, B0 on it (the chain root, turned by the `rootRotation` setting), then the bones along Unity's +X (or the
     /// `boneAxis` setting).
-    fn avatar(&self, bone: f32) -> Avatar {
+    fn avatar(&self, bone: f32) -> Document {
         let node = |name: &str, parent: Option<u32>, t: Vec3| Node {
             name: name.into(),
             parent,
@@ -187,13 +187,13 @@ impl Case {
             allow_posing: false,
             outputs: Default::default(),
         };
-        Avatar {
+        Document {
             hierarchy: Hierarchy { nodes },
             dynamics: Dynamics {
                 chains: vec![chain],
                 colliders,
             },
-            ..Avatar::default()
+            ..Document::default()
         }
     }
 

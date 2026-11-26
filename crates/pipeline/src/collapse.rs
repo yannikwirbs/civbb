@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use civbb_anim::Target;
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{
     Action, Animator, BlendTree, BlendTreeKind, COMPILER_PARAMETER_PREFIX, Clip, ClipIndex, ConditionMode, EntryOp,
     Layer, LayerBlending, Motion, State, StateMachine, Transition, TransitionDest, Unwritten,
@@ -21,7 +21,7 @@ struct Toggle {
 }
 
 /// Collapses toggle layers of a validated avatar's animator in place; returns how many layers went.
-pub fn collapse(a: &mut Avatar) -> usize {
+pub fn collapse(a: &mut Document) -> usize {
     let Some(an) = &a.animator else { return 0 };
     let bound = civbb_anim::bind(a);
     let n = an.layers.len();

@@ -159,7 +159,7 @@ fn run(args: &[String]) -> Result<(), Error> {
                 println!("compiler    {}", pkg.header.compiler);
                 println!("platform    {:?}", pkg.header.platform);
                 (
-                    pkg.avatar(&ReadLimits::default()).map_err(|e| e.to_string())?,
+                    pkg.document(&ReadLimits::default()).map_err(|e| e.to_string())?,
                     pkg.blobs,
                 )
             } else {
@@ -260,7 +260,7 @@ fn read_package(path: &Path, key: &SigningKey) -> Result<Package, Error> {
     let limits = ReadLimits::default();
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let pkg = Package::decode_verified(&bytes, &key.verifying_key(), &limits).map_err(|e| e.to_string())?;
-    let avatar = pkg.avatar(&limits).map_err(|e| e.to_string())?;
+    let avatar = pkg.document(&limits).map_err(|e| e.to_string())?;
     validate(&avatar, &Caps::default(), |id| pkg.blob(id).is_some()).map_err(|errors| {
         let list: Vec<String> = errors.iter().map(ToString::to_string).collect();
         format!("invalid avatar: {}", list.join("; "))

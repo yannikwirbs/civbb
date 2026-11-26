@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{MeshProperty, NodeProperty, Target};
 use civbb_format::face::EyeDriver;
 use civbb_format::hierarchy::NodeIndex;
@@ -36,7 +36,7 @@ struct Key {
 }
 
 /// Merges meshes of a validated, pruned avatar in place; it stays valid and looks the same in every state.
-pub fn merge(a: &mut Avatar) -> Merged {
+pub fn merge(a: &mut Document) -> Merged {
     let meshes_before = a.meshes.len();
     let submeshes_before: usize = a.meshes.iter().map(|m| m.submeshes.len()).sum();
     let n = a.hierarchy.nodes.len();
@@ -149,7 +149,7 @@ pub fn merge(a: &mut Avatar) -> Merged {
         }
         a.meshes.push(m);
     }
-    if let Some(face) = &mut a.face {
+    if let Some(face) = a.avatar_mut().and_then(|r| r.face.as_mut()) {
         let mut binds: Vec<_> = face
             .visemes
             .iter_mut()

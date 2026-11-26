@@ -25,7 +25,7 @@ fn package_dir(name: &str, spec: &civbb_corpus::Spec) -> PathBuf {
         },
         blobs: Default::default(),
     }
-    .with_avatar(&civbb_corpus::generate(spec));
+    .with_document(&civbb_corpus::generate(spec));
     std::fs::write(
         dir.join("avatar.civpkg"),
         package.encode_signed(&SigningKey::from_bytes(&seed)),

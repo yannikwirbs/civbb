@@ -5,19 +5,17 @@
 use std::collections::HashSet;
 
 use crate::BlobId;
-use crate::avatar::Avatar;
 use crate::constraint::{Constraint, ConstraintKind, WorldUp};
+use crate::document::{Document, Role};
 use crate::dynamics::{ContactShape, ContactVolume, Contacts, Dynamics, Graded, Limit, Shape};
-use crate::expressions::{ControlKind, Expressions, Menu};
-use crate::face::{EyeDriver, Face, ShapeBind};
-use crate::hierarchy::{Hierarchy, Humanoid};
+use crate::hierarchy::Hierarchy;
 use crate::material::{MaterialModel, TextureSlot};
 use crate::math::Transform;
 use crate::mesh::{Mesh, Skin};
-use crate::meta::Meta;
 use crate::state::{EntryIndex, EntryKind, PLATFORM_NAMESPACE, Platform, StateTable, SyncMode};
 
 mod animator;
+mod avatar;
 
 /// Hard limits for one avatar.
 #[allow(missing_docs)] // Each field caps the count its name says.
@@ -94,19 +92,17 @@ pub struct ValidationError {
 
 /// Stop collecting after this many errors; one bad array can otherwise produce millions.
 const MAX_ERRORS: usize = 100;
-/// Authors plus references in [`crate::meta::Meta`].
-const META_LISTS: usize = 256;
 /// Levels of detail below the full mesh.
 const MAX_LODS: usize = 8;
 
 /// Checks every cross reference, stream length, ordering and cap. `has_blob` reports whether a texture's blob exists.
-pub fn validate(a: &Avatar, caps: &Caps, has_blob: impl Fn(BlobId) -> bool) -> Result<(), Vec<ValidationError>> {
+pub fn validate(a: &Document, caps: &Caps, has_blob: impl Fn(BlobId) -> bool) -> Result<(), Vec<ValidationError>> {
     let mut v = V {
         errors: Vec::new(),
         caps: *caps,
         platform: Vec::new(),
     };
-    v.avatar(a, &has_blob);
+    v.document(a, &has_blob);
     if v.errors.is_empty() { Ok(()) } else { Err(v.errors) }
 }
 
@@ -172,26 +168,17 @@ impl V {
     }
 
     /// Every part of the avatar, in this order: errors come out in it and stop at [`MAX_ERRORS`].
-    fn avatar(&mut self, a: &Avatar, has_blob: &impl Fn(BlobId) -> bool) {
+    fn document(&mut self, a: &Document, has_blob: &impl Fn(BlobId) -> bool) {
         let c = self.caps;
         let nodes = a.hierarchy.nodes.len();
         self.string(&a.name, || "name".into());
         self.hierarchy(&a.hierarchy);
-        if let Some(h) = &a.humanoid {
-            self.humanoid(h, nodes);
-        }
         self.cap(a.meshes.len(), c.meshes, "meshes");
         self.cap(a.materials.len(), c.materials, "materials");
         self.cap(a.textures.len(), c.textures, "textures");
         let mut totals = Totals::default();
         for (mi, m) in a.meshes.iter().enumerate() {
             self.mesh(mi, m, nodes, a.materials.len(), &mut totals);
-        }
-        if let Some(f) = &a.face {
-            self.face(f, &a.meshes, nodes);
-        }
-        if let Some(m) = &a.meta {
-            self.meta(m);
         }
         self.cap(totals.vertices, c.vertices, "total vertices");
         self.cap(totals.indices, c.indices, "total indices");
@@ -204,12 +191,12 @@ impl V {
         if let Some(anim) = &a.animator {
             self.animator(anim, a.clips.len(), entries, nodes);
         }
-        if let Some(e) = &a.expressions {
-            self.expressions(e, a.textures.len());
-        }
         self.dynamics(&a.dynamics, nodes);
         self.contacts(&a.contacts, nodes);
         self.constraints(&a.constraints, nodes);
+        match &a.role {
+            Role::Avatar(r) => self.avatar(r, a),
+        }
     }
 
     fn hierarchy(&mut self, h: &Hierarchy) {
@@ -226,49 +213,6 @@ impl V {
                 (_, None) => self.fail(p, "only node 0 may lack a parent"),
                 (_, Some(parent)) => self.ensure((parent as usize) < i, p, "parent must precede child"),
             }
-        }
-    }
-
-    fn humanoid(&mut self, h: &Humanoid, nodes: usize) {
-        let mut seen = HashSet::new();
-        for (bone, node) in &h.bones {
-            self.index(*node as usize, nodes, || format!("humanoid.{bone:?}"), "node");
-            self.ensure(seen.insert(*bone), || format!("humanoid.{bone:?}"), "mapped twice");
-        }
-        self.finite(&h.viewpoint, || "humanoid.viewpoint".into());
-        self.ensure(
-            h.human_scale.is_finite() && h.human_scale >= 0.0,
-            || "humanoid.human_scale".into(),
-            "must be finite and 0 or more",
-        );
-        if let Some(c) = &h.center_of_mass {
-            self.finite(c, || "humanoid.center_of_mass".into());
-        }
-        let mut framed = HashSet::new();
-        for (i, f) in h.muscle_frames.iter().enumerate() {
-            let p = || format!("humanoid.muscle_frames[{i}]");
-            self.ensure(h.node(f.bone).is_some(), p, "bone not mapped");
-            self.ensure(framed.insert(f.bone), p, "bone framed twice");
-            let all = [f.pre.as_slice(), &f.post, &f.sign, &f.min, &f.max, &[f.twist]].concat();
-            self.finite(&all, p);
-            let unit = |q: &[f32; 4]| (q.iter().map(|c| c * c).sum::<f32>() - 1.0).abs() < 1e-3;
-            self.ensure(
-                unit(&f.pre) && unit(&f.post),
-                p,
-                "pre and post must be unit quaternions",
-            );
-            self.ensure(f.sign.iter().all(|s| s.abs() == 1.0), p, "signs must be 1 or -1");
-            self.ensure(
-                f.min.iter().all(|m| *m <= 0.0) && f.max.iter().all(|m| *m >= 0.0),
-                p,
-                "min above 0 or max below 0",
-            );
-            let twist_ok = if f.bone.twist_child().is_some() {
-                (0.0..=1.0).contains(&f.twist)
-            } else {
-                f.twist == 1.0
-            };
-            self.ensure(twist_ok, p, "twist must be in 0..=1 on limb bones and 1 elsewhere");
         }
     }
 
@@ -413,53 +357,8 @@ impl V {
         }
     }
 
-    fn face(&mut self, f: &Face, meshes: &[Mesh], nodes: usize) {
-        let mut seen = HashSet::new();
-        for (v, _) in &f.visemes {
-            self.ensure(seen.insert(*v), || format!("face.{v:?}"), "mapped twice");
-        }
-        let mut binds: Vec<&ShapeBind> = f.visemes.iter().flat_map(|(_, b)| b).chain(&f.blink).collect();
-        if let Some(e) = &f.eyes {
-            let maps = [e.horizontal_inner, e.horizontal_outer, e.vertical_down, e.vertical_up];
-            self.finite(&maps.map(|m| [m.input_max, m.output_scale]).concat(), || {
-                "face.eyes".into()
-            });
-            match &e.driver {
-                EyeDriver::Bones { left, right } => {
-                    for n in left.iter().chain(right) {
-                        self.index(*n as usize, nodes, || "face.eyes".into(), "eye node");
-                    }
-                }
-                EyeDriver::Shapes { up, down, left, right } => {
-                    binds.extend(up.iter().chain(down).chain(left).chain(right))
-                }
-            }
-        }
-        for (i, b) in binds.into_iter().enumerate() {
-            let p = || format!("face.binds[{i}]");
-            match meshes.get(b.mesh as usize) {
-                Some(m) => self.index(b.shape as usize, m.blend_shapes.len(), p, "blend shape"),
-                None => self.fail(p, format!("mesh index {} out of range", b.mesh)),
-            }
-            self.finite(&[b.weight], p);
-        }
-    }
-
-    fn meta(&mut self, m: &Meta) {
-        let l = &m.licence;
-        let strings = m.authors.iter().chain(&m.references);
-        self.ensure(
-            m.authors.len() + m.references.len() <= META_LISTS,
-            || "meta".into(),
-            "too many authors or references",
-        );
-        for s in strings.chain([&m.version, &m.copyright, &m.contact, &l.url, &l.other_terms_url]) {
-            self.string(s, || "meta".into());
-        }
-    }
-
     /// Materials' texture slots, then each texture's blob.
-    fn materials(&mut self, a: &Avatar, has_blob: &impl Fn(BlobId) -> bool) {
+    fn materials(&mut self, a: &Document, has_blob: &impl Fn(BlobId) -> bool) {
         for (i, m) in a.materials.iter().enumerate() {
             let p = || format!("materials[{i}]");
             self.string(&m.name, p);
@@ -536,12 +435,6 @@ impl V {
             }
             self.platform.push(platform);
         }
-    }
-
-    fn expressions(&mut self, e: &Expressions, textures: usize) {
-        let mut controls = 0;
-        self.menu(&e.menu, 0, textures, &mut controls);
-        self.cap(controls, self.caps.menu_controls, "expressions.menu controls");
     }
 
     fn dynamics(&mut self, d: &Dynamics, nodes: usize) {
@@ -684,42 +577,21 @@ impl V {
         self.ensure(ok, &path, "negative or non-finite contact size");
         self.finite(&[v.position.as_slice(), &v.rotation, &dims].concat(), path);
     }
-
-    fn menu(&mut self, m: &Menu, depth: usize, textures: usize, controls: &mut usize) {
-        let cap = self.caps.menu_depth;
-        if depth > cap {
-            self.fail(|| "expressions.menu".into(), format!("nested deeper than {cap}"));
-            return;
-        }
-        for (i, ctl) in m.controls.iter().enumerate() {
-            *controls += 1;
-            let p = || format!("expressions.menu(depth {depth})[{i}]");
-            self.string(&ctl.name, p);
-            if let Some(icon) = ctl.icon {
-                self.index(icon as usize, textures, p, "icon texture");
-            }
-            for &e in ctl.parameter.iter().chain(ctl.sub_parameters.iter().flatten()) {
-                self.written(e, p, "entry");
-            }
-            if let ControlKind::SubMenu(sub) = &ctl.kind {
-                self.menu(sub, depth + 1, textures, controls);
-            }
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::animator::TransitionDest;
+    use crate::expressions::{ControlKind, Menu};
     use crate::state::{Entry, EntryKind};
     use crate::testutil::sample_avatar;
 
-    fn check(a: &Avatar) -> Result<(), Vec<ValidationError>> {
+    fn check(a: &Document) -> Result<(), Vec<ValidationError>> {
         validate(a, &Caps::default(), |_| true)
     }
 
-    fn expect_error(a: &Avatar, path_part: &str) {
+    fn expect_error(a: &Document, path_part: &str) {
         let errors = check(a).expect_err("expected a validation error");
         assert!(
             errors.iter().any(|e| e.path.contains(path_part)),
@@ -783,18 +655,21 @@ mod tests {
 
     #[test]
     fn out_of_range_indices_are_rejected() {
-        type Mutation = fn(&mut Avatar);
+        type Mutation = fn(&mut Document);
         let cases: &[(&str, Mutation)] = &[
             ("hierarchy.nodes[1]", |a| a.hierarchy.nodes[1].parent = Some(5)),
-            ("humanoid", |a| a.humanoid.as_mut().unwrap().bones[0].1 = 99),
-            ("humanoid.muscle_frames[0]", |a| {
-                a.humanoid.as_mut().unwrap().muscle_frames[0].bone = crate::hierarchy::HumanBone::Head
+            ("humanoid", |a| {
+                a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().bones[0].1 = 99
             }),
             ("humanoid.muscle_frames[0]", |a| {
-                a.humanoid.as_mut().unwrap().muscle_frames[0].twist = 0.5
+                a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().muscle_frames[0].bone =
+                    crate::hierarchy::HumanBone::Head
             }),
             ("humanoid.muscle_frames[0]", |a| {
-                a.humanoid.as_mut().unwrap().muscle_frames[0].pre = [0.0; 4]
+                a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().muscle_frames[0].twist = 0.5
+            }),
+            ("humanoid.muscle_frames[0]", |a| {
+                a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().muscle_frames[0].pre = [0.0; 4]
             }),
             ("meshes[0].node", |a| a.meshes[0].node = 99),
             ("meshes[0].indices", |a| a.meshes[0].indices[0] = 3),
@@ -809,16 +684,26 @@ mod tests {
             ("meshes[0].blend_shapes[0]", |a| {
                 a.meshes[0].blend_shapes[0].deltas[0].vertex = 3
             }),
-            ("face.binds[0]", |a| a.face.as_mut().unwrap().visemes[0].1[0].shape = 1),
-            ("face.binds[0]", |a| a.face.as_mut().unwrap().visemes[0].1[0].mesh = 1),
+            ("face.binds[0]", |a| {
+                a.avatar_mut().and_then(|r| r.face.as_mut()).unwrap().visemes[0].1[0].shape = 1
+            }),
+            ("face.binds[0]", |a| {
+                a.avatar_mut().and_then(|r| r.face.as_mut()).unwrap().visemes[0].1[0].mesh = 1
+            }),
             ("face.eyes", |a| {
-                a.face.as_mut().unwrap().eyes.as_mut().unwrap().driver = crate::face::EyeDriver::Bones {
+                a.avatar_mut()
+                    .and_then(|r| r.face.as_mut())
+                    .unwrap()
+                    .eyes
+                    .as_mut()
+                    .unwrap()
+                    .driver = crate::face::EyeDriver::Bones {
                     left: Some(9),
                     right: None,
                 }
             }),
             ("face.Aa", |a| {
-                let f = a.face.as_mut().unwrap();
+                let f = a.avatar_mut().and_then(|r| r.face.as_mut()).unwrap();
                 f.visemes.push(f.visemes[0].clone())
             }),
             ("materials[0]", |a| a.textures.clear()),
@@ -849,7 +734,12 @@ mod tests {
                     .collect()
             }),
             ("expressions.menu(depth 0)[0]", |a| {
-                a.expressions.as_mut().unwrap().menu.controls[0].sub_parameters = vec![None, Some(2)]
+                a.avatar_mut()
+                    .and_then(|r| r.expressions.as_mut())
+                    .unwrap()
+                    .menu
+                    .controls[0]
+                    .sub_parameters = vec![None, Some(2)]
             }),
             ("contacts[0]", |a| a.contacts.receivers[0].parameter = Some(2)),
             ("dynamics.chains[0]", |a| a.dynamics.chains[0].colliders[0] = 4),
@@ -949,7 +839,7 @@ mod tests {
             });
             menu = parent;
         }
-        a.expressions.as_mut().unwrap().menu = menu;
+        a.avatar_mut().and_then(|r| r.expressions.as_mut()).unwrap().menu = menu;
         expect_error(&a, "expressions.menu");
     }
 

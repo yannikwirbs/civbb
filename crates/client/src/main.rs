@@ -433,7 +433,7 @@ fn measure(package: &Path, key: &Path, avatars: u32, frames: u32, warmup: u32) -
 
 /// Reads, verifies and validates a package, and decodes its textures.
 #[allow(clippy::type_complexity)]
-fn load_package(path: &Path, key: &Path) -> Result<(civbb_format::Avatar, Vec<Option<view::TextureImage>>), String> {
+fn load_package(path: &Path, key: &Path) -> Result<(civbb_format::Document, Vec<Option<view::TextureImage>>), String> {
     let seed: [u8; 32] = std::fs::read(key)
         .map_err(|e| format!("{}: {e}", key.display()))?
         .try_into()
@@ -442,7 +442,7 @@ fn load_package(path: &Path, key: &Path) -> Result<(civbb_format::Avatar, Vec<Op
     let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let key = SigningKey::from_bytes(&seed).verifying_key();
     let pkg = Package::decode_verified(&bytes, &key, &limits).map_err(|e| e.to_string())?;
-    let avatar = pkg.avatar(&limits).map_err(|e| e.to_string())?;
+    let avatar = pkg.document(&limits).map_err(|e| e.to_string())?;
     validate(&avatar, &Caps::default(), |id| pkg.blob(id).is_some()).map_err(|errors| {
         let list: Vec<String> = errors.iter().map(ToString::to_string).collect();
         format!("invalid avatar: {}", list.join("; "))

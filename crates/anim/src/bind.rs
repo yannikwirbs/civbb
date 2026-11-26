@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::animator::{
     Animator, ClipIndex, Curve, EulerOrder, HumanoidProperty, Key, MeshProperty, Motion, NodeProperty,
     Target as CurveTarget,
@@ -46,9 +46,9 @@ pub enum Target {
     /// Component of a material field on every material of a renderer that has the field (ADRs 0025, 0099); sRGB-encoded
     /// when the flag is set.
     Material(MeshIndex, MaterialField, u8, bool),
-    /// The material a submesh draws with, as an index into [`Avatar::materials`] (values round to the nearest).
+    /// The material a submesh draws with, as an index into [`Document::materials`] (values round to the nearest).
     MaterialSlot(MeshIndex, u8),
-    /// A field of a constraint, by index into [`Avatar::constraints`] (ADR 0040).
+    /// A field of a constraint, by index into [`Document::constraints`] (ADR 0040).
     Constraint(u32, ConstraintField),
     /// Humanoid body pose: position (0..3, `RootT`) or rotation (3..7, `RootQ`) component (ADR 0063).
     Body(u8),
@@ -91,7 +91,7 @@ pub struct Unbound {
 pub struct Bound {
     /// The slots.
     pub bindings: Bindings,
-    /// One per [`Avatar::clips`] entry, same order.
+    /// One per [`Document::clips`] entry, same order.
     pub clips: Vec<BoundClip>,
     /// Curves left out.
     pub unbound: Vec<Unbound>,
@@ -103,7 +103,7 @@ pub struct Bound {
 }
 
 /// Binds every clip of a validated avatar.
-pub fn bind(avatar: &Avatar) -> Bound {
+pub fn bind(avatar: &Document) -> Bound {
     let mut b = Binder::new(avatar);
     let clips = (0..avatar.clips.len()).map(|ci| b.clip(ci)).collect();
     // A mirrored motion writes each muscle's counterpart (ADR 0060): give those slots too.
@@ -146,7 +146,7 @@ fn mirrors(animator: &Animator) -> bool {
 }
 
 struct Binder<'a> {
-    avatar: &'a Avatar,
+    avatar: &'a Document,
     rig: Option<Rig>,
     body: Option<BodyRig>,
     slots: HashMap<Target, Slot>,
@@ -164,13 +164,11 @@ struct NodeRotation<'a> {
 }
 
 impl<'a> Binder<'a> {
-    fn new(avatar: &'a Avatar) -> Self {
+    fn new(avatar: &'a Document) -> Self {
         let rest = |n: NodeIndex| avatar.hierarchy.nodes[n as usize].rest.rotation;
-        let rig = avatar.humanoid.as_ref().and_then(|h| Rig::new(h, rest));
-        let body = avatar
-            .humanoid
-            .as_ref()
-            .and_then(|h| BodyRig::new(&avatar.hierarchy, h));
+        let humanoid = avatar.avatar().and_then(|r| r.humanoid.as_ref());
+        let rig = humanoid.and_then(|h| Rig::new(h, rest));
+        let body = humanoid.and_then(|h| BodyRig::new(&avatar.hierarchy, h));
         Self {
             avatar,
             rig,
@@ -428,7 +426,7 @@ impl<'a> Binder<'a> {
 
 /// A renderer's default for a material field: its first material's value, or 0 when that material lacks the field,
 /// as Unity reads it from the renderer's material 0 (ADRs 0067, 0099). `None` when no material of the renderer has it.
-fn renderer_default(avatar: &Avatar, mesh: MeshIndex, field: MaterialField) -> Option<[f32; 4]> {
+fn renderer_default(avatar: &Document, mesh: MeshIndex, field: MaterialField) -> Option<[f32; 4]> {
     let get = |s: &civbb_format::mesh::Submesh| material::get(&avatar.materials[s.material as usize], field);
     let submeshes = &avatar.meshes[mesh as usize].submeshes;
     submeshes.iter().find_map(get)?;

@@ -50,7 +50,7 @@ fn corpus_round_trips_through_source_extensions() {
     for spec in [civbb_corpus::lean(), civbb_corpus::bloated()] {
         let mut original = civbb_corpus::generate(&spec);
         // The generator makes no muscle frames; one with distinct values checks the field travels.
-        let h = original.humanoid.as_mut().unwrap();
+        let h = original.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap();
         h.muscle_frames.push(civbb_format::hierarchy::MuscleFrame {
             bone: h.bones[0].0,
             pre: [0.0, 0.6, 0.0, 0.8],
@@ -106,16 +106,18 @@ fn corpus_round_trips_through_source_extensions() {
         let a = imported.avatar;
         assert_eq!(a.hierarchy.nodes, original.hierarchy.nodes, "{}", spec.name);
         assert_eq!(a.meshes, original.meshes, "{}", spec.name);
-        let (h, o) = (a.humanoid.unwrap(), original.humanoid.clone().unwrap());
-        assert_eq!(h, o, "{}", spec.name);
-        assert!(original.face.is_some(), "{}: no face", spec.name);
-        assert_eq!(a.face, original.face, "{}", spec.name);
+        let (r, o) = (a.avatar().unwrap(), original.avatar().unwrap());
+        assert!(
+            o.humanoid.is_some() && o.face.is_some(),
+            "{}: no humanoid or face",
+            spec.name
+        );
+        assert_eq!(r, o, "{}", spec.name);
         assert_eq!(a.animator, original.animator, "{}", spec.name);
         assert_eq!(a.clips, original.clips, "{}", spec.name);
         assert_eq!(a.constraints, original.constraints, "{}", spec.name);
         assert_eq!(a.dynamics, original.dynamics, "{}", spec.name);
         assert_eq!(a.contacts, original.contacts, "{}", spec.name);
-        assert_eq!(a.expressions, original.expressions, "{}", spec.name);
         assert_eq!(a.state, original.state, "{}", spec.name);
         assert!(imported.warnings.is_empty(), "{:?}", imported.warnings);
     }
@@ -431,9 +433,9 @@ fn source_extensions_map_nodes_and_clips() {
     let a = import(&gltf(doc, &bin), &Limits::default(), no_files).unwrap().avatar;
     let names: Vec<(&str, bool)> = a.hierarchy.nodes.iter().map(|n| (n.name.as_str(), n.active)).collect();
     assert_eq!(names, [("Root", true), ("A", true), ("B", false)]);
-    let h = a.humanoid.unwrap();
-    assert_eq!(h.bones, [(HumanBone::Hips, 2)]);
-    assert_eq!(h.viewpoint, [0.0; 3], "no head: origin");
+    let r = a.avatar().unwrap();
+    assert_eq!(r.humanoid.as_ref().unwrap().bones, [(HumanBone::Hips, 2)]);
+    assert_eq!(r.viewpoint, [0.0; 3], "no head: origin");
     assert_eq!(a.clips.len(), 2);
     assert_eq!(a.clips[1].name, "X");
     let motion = &a.animator.unwrap().layers[0].state_machine.states[0].motion;
@@ -597,8 +599,10 @@ fn import_local(sub: &str) {
                     a.meshes.len(),
                     a.textures.len(),
                     a.clips.len(),
-                    a.humanoid.as_ref().map_or(0, |h| h.bones.len()),
-                    a.face.as_ref().map_or(0, |f| f.visemes.len()),
+                    a.avatar()
+                        .and_then(|r| r.humanoid.as_ref())
+                        .map_or(0, |h| h.bones.len()),
+                    a.avatar().and_then(|r| r.face.as_ref()).map_or(0, |f| f.visemes.len()),
                     a.dynamics.chains.len(),
                     a.dynamics.colliders.len(),
                     a.constraints.len(),
@@ -704,12 +708,16 @@ fn vrm0_imports() {
         "turned to face +Z"
     );
 
-    let h = a.humanoid.as_ref().unwrap();
+    let h = a.avatar().and_then(|r| r.humanoid.as_ref()).unwrap();
     assert_eq!(h.bones.len(), 3, "duplicate and unknown bones skipped");
     assert_eq!(h.node(HumanBone::Head), Some(3));
-    assert!(close(h.viewpoint, [0.0, 1.66, -0.1]), "{:?}", h.viewpoint);
+    assert!(
+        close(a.avatar().unwrap().viewpoint, [0.0, 1.66, -0.1]),
+        "{:?}",
+        a.avatar().unwrap().viewpoint
+    );
 
-    let face = a.face.as_ref().unwrap();
+    let face = a.avatar().and_then(|r| r.face.as_ref()).unwrap();
     let bind = |shape| ShapeBind {
         mesh: 0,
         shape,
@@ -743,7 +751,7 @@ fn vrm0_imports() {
     assert_eq!(a.meshes[0].first_person, FirstPerson::ThirdPersonOnly);
 
     // CC BY-NC: redistribution and modification with credit, never commercial even though 0.x allowed it.
-    let m = a.meta.as_ref().unwrap();
+    let m = a.avatar().and_then(|r| r.meta.as_ref()).unwrap();
     let l = &m.licence;
     assert_eq!(m.authors, ["Ann"]);
     assert_eq!(
@@ -770,7 +778,12 @@ fn vrm0_imports() {
     assert_eq!(m.blend_shapes[s as usize].name, "Joy");
     assert_eq!(joy.curves[0].keys[0].value, 0.5);
     assert_eq!(
-        a.expressions.as_ref().unwrap().menu.controls.len(),
+        a.avatar()
+            .and_then(|r| r.expressions.as_ref())
+            .unwrap()
+            .menu
+            .controls
+            .len(),
         1,
         "empty `Broken` gets no toggle"
     );
@@ -862,11 +875,15 @@ fn vrm1_imports() {
         [0.0, 0.0, 0.0, 1.0],
         "1.0 already faces +Z"
     );
-    let h = a.humanoid.as_ref().unwrap();
+    let h = a.avatar().and_then(|r| r.humanoid.as_ref()).unwrap();
     assert_eq!(h.node(HumanBone::Spine), Some(2));
-    assert!(close(h.viewpoint, [0.0, 1.65, 0.12]), "{:?}", h.viewpoint);
+    assert!(
+        close(a.avatar().unwrap().viewpoint, [0.0, 1.65, 0.12]),
+        "{:?}",
+        a.avatar().unwrap().viewpoint
+    );
 
-    let face = a.face.as_ref().unwrap();
+    let face = a.avatar().and_then(|r| r.face.as_ref()).unwrap();
     assert_eq!(face.visemes[0].0, Viseme::Aa);
     assert_eq!(face.blink[0].shape, 1);
     let names: Vec<&str> = a.clips.iter().map(|c| c.name.as_str()).collect();
@@ -900,8 +917,8 @@ fn vrm1_imports() {
             .any(|w| w.contains("first-person annotation of a missing mesh"))
     );
 
-    let l = &a.meta.as_ref().unwrap().licence;
-    assert_eq!(a.meta.as_ref().unwrap().authors, ["A", "B"]);
+    let l = &a.avatar().and_then(|r| r.meta.as_ref()).unwrap().licence;
+    assert_eq!(a.avatar().and_then(|r| r.meta.as_ref()).unwrap().authors, ["A", "B"]);
     assert_eq!(
         (l.avatar_use, l.commercial, l.credit_required),
         (AvatarUse::OnlySeparatelyLicensed, Commercial::PersonalProfit, false)

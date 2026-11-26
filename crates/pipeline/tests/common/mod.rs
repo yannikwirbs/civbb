@@ -4,9 +4,9 @@ use std::cmp::Ordering;
 
 use civbb_client::Island;
 pub use civbb_client::parity::placed;
-use civbb_format::{Avatar, Caps, validate};
+use civbb_format::{Caps, Document, validate};
 
-pub fn valid(a: &Avatar) {
+pub fn valid(a: &Document) {
     if let Err(e) = validate(a, &Caps::default(), |_| true) {
         panic!("{e:?}");
     }
@@ -15,9 +15,9 @@ pub fn valid(a: &Avatar) {
 /// Steps one island per avatar through the same states as the parity renders (`civbb_client::parity::states`): the
 /// rest pose, then each of the first avatar's parameters set away from its default in turn. Calls `check` with the
 /// state number and the islands after each.
-pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &[Island])) {
+pub fn states(avatars: &[&Document], mut check: impl FnMut(usize, &[Island])) {
     // The parity stepper skips a parameter an avatar lacks; a stage must keep them all.
-    let names = |a: &Avatar| -> Vec<String> { a.state.entries.iter().map(|p| p.name.clone()).collect() };
+    let names = |a: &Document| -> Vec<String> { a.state.entries.iter().map(|p| p.name.clone()).collect() };
     for a in avatars {
         let have = names(a);
         assert!(
@@ -30,7 +30,7 @@ pub fn states(avatars: &[&Avatar], mut check: impl FnMut(usize, &[Island])) {
 }
 
 /// Steps both avatars through the same states and compares what they show.
-pub fn same_look(before: &Avatar, after: &Avatar, name: &str) {
+pub fn same_look(before: &Document, after: &Document, name: &str) {
     states(&[before, after], |state, i| {
         assert!(
             look(before, &i[0]) == look(after, &i[1]),
@@ -45,7 +45,7 @@ pub fn same_look(before: &Avatar, after: &Avatar, name: &str) {
 
 /// What an avatar shows: every visible triangle with its material, its vertices in world space after shape
 /// weights and skinning, sorted.
-pub fn look(avatar: &Avatar, island: &Island) -> Vec<(u32, [[f32; 3]; 3])> {
+pub fn look(avatar: &Document, island: &Island) -> Vec<(u32, [[f32; 3]; 3])> {
     let mut out = Vec::new();
     for (mesh, placed) in avatar.meshes.iter().zip(placed(avatar, island)) {
         if !island.active()[mesh.node as usize] {

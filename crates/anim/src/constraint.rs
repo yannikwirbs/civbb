@@ -3,7 +3,7 @@
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::constraint::{Constraint, ConstraintField, ConstraintKind, WorldUp};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform, Vec3};
@@ -25,7 +25,7 @@ pub struct Constraints {
     placed: Vec<NodeIndex>,
     /// Per constraint, the placed nodes below its target, parents first: re-placed after it moves the target.
     below: Vec<Vec<NodeIndex>>,
-    /// Per constraint in [`Avatar::constraints`] order, its place in `list`.
+    /// Per constraint in [`Document::constraints`] order, its place in `list`.
     index: Vec<usize>,
 }
 
@@ -76,7 +76,7 @@ impl Offsets {
 impl Constraints {
     /// Sorts a validated avatar's constraints. A constraint runs after every constraint whose target is (or is an
     /// ancestor of) a node it reads: its sources, its up node, its target. Ties and cycles keep list order.
-    pub fn new(avatar: &Avatar) -> Self {
+    pub fn new(avatar: &Document) -> Self {
         let parents: Vec<Option<NodeIndex>> = avatar.hierarchy.nodes.iter().map(|n| n.parent).collect();
         let list = &avatar.constraints;
         let mut by_target: HashMap<NodeIndex, Vec<usize>> = HashMap::new();
@@ -167,7 +167,7 @@ impl Constraints {
         }
     }
 
-    /// Sets an animated field of constraint `i` ([`Avatar::constraints`] order) for one island (ADR 0040). Flags are
+    /// Sets an animated field of constraint `i` ([`Document::constraints`] order) for one island (ADR 0040). Flags are
     /// on at 0.5 or more.
     pub fn set(&self, scratch: &mut Scratch, i: u32, field: ConstraintField, value: f32) {
         self.ready(scratch);

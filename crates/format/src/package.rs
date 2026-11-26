@@ -15,10 +15,10 @@ use std::collections::BTreeMap;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 
-use crate::avatar::Avatar;
 use crate::blob::BlobId;
 use crate::cbor::{self, CborError};
 use crate::cost::CostProfile;
+use crate::document::Document;
 
 const MAGIC: &[u8; 8] = b"CIVBBPKG";
 const CONTAINER_VERSION: u32 = 1;
@@ -53,7 +53,7 @@ pub struct Header {
     pub kind: ContentKind,
     /// Platform variant.
     pub platform: Platform,
-    /// The blob holding the CBOR-encoded root object (an [`Avatar`] for avatars).
+    /// The blob holding the CBOR-encoded root object (a [`crate::Document`]).
     pub root: BlobId,
     /// Measured cost; `None` before the measure stage has run.
     pub cost: Option<CostProfile>,
@@ -88,7 +88,7 @@ pub struct ReadLimits {
     pub max_blob_bytes: u64,
     /// Largest total of all blobs.
     pub max_total_bytes: u64,
-    /// Largest accepted root object (decoded with these bounds by [`Package::avatar`]).
+    /// Largest accepted root object (decoded with these bounds by [`Package::document`]).
     pub max_root_bytes: usize,
 }
 
@@ -155,15 +155,16 @@ impl Package {
         self.blobs.get(&id).map(Vec::as_slice)
     }
 
-    /// Builds an avatar package: stores `avatar` as the root blob. Texture blobs must already be added.
-    pub fn with_avatar(mut self, avatar: &Avatar) -> Self {
-        self.header.kind = ContentKind::Avatar;
-        self.header.root = self.add_blob(cbor::to_vec(avatar));
+    /// Stores `document` as the root blob and sets the content kind from its role. Texture blobs must already be
+    /// added.
+    pub fn with_document(mut self, document: &Document) -> Self {
+        self.header.kind = document.kind();
+        self.header.root = self.add_blob(cbor::to_vec(document));
         self
     }
 
-    /// Decodes the root blob as an [`Avatar`].
-    pub fn avatar(&self, limits: &ReadLimits) -> Result<Avatar, PackageError> {
+    /// Decodes the root blob as a [`Document`].
+    pub fn document(&self, limits: &ReadLimits) -> Result<Document, PackageError> {
         let root = self
             .blob(self.header.root)
             .ok_or(PackageError::MissingRoot(self.header.root))?;
@@ -313,7 +314,7 @@ mod tests {
         };
         let mut avatar = sample_avatar();
         avatar.textures[0].blob = pkg.add_blob(b"not really a png".to_vec());
-        let pkg = pkg.with_avatar(&avatar);
+        let pkg = pkg.with_document(&avatar);
         let bytes = pkg.encode_signed(&key());
         (pkg, bytes)
     }
@@ -328,8 +329,8 @@ mod tests {
         let back = decode(&bytes).unwrap();
         assert_eq!(back, pkg);
         assert_eq!(
-            back.avatar(&ReadLimits::default()).unwrap().textures[0].blob,
-            pkg.avatar(&ReadLimits::default()).unwrap().textures[0].blob
+            back.document(&ReadLimits::default()).unwrap().textures[0].blob,
+            pkg.document(&ReadLimits::default()).unwrap().textures[0].blob
         );
     }
 

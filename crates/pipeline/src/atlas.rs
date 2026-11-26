@@ -8,7 +8,7 @@ use std::io::Cursor;
 use civbb_format::animator::{MeshProperty, Target};
 use civbb_format::expressions::{ControlKind, Menu};
 use civbb_format::material::{ImageFormat, Material, MaterialModel, Texture, TextureSlot};
-use civbb_format::{Avatar, BlobId};
+use civbb_format::{BlobId, Document};
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use image::{ExtendedColorType, ImageEncoder, RgbaImage};
 
@@ -285,7 +285,7 @@ pub fn atlas(imported: &mut Imported, max_side: u32) -> Result<Atlased, String> 
 /// For each material, the size of its textures if it may be atlased (ADR 0029): repeated until every texture it
 /// uses is used only by eligible materials of its set and no vertex it draws maps elsewhere. Also each mesh's
 /// vertex UV tiles.
-fn eligible(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> (Vec<Option<Size>>, Vec<Vec<[f32; 2]>>) {
+fn eligible(a: &Document, blobs: &BTreeMap<BlobId, Vec<u8>>) -> (Vec<Option<Size>>, Vec<Vec<[f32; 2]>>) {
     let dims: Vec<Option<Size>> = a
         .textures
         .iter()
@@ -392,7 +392,7 @@ fn eligible(a: &Avatar, blobs: &BTreeMap<BlobId, Vec<u8>>) -> (Vec<Option<Size>>
                 }
             }
         }
-        if let Some(e) = &a.expressions {
+        if let Some(e) = a.avatar().and_then(|r| r.expressions.as_ref()) {
             icons(&e.menu, &mut |t| add(t, Use::Pinned));
         }
         for (k, m) in a.materials.iter().enumerate() {
@@ -549,7 +549,7 @@ fn compact(imported: &mut Imported) {
             }
         }
     }
-    if let Some(e) = &a.expressions {
+    if let Some(e) = a.avatar().and_then(|r| r.expressions.as_ref()) {
         icons(&e.menu, &mut |t| used[t as usize] = true);
     }
     let map = renumber(&used);
@@ -562,7 +562,7 @@ fn compact(imported: &mut Imported) {
             }
         }
     }
-    if let Some(e) = &mut a.expressions {
+    if let Some(e) = a.avatar_mut().and_then(|r| r.expressions.as_mut()) {
         remap_icons(&mut e.menu, &map);
     }
     let held: Vec<BlobId> = a.textures.iter().map(|t| t.blob).collect();
@@ -581,7 +581,7 @@ fn remap_icons(menu: &mut Menu, map: &[u32]) {
 }
 
 /// The materials material-slot curves swap in, as valid indices (the animator rejects the others).
-fn slot_materials(a: &Avatar) -> Vec<u32> {
+fn slot_materials(a: &Document) -> Vec<u32> {
     let n = a.materials.len();
     a.clips
         .iter()

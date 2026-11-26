@@ -7,13 +7,13 @@ use civbb_client::view::decode_textures;
 use civbb_format::cost::{Light, Parity};
 use civbb_format::material::MaterialModel;
 use civbb_format::package::Platform;
-use civbb_format::{Avatar, Package, ReadLimits, SigningKey};
+use civbb_format::{Document, Package, ReadLimits, SigningKey};
 use civbb_pipeline::{Imported, compile};
 
 const KEY: [u8; 32] = [7; 32];
 
 /// A corpus avatar as imported and as compiled, read back from its signed package.
-fn compiled(spec: &civbb_corpus::Spec) -> (Avatar, Avatar) {
+fn compiled(spec: &civbb_corpus::Spec) -> (Document, Document) {
     let source = civbb_corpus::generate(spec);
     let imported = Imported {
         avatar: source.clone(),
@@ -23,12 +23,12 @@ fn compiled(spec: &civbb_corpus::Spec) -> (Avatar, Avatar) {
     let (bytes, _) = compile(imported, Platform::Desktop, &SigningKey::from_bytes(&KEY), None, |_| {}).unwrap();
     let key = SigningKey::from_bytes(&KEY).verifying_key();
     let pkg = Package::decode_verified(&bytes, &key, &ReadLimits::default()).unwrap();
-    (source, pkg.avatar(&ReadLimits::default()).unwrap())
+    (source, pkg.document(&ReadLimits::default()).unwrap())
 }
 
 /// Parity of `test` against `reference`; `None` without a device.
-fn parity(reference: &Avatar, test: &Avatar) -> Option<Parity> {
-    let none = |a: &Avatar| decode_textures(a, |_| None);
+fn parity(reference: &Document, test: &Document) -> Option<Parity> {
+    let none = |a: &Document| decode_textures(a, |_| None);
     let (rt, tt) = (none(reference), none(test));
     let side = |avatar, textures| Side { avatar, textures };
     match parity::run(Reference::Package(side(reference, &rt)), side(test, &tt), None) {
@@ -64,12 +64,12 @@ fn lean_compiled_matches_its_import_in_every_state() {
 #[test]
 fn compiled_states_match_the_import() {
     let (source, compiled) = compiled(&civbb_corpus::bloated());
-    let names = |a: &Avatar| {
+    let names = |a: &Document| {
         let mut names = Vec::new();
         parity::states(&[a], &parity::toggles(a), |_, name, _| names.push(name.to_owned()));
         names
     };
-    let params = |a: &Avatar| a.state.entries.len();
+    let params = |a: &Document| a.state.entries.len();
     assert!(params(&compiled) > params(&source), "collapsing added a parameter");
     assert_eq!(names(&compiled), names(&source));
 }

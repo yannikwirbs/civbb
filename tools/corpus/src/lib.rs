@@ -2,7 +2,6 @@
 
 pub mod gltf;
 
-use civbb_format::Avatar;
 use civbb_format::animator::*;
 use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
 use civbb_format::dynamics::*;
@@ -13,6 +12,7 @@ use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, To
 use civbb_format::math::{Transform, Vec3};
 use civbb_format::mesh::{BlendShape, Mesh, ShapeDelta, Skin, Submesh};
 use civbb_format::state::{Entry, EntryIndex, EntryKind, StateTable, SyncMode};
+use civbb_format::{Avatar, Document, Role};
 
 /// What to generate.
 #[derive(Clone, Debug)]
@@ -386,7 +386,7 @@ fn toggle_clip(name: String, node: NodeIndex, on: bool) -> Clip {
 }
 
 /// Generates the avatar described by `spec`. Same spec, same avatar, on every platform.
-pub fn generate(spec: &Spec) -> Avatar {
+pub fn generate(spec: &Spec) -> Document {
     let mut rng = Rng(0x9e37_79b9_7f4a_7c15 ^ spec.name.len() as u64);
     let mut b = Builder {
         nodes: Vec::new(),
@@ -396,7 +396,6 @@ pub fn generate(spec: &Spec) -> Avatar {
     let armature = b.add("Armature", Some(root), [0.0; 3], true);
     let mut humanoid = Humanoid {
         bones: Vec::new(),
-        viewpoint: [0.0, 1.55, 0.08],
         muscle_frames: Vec::new(),
         human_scale: 0.0,
         center_of_mass: None,
@@ -746,42 +745,45 @@ pub fn generate(spec: &Spec) -> Avatar {
         }],
     };
 
-    Avatar {
+    Document {
         name: spec.name.clone(),
         hierarchy: Hierarchy { nodes: b.nodes },
-        humanoid: Some(humanoid),
         meshes,
-        // The first 15 shape keys on the body are the visemes, in legacy order.
-        face: Some(Face {
-            visemes: Viseme::ALL
-                .into_iter()
-                .zip(0..spec.shape_keys.min(15))
-                .map(|(v, shape)| {
-                    (
-                        v,
-                        vec![ShapeBind {
-                            mesh: 0,
-                            shape,
-                            weight: 1.0,
-                        }],
-                    )
-                })
-                .collect(),
-            blink: vec![],
-            eyes: None,
-        }),
-        meta: None,
         materials,
         textures: vec![],
         state: StateTable { entries },
         animator: Some(animator),
         clips,
-        expressions: Some(Expressions {
-            menu: Menu { controls: pages },
-        }),
         dynamics,
         contacts,
         constraints,
+        role: Role::Avatar(Avatar {
+            humanoid: Some(humanoid),
+            viewpoint: [0.0, 1.55, 0.08],
+            // The first 15 shape keys on the body are the visemes, in legacy order.
+            face: Some(Face {
+                visemes: Viseme::ALL
+                    .into_iter()
+                    .zip(0..spec.shape_keys.min(15))
+                    .map(|(v, shape)| {
+                        (
+                            v,
+                            vec![ShapeBind {
+                                mesh: 0,
+                                shape,
+                                weight: 1.0,
+                            }],
+                        )
+                    })
+                    .collect(),
+                blink: vec![],
+                eyes: None,
+            }),
+            expressions: Some(Expressions {
+                menu: Menu { controls: pages },
+            }),
+            meta: None,
+        }),
     }
 }
 

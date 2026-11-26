@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use civbb_format::Avatar;
+use civbb_format::Document;
 use civbb_format::dynamics::{ContactShape, ContactVolume, ReceiverKind};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Vec3};
@@ -69,7 +69,7 @@ pub struct ContactRig {
 
 impl ContactRig {
     /// Compiles a validated avatar's contacts.
-    pub fn new(avatar: &Avatar) -> Self {
+    pub fn new(avatar: &Document) -> Self {
         let c = &avatar.contacts;
         Self {
             senders: c
