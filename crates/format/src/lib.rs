@@ -15,6 +15,7 @@ pub mod material;
 pub mod math;
 pub mod mesh;
 pub mod meta;
+pub mod migrate;
 pub mod package;
 pub mod state;
 pub mod validate;

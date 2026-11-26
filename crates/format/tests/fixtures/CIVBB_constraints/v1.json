@@ -1,0 +1,135 @@
+{
+  "constraints": [
+    {
+      "active": true,
+      "axes": [
+        true,
+        false,
+        false
+      ],
+      "kind": {
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "type": "rotation"
+      },
+      "options": {
+        "freeze": false,
+        "local_space": false,
+        "rebake": false
+      },
+      "rest": {
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "translation": [
+          0.25,
+          0.0,
+          0.0
+        ]
+      },
+      "sources": [
+        {
+          "node": 11,
+          "offset": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "weight": 1.0
+        }
+      ],
+      "target": 10,
+      "weight": 0.5
+    },
+    {
+      "active": true,
+      "axes": [
+        true,
+        false,
+        false
+      ],
+      "kind": {
+        "offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "type": "rotation"
+      },
+      "options": {
+        "freeze": false,
+        "local_space": false,
+        "rebake": false
+      },
+      "rest": {
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "translation": [
+          -0.25,
+          0.0,
+          0.0
+        ]
+      },
+      "sources": [
+        {
+          "node": 16,
+          "offset": {
+            "rotation": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "translation": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "weight": 1.0
+        }
+      ],
+      "target": 15,
+      "weight": 0.5
+    }
+  ],
+  "version": 1
+}

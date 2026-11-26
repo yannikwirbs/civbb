@@ -1,0 +1,319 @@
+{
+  "expressions": {
+    "menu": {
+      "controls": [
+        {
+          "kind": {
+            "controls": [
+              {
+                "kind": {
+                  "type": "toggle"
+                },
+                "name": "Outfit_0",
+                "parameter": 0,
+                "sub_parameters": [],
+                "value": 1.0
+              },
+              {
+                "kind": {
+                  "type": "toggle"
+                },
+                "name": "Prop_0",
+                "parameter": 1,
+                "sub_parameters": [],
+                "value": 1.0
+              }
+            ],
+            "type": "sub_menu"
+          },
+          "name": "Page 0",
+          "sub_parameters": [],
+          "value": 0.0
+        }
+      ]
+    }
+  },
+  "face": {
+    "blink": [],
+    "visemes": [
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 0,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "sil"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 1,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "pp"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 2,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "ff"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 3,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "th"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 4,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "dd"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 5,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "kk"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 6,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "ch"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 7,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "ss"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 8,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "nn"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 9,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "rr"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 10,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "aa"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 11,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "e"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 12,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "i"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 13,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "o"
+      },
+      {
+        "binds": [
+          {
+            "mesh": 26,
+            "shape": 14,
+            "weight": 1.0
+          }
+        ],
+        "viseme": "u"
+      }
+    ]
+  },
+  "humanoid": {
+    "bones": [
+      {
+        "bone": "hips",
+        "node": 2
+      },
+      {
+        "bone": "spine",
+        "node": 3
+      },
+      {
+        "bone": "chest",
+        "node": 4
+      },
+      {
+        "bone": "neck",
+        "node": 5
+      },
+      {
+        "bone": "head",
+        "node": 6
+      },
+      {
+        "bone": "leftShoulder",
+        "node": 8
+      },
+      {
+        "bone": "leftUpperArm",
+        "node": 9
+      },
+      {
+        "bone": "leftLowerArm",
+        "node": 10
+      },
+      {
+        "bone": "leftHand",
+        "node": 11
+      },
+      {
+        "bone": "rightShoulder",
+        "node": 13
+      },
+      {
+        "bone": "rightUpperArm",
+        "node": 14
+      },
+      {
+        "bone": "rightLowerArm",
+        "node": 15
+      },
+      {
+        "bone": "rightHand",
+        "node": 16
+      },
+      {
+        "bone": "leftUpperLeg",
+        "node": 18
+      },
+      {
+        "bone": "leftLowerLeg",
+        "node": 19
+      },
+      {
+        "bone": "leftFoot",
+        "node": 20
+      },
+      {
+        "bone": "leftToes",
+        "node": 21
+      },
+      {
+        "bone": "rightUpperLeg",
+        "node": 22
+      },
+      {
+        "bone": "rightLowerLeg",
+        "node": 23
+      },
+      {
+        "bone": "rightFoot",
+        "node": 24
+      },
+      {
+        "bone": "rightToes",
+        "node": 25
+      }
+    ],
+    "human_scale": 0.0,
+    "muscle_frames": [
+      {
+        "bone": "hips",
+        "max": [
+          40.0,
+          30.0,
+          20.0
+        ],
+        "min": [
+          -40.0,
+          -30.0,
+          -20.0
+        ],
+        "post": [
+          0.6000000238418579,
+          0.0,
+          0.0,
+          0.800000011920929
+        ],
+        "pre": [
+          0.0,
+          0.6000000238418579,
+          0.0,
+          0.800000011920929
+        ],
+        "sign": [
+          1.0,
+          -1.0,
+          1.0
+        ],
+        "twist": 1.0
+      }
+    ]
+  },
+  "version": 1,
+  "viewpoint": [
+    0.0,
+    1.5499999523162842,
+    0.07999999821186066
+  ]
+}

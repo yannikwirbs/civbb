@@ -1,0 +1,29 @@
+{
+  "entries": [
+    {
+      "default": 1.0,
+      "external": true,
+      "kind": "bool",
+      "name": "Outfit_0",
+      "saved": true,
+      "sync": "owner"
+    },
+    {
+      "default": 0.0,
+      "external": true,
+      "kind": "bool",
+      "name": "Prop_0",
+      "saved": true,
+      "sync": "owner"
+    },
+    {
+      "default": 1.0,
+      "external": false,
+      "kind": "bool",
+      "name": "platform/grounded",
+      "saved": false,
+      "sync": "none"
+    }
+  ],
+  "version": 1
+}

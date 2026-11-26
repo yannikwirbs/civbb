@@ -110,11 +110,13 @@ Internal deps: none
 - `src/math.rs`: Plain math types used by the format: vectors, quaternions and transforms as arrays.
 - `src/mesh.rs`: Meshes: vertex streams, skinning, submeshes and sparse blendshapes.
 - `src/meta.rs`: Creator and licence metadata (VRM `meta`): who made an avatar and what others may do with it (ADR 0012).
+- `src/migrate.rs`: Per-extension versions of the `CIVBB_*` source extensions and the JSON migrations between them (ADR 0087).
 - `src/package.rs`: Runtime packages: a signed CBOR manifest followed by the BLAKE3-addressed blobs it lists.
 - `src/state.rs`: The document's state table (ADR 0088): typed entries every reader and writer references by index.
 - `src/validate/animator.rs`: Validation of clips and animator controllers: curves and keys, layers, states, transitions, blend trees and
 - `src/validate/avatar.rs`: Validation of the avatar role: humanoid map, viewpoint, face, expression menu and metadata.
 - `src/validate.rs`: Structural validation and hard caps for untrusted avatars. After [`validate`] passes, every index is in range.
+- `tests/migrate.rs`: Per-extension migrations (ADR 0087): a test-only chain moves a frozen fixture through two versions, versions
 
 ## `crates/pipeline` (civbb-pipeline)
 
@@ -157,6 +159,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `tests/lod.rs`: LOD chain (ADR 0031): levels fall in triangles within their error caps, keep submesh borders and UV seams, keep
 - `tests/material_records.rs`: The material records the renderer uploads (`civbb_render::material::pack`), pinned so a restructuring of the
 - `tests/merge.rs`: Mesh merging (ADR 0027): meshes always visible together merge and same-material submeshes join, everything
+- `tests/native_fixtures.rs`: Frozen `CIVBB_*` fixtures (ADR 0087 point 2): every version of every extension, with the newest of the others,
 - `tests/native_import.rs`: The native `CIVBB_*` extensions (ADRs 0086, 0101): the generated corpus round-trips through them, and
 - `tests/parity.rs`: FLIP parity on a device (ADR 0033): the lean and bloated corpus avatars after every compiler stage render like
 - `tests/prune.rs`: Pruning (ADR 0026): unused skin joints, unreferenced nodes and undriven blendshapes go; everything referenced,

@@ -1,0 +1,84 @@
+{
+  "receivers": [
+    {
+      "allow_others": true,
+      "allow_self": false,
+      "face": false,
+      "kind": "proximity",
+      "local_only": true,
+      "min_velocity": 0.0,
+      "tags": [
+        "Hand"
+      ],
+      "volume": {
+        "node": 6,
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "shape": {
+          "radius": 0.15000000596046448,
+          "type": "sphere"
+        }
+      }
+    }
+  ],
+  "senders": [
+    {
+      "local_only": false,
+      "tags": [
+        "Hand"
+      ],
+      "volume": {
+        "node": 11,
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "shape": {
+          "radius": 0.05000000074505806,
+          "type": "sphere"
+        }
+      }
+    },
+    {
+      "local_only": false,
+      "tags": [
+        "Hand"
+      ],
+      "volume": {
+        "node": 16,
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "shape": {
+          "radius": 0.05000000074505806,
+          "type": "sphere"
+        }
+      }
+    }
+  ],
+  "version": 1
+}

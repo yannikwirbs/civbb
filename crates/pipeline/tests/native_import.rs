@@ -132,7 +132,7 @@ fn hostile_native_extensions_are_rejected() {
     reject("CIVBB_avatar: no version", &|d| {
         d["extensions"] = json!({"CIVBB_avatar": {}})
     });
-    reject("CIVBB_state: this importer reads version 1", &|d| {
+    reject("CIVBB_state: version 2, this importer reads version 1 to 1", &|d| {
         d["extensions"] = json!({"CIVBB_state": {"version": 2, "entries": []}})
     });
     reject("CIVBB_dynamics", &|d| d["extensions"] = json!({"CIVBB_dynamics": []}));

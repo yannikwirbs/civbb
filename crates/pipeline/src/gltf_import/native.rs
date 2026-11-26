@@ -20,9 +20,6 @@ use serde_json::Value;
 
 use super::Importer;
 
-/// Newest version of every `CIVBB_*` extension this importer reads (ADR 0087; migrations come with version 2).
-const VERSION: u64 = 1;
-
 /// Root-level extensions.
 pub(super) const NAMES: [&str; 6] = [
     "CIVBB_avatar",
@@ -88,7 +85,8 @@ pub fn schemas() -> Vec<(&'static str, Value)> {
         s["title"] = name.into();
         // Unknown fields fail the import (ADR 0086 point 5); a flattened struct's schema does not say so itself.
         s["additionalProperties"] = false.into();
-        s["properties"]["version"] = serde_json::json!({"description": "Extension version (ADR 0087).", "type": "integer", "minimum": 1, "maximum": VERSION});
+        let newest = civbb_format::migrate::newest(name);
+        s["properties"]["version"] = serde_json::json!({"description": "Extension version (ADR 0087).", "type": "integer", "minimum": 1, "maximum": newest});
         if let Some(r) = s["required"].as_array_mut() {
             r.insert(0, "version".into());
         } else {
@@ -108,16 +106,10 @@ pub fn schemas() -> Vec<(&'static str, Value)> {
     ]
 }
 
-/// Parses one extension object after checking and removing its `version`.
+/// Parses one extension object after migrating it to the newest version (ADR 0087).
 fn parse<T: DeserializeOwned>(name: &str, v: &Value) -> Result<T, String> {
-    let mut v = v.clone();
-    let o = v.as_object_mut().ok_or_else(|| format!("{name}: not an object"))?;
-    match o.remove("version").map(|n| n.as_u64()) {
-        Some(Some(1..=VERSION)) => {}
-        Some(_) => return Err(format!("{name}: this importer reads version 1 to {VERSION}")),
-        None => return Err(format!("{name}: no version")),
-    }
-    T::deserialize(v).map_err(|e| format!("{name}: {e}"))
+    let o = civbb_format::migrate::migrate(name, v).map_err(|e| e.to_string())?;
+    T::deserialize(Value::Object(o)).map_err(|e| format!("{name}: {e}"))
 }
 
 impl Importer<'_> {
@@ -177,12 +169,11 @@ impl Importer<'_> {
             let Some(v) = m.extension_value("CIVBB_materials_toon") else {
                 continue;
             };
-            let mut v = v.clone();
-            let order = v.as_object_mut().and_then(|o| o.remove("order"));
-            let order = order.map_or(Ok(0), |n| {
-                i32::deserialize(n).map_err(|e| format!("CIVBB_materials_toon: {e}"))
-            })?;
-            let mut toon: Toon = parse("CIVBB_materials_toon", &v)?;
+            let name = "CIVBB_materials_toon";
+            let mut o = civbb_format::migrate::migrate(name, v).map_err(|e| e.to_string())?;
+            let order = o.remove("order").map_or(Ok(0), i32::deserialize);
+            let order = order.map_err(|e| format!("{name}: {e}"))?;
+            let mut toon = Toon::deserialize(Value::Object(o)).map_err(|e| format!("{name}: {e}"))?;
             for (slot, space) in toon_slots(&mut toon) {
                 let n = slot.texture;
                 let texture = (doc.textures().nth(n as usize))

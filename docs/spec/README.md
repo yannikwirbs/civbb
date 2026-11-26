@@ -23,8 +23,8 @@ The `CIVBB_` prefix is provisional until the platform's final name (#126).
 
 ## Rules for every extension
 
-1. **Version.** Every extension object has `"version"`, currently `1`. A reader refuses an object without one or with
-   a version newer than it reads, naming the extension (ADR 0087).
+1. **Version.** Every extension object has `"version"`, currently `1` for each. A reader migrates older versions to its
+   own and refuses an object without one or with a newer one, naming the extension (ADR 0087).
 2. **Unknown fields fail.** A field the extension's version does not define fails the import, at any depth.
 3. **One source kind.** A file carries `CIVBB_*`, VRM (`VRMC_*`) or Unity dialect 1 (`X_*`) extensions, never two
    kinds (ADR 0101 point 4).
@@ -73,4 +73,7 @@ found, each with a path (`constraints[3]: source node index 40 out of range (12)
 
 The schemas are generated from the Rust types: `cargo xtask schema` rewrites [`schema/`](schema/), and the gate fails
 while they are stale. A change to a type's shape bumps `FORMAT_VERSION`; a change to what an extension means or
-accepts also bumps that extension's `version` and adds a migration (ADR 0087).
+accepts, other than a new optional field whose default keeps the old behaviour, also bumps that extension's
+`version`: add a step to `civbb_format::migrate::STEPS` and a frozen fixture
+`crates/format/tests/fixtures/<extension>/v<N>.json` (ADR 0087). Fixtures are never edited; each version's fixture,
+with the newest of the others on `fixtures/host.glb`, must import and validate (`tests/native_fixtures.rs`).
