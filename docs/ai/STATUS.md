@@ -7,13 +7,15 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#124 (ADR 0086: serde shapes, `cargo xtask schema`, prose spec, `CIVBB_*` importer and writer), then #125 (events
-are Phase 2, #127). All model changes #113 to #123 have landed (format v35). For #124: `HumanBone` serialises
-camelCase on purpose (VRM's own names; a Unity name then fails to parse instead of shifting a thumb); keep it as
-the one exception or decide otherwise in its ADR. The toon features (ADR 0100) map one to one onto
-`CIVBB_materials_toon`. The fuzz crate is outside the gate: after a format API change run `cargo check
---manifest-path fuzz/Cargo.toml --bins`. Parity reruns are ~1 min with a warm texture cache (ADR 0097); last full run
-`corpus/local/unity-ref/scores/s123`.
+#124 continued, then #125 (events are Phase 2, #127). Done: ADR 0101 and the native `CIVBB_*` importer
+(`gltf_import/native.rs`); the corpus writes `CIVBB_*` (`to_source_glb`), round trip in `tests/native_import.rs`.
+**Uncommitted work lives on the local branch `wip/124-json-shapes`** (red, not pushed): the ADR 0086 point 3 JSON
+shapes (named fields instead of newtypes and tuples, snake_case, `type`-tagged enums, omitted `None`s,
+`deny_unknown_fields`) and the dialect-1 rewrite `gltf_import/unity_shapes.rs`; 18 tests still fail. Its state, the
+failing list and the verification plan (Debug dumps of the dialect fixtures before and after, then re-bless) are in
+the #124 comment of 2026-11-26. Rebase it on main, finish, write ADR 0102 (JSON rewrite of dialect 1 instead of
+copied types, superseding ADR 0085 point 2), bump FORMAT_VERSION to 36, then `schemars` + `cargo xtask schema` and
+`docs/spec/`. The fuzz crate is outside the gate: `cargo check --manifest-path fuzz/Cargo.toml --bins`.
 
 ## Now
 
@@ -36,15 +38,13 @@ the one exception or decide otherwise in its ADR. The toon features (ADR 0100) m
 
 ## Blockers and needs-user
 
+- #129 (found): contact volumes' `component` node is never remapped by the dialect importer or pruning.
 - #126 (needs-user, not blocking): register a glTF vendor prefix (`CIVBB_` is provisional until the final name, D9).
 
 ## Last sessions
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-26 (7): #121 native actions (`Action::Entries/PoseSource/LayerWeight/GroupWeight/Locomotion`, `EntryOp`)
-  and `State::unwritten: Hold | Rest`, `Mask`; format v32. Dialect 1 lowered by `unity_state::lower_states`, raised
-  back by the corpus writer. Goldens and parity s121 unchanged. Next: #122.
 - 2026-11-26 (8): #122 document root and VRM 1.0 bone names (format v34): `Document` + `Role::Avatar(Avatar {humanoid,
   viewpoint, face, expressions, meta})`, `Package::with_document`/`document`; `HumanBone` thumbs metacarpal,
   proximal, distal, camelCase serde; Unity names via `civbb_anim::muscle::unity_bone`. Dialect goldens equal after
@@ -53,3 +53,6 @@ The newest three; `SESSIONS.md` has them all.
   named features (ADRs 0090, 0100, format v35), `Material::order`; renderer records pinned first
   (`material_records.rs`) and byte-identical after, a black rim now packs power 0 (pixel-identical). Parity s123
   identical to s122 in every state. Next: #124.
+- 2026-11-26 (10): #124 part 1: ADR 0101 (`CIVBB_*` layout), native importer `gltf_import/native.rs`, corpus writes
+  `CIVBB_*` (dialect-1 writer removed), material-records golden re-blessed (lean-source now keeps its toon
+  materials). JSON shape change parked red on local branch `wip/124-json-shapes`. Found #129. Next: #124 continued.

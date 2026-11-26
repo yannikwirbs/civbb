@@ -47,3 +47,7 @@ run that takes minutes.
   forms (native `platform/` names lowered as-is): also assert on the raised text itself.
 - Waiting on a build log with `until grep -q 'error' ...`: `civbb build`'s lod line contains `error [...]` and ends
   the wait early. Match anchored, specific lines (`^stage seconds|^civbb:`).
+- A change of the format types' serde shapes reaches far beyond the format crate: Unity dialect 1, anim and dynamics
+  recordings, goldens and the corpus writer all parse or write that JSON. Before such a change, grep for
+  `serde_json::from_` of format types across every crate's tests, and capture a serde-independent pin (`{:?}` of the
+  imports) to compare after, so goldens can be re-blessed with evidence.
