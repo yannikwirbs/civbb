@@ -673,16 +673,19 @@
               },
               {
                 "in_tangent": 0.0,
-                "out_tangent": 0.25,
+                "out_tangent": 0.004363323096185923,
                 "time": 0.5,
-                "value": 1.0
+                "value": 0.01745329238474369
               }
             ],
             "target": {
               "Node": {
                 "node": 2,
                 "property": {
-                  "EulerRotation": 1
+                  "EulerRotation": {
+                    "axis": 1,
+                    "order": "Zxy"
+                  }
                 }
               }
             }

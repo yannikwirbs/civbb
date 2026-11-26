@@ -5,7 +5,7 @@
 //! `X_*` extensions (ADR 0041) for what glTF lacks.
 
 use civbb_format::Avatar;
-use civbb_format::animator::{HumanoidProperty, Key, MeshProperty, NodeProperty, Target};
+use civbb_format::animator::{EulerOrder, HumanoidProperty, Key, MeshProperty, NodeProperty, Target};
 use civbb_format::constraint::ConstraintType;
 use civbb_format::face::{EyeDriver, ShapeBind};
 use civbb_format::material::MaterialModel;
@@ -155,18 +155,22 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
                 o.remove("target");
                 o.insert("binding".into(), binding(a, &paths, &c.target));
                 // Dialect 1's units (the inverse of the importer's conversion).
-                let scale = match c.target {
+                let unit: Option<fn(f32) -> f32> = match c.target {
                     Target::Mesh {
                         property: MeshProperty::Weight(_),
                         ..
-                    } => 100.0,
-                    _ => 1.0,
+                    } => Some(|v| v * 100.0),
+                    Target::Node {
+                        property: NodeProperty::EulerRotation { .. },
+                        ..
+                    } => Some(f32::to_degrees),
+                    _ => None,
                 };
-                if scale != 1.0 {
+                if let Some(f) = unit {
                     let keys = c.keys.iter().map(|k| Key {
-                        value: k.value * scale,
-                        in_tangent: k.in_tangent * scale,
-                        out_tangent: k.out_tangent * scale,
+                        value: f(k.value),
+                        in_tangent: f(k.in_tangent),
+                        out_tangent: f(k.out_tangent),
                         ..*k
                     });
                     o.insert("keys".into(), json!(keys.collect::<Vec<_>>()));
@@ -241,7 +245,10 @@ fn binding(a: &Avatar, paths: &[String], t: &Target) -> Value {
             let p = match *property {
                 NodeProperty::Translation(i) => json!({"Position": i}),
                 NodeProperty::Rotation(i) => json!({"Rotation": i}),
-                NodeProperty::EulerRotation(i) => json!({"EulerRotation": i}),
+                NodeProperty::EulerRotation {
+                    axis,
+                    order: EulerOrder::Zxy,
+                } => json!({"EulerRotation": axis}),
                 NodeProperty::Scale(i) => json!({"Scale": i}),
                 NodeProperty::Active => json!("Active"),
             };

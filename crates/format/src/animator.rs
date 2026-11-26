@@ -447,12 +447,25 @@ pub enum NodeProperty {
     Translation(u8),
     /// Local rotation quaternion component (0 = x .. 3 = w).
     Rotation(u8),
-    /// Local Euler angle component in degrees about our axes, applied Z, X, Y (Unity `localEulerAnglesRaw`, ADR 0007).
-    EulerRotation(u8),
+    /// Local Euler angle component (0 = x, 1 = y, 2 = z) in radians about the node's axes, applied in `order`. A
+    /// node's Euler curves in one clip share an order.
+    EulerRotation {
+        /// Component.
+        axis: u8,
+        /// The order the three rotations apply in.
+        order: EulerOrder,
+    },
     /// Local scale component.
     Scale(u8),
     /// Active flag, 0 or 1.
     Active,
+}
+
+/// Orders of Euler rotations. One so far; others come with an importer whose source uses them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EulerOrder {
+    /// About Z, then X, then Y (`q = qy qx qz`; Unity's `localEulerAnglesRaw`, ADR 0007).
+    Zxy,
 }
 
 /// Animatable mesh instance properties.

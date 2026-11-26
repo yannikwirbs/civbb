@@ -30,9 +30,9 @@ impl V {
                     Target::Node { node, property } => {
                         self.index(*node as usize, a.hierarchy.nodes.len(), cp, "node");
                         match property {
-                            NodeProperty::Translation(i) | NodeProperty::EulerRotation(i) | NodeProperty::Scale(i) => {
-                                *i < 3
-                            }
+                            NodeProperty::Translation(i)
+                            | NodeProperty::EulerRotation { axis: i, .. }
+                            | NodeProperty::Scale(i) => *i < 3,
                             NodeProperty::Rotation(i) => *i < 4,
                             NodeProperty::Active => true,
                         }

@@ -4,14 +4,15 @@ use std::collections::{HashMap, HashSet};
 
 use civbb_format::Avatar;
 use civbb_format::animator::{
-    Animator, ClipIndex, Curve, HumanoidProperty, Key, MeshProperty, Motion, NodeProperty, Target as CurveTarget,
+    Animator, ClipIndex, Curve, EulerOrder, HumanoidProperty, Key, MeshProperty, Motion, NodeProperty,
+    Target as CurveTarget,
 };
 use civbb_format::constraint::ConstraintField;
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::mesh::MeshIndex;
 use civbb_format::state::{EntryIndex, EntryKind};
 
-use civbb_core::math::quat_to_euler;
+use civbb_core::math::quat_to_euler_zxy;
 
 use crate::body::{BodyRig, RootMotion};
 use crate::clip::{BodyCurves, BoundClip, BoundCurve, EulerCurves};
@@ -295,7 +296,7 @@ impl<'a> Binder<'a> {
                 }
                 out.quats.push(first);
             } else {
-                let rest = quat_to_euler(rest);
+                let rest = quat_to_euler_zxy(rest);
                 out.eulers.push(EulerCurves {
                     slot: first,
                     axes: [0, 1, 2].map(|i| r.euler[i].map_or_else(|| constant(rest[i]), <[Key]>::to_vec)),
@@ -347,7 +348,12 @@ impl<'a> Binder<'a> {
                 NodeProperty::Translation(i) => Target::Position(node, i),
                 NodeProperty::Scale(i) => Target::Scale(node, i),
                 NodeProperty::Rotation(i) => return Ok(Resolved::Rotation(node, false, i as usize)),
-                NodeProperty::EulerRotation(i) => return Ok(Resolved::Rotation(node, true, i as usize)),
+                NodeProperty::EulerRotation {
+                    axis,
+                    order: EulerOrder::Zxy,
+                } => {
+                    return Ok(Resolved::Rotation(node, true, axis as usize));
+                }
                 NodeProperty::Active => Target::Active(node),
             },
             CurveTarget::Mesh { mesh, property } => {

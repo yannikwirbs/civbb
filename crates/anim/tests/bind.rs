@@ -2,6 +2,8 @@
 //! constraint fields (ADR 0040).
 
 use civbb_anim::{Target, bind};
+use std::f32::consts::{FRAC_PI_2, PI};
+
 use civbb_core::math::{euler_to_quat, quat_to_euler};
 use civbb_format::Avatar;
 use civbb_format::animator::Target as CurveTarget;
@@ -274,10 +276,7 @@ fn partial_quaternion_curves_fill_from_rest_and_normalise() {
 #[test]
 fn euler_curves_write_the_quaternion_slots() {
     let a = avatar(vec![
-        clip(vec![curve(
-            on(ARM, NodeProperty::EulerRotation(1)),
-            &[(0.0, 0.0), (1.0, 180.0)],
-        )]),
+        clip(vec![curve(on(ARM, euler(1)), &[(0.0, 0.0), (1.0, PI)])]),
         clip(vec![curve(on(ARM, NodeProperty::Rotation(0)), &[(0.0, 0.0)])]),
     ]);
     let b = bind(&a);
@@ -291,10 +290,17 @@ fn euler_curves_write_the_quaternion_slots() {
     close(&out, &euler_to_quat([0.0, 90.0, 45.0]));
 }
 
+fn euler(axis: u8) -> NodeProperty {
+    NodeProperty::EulerRotation {
+        axis,
+        order: EulerOrder::Zxy,
+    }
+}
+
 #[test]
 fn quaternion_curves_win_over_euler_curves_on_one_node() {
     let a = avatar(vec![clip(vec![
-        curve(on(ARM, NodeProperty::EulerRotation(0)), &[(0.0, 90.0)]),
+        curve(on(ARM, euler(0)), &[(0.0, FRAC_PI_2)]),
         curve(on(ARM, NodeProperty::Rotation(3)), &[(0.0, 1.0)]),
     ])]);
     let b = bind(&a);

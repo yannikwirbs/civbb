@@ -127,7 +127,12 @@ pub fn slerp(a: Quat, b: Quat, t: f32) -> Quat {
 
 /// `[x, y, z]` degrees to a rotation about Z, then X, then Y: `q = qy * qx * qz`, Unity's Euler order (ADR 0007).
 pub fn euler_to_quat(deg: Vec3) -> Quat {
-    let [(sx, cx), (sy, cy), (sz, cz)] = deg.map(|d| (d.to_radians() * 0.5).sin_cos());
+    euler_zxy_to_quat(deg.map(f32::to_radians))
+}
+
+/// [`euler_to_quat`] in radians.
+pub fn euler_zxy_to_quat(rad: Vec3) -> Quat {
+    let [(sx, cx), (sy, cy), (sz, cz)] = rad.map(|r| (r * 0.5).sin_cos());
     // qy * qx, then * qz.
     let (x, y, z, w) = (cy * sx, sy * cx, -sy * sx, cy * cx);
     [x * cz + y * sz, y * cz - x * sz, w * sz + z * cz, w * cz - z * sz]
@@ -135,6 +140,11 @@ pub fn euler_to_quat(deg: Vec3) -> Quat {
 
 /// The inverse of [`euler_to_quat`] for a unit quaternion: `[x, y, z]` degrees, x in -90..=90.
 pub fn quat_to_euler(q: Quat) -> Vec3 {
+    quat_to_euler_zxy(q).map(f32::to_degrees)
+}
+
+/// [`quat_to_euler`] in radians.
+pub fn quat_to_euler_zxy(q: Quat) -> Vec3 {
     let [x, y, z, w] = q;
     // Rotation matrix entries of R = Ry * Rx * Rz.
     let r12 = 2.0 * (y * z - w * x);
@@ -151,7 +161,7 @@ pub fn quat_to_euler(q: Quat) -> Vec3 {
         let r20 = 2.0 * (x * z - w * y);
         ((-r20).atan2(r00), 0.0)
     };
-    [ax, ay, az].map(f32::to_degrees)
+    [ax, ay, az]
 }
 
 /// Column-major 4x4 matrix product `a * b`.

@@ -2,7 +2,7 @@
 
 use civbb_format::animator::Key;
 
-use civbb_core::math::{euler_to_quat, qnormalize};
+use civbb_core::math::{euler_zxy_to_quat, qnormalize};
 use civbb_format::math::{Quat, Vec3};
 
 use crate::bind::Slot;
@@ -56,7 +56,7 @@ impl BodyCurves {
     }
 }
 
-/// Euler angle curves of one node, in degrees about our axes, applied Z, then X, then Y (ADR 0007).
+/// Euler angle curves of one node, in radians about its axes, applied Z, then X, then Y (ADR 0007).
 #[derive(Clone, Debug, PartialEq)]
 pub struct EulerCurves {
     /// First of the node's 4 quaternion slots.
@@ -92,9 +92,9 @@ impl BoundClip {
             out[s + 3..s + 7].copy_from_slice(&pose.1);
         }
         for e in &self.eulers {
-            let deg = [0, 1, 2].map(|i| curve::eval(&e.axes[i], time));
+            let rad = [0, 1, 2].map(|i| curve::eval(&e.axes[i], time));
             let s = e.slot as usize;
-            out[s..s + 4].copy_from_slice(&euler_to_quat(deg));
+            out[s..s + 4].copy_from_slice(&euler_zxy_to_quat(rad));
         }
     }
 }

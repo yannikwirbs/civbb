@@ -4,7 +4,9 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use civbb_format::animator::{Clip, Curve, HumanoidProperty, Key, MeshProperty, NodeProperty, RootSettings, Target};
+use civbb_format::animator::{
+    Clip, Curve, EulerOrder, HumanoidProperty, Key, MeshProperty, NodeProperty, RootSettings, Target,
+};
 use civbb_format::constraint::{Constraint, ConstraintField, ConstraintType};
 use civbb_format::hierarchy::{Node, NodeIndex};
 use civbb_format::mesh::{Mesh, MeshIndex};
@@ -133,6 +135,7 @@ enum Unit {
     Same,
     /// Unity's 0 to 100 to 0 to 1.
     Percent,
+    Degrees,
 }
 
 impl Unit {
@@ -140,6 +143,7 @@ impl Unit {
         let f = |v: f32| match self {
             Unit::Same => v,
             Unit::Percent => v / 100.0,
+            Unit::Degrees => v.to_radians(),
         };
         Key {
             time: k.time,
@@ -153,6 +157,7 @@ impl Unit {
 fn target(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Result<(Target, Unit), &'static str> {
     let unit = match b.property {
         XProperty::BlendShape(_) => Unit::Percent,
+        XProperty::EulerRotation(_) => Unit::Degrees,
         _ => Unit::Same,
     };
     resolve(b, s, by_path).map(|t| (t, unit))
@@ -183,7 +188,10 @@ fn resolve(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Resu
     match b.property {
         XProperty::Position(i) => on_node(NodeProperty::Translation(i)),
         XProperty::Rotation(i) => on_node(NodeProperty::Rotation(i)),
-        XProperty::EulerRotation(i) => on_node(NodeProperty::EulerRotation(i)),
+        XProperty::EulerRotation(axis) => on_node(NodeProperty::EulerRotation {
+            axis,
+            order: EulerOrder::Zxy,
+        }),
         XProperty::Scale(i) => on_node(NodeProperty::Scale(i)),
         XProperty::Active => on_node(NodeProperty::Active),
         XProperty::RendererEnabled => on_mesh(MeshProperty::Visible),
