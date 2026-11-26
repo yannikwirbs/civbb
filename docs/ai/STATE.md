@@ -111,6 +111,15 @@ What exists, by area. Read the section for the area you touch; update it when th
   plus `version`, root `additionalProperties: false`) -> `docs/spec/schema/*.schema.json`; `tests/schema.rs` fails
   when stale (`cargo xtask schema` rewrites) and validates the corpus's `CIVBB_*` JSON (`jsonschema` dev-dep).
   Prose per extension in `docs/spec/` (README: common rules and the caps table).
+- Versions and migrations (ADR 0087, #125): `civbb_format::migrate` (`STEPS`: one `Step {extension, from, run}` per
+  breaking change on the JSON map; newest version = 1 + the extension's steps; `migrate` checks `version`, runs
+  the steps, returns the map without it; `MigrateError` names the extension). The importer's `parse` and the toon
+  path (migrate, then take `order`) go through it; the schemas' `version.maximum` is `newest`. Frozen fixtures
+  `format/tests/fixtures/<ext>/v<N>.json` plus `host.glb` (lean corpus avatar with actions, a muscle frame and a
+  platform entry, `CIVBB_*` stripped; the dynamics fixture has one hand-added chain). `pipeline/tests/
+  native_fixtures.rs` imports every version of each with the newest of the others (`CIVBB_node` on the first mesh
+  node, toon on every material); `format/tests/migrate.rs` runs a test-only v1 -> v2 -> v3 chain and checks one
+  fixture per version. Never edit a fixture; a new version adds a step and `v<N+1>.json`.
 - Native toon model (ADRs 0090, 0100, #123, format v35): `Toon` = base colour, shade colour/texture/shift/toony, plus
   optional features `light_clamp` (none: additive ambient), `normal`, `emission`, `matcaps` (list, at most
   `material::MATCAPS` = 2), `rim` (with its ramp), `rim_shade`, `shade` (second band, border), `color_adjust`,

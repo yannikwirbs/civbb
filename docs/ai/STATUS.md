@@ -7,12 +7,11 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#125 (per-extension versions, `civbb_format::migrate`, frozen v1 fixtures per extension; events are Phase 2, #127).
-#124 is closed: JSON shapes (ADR 0102, format v36), schemas `docs/spec/schema/` (`cargo xtask schema`; the importer's
-`parse` in `gltf_import/native.rs` is where `version` is checked today, so the migration hook goes there or in
-`civbb_format::migrate` called from it), prose `docs/spec/`. A v1 fixture per extension can start from the corpus's
-`to_source_glb` output (lean); the schema test already extracts extension JSON from a GLB. #129 is small and in the
-same importer area. The fuzz crate is outside the gate: `cargo check --manifest-path fuzz/Cargo.toml --bins`.
+M1.1's implementation issues are closed (#113 to #125, #129); open are only #100 (the umbrella) and #126
+(needs-user). Check #100's goals against what exists (events are Phase 2, #127), close it and the milestone, then start
+M1.2 ECS client runtime: file its issues from the design doc's sections (none exist yet) and take the first.
+Extension versions (#125): a breaking change to a `CIVBB_*` extension adds a step to `civbb_format::migrate::STEPS`
+and a frozen `crates/format/tests/fixtures/<ext>/v<N>.json`; never edit a fixture.
 
 ## Now
 
@@ -24,28 +23,24 @@ same importer area. The fuzz crate is outside the gate: `cargo check --manifest-
 - **M1.1 (#100) is designed**: ADRs 0085 to 0090, design doc §9. Done: #113 to #121 (state table ADR 0095, chain
   outputs, platform values ADR 0096, sync encoding ADR 0098, typed curve targets, native curve units and material
   fields ADR 0099, native actions and `unwritten`, document role and VRM 1.0 bone names, toon features ADR 0100;
-  #124 schemas and spec (ADR 0102); format v36: packages in corpus/local need `civbb build` again). #128: build-stage timings and the texture cache
+  #124 schemas and spec (ADR 0102); #125 per-extension migrations and frozen fixtures; format v36: packages in
+  corpus/local need `civbb build` again). #128: build-stage timings and the texture cache
   (ADR 0097).
 - Parity rerun after any change to materials, dynamics or the renderer: `tools/parity.sh --against <last run>
   <out dir>` (~1 min with a warm texture cache). The ADR 0084 table must not regress; Yumeka's rest worst view is 0.1197, 0.0003
-  under red. Last full run: `corpus/local/unity-ref/scores/s123` (#123): every state identical to s122.
+  under red. Last full run: `corpus/local/unity-ref/scores/s129` (#129): every report byte-identical to s123.
 - Session cost: ADRs 0091 and 0092 (2026-11-26). Measured over 9 sessions (`docs/iteration-baseline.md`): $5.5 and
   13.6 M cache-read tokens per closed issue, against $9.2 and 28.1 M before.
 - Toolchain: Rust 1.100.0, pinned by `rust-toolchain.toml` (ADR 0045).
 
 ## Blockers and needs-user
 
-- #129 (found): contact volumes' `component` node is never remapped by the dialect importer or pruning.
 - #126 (needs-user, not blocking): register a glTF vendor prefix (`CIVBB_` is provisional until the final name, D9).
 
 ## Last sessions
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-26 (9): fuzz CI fixed (targets still used `Avatar`/`p.avatar`). #123 toon materials as base fields plus
-  named features (ADRs 0090, 0100, format v35), `Material::order`; renderer records pinned first
-  (`material_records.rs`) and byte-identical after, a black rim now packs power 0 (pixel-identical). Parity s123
-  identical to s122 in every state. Next: #124.
 - 2026-11-26 (10): #124 part 1: ADR 0101 (`CIVBB_*` layout), native importer `gltf_import/native.rs`, corpus writes
   `CIVBB_*` (dialect-1 writer removed), material-records golden re-blessed (lean-source now keeps its toon
   materials). JSON shape change parked red on local branch `wip/124-json-shapes`. Found #129. Next: #124 continued.
@@ -53,3 +48,7 @@ The newest three; `SESSIONS.md` has them all.
   re-blessed; recordings, golden cases and unity-truth recorders converted, Goldens/Constraints re-recorded
   identically), ADR 0102, format v36; schemars schemas + `tests/schema.rs` + `cargo xtask schema`; toon material
   accepted unknown fields (flatten), fixed; `docs/spec/`. Parity not rerun (serde-only change). Next: #125.
+- 2026-11-27 (12): #125 closed: `civbb_format::migrate` (steps per extension, newest = 1 + steps, typed errors),
+  importer and schemas use it; frozen v1 fixtures + `host.glb`, test-only v1 -> v3 chain. #129 closed: contact
+  `component` remapped by the dialect importer and prune. Parity s129 byte-identical to s123. Next: close #100/M1.1,
+  file M1.2.
