@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use civbb_anim::muscle::{COUNT, find, mirror};
+use civbb_anim::muscle::{COUNT, find, mirror, property};
 use civbb_anim::{Controller, Instance, Target};
 use civbb_format::Avatar;
 use civbb_format::animator::Target as CurveTarget;
@@ -99,7 +99,7 @@ fn clip(curves: &[(&str, f32)]) -> Clip {
         curves: curves
             .iter()
             .map(|(m, v)| Curve {
-                target: CurveTarget::Humanoid(HumanoidProperty::Muscle((*m).into())),
+                target: CurveTarget::Humanoid(property(find(m).expect("a Unity muscle"))),
                 keys: vec![Key {
                     time: 0.0,
                     value: *v,

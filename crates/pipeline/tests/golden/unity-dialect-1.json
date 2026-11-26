@@ -731,7 +731,10 @@
             ],
             "target": {
               "Humanoid": {
-                "Muscle": "Left Arm Down-Up"
+                "Muscle": {
+                  "axis": 2,
+                  "bone": "LeftUpperArm"
+                }
               }
             }
           },

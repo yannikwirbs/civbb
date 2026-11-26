@@ -49,10 +49,7 @@ impl V {
                         }
                         true
                     }
-                    Target::Humanoid(HumanoidProperty::Muscle(s)) => {
-                        self.string(s, cp);
-                        true
-                    }
+                    Target::Humanoid(HumanoidProperty::Muscle { axis, .. }) => *axis < 3,
                     Target::Humanoid(HumanoidProperty::Body(i)) => *i < 7,
                     Target::Entry(e) => {
                         self.written(*e, cp, "entry");

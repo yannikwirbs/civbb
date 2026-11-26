@@ -486,8 +486,14 @@ pub enum MeshProperty {
 /// Animatable humanoid properties.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum HumanoidProperty {
-    /// A muscle, by Unity clip property name (`Left Arm Down-Up`, `LeftHand.Index.1 Stretched`; ADR 0014).
-    Muscle(String),
+    /// A muscle: the rotation of `bone` about one axis of its muscle frame, -1 to 1 over the muscle's range (ADR
+    /// 0014). The bones and axes that have muscles are listed in `civbb_anim::muscle::MUSCLES`.
+    Muscle {
+        /// The bone it turns.
+        bone: HumanBone,
+        /// Axis of the bone's muscle frame: 0 twist (X), 1 Y, 2 Z.
+        axis: u8,
+    },
     /// The body pose: position (0..3) or rotation (3..7) component (ADR 0063).
     Body(u8),
 }

@@ -419,7 +419,7 @@ fn key(value: f32) -> Vec<Key> {
 }
 
 fn muscle(name: &str) -> CurveTarget {
-    CurveTarget::Humanoid(HumanoidProperty::Muscle(name.into()))
+    CurveTarget::Humanoid(civbb_anim::muscle::property(find(name).expect("a Unity muscle")))
 }
 
 fn muscle_clip(curves: &[(CurveTarget, f32)]) -> Clip {
@@ -442,7 +442,14 @@ fn muscle_clip(curves: &[(CurveTarget, f32)]) -> Clip {
 fn muscle_curves_bind_to_slots_with_zero_defaults() {
     let clip = muscle_clip(&[
         (muscle("Left Arm Down-Up"), 1.0),
-        (muscle("Left Arm Up"), 1.0),
+        // The jaw has no muscle about X.
+        (
+            CurveTarget::Humanoid(HumanoidProperty::Muscle {
+                bone: HumanBone::Jaw,
+                axis: 0,
+            }),
+            1.0,
+        ),
         (muscle("Spine Front-Back"), 1.0),
         (CurveTarget::Humanoid(HumanoidProperty::Body(0)), 1.0),
     ]);

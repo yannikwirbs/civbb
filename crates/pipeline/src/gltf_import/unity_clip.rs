@@ -173,7 +173,10 @@ fn resolve(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Resu
             }
             return s.state.find(&name).map(Target::Entry).ok_or("no such parameter");
         }
-        XProperty::Muscle(name) => return Ok(Target::Humanoid(HumanoidProperty::Muscle(name))),
+        XProperty::Muscle(name) => {
+            let m = civbb_anim::muscle::find(&name).ok_or("no such muscle")?;
+            return Ok(Target::Humanoid(civbb_anim::muscle::property(m)));
+        }
         XProperty::RootMotion(i) => return Ok(Target::Humanoid(HumanoidProperty::Body(i))),
         XProperty::Component { .. } => return Err("unsupported component property"),
         _ => {}

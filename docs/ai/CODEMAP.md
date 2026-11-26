@@ -190,7 +190,7 @@ Internal deps: civbb-core, civbb-format
 
 Deterministic generator of synthetic test avatars (lean control and deliberately bloated), CC0.
 
-Internal deps: civbb-format
+Internal deps: civbb-anim, civbb-format
 
 - `src/gltf.rs`: Exports an avatar's node, mesh, skin and morph subset as GLB, the importer's test input.
 - `src/lib.rs`: Deterministic synthetic avatars: a lean control and a deliberately bloated worst case (design doc §21).

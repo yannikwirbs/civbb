@@ -264,7 +264,10 @@ fn binding(a: &Avatar, paths: &[String], t: &Target) -> Value {
             };
             (paths[m.node as usize].as_str(), p)
         }
-        Target::Humanoid(HumanoidProperty::Muscle(name)) => ("", json!({"Muscle": name})),
+        &Target::Humanoid(HumanoidProperty::Muscle { bone, axis }) => {
+            let m = civbb_anim::muscle::index(bone, axis).expect("a muscle");
+            ("", json!({"Muscle": civbb_anim::muscle::MUSCLES[m as usize].name}))
+        }
         Target::Humanoid(HumanoidProperty::Body(i)) => ("", json!({"RootMotion": i})),
         Target::Entry(e) => ("", json!({"Parameter": dialect(&a.state.entries[*e as usize].name)})),
         Target::Constraint { constraint, field } => {

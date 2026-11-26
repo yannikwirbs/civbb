@@ -1,14 +1,14 @@
 //! Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order,
 //! constraint fields (ADR 0040).
 
-use civbb_anim::{Target, bind};
 use std::f32::consts::{FRAC_PI_2, PI};
 
+use civbb_anim::{Target, bind};
 use civbb_core::math::{euler_to_quat, quat_to_euler};
 use civbb_format::Avatar;
 use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
-use civbb_format::hierarchy::{Hierarchy, Node};
+use civbb_format::hierarchy::{Hierarchy, HumanBone, Node};
 use civbb_format::math::{Quat, Transform};
 use civbb_format::mesh::{BlendShape, Mesh};
 use civbb_format::state::{Entry, EntryKind, StateTable};
@@ -160,7 +160,10 @@ fn reports_what_does_not_bind() {
         (curve(on(BODY, NodeProperty::Active), &[]), "no keys"),
         (
             curve(
-                CurveTarget::Humanoid(HumanoidProperty::Muscle("Jaw Close".into())),
+                CurveTarget::Humanoid(HumanoidProperty::Muscle {
+                    bone: HumanBone::Jaw,
+                    axis: 2,
+                }),
                 &[(0.0, 1.0)],
             ),
             "no muscle frames (#53)",

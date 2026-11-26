@@ -1,5 +1,6 @@
 //! Humanoid muscles: Unity's muscle table, and muscle values to human bones' local rotations (ADR 0014).
 
+use civbb_format::animator::HumanoidProperty;
 use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, NodeIndex};
 use civbb_format::math::Quat;
 
@@ -146,9 +147,25 @@ pub const MUSCLES: [Muscle; COUNT] = [
     m("RightHand.Little.3 Stretched", H::RightLittleDistal, 2, -45.0, 45.0),
 ];
 
-/// The muscle a clip property names.
+/// The muscle a Unity clip property names.
 pub fn find(name: &str) -> Option<u8> {
     MUSCLES.iter().position(|m| m.name == name).map(|i| i as u8)
+}
+
+/// The muscle that turns `bone` about `axis`.
+pub fn index(bone: HumanBone, axis: u8) -> Option<u8> {
+    (MUSCLES.iter())
+        .position(|m| m.bone == bone && m.axis == axis)
+        .map(|i| i as u8)
+}
+
+/// The curve property that drives muscle `m`.
+pub fn property(m: u8) -> HumanoidProperty {
+    let m = &MUSCLES[m as usize];
+    HumanoidProperty::Muscle {
+        bone: m.bone,
+        axis: m.axis,
+    }
 }
 
 /// Where a mirrored motion takes muscle `m` from (ADR 0060, recorded in Unity): the muscle and the sign its value

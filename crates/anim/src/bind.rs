@@ -330,8 +330,8 @@ impl<'a> Binder<'a> {
                 EntryKind::Float => Target::Parameter(*p),
                 _ => return Err("only float parameters can be animated"),
             },
-            CurveTarget::Humanoid(HumanoidProperty::Muscle(name)) => {
-                let m = muscle::find(name).ok_or("no such muscle")?;
+            &CurveTarget::Humanoid(HumanoidProperty::Muscle { bone, axis }) => {
+                let m = muscle::index(bone, axis).ok_or("no such muscle")?;
                 let rig = self.rig.as_ref().ok_or("no muscle frames (#53)")?;
                 if !rig.has(MUSCLES[m as usize].bone) {
                     return Err("no muscle frame for the muscle's bone");
