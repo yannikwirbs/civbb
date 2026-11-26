@@ -89,7 +89,7 @@ What exists, by area. Read the section for the area you touch; update it when th
 - Exporter (ADR 0038): UPM package `tools/unity-exporter` in this repo (not a separate repo), excluded from the
   workspace; README has the batch commands for both host projects.
 - Source extensions (ADR 0041, 0042, 0043): `X_*` payloads are the format types' serde JSON with glTF node indices
-  (`gltf_import/source.rs`), except `X_avatar` (`{humanoid, viewpoint, muscle_frames, face}`) and per-material
+  (`gltf_import/source.rs`), except `X_avatar` (`{humanoid, viewpoint, muscle_frames, face}`, bones by Unity `HumanBodyBones` name) and per-material
   `X_toon_material`; `extras.active: false` marks inactive nodes; a `null` key tangent is a step.
   `civbb_corpus::gltf::to_source_glb` writes them (round-trip test) except `X_toon_material` (a Unity property dump;
   hostile and mapping tests in `tests/unity_material.rs`). Fuzz seeds: `lean-source.glb` and `toon-materials.gltf`
@@ -120,7 +120,7 @@ What exists, by area. Read the section for the area you touch; update it when th
 - glTF input (ADR 0076): `KHR_mesh_quantization` accepted (integer attributes, morph deltas and animation outputs
   through the normalising accessor reader); required Draco or meshopt compression refused with an export hint.
 - State table (ADR 0088, 0095, 0096, 0098, #115 to #118, format v29): `civbb_format::state` (`StateTable`, `Entry {name, kind, default, range,
-  rest, sync, saved, external}`, `EntryIndex`), `Avatar::state`. Animator conditions, blend inputs, speed/offset/
+  rest, sync, saved, external}`, `EntryIndex`), `Document::state`. Animator conditions, blend inputs, speed/offset/
   time/mirror inputs, drivers, menu controls (`Option<EntryIndex>`, puppet axes `Vec<Option<_>>`), contact
   receivers and chain outputs (`Chain::outputs`, one per grabbed/posed/angle/stretch/squish; dialect 1's prefix
   resolves `<prefix>_IsGrabbed` etc.) reference entries; the animator has no parameter table and `Expressions` only the menu. The Unity
@@ -154,6 +154,14 @@ What exists, by area. Read the section for the area you touch; update it when th
   `LayerWeight`, `GroupWeight`, `Locomotion`; the layer mask is `animator::Mask`. Dialect 1's `write_defaults` and
   `behaviours` are rewritten by `unity_state::lower_states` (forked `XBehaviour`) before parsing; the corpus writer
   raises them back (`raise_states`). Runtime: `civbb_anim::action` (was `behaviour`), `Instance::pose_sources`.
+- Document root (ADR 0085 points 5 and 6, #122, format v34): `civbb_format::Document` holds the shared parts
+  (nodes, meshes, materials, textures, state, animator, clips, dynamics, contacts, constraints) and `role: Role`;
+  `Role::Avatar(Avatar {humanoid, viewpoint, face, expressions, meta})` (viewpoint left `Humanoid`). Access with
+  `doc.avatar()` / `avatar_mut()` (`Option`, so Phase 2's `Role::World` adds no panics); `Package::with_document`
+  sets the content kind from the role, `Package::document` decodes. Avatar-role checks in `validate/avatar.rs`.
+  `HumanBone` is VRM 1.0's set (thumb metacarpal, proximal, distal), serialised camelCase (`leftThumbMetacarpal`);
+  Unity names map by `civbb_anim::muscle::unity_bone(_name)` (Unity's thumb proximal is the metacarpal): X_avatar
+  (forked `XMuscleFrame`), VRM 0.x, the corpus writer and the Unity recordings in anim tests. VRM 1.0 parses as is.
 - Importer layout (health check): `gltf_import.rs` (entry, parsing, URI resolver, buffers, hierarchy) with
   `gltf_import/{material,mesh,animation,source,unity_clip,unity_material,unity_state}.rs` and `vrm.rs` (entry, humanoid, node constraints,
   first person) with `vrm/{springs,mtoon,expressions,meta}.rs`. vrm keeps its own `qmul`/`rotate`/`from_to` (core's

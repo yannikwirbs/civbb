@@ -24,7 +24,10 @@ Add a line to the matching file whenever something costs more than one attempt.
   command (create the manifest first); a non-crate directory under `tools/` must be in `[workspace] exclude`.
 - Write Rust and docs with the Write/Edit tools. Python run from a Bash heredoc turns backslash escapes inside normal
   strings into real characters (`\x02`, `\n` in a Rust literal, `\1` in a path), and a stray quote breaks the
-  heredoc. If Python must write them, use raw strings and check the output.
+  heredoc. Even a quoted `<<'EOF'` heredoc lost backslashes here, raw strings included (`r'\1'` arrived as byte
+  0x01 and was written into sources): write such scripts to the scratchpad with the Write tool and run them.
+- Scripted fixes keyed on compiler error lines: one fixer per build round. A second fixer in the same round reads
+  line numbers the first one shifted, and rerunning on an already fixed line wraps it again.
 - Python on Windows: `open()` defaults to cp1252 (replacements containing `§` silently fail to match) and `"w"`
   writes CRLF: use `encoding="utf-8", newline="\n"`. `str.replace` silently does nothing when the pattern is
   missing: `assert old in s` first, or use the Edit tool. Git Bash's `iconv` reports every file as invalid UTF-8;

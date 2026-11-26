@@ -187,9 +187,12 @@ Measured and dropped: turning off claude.ai connectors (`ENABLE_CLAUDEAI_MCP_SER
 first-call context by under 10 tokens; a hook logging tool output sizes would duplicate the transcripts; rust-lld was
 already slower (above); no subagent definitions (ADR 0092).
 
-Not measurable yet: tokens and dollars per closed issue. After about five sessions run
-`python tools/session-stats.py --since 2026-11-26` and compare with $9.2 and 28.1 M cache-read tokens per closed
-issue above. The session-shape simulation predicts 8 to 11 % from the 250 k limit alone.
+Per closed issue, measured 2026-11-26 with `python tools/session-stats.py --since 2026-11-26` over 9 sessions
+(#115 to #122 and #128; the last session before its end phase): $5.5 (fitted $49, Claude Code's own total $45)
+and 13.6 M cache-read tokens (122 M), against $9.2 and 28.1 M before: -40 % and -52 %. The simulation predicted 8
+to 11 % from the 250 k limit alone; the rest comes from one issue chain per session and the helpers above, and
+from M1.1's issues being more mechanical than Phase 0's. Peak context stayed under 256 k in every session; at
+these sizes the script finds a lower limit would cost more (150 k: +16 %, 200 k: +4 %).
 
 Recommendation, not applied (the owner's setting): thinking is 1.12 M of 2.95 M output tokens and stays in the
 context. Output is 20 % of the cost; trying `medium` effort on two or three sessions of mechanical issues, compared
