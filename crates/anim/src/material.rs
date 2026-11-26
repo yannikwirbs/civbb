@@ -3,7 +3,8 @@
 
 use civbb_format::material::{AlphaMode, Material, MaterialField, MaterialModel};
 
-/// The field's components as stored (unused ones 0), or `None` when the material has no such field.
+/// The field's components as stored (unused ones 0), or `None` when the material has no such field (a toon
+/// material lacks the fields of its absent features, ADR 0090).
 pub fn get(m: &Material, field: MaterialField) -> Option<[f32; 4]> {
     let mut out = [0.0; 4];
     let mut m = m.clone();
@@ -41,20 +42,20 @@ fn place(m: &mut Material, field: MaterialField) -> Option<&mut [f32]> {
         (F::BaseColor, Toon(t)) => &mut t.base_color,
         (F::BaseColor, Unlit(u)) => &mut u.color,
         (F::Emission, Pbr(p)) => &mut p.emissive,
-        (F::Emission, Toon(t)) => &mut t.emissive,
+        (F::Emission, Toon(t)) => &mut t.emission.as_mut()?.color,
         (F::ShadeColor, Toon(t)) => &mut t.shade_color,
-        (F::RimColor, Toon(t)) => &mut t.rim_color,
-        (F::OutlineColor, Toon(t)) => &mut t.outline_color,
+        (F::RimColor, Toon(t)) => &mut t.rim.as_mut()?.color,
+        (F::OutlineColor, Toon(t)) => &mut t.outline.as_mut()?.color,
         (F::Metallic, Pbr(p)) => one(&mut p.metallic),
         (F::Roughness, Pbr(p)) => one(&mut p.roughness),
         (F::NormalScale, Pbr(p)) => one(&mut p.normal_scale),
-        (F::NormalScale, Toon(t)) => one(&mut t.normal_scale),
+        (F::NormalScale, Toon(t)) => one(&mut t.normal.as_mut()?.scale),
         (F::ShadeShift, Toon(t)) => one(&mut t.shade_shift),
         (F::ShadeToony, Toon(t)) => one(&mut t.shade_toony),
-        (F::RimPower, Toon(t)) => one(&mut t.rim_power),
-        (F::MatcapStrength, Toon(t)) => one(&mut t.matcap_strength),
-        (F::LightMin, Toon(t)) => one(&mut t.light_min),
-        (F::LightMax, Toon(t)) => one(&mut t.light_max),
+        (F::RimPower, Toon(t)) => one(&mut t.rim.as_mut()?.power),
+        (F::MatcapStrength, Toon(t)) => one(&mut t.matcaps.first_mut()?.strength),
+        (F::LightMin, Toon(t)) => one(&mut t.light_clamp.as_mut()?.min),
+        (F::LightMax, Toon(t)) => one(&mut t.light_clamp.as_mut()?.max),
         (F::BaseColorTransform, Pbr(p)) => &mut p.base_color_tex.as_mut()?.scale_offset,
         (F::BaseColorTransform, Toon(t)) => &mut t.base_color_tex.as_mut()?.scale_offset,
         (F::BaseColorTransform, Unlit(u)) => &mut u.color_tex.as_mut()?.scale_offset,

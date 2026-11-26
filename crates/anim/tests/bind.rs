@@ -209,7 +209,7 @@ fn material_slots_bind_with_the_submesh_material_as_default_and_reject_other_ind
             }),
             alpha: AlphaMode::Opaque,
             double_sided: false,
-            render_queue: 2000,
+            order: 0,
         };
         a.materials = vec![unlit; 3];
         a.meshes[0].submeshes = [0, 1]

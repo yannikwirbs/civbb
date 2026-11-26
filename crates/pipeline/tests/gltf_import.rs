@@ -810,7 +810,7 @@ fn vrm0_imports() {
         panic!("not toon: {m:?}")
     };
     assert_eq!(
-        (m.alpha, m.double_sided, m.render_queue),
+        (m.alpha, m.double_sided, m.queue()),
         (AlphaMode::Mask { cutoff: 0.3 }, true, 2450)
     );
     assert!(
@@ -818,7 +818,7 @@ fn vrm0_imports() {
         "sRGB 0.5 linearised: {}",
         t.base_color[0]
     );
-    assert_eq!((t.outline_width, t.shade_toony), (0.005, 0.7));
+    assert_eq!((t.outline.unwrap().width, t.shade_toony), (0.005, 0.7));
 }
 
 #[test]
@@ -980,5 +980,5 @@ fn vrm1_imports() {
     let MaterialModel::Toon(t) = &a.materials[0].model else {
         panic!("not toon")
     };
-    assert_eq!((t.shade_color, t.outline_width), ([0.2, 0.3, 0.4], 0.002));
+    assert_eq!((t.shade_color, t.outline.unwrap().width), ([0.2, 0.3, 0.4], 0.002));
 }

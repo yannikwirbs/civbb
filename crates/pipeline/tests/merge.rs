@@ -83,7 +83,7 @@ fn avatar() -> Document {
         }),
         alpha,
         double_sided: false,
-        render_queue: 2000,
+        order: 0,
     };
     let curve = |target| Curve {
         target,

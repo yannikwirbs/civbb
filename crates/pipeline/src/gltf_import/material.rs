@@ -10,15 +10,12 @@ use super::Importer;
 impl Importer<'_> {
     pub(super) fn material(&mut self, m: &gltf::Material) -> Material {
         let pbr = m.pbr_metallic_roughness();
-        let (alpha, render_queue) = match m.alpha_mode() {
-            gltf::material::AlphaMode::Opaque => (AlphaMode::Opaque, 2000),
-            gltf::material::AlphaMode::Mask => (
-                AlphaMode::Mask {
-                    cutoff: m.alpha_cutoff().unwrap_or(0.5),
-                },
-                2450,
-            ),
-            gltf::material::AlphaMode::Blend => (AlphaMode::Blend, 3000),
+        let alpha = match m.alpha_mode() {
+            gltf::material::AlphaMode::Opaque => AlphaMode::Opaque,
+            gltf::material::AlphaMode::Mask => AlphaMode::Mask {
+                cutoff: m.alpha_cutoff().unwrap_or(0.5),
+            },
+            gltf::material::AlphaMode::Blend => AlphaMode::Blend,
         };
         let base_tex = pbr
             .base_color_texture()
@@ -55,7 +52,7 @@ impl Importer<'_> {
             model,
             alpha,
             double_sided: m.double_sided(),
-            render_queue,
+            order: 0,
         }
     }
 
@@ -176,7 +173,7 @@ impl Importer<'_> {
                 }),
                 alpha: AlphaMode::Opaque,
                 double_sided: false,
-                render_queue: 2000,
+                order: 0,
             });
             self.materials.len() as u32 - 1
         })

@@ -167,7 +167,7 @@ fn animated_materials_are_per_island() {
     }
     let k = animated[0].1.iter().position(|&m| m == used).unwrap();
     let emissive = |m: &Material| match &m.model {
-        MaterialModel::Toon(t) => t.emissive,
+        MaterialModel::Toon(t) => t.emission.expect("the corpus toons emit").color,
         _ => unreachable!("the corpus uses toon materials"),
     };
     islands[0].materials(&mut out);

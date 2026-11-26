@@ -5,8 +5,8 @@
 
 use civbb_format::Document;
 use civbb_format::material::{
-    AlphaMode, Matcap, MatcapBlend, Material, MaterialModel, Pbr, RimRamp, RimShade, ShadeBands, TextureSlot, Toon,
-    ToonLight, Unlit,
+    AlphaMode, ColorAdjust, Emission, LightClamp, Matcap, MatcapBlend, Material, MaterialModel, Outline, Pbr, Rim,
+    RimShade, Shade, TextureSlot, Toon, Unlit,
 };
 use civbb_format::math::Mat4;
 use civbb_format::mesh::{Mesh, Submesh};
@@ -58,7 +58,7 @@ fn material(model: MaterialModel, alpha: AlphaMode) -> Material {
         model,
         alpha,
         double_sided: false,
-        render_queue: 2000,
+        order: 0,
     }
 }
 
@@ -70,35 +70,19 @@ fn toon(base_color: [f32; 4], shade_color: [f32; 3], shade_shift: f32) -> Materi
     MaterialModel::Toon(Toon {
         base_color,
         base_color_tex: None,
-        normal_tex: None,
-        normal_scale: 1.0,
         shade_color,
         shade_tex: None,
         shade_shift,
         shade_toony: 0.9,
-        rim_color: [0.0; 3],
-        rim_power: 0.0,
+        light_clamp: None,
+        normal: None,
+        emission: None,
+        matcaps: Vec::new(),
+        rim: None,
         rim_shade: None,
-        rim_ramp: None,
-        shade_bands: None,
-        tone: None,
-        matcap_tex: None,
-        matcap_strength: 0.0,
-        matcap_blend: MatcapBlend::Add,
-        matcap_color: [1.0; 3],
-        matcap_mask_tex: None,
-        matcap_emission: 0.0,
-        second_matcap: None,
-        emissive: [0.0; 3],
-        emissive_tex: None,
-        emissive_main_strength: 0.0,
-        outline_width: 0.0,
-        outline_color: [0.0; 3],
-        outline_width_tex: None,
-        outline_tex: None,
-        light: ToonLight::Additive,
-        light_min: 0.0,
-        light_max: 1.0,
+        shade: None,
+        color_adjust: None,
+        outline: None,
     })
 }
 
@@ -329,8 +313,10 @@ fn toon_light_limits_bound_the_clamped_light() {
     let grey = |light_min, light_max| {
         let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
         if let MaterialModel::Toon(t) = &mut m {
-            t.light = ToonLight::Clamped;
-            (t.light_min, t.light_max) = (light_min, light_max);
+            t.light_clamp = Some(LightClamp {
+                min: light_min,
+                max: light_max,
+            });
         }
         material(m, AlphaMode::Opaque)
     };
@@ -370,12 +356,14 @@ fn toon_light_models_add_or_clamp_the_ambient() {
     let grey = |light| {
         let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.0; 3], 0.0);
         if let MaterialModel::Toon(t) = &mut m {
-            t.light = light;
+            t.light_clamp = light;
         }
         material(m, AlphaMode::Opaque)
     };
-    let additive = scene.add_material(&ctx, &grey(ToonLight::Additive), &[]).unwrap();
-    let clamped = scene.add_material(&ctx, &grey(ToonLight::Clamped), &[]).unwrap();
+    let additive = scene.add_material(&ctx, &grey(None), &[]).unwrap();
+    let clamped = scene
+        .add_material(&ctx, &grey(Some(LightClamp { min: 0.0, max: 1.0 })), &[])
+        .unwrap();
     let meshes = [
         quad([-3.0, 0.0], [-3.0, 3.0], 0.0, 0),
         quad([0.0, 3.0], [-3.0, 3.0], 0.0, 1),
@@ -426,12 +414,15 @@ fn matcaps_add_or_multiply() {
     let grey = |blend, matcap_color, matcap_mask_tex| {
         let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
         if let MaterialModel::Toon(t) = &mut m {
-            t.light = ToonLight::Clamped;
-            t.matcap_tex = slot(0);
-            t.matcap_strength = 1.0;
-            t.matcap_blend = blend;
-            t.matcap_color = matcap_color;
-            t.matcap_mask_tex = matcap_mask_tex;
+            t.light_clamp = Some(LightClamp { min: 0.0, max: 1.0 });
+            t.matcaps = vec![Matcap {
+                tex: slot(0),
+                strength: 1.0,
+                blend,
+                color: matcap_color,
+                mask_tex: matcap_mask_tex,
+                emission: 0.0,
+            }];
         }
         material(m, AlphaMode::Opaque)
     };
@@ -490,8 +481,7 @@ fn matcaps_replace_lit_and_emit_unlit() {
     let grey = |strength, emission, second: bool| {
         let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
         if let MaterialModel::Toon(t) = &mut m {
-            t.light = ToonLight::Clamped;
-            t.matcap_tex = tex;
+            t.light_clamp = Some(LightClamp { min: 0.0, max: 1.0 });
             let red = Matcap {
                 tex,
                 strength,
@@ -500,12 +490,15 @@ fn matcaps_replace_lit_and_emit_unlit() {
                 mask_tex: None,
                 emission,
             };
-            if second {
-                t.second_matcap = Some(red);
-            } else {
-                (t.matcap_blend, t.matcap_strength, t.matcap_emission) = (red.blend, strength, emission);
-                t.matcap_color = red.color;
-            }
+            let first = Matcap {
+                tex,
+                strength: 0.0,
+                blend: MatcapBlend::Add,
+                color: [1.0; 3],
+                mask_tex: None,
+                emission: 0.0,
+            };
+            t.matcaps = if second { vec![first, red] } else { vec![red] };
         }
         material(m, AlphaMode::Opaque)
     };
@@ -586,7 +579,7 @@ fn rim_shade_darkens_away_from_the_view_direction() {
     let grey = |rim_shade| {
         let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
         if let MaterialModel::Toon(t) = &mut m {
-            t.light = ToonLight::Clamped;
+            t.light_clamp = Some(LightClamp { min: 0.0, max: 1.0 });
             t.rim_shade = rim_shade;
         }
         material(m, AlphaMode::Opaque)
@@ -635,7 +628,7 @@ fn two_grey_toons(edit: [&dyn Fn(&mut Toon); 2], light_dir: [f32; 3]) -> Option<
     let ids = edit.map(|edit| {
         let mut m = toon([0.5, 0.5, 0.5, 1.0], [0.5; 3], 0.0);
         if let MaterialModel::Toon(t) = &mut m {
-            t.light = ToonLight::Clamped;
+            t.light_clamp = Some(LightClamp { min: 0.0, max: 1.0 });
             edit(t);
         }
         scene.add_material(&ctx, &material(m, AlphaMode::Opaque), &[]).unwrap()
@@ -658,7 +651,7 @@ fn two_grey_toons(edit: [&dyn Fn(&mut Toon); 2], light_dir: [f32; 3]) -> Option<
 
 #[test]
 fn shade_bands_mix_the_second_shadow_the_albedo_and_the_strength() {
-    let bands = ShadeBands {
+    let bands = Shade {
         strength: 1.0,
         main_strength: 0.0,
         second_color: [0.5; 3],
@@ -672,7 +665,7 @@ fn shade_bands_mix_the_second_shadow_the_albedo_and_the_strength() {
     let Some((left, right)) = two_grey_toons(
         [
             &|t| {
-                t.shade_bands = Some(ShadeBands {
+                t.shade = Some(Shade {
                     strength: 0.5,
                     main_strength: 1.0,
                     second_strength: 1.0,
@@ -681,7 +674,7 @@ fn shade_bands_mix_the_second_shadow_the_albedo_and_the_strength() {
             },
             &|t| {
                 t.shade_color = [1.0; 3];
-                t.shade_bands = Some(bands);
+                t.shade = Some(bands);
             },
         ],
         [0.0, 0.0, -1.0],
@@ -700,7 +693,9 @@ fn shade_bands_mix_the_second_shadow_the_albedo_and_the_strength() {
 
 #[test]
 fn rim_ramp_gates_and_tints_the_rim_and_emission_takes_the_albedo() {
-    let ramp = RimRamp {
+    let rim = Rim {
+        color: [0.5; 3],
+        power: 1.0,
         border: 0.0,
         blur: 0.0,
         shadow_mask: 1.0,
@@ -708,16 +703,14 @@ fn rim_ramp_gates_and_tints_the_rim_and_emission_takes_the_albedo() {
     };
     // Lit from the front; a zero-width ramp at 0 turns the rim fully on off-axis, at 1 off.
     let Some((left, right)) = two_grey_toons(
-        [
-            &|t| {
-                (t.rim_color, t.rim_power, t.rim_ramp) = ([0.5; 3], 1.0, Some(ramp));
-            },
-            &|t| {
-                (t.rim_color, t.rim_power) = ([0.5; 3], 1.0);
-                t.rim_ramp = Some(RimRamp { border: 1.0, ..ramp });
-                (t.emissive, t.emissive_main_strength) = ([0.2; 3], 1.0);
-            },
-        ],
+        [&|t| t.rim = Some(rim), &|t| {
+            t.rim = Some(Rim { border: 1.0, ..rim });
+            t.emission = Some(Emission {
+                color: [0.2; 3],
+                tex: None,
+                main_strength: 1.0,
+            });
+        }],
         [0.0, 0.0, 1.0],
     ) else {
         return;
@@ -731,8 +724,13 @@ fn rim_ramp_gates_and_tints_the_rim_and_emission_takes_the_albedo() {
 #[test]
 fn tone_correction_scales_the_base_texture() {
     // No texture samples white; value 0.5 halves it before the base colour 0.5.
-    let Some((left, right)) = two_grey_toons([&|t| t.tone = Some([0.0, 1.0, 0.5, 1.0]), &|_| {}], [0.0, 0.0, 1.0])
-    else {
+    let adjust = ColorAdjust {
+        hue: 0.0,
+        saturation: 1.0,
+        value: 0.5,
+        gamma: 1.0,
+    };
+    let Some((left, right)) = two_grey_toons([&|t| t.color_adjust = Some(adjust), &|_| {}], [0.0, 0.0, 1.0]) else {
         return;
     };
     assert_near(left, [64, 64, 64], 1, "value halved");
@@ -818,15 +816,17 @@ fn draws_toon_outlines_around_the_silhouette() {
     let magenta = scene.add_texture(&ctx, 1, 1, &[255, 0, 255, 255], false).unwrap();
     let mut model = toon([1.0, 1.0, 0.0, 1.0], [1.0, 1.0, 0.0], 0.0);
     if let MaterialModel::Toon(t) = &mut model {
-        t.outline_width = 0.3;
-        t.outline_color = [1.0, 1.0, 0.0];
         let slot = |texture| TextureSlot {
             texture,
             uv_set: 0,
             scale_offset: [1.0, 1.0, 0.0, 0.0],
         };
-        t.outline_width_tex = Some(slot(0));
-        t.outline_tex = Some(slot(1));
+        t.outline = Some(Outline {
+            width: 0.3,
+            color: [1.0, 1.0, 0.0],
+            width_tex: Some(slot(0)),
+            tex: Some(slot(1)),
+        });
     }
     let outlined = scene
         .add_material(&ctx, &material(model, AlphaMode::Opaque), &[white, magenta])

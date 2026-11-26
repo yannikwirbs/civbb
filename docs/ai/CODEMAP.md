@@ -310,6 +310,7 @@ Internal deps: none
 - `docs/adr/0097-texture-cache.md`: 0097: An opt-in cache of encoded textures, keyed by everything the bytes depend on
 - `docs/adr/0098-sync-encoding-per-entry.md`: 0098: The sync encoding of a state entry: ranges, unranged values and the exact midpoint
 - `docs/adr/0099-native-material-curves.md`: 0099: Material curves drive native fields; Unity's unanimated vector components are baked into materials
+- `docs/adr/0100-toon-features-presence.md`: 0100: When a toon feature is present, and what an absent one means
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

@@ -710,7 +710,7 @@
           }
         },
         "name": "Plain",
-        "render_queue": 2000
+        "order": 0
       }
     ],
     "meshes": [

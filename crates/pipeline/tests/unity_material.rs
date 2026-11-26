@@ -2,7 +2,8 @@
 //! each family's mapping to the native Toon, PBR and Unlit models, on hand-written saved properties.
 
 use base64::Engine;
-use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, RimRamp, Toon, ToonLight};
+use civbb_format::material::{AlphaMode, LightClamp, MatcapBlend, Material, MaterialModel, Rim, Toon};
+use civbb_format::math::Vec3;
 use civbb_pipeline::gltf_import::{Imported, Limits, import};
 use serde_json::{Value, json};
 
@@ -53,6 +54,21 @@ fn toon(m: &Material) -> &Toon {
     }
 }
 
+/// The emission colour; black without emission.
+fn emissive(t: &Toon) -> Vec3 {
+    t.emission.map_or([0.0; 3], |e| e.color)
+}
+
+/// The rim colour; black without a rim.
+fn rim_color(t: &Toon) -> Vec3 {
+    t.rim.map_or([0.0; 3], |r| r.color)
+}
+
+/// The outline width; 0 without an outline.
+fn outline_width(t: &Toon) -> f32 {
+    t.outline.map_or(0.0, |o| o.width)
+}
+
 fn close(a: f32, b: f32) -> bool {
     (a - b).abs() < 1e-5
 }
@@ -77,10 +93,7 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
             "_OutlineTex": tex([1.0, 1.0, 0.0, 0.0])},
     }));
     assert_eq!(m.name, "m");
-    assert_eq!(
-        (m.alpha, m.render_queue, m.double_sided),
-        (AlphaMode::Blend, 3000, true)
-    );
+    assert_eq!((m.alpha, m.queue(), m.double_sided), (AlphaMode::Blend, 3000, true));
     let t = toon(&m);
     let half = 0.21404114; // sRGB 0.5 in linear
     assert!(
@@ -94,28 +107,36 @@ fn liltoon_by_guid_maps_its_variant_and_enabled_features() {
     // MToon's shift -0.2 and toony 0.8.
     assert!(close(t.shade_color[0], half * half), "{:?}", t.shade_color);
     assert!(close(t.shade_shift, -0.2) && close(t.shade_toony, 0.8));
-    let bands = t.shade_bands.expect("shadow on");
+    let bands = t.shade.expect("shadow on");
     assert!(bands.strength == 0.5 && bands.main_strength == 0.0 && bands.second_border == 0.15);
     assert_eq!(t.shade_tex, t.base_color_tex, "no shadow texture: the main one");
     // The tint's alpha scales the strength; its colour tints the matcap.
-    assert!(t.matcap_tex.is_some() && close(t.matcap_strength, 0.35) && close(t.matcap_color[0], half));
-    assert!(t.matcap_mask_tex.is_some());
+    assert!(
+        t.matcaps.first().and_then(|m| m.tex).is_some()
+            && close(t.matcaps[0].strength, 0.35)
+            && close(t.matcaps[0].color[0], half)
+    );
+    assert!(t.matcaps[0].mask_tex.is_some());
     assert_eq!(
-        (t.light_min, t.light_max),
-        (0.05, 0.8),
+        t.light_clamp,
+        Some(LightClamp { min: 0.05, max: 0.8 }),
         "lilToon's light limits, the lower one by default"
     );
-    assert_eq!(t.matcap_blend, MatcapBlend::Add, "lilToon's default blend mode adds");
+    assert_eq!(
+        t.matcaps[0].blend,
+        MatcapBlend::Add,
+        "lilToon's default blend mode adds"
+    );
     let rim_shade = t.rim_shade.expect("rim shade on");
     assert!(close(rim_shade.color[0], half) && rim_shade.border == 0.6 && rim_shade.blur == 1.0);
     assert_eq!(
-        (t.rim_color, t.emissive),
+        (rim_color(t), emissive(t)),
         ([0.0; 3], [0.0; 3]),
         "rim and emission are off"
     );
-    assert!(t.normal_tex.is_none(), "normal map off");
-    assert!(close(t.outline_width, 0.001) && t.outline_color == [1.0, 0.0, 0.0]);
-    assert!(t.outline_tex.is_some(), "the outline colour times _OutlineTex");
+    assert!(t.normal.map(|n| n.tex).is_none(), "normal map off");
+    assert!(close(outline_width(t), 0.001) && t.outline.unwrap().color == [1.0, 0.0, 0.0]);
+    assert!(t.outline.unwrap().tex.is_some(), "the outline colour times _OutlineTex");
 }
 
 #[test]
@@ -127,19 +148,26 @@ fn liltoon_rim_and_emission_take_their_ramp_and_main_strength() {
         "colors": {"_Color": [0.5, 0.5, 0.5, 1], "_RimColor": [1, 1, 1, 0.5], "_EmissionColor": [1, 1, 1, 1]},
     }));
     let t = toon(&m);
+    let rim = t.rim.expect("rim on");
     assert_eq!(
-        t.rim_ramp,
-        Some(RimRamp {
+        Rim {
+            color: [0.0; 3],
+            power: 0.0,
+            ..rim
+        },
+        Rim {
+            color: [0.0; 3],
+            power: 0.0,
             border: 0.9,
             blur: 0.2,
             shadow_mask: 1.0,
             main_strength: 0.25
-        })
+        }
     );
-    assert!(close(t.rim_color[0], 0.5) && close(t.rim_power, 0.2));
+    assert!(close(rim.color[0], 0.5) && close(rim.power, 0.2));
     // The shader multiplies by the albedo, main texture included; the colour stays as saved.
-    assert!(t.emissive == [1.0; 3] && t.emissive_main_strength == 1.0);
-    assert!(t.shade_bands.is_none(), "shadow off");
+    assert!(emissive(t) == [1.0; 3] && t.emission.unwrap().main_strength == 1.0);
+    assert!(t.shade.is_none(), "shadow off");
 }
 
 #[test]
@@ -151,7 +179,8 @@ fn liltoon_tone_correction_needs_the_keyword_only_on_the_multi_shader() {
             "floats": {"_lilToonVersion": 45},
             "colors": {"_MainTexHSVG": hsvg},
         })))
-        .tone
+        .color_adjust
+        .map(|c| [c.hue, c.saturation, c.value, c.gamma])
     };
     assert_eq!(tone("lilToon", &[]), Some(hsvg), "as saved, not linearised");
     assert_eq!(tone("_lil/lilToonMulti", &[]), None);
@@ -166,10 +195,10 @@ fn liltoon_by_markers_takes_transparency_from_the_queue_and_leaves_the_outline_o
     }));
     let m = &imported.avatar.materials[0];
     assert_eq!(
-        (m.alpha, m.render_queue, m.double_sided),
+        (m.alpha, m.queue(), m.double_sided),
         (AlphaMode::Mask { cutoff: 0.3 }, 2450, false)
     );
-    assert_eq!(toon(m).outline_width, 0.0);
+    assert_eq!(outline_width(toon(m)), 0.0);
     assert!(
         imported
             .warnings
@@ -196,7 +225,11 @@ fn a_shader_name_wins_over_leftover_markers() {
     assert_eq!(m.alpha, AlphaMode::Blend);
     let t = toon(&m);
     assert_eq!(
-        (t.emissive, t.matcap_tex.is_none(), t.outline_width),
+        (
+            emissive(t),
+            t.matcaps.first().and_then(|m| m.tex).is_none(),
+            outline_width(t)
+        ),
         ([2.0; 3], true, 0.0)
     );
 }
@@ -204,14 +237,18 @@ fn a_shader_name_wins_over_leftover_markers() {
 #[test]
 fn unity_toon_families_clamp_the_light_while_mtoon_and_mobile_add_the_ambient() {
     // ADR 0050.
-    let light = |shader: &str| toon(&material(json!({"shader": shader, "render_queue": -1}))).light;
-    assert_eq!(light("VRM/MToon"), ToonLight::Additive);
-    assert_eq!(light("VRChat/Mobile/Toon Lit"), ToonLight::Additive);
+    let clamped = |shader: &str| {
+        toon(&material(json!({"shader": shader, "render_queue": -1})))
+            .light_clamp
+            .is_some()
+    };
+    assert!(!clamped("VRM/MToon"));
+    assert!(!clamped("VRChat/Mobile/Toon Lit"));
     for shader in [
         "Hidden/.poiyomi/• Poiyomi Toon •/Body",
         "UnityChanToonShader/Toon_DoubleShadeWithFeather",
     ] {
-        assert_eq!(light(shader), ToonLight::Clamped, "{shader}");
+        assert!(clamped(shader), "{shader}");
     }
 }
 
@@ -231,13 +268,13 @@ fn uts2_maps_shade_step_feather_and_outline() {
     // Shaded below half-Lambert 0.5, lit above 0.7: MToon's shift -0.2 and toony 0.8 (as lilToon's test).
     assert!(close(t.shade_shift, -0.2) && close(t.shade_toony, 0.8));
     // The second shade below 0.3 to 0.4: lilToon's second band, border 0.35 and blur 0.1.
-    let b = t.shade_bands.expect("second shade");
+    let b = t.shade.expect("second shade");
     assert_eq!(
         (b.second_color, b.second_strength, b.strength),
         ([1.0, 0.0, 0.0], 1.0, 1.0)
     );
     assert!(close(b.second_border, 0.35) && close(b.second_blur, 0.1) && b.border_color == [0.0; 3]);
-    assert!(close(t.outline_width, 0.002) && t.rim_color == [1.0, 0.0, 0.0] && m.double_sided);
+    assert!(close(outline_width(t), 0.002) && rim_color(t) == [1.0, 0.0, 0.0] && m.double_sided);
 }
 
 #[test]
@@ -260,8 +297,12 @@ fn standard_vrchat_mobile_unlit_and_unknown_shaders() {
     assert_eq!(m.alpha, AlphaMode::Mask { cutoff: 0.4 });
 
     let m = material(json!({"shader": "VRChat/Mobile/MatCap Lit", "textures": {"_MatCap": tex([1.0, 1.0, 0.0, 0.0])}}));
-    assert!(toon(&m).matcap_tex.is_some() && toon(&m).matcap_strength == 1.0);
-    assert_eq!(toon(&m).matcap_blend, MatcapBlend::Multiply, "MatCap Lit multiplies");
+    assert!(toon(&m).matcaps.first().and_then(|m| m.tex).is_some() && toon(&m).matcaps[0].strength == 1.0);
+    assert_eq!(
+        toon(&m).matcaps[0].blend,
+        MatcapBlend::Multiply,
+        "MatCap Lit multiplies"
+    );
 
     // Toon Lit and MatCap Lit are unshaded and have no colour or emission: leftovers of earlier
     // shaders are ignored (#101). Toon Standard keeps its emission.
@@ -272,14 +313,18 @@ fn standard_vrchat_mobile_unlit_and_unknown_shaders() {
         let t = toon(&m);
         assert_eq!((t.base_color, t.shade_color), ([1.0; 4], [1.0; 3]), "{shader}");
         assert_eq!(t.shade_tex, t.base_color_tex, "{shader}");
-        assert_eq!((t.emissive, t.emissive_tex), ([0.0; 3], None), "{shader}");
+        assert_eq!(
+            (emissive(t), t.emission.and_then(|e| e.tex)),
+            ([0.0; 3], None),
+            "{shader}"
+        );
     }
     let m = material(
         json!({"shader": "VRChat/Mobile/Toon Standard", "colors": leftovers, "textures": emission,
         "floats": {"_EmissionStrength": 1.5}}),
     );
-    assert_eq!(toon(&m).emissive, [1.5, 0.0, 0.0], "colour times strength");
-    assert!(toon(&m).emissive_tex.is_some());
+    assert_eq!(emissive(toon(&m)), [1.5, 0.0, 0.0], "colour times strength");
+    assert!(toon(&m).emission.and_then(|e| e.tex).is_some());
 
     let m = material(json!({"shader": "VRChat/Mobile/Particles/Additive"}));
     assert!(matches!(m.model, MaterialModel::Unlit(_)) && m.alpha == AlphaMode::Blend);
@@ -332,7 +377,7 @@ fn liltoon_emission_gradient_scales_the_emission_by_its_start() {
     let t = toon(&imported.avatar.materials[0]);
     // `[HDR]` 2 reaches the shader as saved (ADR 0062), times the averaged texel 0.5.
     let want = 2.0 * 0.5;
-    assert!(close(t.emissive[0], want), "{:?} != {want}", t.emissive);
+    assert!(close(emissive(t)[0], want), "{:?} != {want}", emissive(t));
 }
 
 #[test]
@@ -342,12 +387,16 @@ fn hdr_emission_colours_stay_as_saved_and_plain_ones_linearise() {
         "shader": "UnityChanToonShader/Toon_DoubleShadeWithFeather", "floats": {"_utsVersion": 2},
         "colors": {"_Emissive_Color": [0.5, 0.5, 0.5, 1]},
     }));
-    assert!(close(toon(&uts2).emissive[0], 0.5), "{:?}", toon(&uts2).emissive);
+    assert!(close(emissive(toon(&uts2))[0], 0.5), "{:?}", emissive(toon(&uts2)));
     let poiyomi = material(json!({
         "shader": "Hidden/.poiyomi/• Poiyomi Toon •/Body", "floats": {"_EnableEmission": 1},
         "colors": {"_EmissionColor": [0.5, 0.5, 0.5, 1]},
     }));
-    assert!(close(toon(&poiyomi).emissive[0], 0.5), "{:?}", toon(&poiyomi).emissive);
+    assert!(
+        close(emissive(toon(&poiyomi))[0], 0.5),
+        "{:?}",
+        emissive(toon(&poiyomi))
+    );
 }
 
 #[test]
@@ -368,30 +417,36 @@ fn poiyomi_matcaps_take_their_largest_weight_and_tint() {
         json!([]),
     );
     assert_eq!(
-        (t.matcap_blend, t.matcap_strength, t.matcap_emission),
+        (t.matcaps[0].blend, t.matcaps[0].strength, t.matcaps[0].emission),
         (MatcapBlend::Replace, 0.02, 0.01)
     );
-    assert!(close(t.matcap_color[0], 0.21404114 * 2.0) && t.matcap_mask_tex.is_some());
+    assert!(close(t.matcaps[0].color[0], 0.21404114 * 2.0) && t.matcaps[0].mask_tex.is_some());
     let t = matcap(json!({"_MatcapMultiply": 0.5}), json!([]));
-    assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Multiply, 0.5));
+    assert_eq!(
+        (t.matcaps[0].blend, t.matcaps[0].strength),
+        (MatcapBlend::Multiply, 0.5)
+    );
     let t = matcap(json!({"_MatcapAdd": 0.25, "_MatcapEmissionStrength": 0.5}), json!([]));
     assert_eq!(
-        (t.matcap_blend, t.matcap_strength, t.matcap_emission),
+        (t.matcaps[0].blend, t.matcaps[0].strength, t.matcaps[0].emission),
         (MatcapBlend::Add, 0.75, 0.0)
     );
     // KohzieBoi: a faint first matcap and a second that replaces and emits, under the keyword.
     let kohzie = json!({"_MatcapReplace": 0.02, "_Matcap2Enable": 1, "_Matcap2Replace": 1,
         "_Matcap2EmissionStrength": 1, "_Matcap2MaskUV": 1});
     let t = matcap(kohzie.clone(), json!(["COLOR_GRADING_HDR_3D"]));
-    assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Replace, 0.02));
-    let m = t.second_matcap.expect("second matcap");
+    assert_eq!(
+        (t.matcaps[0].blend, t.matcaps[0].strength),
+        (MatcapBlend::Replace, 0.02)
+    );
+    let m = t.matcaps[1];
     assert_eq!((m.blend, m.strength, m.emission), (MatcapBlend::Replace, 1.0, 1.0));
     assert_eq!(m.color, [1.0, 0.0, 0.0], "its own tint, intensity 1 by default");
     assert!(m.tex.is_some());
     assert_eq!(m.mask_tex.map(|s| s.uv_set), Some(1));
     let t = matcap(kohzie, json!([]));
     assert!(
-        t.second_matcap.is_none(),
+        (t.matcaps.len() < 2),
         "without the keyword the second matcap is compiled out"
     );
 }
@@ -407,9 +462,12 @@ fn poiyomi_slots_read_the_uv_set_their_uv_property_names() {
     }));
     let t = toon(&imported.avatar.materials[0]);
     let uv = |s: Option<civbb_format::material::TextureSlot>| s.expect("slot").uv_set;
-    assert_eq!([t.base_color_tex, t.emissive_tex, t.matcap_mask_tex].map(uv), [1, 1, 1]);
+    assert_eq!(
+        [t.base_color_tex, t.emission.and_then(|e| e.tex), t.matcaps[0].mask_tex].map(uv),
+        [1, 1, 1]
+    );
     assert_eq!(uv(t.shade_tex), 1, "the shade takes the main texture");
-    assert_eq!(uv(t.normal_tex), 0, "UV2 has no counterpart");
+    assert_eq!(uv(t.normal.map(|n| n.tex)), 0, "UV2 has no counterpart");
     assert!(
         imported.warnings.iter().any(|w| w.contains("_BumpMapUV")),
         "{:?}",
@@ -457,16 +515,16 @@ fn toon_standard_shades_by_its_ramp_with_an_albedo_coloured_shadow() {
     // `lerp(albedo * _ShadowAlbedo, 1, min(1, ramp + boost))` times the albedo: the shade colour times the main
     // texture times the albedo again, mixed in by one minus the darkest brightness (0.2 + 0.1).
     assert_eq!((t.shade_color, t.shade_tex), ([0.25; 3], t.base_color_tex));
-    let b = t.shade_bands.expect("ramp");
+    let b = t.shade.expect("ramp");
     assert!(close(b.main_strength, 1.0) && close(b.strength, 0.7), "{b:?}");
     assert_eq!((b.second_strength, b.border_color), (0.0, [0.0; 3]));
     // Dark up to half-Lambert 0.375, bright from 0.625: MToon's shift 0 and toony 0.75.
     assert!(close(t.shade_shift, 0.0) && close(t.shade_toony, 0.75), "{t:?}");
-    assert_eq!(t.light, ToonLight::Clamped, "_LimitBrightness defaults to on");
+    assert!(t.light_clamp.is_some(), "_LimitBrightness defaults to on");
     // Without a ramp (the shader's default is white) or with a flat one, the surface is unshaded.
     let t = standard(json!({"_LimitBrightness": 0}), false);
-    assert!(close(t.shade_bands.expect("ramp").strength, 0.0));
-    assert_eq!(t.light, ToonLight::Additive, "unlimited: light plus ambient, unclamped");
+    assert!(close(t.shade.expect("ramp").strength, 0.0));
+    assert_eq!(t.light_clamp, None, "unlimited: light plus ambient, unclamped");
 }
 
 #[test]
@@ -480,10 +538,13 @@ fn tsf_is_an_unlit_matcap_times_the_texture() {
     let t = toon(&m);
     // `_Color` tints only with `_COLOR_ON`; the light is exactly 1, so the shade is the lit colour.
     assert_eq!((t.base_color, t.shade_color), ([2.0, 2.0, 2.0, 1.0], [2.0; 3]));
-    assert_eq!((t.light, t.light_min, t.light_max), (ToonLight::Clamped, 1.0, 1.0));
-    assert!(t.base_color_tex.is_some() && t.matcap_tex.is_some());
-    assert_eq!((t.matcap_blend, t.matcap_strength), (MatcapBlend::Multiply, 1.0));
-    assert!(close(t.outline_width, 0.0012) && t.outline_color == [0.0; 3]);
+    assert_eq!(t.light_clamp, Some(LightClamp { min: 1.0, max: 1.0 }));
+    assert!(t.base_color_tex.is_some() && t.matcaps.first().and_then(|m| m.tex).is_some());
+    assert_eq!(
+        (t.matcaps[0].blend, t.matcaps[0].strength),
+        (MatcapBlend::Multiply, 1.0)
+    );
+    assert!(close(outline_width(t), 0.0012) && t.outline.unwrap().color == [0.0; 3]);
 
     let m = material(json!({
         "shader": "TSF/Base1", "keywords": ["_COLOR_ON"], "colors": {"_Color": [0, 0, 0, 1]},
@@ -492,5 +553,5 @@ fn tsf_is_an_unlit_matcap_times_the_texture() {
     let t = toon(&m);
     assert_eq!(t.base_color, [0.0, 0.0, 0.0, 1.0], "tinted");
     assert!(t.base_color_tex.is_none(), "no texture without _TEX_ON");
-    assert_eq!(t.outline_width, 0.0);
+    assert_eq!(outline_width(t), 0.0);
 }

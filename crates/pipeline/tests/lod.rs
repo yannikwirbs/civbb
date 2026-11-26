@@ -106,7 +106,7 @@ fn grid() -> Document {
         }),
         alpha: AlphaMode::Opaque,
         double_sided: false,
-        render_queue: 2000,
+        order: 0,
     };
     Document {
         hierarchy: Hierarchy {

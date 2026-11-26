@@ -8,7 +8,7 @@ use civbb_format::dynamics::*;
 use civbb_format::expressions::*;
 use civbb_format::face::{Face, ShapeBind, Viseme};
 use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, Node, NodeIndex};
-use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, Toon, ToonLight};
+use civbb_format::material::{AlphaMode, Emission, Material, MaterialModel, Toon};
 use civbb_format::math::{Transform, Vec3};
 use civbb_format::mesh::{BlendShape, Mesh, ShapeDelta, Skin, Submesh};
 use civbb_format::state::{Entry, EntryIndex, EntryKind, StateTable, SyncMode};
@@ -323,39 +323,28 @@ fn toon(name: &str, color: [f32; 4]) -> Material {
         model: MaterialModel::Toon(Toon {
             base_color: color,
             base_color_tex: None,
-            normal_tex: None,
-            normal_scale: 1.0,
             shade_color: [color[0] * 0.7, color[1] * 0.6, color[2] * 0.7],
             shade_tex: None,
             shade_shift: 0.0,
             shade_toony: 0.9,
-            rim_color: [0.0; 3],
-            rim_power: 3.0,
+            light_clamp: None,
+            normal: None,
+            // Black: the clips animate it.
+            emission: Some(Emission {
+                color: [0.0; 3],
+                tex: None,
+                main_strength: 0.0,
+            }),
+            matcaps: Vec::new(),
+            rim: None,
             rim_shade: None,
-            rim_ramp: None,
-            shade_bands: None,
-            tone: None,
-            matcap_tex: None,
-            matcap_strength: 0.0,
-            matcap_blend: MatcapBlend::Add,
-            matcap_color: [1.0; 3],
-            matcap_mask_tex: None,
-            matcap_emission: 0.0,
-            second_matcap: None,
-            emissive: [0.0; 3],
-            emissive_tex: None,
-            emissive_main_strength: 0.0,
-            outline_width: 0.0,
-            outline_color: [0.0; 3],
-            outline_width_tex: None,
-            outline_tex: None,
-            light: ToonLight::Additive,
-            light_min: 0.0,
-            light_max: 1.0,
+            shade: None,
+            color_adjust: None,
+            outline: None,
         }),
         alpha: AlphaMode::Opaque,
         double_sided: false,
-        render_queue: 2000,
+        order: 0,
     }
 }
 

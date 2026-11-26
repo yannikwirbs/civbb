@@ -2,7 +2,7 @@
 //! into runs, and the reverse-Z projection.
 
 use civbb_format::material::{
-    AlphaMode, MatcapBlend, Material, MaterialModel, Pbr, TextureSlot, Toon, ToonLight, Unlit,
+    AlphaMode, Matcap, MatcapBlend, Material, MaterialModel, Outline, Pbr, Rim, TextureSlot, Toon, Unlit,
 };
 use civbb_render::material::{MATERIAL_WORDS, NONE, PipelineKey, Shader, pack};
 use civbb_render::{Batches, Draw, MaterialId, View, batch};
@@ -16,7 +16,7 @@ fn unlit(alpha: AlphaMode, double_sided: bool) -> Material {
         }),
         alpha,
         double_sided,
-        render_queue: 2000,
+        order: 0,
     }
 }
 
@@ -76,7 +76,7 @@ fn material_records() {
         }),
         alpha: AlphaMode::Mask { cutoff: 0.4 },
         double_sided: false,
-        render_queue: 2450,
+        order: 0,
     };
     // Texture 7 does not exist: its slot gets none.
     let r = pack(&pbr, &[10, 11]);
@@ -93,39 +93,37 @@ fn material_records() {
         model: MaterialModel::Toon(Toon {
             base_color: [1.0; 4],
             base_color_tex: None,
-            normal_tex: None,
-            normal_scale: 1.0,
             shade_color: [0.2, 0.3, 0.4],
             shade_tex: tex(0, 0),
             shade_shift: -0.25,
             shade_toony: 0.9,
-            rim_color: [0.5, 0.5, 0.5],
-            rim_power: 3.0,
+            light_clamp: None,
+            normal: None,
+            emission: None,
+            matcaps: vec![Matcap {
+                tex: tex(1, 0),
+                strength: 0.5,
+                blend: MatcapBlend::Add,
+                color: [1.0; 3],
+                mask_tex: None,
+                emission: 0.0,
+            }],
+            rim: Some(Rim {
+                color: [0.5, 0.5, 0.5],
+                power: 3.0,
+                border: 0.5,
+                blur: 1.0,
+                shadow_mask: 0.0,
+                main_strength: 0.0,
+            }),
             rim_shade: None,
-            rim_ramp: None,
-            shade_bands: None,
-            tone: None,
-            matcap_tex: tex(1, 0),
-            matcap_strength: 0.5,
-            matcap_blend: MatcapBlend::Add,
-            matcap_color: [1.0; 3],
-            matcap_mask_tex: None,
-            matcap_emission: 0.0,
-            second_matcap: None,
-            emissive: [0.0; 3],
-            emissive_tex: None,
-            emissive_main_strength: 0.0,
-            outline_width: 0.0,
-            outline_color: [0.0; 3],
-            outline_width_tex: None,
-            outline_tex: None,
-            light: ToonLight::Additive,
-            light_min: 0.0,
-            light_max: 1.0,
+            shade: None,
+            color_adjust: None,
+            outline: None,
         }),
         alpha: AlphaMode::Opaque,
         double_sided: true,
-        render_queue: 2000,
+        order: 0,
     };
     let r = pack(&toon, &[10, 11]);
     assert_eq!(f(&r[8..12]), [0.2, 0.3, 0.4, 0.0]);
@@ -151,43 +149,32 @@ fn outlined_toon_materials_add_an_outline_draw() {
     m.model = MaterialModel::Toon(Toon {
         base_color: [1.0; 4],
         base_color_tex: None,
-        normal_tex: None,
-        normal_scale: 1.0,
         shade_color: [0.0; 3],
         shade_tex: None,
         shade_shift: 0.0,
         shade_toony: 0.9,
-        rim_color: [0.0; 3],
-        rim_power: 0.0,
+        light_clamp: None,
+        normal: None,
+        emission: None,
+        matcaps: Vec::new(),
+        rim: None,
         rim_shade: None,
-        rim_ramp: None,
-        shade_bands: None,
-        tone: None,
-        matcap_tex: None,
-        matcap_strength: 0.0,
-        matcap_blend: MatcapBlend::Add,
-        matcap_color: [1.0; 3],
-        matcap_mask_tex: None,
-        matcap_emission: 0.0,
-        second_matcap: None,
-        emissive: [0.0; 3],
-        emissive_tex: None,
-        emissive_main_strength: 0.0,
-        outline_width: 0.002,
-        outline_color: [0.1, 0.2, 0.3],
-        outline_width_tex: Some(TextureSlot {
-            texture: 1,
-            uv_set: 1,
-            scale_offset: [2.0, 3.0, 0.25, 0.5],
+        shade: None,
+        color_adjust: None,
+        outline: Some(Outline {
+            width: 0.002,
+            color: [0.1, 0.2, 0.3],
+            width_tex: Some(TextureSlot {
+                texture: 1,
+                uv_set: 1,
+                scale_offset: [2.0, 3.0, 0.25, 0.5],
+            }),
+            tex: Some(TextureSlot {
+                texture: 0,
+                uv_set: 0,
+                scale_offset: [1.0, 1.0, 0.0, 0.0],
+            }),
         }),
-        outline_tex: Some(TextureSlot {
-            texture: 0,
-            uv_set: 0,
-            scale_offset: [1.0, 1.0, 0.0, 0.0],
-        }),
-        light: ToonLight::Additive,
-        light_min: 0.0,
-        light_max: 1.0,
     });
     let r = pack(&m, &[10, 11]);
     assert_eq!(f(&r[72..76]), [0.1, 0.2, 0.3, 0.002]);
@@ -229,7 +216,7 @@ fn draw(first_index: u32, material: &Material, index: u32, distance: f32) -> Dra
         material: MaterialId {
             index,
             key: PipelineKey::of(material),
-            queue: material.render_queue,
+            queue: material.queue(),
             outline: PipelineKey::outline(material),
         },
         distance,
@@ -242,7 +229,7 @@ fn opaque_runs_by_pipeline_then_blended_back_to_front() {
     let two_sided = unlit(AlphaMode::Opaque, true);
     let blend = unlit(AlphaMode::Blend, false);
     let mut late_blend = unlit(AlphaMode::Blend, true);
-    late_blend.render_queue = 3100;
+    late_blend.order = 100;
     let mut draws = vec![
         draw(0, &blend, 2, 1.0),
         draw(3, &two_sided, 1, 5.0),

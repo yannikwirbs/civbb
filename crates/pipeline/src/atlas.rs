@@ -40,33 +40,42 @@ pub struct Atlased {
 }
 
 /// A material's texture slots in a fixed order, each with whether it is sampled by UV (matcaps are sampled by
-/// normal).
-fn slots(m: &mut MaterialModel) -> Vec<(&mut Option<TextureSlot>, bool)> {
+/// normal). A toon's first matcap and its features' slots have places even when absent.
+fn slots(m: &mut MaterialModel) -> Vec<(Option<&mut TextureSlot>, bool)> {
     match m {
         MaterialModel::Pbr(p) => vec![
-            (&mut p.base_color_tex, true),
-            (&mut p.metallic_roughness_tex, true),
-            (&mut p.normal_tex, true),
-            (&mut p.occlusion_tex, true),
-            (&mut p.emissive_tex, true),
+            (p.base_color_tex.as_mut(), true),
+            (p.metallic_roughness_tex.as_mut(), true),
+            (p.normal_tex.as_mut(), true),
+            (p.occlusion_tex.as_mut(), true),
+            (p.emissive_tex.as_mut(), true),
         ],
         MaterialModel::Toon(t) => {
+            let mut matcaps = t.matcaps.iter_mut();
+            let (matcap_tex, matcap_mask) = match matcaps.next() {
+                Some(m) => (m.tex.as_mut(), m.mask_tex.as_mut()),
+                None => (None, None),
+            };
+            let (outline_width, outline_tex) = match &mut t.outline {
+                Some(o) => (o.width_tex.as_mut(), o.tex.as_mut()),
+                None => (None, None),
+            };
             let mut slots = vec![
-                (&mut t.base_color_tex, true),
-                (&mut t.normal_tex, true),
-                (&mut t.shade_tex, true),
-                (&mut t.matcap_tex, false),
-                (&mut t.matcap_mask_tex, true),
-                (&mut t.emissive_tex, true),
-                (&mut t.outline_width_tex, true),
-                (&mut t.outline_tex, true),
+                (t.base_color_tex.as_mut(), true),
+                (t.normal.as_mut().map(|n| &mut n.tex), true),
+                (t.shade_tex.as_mut(), true),
+                (matcap_tex, false),
+                (matcap_mask, true),
+                (t.emission.as_mut().and_then(|e| e.tex.as_mut()), true),
+                (outline_width, true),
+                (outline_tex, true),
             ];
-            if let Some(m) = &mut t.second_matcap {
-                slots.extend([(&mut m.tex, false), (&mut m.mask_tex, true)]);
+            for m in matcaps {
+                slots.extend([(m.tex.as_mut(), false), (m.mask_tex.as_mut(), true)]);
             }
             slots
         }
-        MaterialModel::Unlit(u) => vec![(&mut u.color_tex, true)],
+        MaterialModel::Unlit(u) => vec![(u.color_tex.as_mut(), true)],
     }
 }
 
@@ -76,7 +85,7 @@ fn uv_slots(m: &Material) -> Vec<Option<TextureSlot>> {
     slots(&mut model)
         .into_iter()
         .filter(|(_, uv)| *uv)
-        .map(|(s, _)| *s)
+        .map(|(s, _)| s.copied())
         .collect()
 }
 

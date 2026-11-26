@@ -1,7 +1,7 @@
 //! Materials as the uber-shaders read them: one fixed-size record per material in the material buffer, and the
 //! pipeline each material draws with (design doc §6, ADR 0023).
 
-use civbb_format::material::{AlphaMode, MatcapBlend, Material, MaterialModel, TextureSlot, ToonLight};
+use civbb_format::material::{AlphaMode, Emission, Matcap, MatcapBlend, Material, MaterialModel, TextureSlot};
 
 /// 32-bit words per material record (`Material` in `mesh.slang`).
 pub const MATERIAL_WORDS: usize = 164;
@@ -53,7 +53,7 @@ impl PipelineKey {
     /// The key of a material's outline draw: toon materials with an outline width; blended like the material.
     pub fn outline(m: &Material) -> Option<Self> {
         match &m.model {
-            MaterialModel::Toon(t) if t.outline_width > 0.0 => Some(PipelineKey {
+            MaterialModel::Toon(t) if t.outline.is_some_and(|o| o.width > 0.0) => Some(PipelineKey {
                 shader: Shader::Outline,
                 blend: m.alpha == AlphaMode::Blend,
                 double_sided: false,
@@ -106,7 +106,7 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
     let mut matcap = [1.0, 1.0, 1.0, 0.0];
     // The clamped light's bounds.
     let mut light = [0.0, 1.0, 0.0, 0.0];
-    // Shadow strength, main strength, and 1 to keep the shadow below the lit colour (lilToon's shade bands).
+    // Shadow strength, main strength, and 1 to keep the shadow below the lit colour (`Toon::shade`).
     let mut shade_mix = [1.0, 0.0, 0.0, 0.0];
     // Second shadow colour and strength.
     let mut shade_second = [0.0; 4];
@@ -142,26 +142,38 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
         }
         MaterialModel::Toon(t) => {
             base_color = t.base_color;
-            emissive = t.emissive;
-            let clamped = if t.light == ToonLight::Clamped { 1.0 } else { 0.0 };
+            let emission = t.emission.unwrap_or(Emission {
+                color: [0.0; 3],
+                tex: None,
+                main_strength: 0.0,
+            });
+            emissive = emission.color;
+            let clamped = if t.light_clamp.is_some() { 1.0 } else { 0.0 };
             shade = [t.shade_color[0], t.shade_color[1], t.shade_color[2], clamped];
-            rim = [
-                t.rim_color[0],
-                t.rim_color[1],
-                t.rim_color[2],
-                blend_code(t.matcap_blend),
-            ];
-            params[2] = t.normal_scale;
+            let off = Matcap {
+                tex: None,
+                strength: 0.0,
+                blend: MatcapBlend::Add,
+                color: [1.0; 3],
+                mask_tex: None,
+                emission: 0.0,
+            };
+            let first = t.matcaps.first().copied().unwrap_or(off);
+            let rim_color = t.rim.map_or([0.0; 3], |r| r.color);
+            rim = [rim_color[0], rim_color[1], rim_color[2], blend_code(first.blend)];
+            if let Some(n) = t.normal {
+                params[2] = n.scale;
+            }
             if let Some(r) = t.rim_shade {
                 rim_shade = [r.color[0], r.color[1], r.color[2], r.strength];
                 let (lo, hi) = ramp(r.border, r.blur);
                 rim_shade_ramp = [lo, hi, r.power, 0.0];
             }
             // A black rim adds nothing; power 0 turns it off in the shader.
-            let rim_power = if t.rim_color == [0.0; 3] { 0.0 } else { t.rim_power };
-            toon = [t.shade_shift, t.shade_toony, rim_power, t.matcap_strength];
-            if let Some(b) = t.shade_bands {
-                // The first ramp's start and end in half-Lambert terms, from MToon's shift and toony.
+            let rim_power = t.rim.filter(|r| r.color != [0.0; 3]).map_or(0.0, |r| r.power);
+            toon = [t.shade_shift, t.shade_toony, rim_power, first.strength];
+            if let Some(b) = t.shade {
+                // The first ramp's start and end in half-Lambert terms, from the shade shift and toony.
                 let lo = (t.shade_toony - t.shade_shift) * 0.5;
                 let hi = lo + 1.0 - t.shade_toony;
                 let (lo2, hi2) = ramp(b.second_border, b.second_blur);
@@ -175,42 +187,39 @@ pub fn pack(m: &Material, textures: &[u32]) -> [u32; MATERIAL_WORDS] {
                 shade_ramps = [lo2, hi2, (lo - b.border_range).max(0.0), hi];
                 shade_border = [b.border_color[0], b.border_color[1], b.border_color[2], 0.0];
             }
-            shade_border[3] = t.emissive_main_strength;
-            tone = t.tone.unwrap_or(tone);
-            if let Some(r) = t.rim_ramp {
+            shade_border[3] = emission.main_strength;
+            if let Some(c) = t.color_adjust {
+                tone = [c.hue, c.saturation, c.value, c.gamma];
+            }
+            if let Some(r) = t.rim {
                 let (lo, hi) = ramp(r.border, r.blur);
                 rim_ramp = [lo, hi, r.shadow_mask, r.main_strength];
             }
-            outline = [
-                t.outline_color[0],
-                t.outline_color[1],
-                t.outline_color[2],
-                t.outline_width,
-            ];
+            if let Some(o) = t.outline {
+                outline = [o.color[0], o.color[1], o.color[2], o.width];
+            }
+            let second = t.matcaps.get(1);
             slots = [
                 t.base_color_tex,
-                t.normal_tex,
+                t.normal.map(|n| n.tex),
                 t.shade_tex,
                 None,
-                t.emissive_tex,
-                t.matcap_tex,
-                t.outline_width_tex,
-                t.matcap_mask_tex,
-                t.outline_tex,
-                t.second_matcap.and_then(|m| m.tex),
-                t.second_matcap.and_then(|m| m.mask_tex),
+                emission.tex,
+                first.tex,
+                t.outline.and_then(|o| o.width_tex),
+                first.mask_tex,
+                t.outline.and_then(|o| o.tex),
+                second.and_then(|m| m.tex),
+                second.and_then(|m| m.mask_tex),
             ];
-            if let Some(m) = t.second_matcap {
+            if let Some(m) = second {
                 matcap2 = [m.color[0], m.color[1], m.color[2], m.strength];
                 matcap2_mode = [blend_code(m.blend), m.emission, 0.0, 0.0];
             }
-            matcap = [
-                t.matcap_color[0],
-                t.matcap_color[1],
-                t.matcap_color[2],
-                t.matcap_emission,
-            ];
-            light = [t.light_min, t.light_max, 0.0, 0.0];
+            matcap = [first.color[0], first.color[1], first.color[2], first.emission];
+            if let Some(c) = t.light_clamp {
+                light = [c.min, c.max, 0.0, 0.0];
+            }
         }
         MaterialModel::Unlit(u) => {
             base_color = u.color;
@@ -266,7 +275,7 @@ fn blend_code(blend: MatcapBlend) -> f32 {
     }
 }
 
-/// lilToon's ramp from `border - blur / 2` to `border + blur / 2`, both clamped to 0 to 1.
+/// The ramp from `border - blur / 2` to `border + blur / 2`, both clamped to 0 to 1.
 fn ramp(border: f32, blur: f32) -> (f32, f32) {
     (
         (border - blur * 0.5).clamp(0.0, 1.0),

@@ -17,7 +17,7 @@ fn records(doc: &Document) -> String {
     let identity: Vec<u32> = (0..doc.textures.len() as u32).collect();
     let mut out = String::new();
     for (i, m) in doc.materials.iter().enumerate() {
-        write!(out, "{i} {:?} queue {}", m.name, m.render_queue).unwrap();
+        write!(out, "{i} {:?} queue {}", m.name, m.queue()).unwrap();
         for w in pack(m, &identity) {
             write!(out, " {w:08x}").unwrap();
         }

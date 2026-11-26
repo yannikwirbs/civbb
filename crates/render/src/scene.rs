@@ -261,7 +261,7 @@ impl Scene {
         Ok(MaterialId {
             index,
             key: PipelineKey::of(material),
-            queue: material.render_queue,
+            queue: material.queue(),
             outline: PipelineKey::outline(material),
         })
     }

@@ -75,7 +75,7 @@ fn unlit(name: &str, texture: u32, color: [f32; 4], scale_offset: [f32; 4]) -> M
         }),
         alpha: AlphaMode::Opaque,
         double_sided: false,
-        render_queue: 2000,
+        order: 0,
     }
 }
 
@@ -427,7 +427,7 @@ fn pbr_avatar() -> (Imported, RgbaImage, RgbaImage) {
         }),
         alpha: AlphaMode::Opaque,
         double_sided: false,
-        render_queue: 2000,
+        order: 0,
     }];
     i.avatar.clips.clear();
     i.avatar

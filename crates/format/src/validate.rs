@@ -9,7 +9,7 @@ use crate::constraint::{Constraint, ConstraintKind, WorldUp};
 use crate::document::{Document, Role};
 use crate::dynamics::{ContactShape, ContactVolume, Contacts, Dynamics, Graded, Limit, Shape};
 use crate::hierarchy::Hierarchy;
-use crate::material::{MaterialModel, TextureSlot};
+use crate::material::{MATCAPS, MaterialModel, TextureSlot};
 use crate::math::Transform;
 use crate::mesh::{Mesh, Skin};
 use crate::state::{EntryIndex, EntryKind, PLATFORM_NAMESPACE, Platform, StateTable, SyncMode};
@@ -362,31 +362,31 @@ impl V {
         for (i, m) in a.materials.iter().enumerate() {
             let p = || format!("materials[{i}]");
             self.string(&m.name, p);
-            let slots: Vec<&Option<TextureSlot>> = match &m.model {
+            let slots: Vec<Option<TextureSlot>> = match &m.model {
                 MaterialModel::Pbr(x) => vec![
-                    &x.base_color_tex,
-                    &x.metallic_roughness_tex,
-                    &x.normal_tex,
-                    &x.occlusion_tex,
-                    &x.emissive_tex,
+                    x.base_color_tex,
+                    x.metallic_roughness_tex,
+                    x.normal_tex,
+                    x.occlusion_tex,
+                    x.emissive_tex,
                 ],
                 MaterialModel::Toon(x) => {
+                    self.ensure(x.matcaps.len() <= MATCAPS, p, "more matcaps than MATCAPS");
                     let mut slots = vec![
-                        &x.base_color_tex,
-                        &x.normal_tex,
-                        &x.shade_tex,
-                        &x.matcap_tex,
-                        &x.matcap_mask_tex,
-                        &x.emissive_tex,
-                        &x.outline_width_tex,
-                        &x.outline_tex,
+                        x.base_color_tex,
+                        x.shade_tex,
+                        x.normal.map(|n| n.tex),
+                        x.emission.and_then(|e| e.tex),
                     ];
-                    if let Some(m) = &x.second_matcap {
-                        slots.extend([&m.tex, &m.mask_tex]);
+                    if let Some(o) = &x.outline {
+                        slots.extend([o.width_tex, o.tex]);
+                    }
+                    for m in &x.matcaps {
+                        slots.extend([m.tex, m.mask_tex]);
                     }
                     slots
                 }
-                MaterialModel::Unlit(x) => vec![&x.color_tex],
+                MaterialModel::Unlit(x) => vec![x.color_tex],
             };
             for s in slots.into_iter().flatten() {
                 self.index(s.texture as usize, a.textures.len(), p, "texture");
@@ -670,6 +670,20 @@ mod tests {
             }),
             ("humanoid.muscle_frames[0]", |a| {
                 a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().muscle_frames[0].pre = [0.0; 4]
+            }),
+            ("materials[0]", |a| {
+                let crate::material::MaterialModel::Toon(t) = &mut a.materials[0].model else {
+                    unreachable!("the sample's material is toon")
+                };
+                let off = crate::material::Matcap {
+                    tex: None,
+                    strength: 0.0,
+                    blend: crate::material::MatcapBlend::Add,
+                    color: [1.0; 3],
+                    mask_tex: None,
+                    emission: 0.0,
+                };
+                t.matcaps = vec![off; MATCAPS + 1];
             }),
             ("meshes[0].node", |a| a.meshes[0].node = 99),
             ("meshes[0].indices", |a| a.meshes[0].indices[0] = 3),

@@ -19,7 +19,7 @@ fn unlit() -> Material {
         }),
         alpha: AlphaMode::Opaque,
         double_sided: false,
-        render_queue: 2000,
+        order: 0,
     }
 }
 
@@ -44,7 +44,7 @@ fn pbr() -> Material {
         }),
         alpha: AlphaMode::Mask { cutoff: 0.5 },
         double_sided: false,
-        render_queue: 2450,
+        order: 0,
     }
 }
 

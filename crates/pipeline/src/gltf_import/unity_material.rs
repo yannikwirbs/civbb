@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 
 use civbb_anim::material::to_linear;
 use civbb_format::material::{
-    AlphaMode, ColorSpace, Matcap, MatcapBlend, Material, MaterialField, MaterialModel, Pbr, RimRamp, RimShade,
-    ShadeBands, TextureSlot, Toon, ToonLight, Unlit,
+    AlphaMode, ColorAdjust, ColorSpace, Emission, LightClamp, Matcap, MatcapBlend, Material, MaterialField,
+    MaterialModel, Normal, Outline, Pbr, Rim, RimShade, Shade, TextureSlot, Toon, Unlit,
 };
 use civbb_format::math::Vec3;
 use serde::Deserialize;
@@ -321,36 +321,68 @@ fn plain_toon(base_color: [f32; 4], base_color_tex: Option<TextureSlot>) -> Toon
     Toon {
         base_color,
         base_color_tex,
-        normal_tex: None,
-        normal_scale: 1.0,
         shade_color: scale([base_color[0], base_color[1], base_color[2]], 0.75),
         shade_tex: base_color_tex,
         shade_shift: 0.0,
         shade_toony: 0.9,
-        rim_color: [0.0; 3],
-        rim_power: 5.0,
+        light_clamp: Some(LightClamp { min: 0.0, max: 1.0 }),
+        normal: None,
+        emission: None,
+        matcaps: Vec::new(),
+        rim: None,
         rim_shade: None,
-        rim_ramp: None,
-        shade_bands: None,
-        tone: None,
-        matcap_tex: None,
-        matcap_strength: 0.0,
-        matcap_blend: MatcapBlend::Add,
-        matcap_color: [1.0; 3],
-        matcap_mask_tex: None,
-        matcap_emission: 0.0,
-        second_matcap: None,
-        emissive: [0.0; 3],
-        emissive_tex: None,
-        emissive_main_strength: 0.0,
-        outline_width: 0.0,
-        outline_color: [0.0; 3],
-        outline_width_tex: None,
-        outline_tex: None,
-        light: ToonLight::Clamped,
-        light_min: 0.0,
-        light_max: 1.0,
+        shade: None,
+        color_adjust: None,
+        outline: None,
     }
+}
+
+/// A plain fresnel rim: no ramp, no shadow mask, not tinted by the albedo.
+fn rim(color: Vec3, power: f32) -> Rim {
+    Rim {
+        color,
+        power,
+        border: 0.5,
+        blur: 1.0,
+        shadow_mask: 0.0,
+        main_strength: 0.0,
+    }
+}
+
+/// Emission not tinted by the albedo.
+fn emission(color: Vec3, tex: Option<TextureSlot>) -> Emission {
+    Emission {
+        color,
+        tex,
+        main_strength: 0.0,
+    }
+}
+
+/// An untinted matcap without mask or emission.
+fn matcap(tex: Option<TextureSlot>, strength: f32, blend: MatcapBlend) -> Matcap {
+    Matcap {
+        tex,
+        strength,
+        blend,
+        color: [1.0; 3],
+        mask_tex: None,
+        emission: 0.0,
+    }
+}
+
+/// An outline without a colour texture.
+fn outline(width: f32, color: Vec3, width_tex: Option<TextureSlot>) -> Outline {
+    Outline {
+        width,
+        color,
+        width_tex,
+        tex: None,
+    }
+}
+
+/// A normal map when its texture is set.
+fn normal(tex: Option<TextureSlot>, scale: f32) -> Option<Normal> {
+    tex.map(|tex| Normal { tex, scale })
 }
 
 impl Importer<'_> {
@@ -531,29 +563,30 @@ impl Importer<'_> {
                     // so without one every side is fully lit (`CGI_PoiLighting.cginc`, 7.3).
                     t.shade_color = [base[0], base[1], base[2]];
                 }
-                if let Some(normal) = self.poiyomi_slot(x, "_BumpMap", "_BumpMapUV", ColorSpace::Linear) {
-                    t.normal_tex = Some(normal);
-                    t.normal_scale = p.f("_BumpScale", 1.0);
-                }
+                let normal_tex = self.poiyomi_slot(x, "_BumpMap", "_BumpMapUV", ColorSpace::Linear);
+                t.normal = normal(normal_tex, p.f("_BumpScale", 1.0));
+                // The second matcap is compiled in by `COLOR_GRADING_HDR_3D`; without the first, the first slot is off.
+                let second = x.keywords.iter().any(|k| k == "COLOR_GRADING_HDR_3D") && p.on("_Matcap2Enable");
                 if p.on("_MatcapEnable") {
-                    let m = self.poiyomi_matcap(x, "");
-                    t.matcap_tex = m.tex;
-                    t.matcap_strength = m.strength;
-                    t.matcap_blend = m.blend;
-                    t.matcap_color = m.color;
-                    t.matcap_mask_tex = m.mask_tex;
-                    t.matcap_emission = m.emission;
+                    let first = self.poiyomi_matcap(x, "");
+                    t.matcaps.push(first);
+                } else if second {
+                    t.matcaps.push(matcap(None, 0.0, MatcapBlend::Add));
                 }
-                // The second matcap is compiled in by `COLOR_GRADING_HDR_3D`.
-                if x.keywords.iter().any(|k| k == "COLOR_GRADING_HDR_3D") && p.on("_Matcap2Enable") {
-                    t.second_matcap = Some(self.poiyomi_matcap(x, "2"));
+                if second {
+                    let second = self.poiyomi_matcap(x, "2");
+                    t.matcaps.push(second);
                 }
                 if p.on("_EnableRimLighting") {
-                    t.rim_color = scale(p.rgb("_RimLightColor", WHITE), p.color("_RimLightColor", WHITE)[3]);
+                    let color = scale(p.rgb("_RimLightColor", WHITE), p.color("_RimLightColor", WHITE)[3]);
+                    t.rim = Some(rim(color, 5.0));
                 }
                 if p.on("_EnableEmission") {
-                    t.emissive = scale(p.hdr_rgb("_EmissionColor", BLACK), p.f("_EmissionStrength", 1.0));
-                    t.emissive_tex = self.poiyomi_slot(x, "_EmissionMap", "_EmissionMapUV", srgb);
+                    let color = scale(p.hdr_rgb("_EmissionColor", BLACK), p.f("_EmissionStrength", 1.0));
+                    t.emission = Some(emission(
+                        color,
+                        self.poiyomi_slot(x, "_EmissionMap", "_EmissionMapUV", srgb),
+                    ));
                 }
                 let alpha = queue_alpha.unwrap_or_else(|| mode_alpha(p.f("_Mode", 0.0)));
                 (MaterialModel::Toon(t), alpha, p.f("_Cull", 2.0))
@@ -566,24 +599,27 @@ impl Importer<'_> {
             Family::MToon => {
                 let base = p.color("_Color", WHITE);
                 let mut t = plain_toon(base, main);
-                t.light = ToonLight::Additive;
+                t.light_clamp = None;
                 t.shade_color = p.rgb("_ShadeColor", [0.97, 0.81, 0.86, 1.0]);
                 t.shade_tex = self.unity_slot(x, "_ShadeTexture", srgb);
                 t.shade_shift = p.f("_ShadeShift", 0.0);
                 t.shade_toony = p.f("_ShadeToony", 0.9);
-                t.normal_tex = self.unity_slot(x, "_BumpMap", ColorSpace::Linear);
-                t.normal_scale = p.f("_BumpScale", 1.0);
-                t.rim_color = p.rgb("_RimColor", BLACK);
-                t.rim_power = p.f("_RimFresnelPower", 1.0);
-                t.matcap_tex = self.unity_slot(x, "_SphereAdd", srgb);
-                t.matcap_strength = if t.matcap_tex.is_some() { 1.0 } else { 0.0 };
-                t.emissive = p.rgb("_EmissionColor", BLACK);
-                t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
+                let normal_tex = self.unity_slot(x, "_BumpMap", ColorSpace::Linear);
+                t.normal = normal(normal_tex, p.f("_BumpScale", 1.0));
+                t.rim = Some(rim(p.rgb("_RimColor", BLACK), p.f("_RimFresnelPower", 1.0)));
+                if let Some(tex) = self.unity_slot(x, "_SphereAdd", srgb) {
+                    t.matcaps.push(matcap(Some(tex), 1.0, MatcapBlend::Add));
+                }
+                let emission_tex = self.unity_slot(x, "_EmissionMap", srgb);
+                t.emission = Some(emission(p.rgb("_EmissionColor", BLACK), emission_tex));
                 if p.f("_OutlineWidthMode", 0.0) as i32 == 1 {
                     // World outline width in centimetres.
-                    t.outline_width = p.f("_OutlineWidth", 0.0) * 0.01;
-                    t.outline_color = p.rgb("_OutlineColor", BLACK);
-                    t.outline_width_tex = self.unity_slot(x, "_OutlineWidthTexture", ColorSpace::Linear);
+                    let width_tex = self.unity_slot(x, "_OutlineWidthTexture", ColorSpace::Linear);
+                    t.outline = Some(outline(
+                        p.f("_OutlineWidth", 0.0) * 0.01,
+                        p.rgb("_OutlineColor", BLACK),
+                        width_tex,
+                    ));
                 }
                 let alpha = queue_alpha.unwrap_or_else(|| mode_alpha(p.f("_BlendMode", 0.0)));
                 (MaterialModel::Toon(t), alpha, p.f("_CullMode", 2.0))
@@ -622,12 +658,12 @@ impl Importer<'_> {
                 // the matcap) times light plus ambient, unclamped. A shade equal to the lit colour gives that
                 // under the additive light model (ADR 0050; the SDK's `VRChat-Mobile-ToonLit.shader`).
                 let mut t = plain_toon(WHITE, main);
-                t.light = ToonLight::Additive;
+                t.light_clamp = None;
                 t.shade_color = [1.0; 3];
                 if family == Family::MobileMatcap {
-                    t.matcap_tex = self.unity_slot(x, "_MatCap", srgb);
-                    t.matcap_strength = if t.matcap_tex.is_some() { 1.0 } else { 0.0 };
-                    t.matcap_blend = MatcapBlend::Multiply;
+                    let tex = self.unity_slot(x, "_MatCap", srgb);
+                    let strength = if tex.is_some() { 1.0 } else { 0.0 };
+                    t.matcaps.push(matcap(tex, strength, MatcapBlend::Multiply));
                 }
                 (MaterialModel::Toon(t), queue_alpha.unwrap_or(Alpha::Opaque), 2.0)
             }
@@ -643,7 +679,7 @@ impl Importer<'_> {
                 t.shade_color = scale([base[0], base[1], base[2]], p.f("_ShadowAlbedo", 0.5));
                 t.shade_shift = 1.0 - (lo + hi);
                 t.shade_toony = 1.0 - (hi - lo);
-                t.shade_bands = Some(ShadeBands {
+                t.shade = Some(Shade {
                     strength: 1.0 - (dark + p.f("_ShadowBoost", 0.0)).min(1.0),
                     main_strength: 1.0,
                     second_color: [0.0; 3],
@@ -654,11 +690,12 @@ impl Importer<'_> {
                     border_range: 0.0,
                 });
                 if p.f("_LimitBrightness", 1.0) == 0.0 {
-                    t.light = ToonLight::Additive;
+                    t.light_clamp = None;
                 }
                 // Emission is always on: map times colour times strength (`VertexFragment.cginc`).
-                t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
-                t.emissive = scale(p.rgb("_EmissionColor", BLACK), p.f("_EmissionStrength", 1.0));
+                let emission_tex = self.unity_slot(x, "_EmissionMap", srgb);
+                let color = scale(p.rgb("_EmissionColor", BLACK), p.f("_EmissionStrength", 1.0));
+                t.emission = Some(emission(color, emission_tex));
                 if p.f("_MinBrightness", 0.0) != 0.0 {
                     self.warnings.push(
                         "X_toon_material: Toon Standard _MinBrightness (albedo added as emission) dropped".into(),
@@ -681,15 +718,13 @@ impl Importer<'_> {
                     main.filter(|_| keyword("_TEX_ON")),
                 );
                 t.shade_color = base;
-                t.light_min = 1.0;
-                t.light_max = 1.0;
-                t.matcap_tex = self.unity_slot(x, "_ToonShade", srgb);
-                t.matcap_strength = 1.0;
-                t.matcap_blend = MatcapBlend::Multiply;
+                t.light_clamp = Some(LightClamp { min: 1.0, max: 1.0 });
+                let tex = self.unity_slot(x, "_ToonShade", srgb);
+                t.matcaps.push(matcap(tex, 1.0, MatcapBlend::Multiply));
                 if x.shader.to_ascii_lowercase().contains("outline") {
                     // Object-space normal offset by `_Outline * 0.01`.
-                    t.outline_width = p.f("_Outline", 0.01) * 0.01;
-                    t.outline_color = p.rgb("_OutlineColor", [0.5, 0.5, 0.5, 1.0]);
+                    let color = p.rgb("_OutlineColor", [0.5, 0.5, 0.5, 1.0]);
+                    t.outline = Some(outline(p.f("_Outline", 0.01) * 0.01, color, None));
                 }
                 (MaterialModel::Toon(t), queue_alpha.unwrap_or(Alpha::Opaque), 2.0)
             }
@@ -724,25 +759,23 @@ impl Importer<'_> {
                 )
             }
         };
-        let (alpha, default_queue) = match alpha {
-            Alpha::Opaque => (AlphaMode::Opaque, 2000),
-            Alpha::Cutout => (
-                AlphaMode::Mask {
-                    cutoff: p.f("_Cutoff", 0.5).clamp(0.0, 1.0),
-                },
-                2450,
-            ),
-            Alpha::Transparent => (AlphaMode::Blend, 3000),
+        let alpha = match alpha {
+            Alpha::Opaque => AlphaMode::Opaque,
+            Alpha::Cutout => AlphaMode::Mask {
+                cutoff: p.f("_Cutoff", 0.5).clamp(0.0, 1.0),
+            },
+            Alpha::Transparent => AlphaMode::Blend,
         };
         Material {
             name: String::new(),
             model,
             alpha,
             double_sided: cull as i32 == 0,
-            render_queue: if x.render_queue >= 0 {
-                x.render_queue.min(5000)
+            // Unity's render queue, as an offset within the pass (ADR 0090).
+            order: if x.render_queue >= 0 {
+                x.render_queue.min(5000) - alpha.queue_base()
             } else {
-                default_queue
+                0
             },
         }
     }
@@ -754,18 +787,26 @@ impl Importer<'_> {
         let base = p.color("_Color", WHITE);
         let mut t = plain_toon(base, main);
         let base_rgb = [base[0], base[1], base[2]];
-        t.light_min = p.f("_LightMinLimit", 0.05);
-        t.light_max = p.f("_LightMaxLimit", 1.0);
+        t.light_clamp = Some(LightClamp {
+            min: p.f("_LightMinLimit", 0.05),
+            max: p.f("_LightMaxLimit", 1.0),
+        });
         // Tone correction: every variant applies it, the multi shader only with its keyword (`EFFECT_HUE_VARIATION`,
         // lilToon's `lil_replace_keywords.hlsl`). A vector, not a colour: as saved. The mask is not modelled.
         let identity = [0.0, 1.0, 1.0, 1.0];
         let hsvg = x.colors.get("_MainTexHSVG").copied().unwrap_or(identity);
         if hsvg != identity && (!lil_multi(x) || x.keywords.iter().any(|k| k == "EFFECT_HUE_VARIATION")) {
-            t.tone = Some(hsvg);
+            let [hue, saturation, value, gamma] = hsvg;
+            t.color_adjust = Some(ColorAdjust {
+                hue,
+                saturation,
+                value,
+                gamma,
+            });
         }
         if p.on("_UseBumpMap") {
-            t.normal_tex = self.unity_slot(x, "_BumpMap", ColorSpace::Linear);
-            t.normal_scale = p.f("_BumpScale", 1.0);
+            let tex = self.unity_slot(x, "_BumpMap", ColorSpace::Linear);
+            t.normal = normal(tex, p.f("_BumpScale", 1.0));
         }
         if p.on("_UseShadow") {
             // Shadowed albedo is the albedo times the shadow colour, mixed in by strength; the shadow texture replaces
@@ -776,7 +817,7 @@ impl Importer<'_> {
             t.shade_color = mul(base_rgb, p.rgb("_ShadowColor", [0.82, 0.76, 0.85, 1.0]));
             t.shade_tex = self.unity_slot(x, "_ShadowColorTex", srgb).or(main);
             let second = [0.68, 0.66, 0.79, 1.0];
-            t.shade_bands = Some(ShadeBands {
+            t.shade = Some(Shade {
                 strength: p.f("_ShadowStrength", 1.0),
                 main_strength: p.f("_ShadowMainStrength", 0.0),
                 second_color: p.rgb("_Shadow2ndColor", second),
@@ -795,13 +836,13 @@ impl Importer<'_> {
             t.shade_color = base_rgb;
         }
         if p.on("_UseRim") {
-            t.rim_color = scale(
-                p.rgb("_RimColor", [0.66, 0.5, 0.48, 1.0]),
-                p.color("_RimColor", WHITE)[3],
-            );
-            t.rim_power = p.f("_RimFresnelPower", 3.0);
             // The light direction terms, the colour texture and the normal strength are not modelled.
-            t.rim_ramp = Some(RimRamp {
+            t.rim = Some(Rim {
+                color: scale(
+                    p.rgb("_RimColor", [0.66, 0.5, 0.48, 1.0]),
+                    p.color("_RimColor", WHITE)[3],
+                ),
+                power: p.f("_RimFresnelPower", 3.0),
                 border: p.f("_RimBorder", 0.5),
                 blur: p.f("_RimBlur", 0.65),
                 shadow_mask: p.f("_RimShadowMask", 0.5),
@@ -820,40 +861,50 @@ impl Importer<'_> {
             });
         }
         if p.on("_UseMatCap") {
-            t.matcap_tex = self.unity_slot(x, "_MatCapTex", srgb);
-            t.matcap_strength = if t.matcap_tex.is_some() {
-                p.f("_MatCapBlend", 1.0)
-            } else {
-                0.0
-            };
+            let tex = self.unity_slot(x, "_MatCapTex", srgb);
+            let strength = if tex.is_some() { p.f("_MatCapBlend", 1.0) } else { 0.0 };
             // Normal 0, add 1, screen 2, multiply 3; normal and screen have no counterpart and add.
-            if p.f("_MatCapBlendMode", 1.0) as i32 == 3 {
-                t.matcap_blend = MatcapBlend::Multiply;
-            }
+            let blend = if p.f("_MatCapBlendMode", 1.0) as i32 == 3 {
+                MatcapBlend::Multiply
+            } else {
+                MatcapBlend::Add
+            };
             let tint = p.color("_MatCapColor", WHITE);
-            t.matcap_color = [tint[0], tint[1], tint[2]];
-            t.matcap_strength *= tint[3];
-            t.matcap_mask_tex = self.unity_slot(x, "_MatCapBlendMask", ColorSpace::Linear);
+            let mask_tex = self.unity_slot(x, "_MatCapBlendMask", ColorSpace::Linear);
+            t.matcaps.push(Matcap {
+                tex,
+                strength: strength * tint[3],
+                blend,
+                color: [tint[0], tint[1], tint[2]],
+                mask_tex,
+                emission: 0.0,
+            });
         }
         if p.on("_UseEmission") {
-            t.emissive = scale(p.hdr_rgb("_EmissionColor", WHITE), p.color("_EmissionColor", WHITE)[3]);
-            t.emissive_tex = self.unity_slot(x, "_EmissionMap", srgb);
-            t.emissive_main_strength = p.f("_EmissionMainStrength", 0.0);
+            let tex = self.unity_slot(x, "_EmissionMap", srgb);
+            let mut color = scale(p.hdr_rgb("_EmissionColor", WHITE), p.color("_EmissionColor", WHITE)[3]);
             if p.on("_EmissionUseGrad") {
                 // The gradient is sampled at speed times time; without time in our runtime, at its start (where
                 // Unity's reference renders sample it too).
                 if let Some(g) = self.unity_texel_at_zero(x, "_EmissionGradTex") {
-                    t.emissive = mul(t.emissive, g);
+                    color = mul(color, g);
                 }
             }
+            t.emission = Some(Emission {
+                color,
+                tex,
+                main_strength: p.f("_EmissionMainStrength", 0.0),
+            });
         }
         if outline {
             // lilToon outline width is in centimetres.
-            t.outline_width = p.f("_OutlineWidth", 0.08) * 0.01;
-            t.outline_color = p.rgb("_OutlineColor", [0.6, 0.56, 0.73, 1.0]);
-            t.outline_width_tex = self.unity_slot(x, "_OutlineWidthMask", ColorSpace::Linear);
-            // The outline colour times `_OutlineTex` (lilToon's `LIL_GET_OUTLINE_TEX`).
-            t.outline_tex = self.unity_slot(x, "_OutlineTex", srgb);
+            t.outline = Some(Outline {
+                width: p.f("_OutlineWidth", 0.08) * 0.01,
+                color: p.rgb("_OutlineColor", [0.6, 0.56, 0.73, 1.0]),
+                width_tex: self.unity_slot(x, "_OutlineWidthMask", ColorSpace::Linear),
+                // The outline colour times `_OutlineTex` (lilToon's `LIL_GET_OUTLINE_TEX`).
+                tex: self.unity_slot(x, "_OutlineTex", srgb),
+            });
         }
         t
     }
@@ -874,7 +925,7 @@ impl Importer<'_> {
         t.shade_toony = (1.0 - feather).clamp(0.0, 1.0);
         // The second shade, below `_ShadeColor_Step` by its feather: lilToon's second shadow band with nothing else.
         let (step2, feather2) = (p.f("_ShadeColor_Step", 0.0), p.f("_1st2nd_Shades_Feather", 0.0001));
-        t.shade_bands = Some(ShadeBands {
+        t.shade = Some(Shade {
             strength: 1.0,
             main_strength: 0.0,
             second_color: p.rgb("_2nd_ShadeColor", WHITE),
@@ -884,21 +935,22 @@ impl Importer<'_> {
             border_color: [0.0; 3],
             border_range: 0.0,
         });
-        t.normal_tex = self.unity_slot(x, "_NormalMap", ColorSpace::Linear);
-        t.normal_scale = p.f("_BumpScale", 1.0);
+        let normal_tex = self.unity_slot(x, "_NormalMap", ColorSpace::Linear);
+        t.normal = normal(normal_tex, p.f("_BumpScale", 1.0));
         if p.on("_RimLight") {
-            t.rim_color = p.rgb("_RimLightColor", WHITE);
+            t.rim = Some(rim(p.rgb("_RimLightColor", WHITE), 5.0));
         }
         if p.on("_MatCap") {
-            t.matcap_tex = self.unity_slot(x, "_MatCap_Sampler", srgb);
-            t.matcap_strength = if t.matcap_tex.is_some() { 1.0 } else { 0.0 };
+            let tex = self.unity_slot(x, "_MatCap_Sampler", srgb);
+            let strength = if tex.is_some() { 1.0 } else { 0.0 };
+            t.matcaps.push(matcap(tex, strength, MatcapBlend::Add));
         }
-        t.emissive = p.hdr_rgb("_Emissive_Color", BLACK);
-        t.emissive_tex = self.unity_slot(x, "_Emissive_Tex", srgb);
+        let emission_tex = self.unity_slot(x, "_Emissive_Tex", srgb);
+        t.emission = Some(emission(p.hdr_rgb("_Emissive_Color", BLACK), emission_tex));
         if x.keywords.iter().any(|k| k.starts_with("_OUTLINE_")) {
-            t.outline_width = p.f("_Outline_Width", 0.0) * 0.001;
-            t.outline_color = p.rgb("_Outline_Color", [0.5, 0.5, 0.5, 1.0]);
-            t.outline_width_tex = self.unity_slot(x, "_Outline_Sampler", ColorSpace::Linear);
+            let width_tex = self.unity_slot(x, "_Outline_Sampler", ColorSpace::Linear);
+            let color = p.rgb("_Outline_Color", [0.5, 0.5, 0.5, 1.0]);
+            t.outline = Some(outline(p.f("_Outline_Width", 0.0) * 0.001, color, width_tex));
         }
         t
     }

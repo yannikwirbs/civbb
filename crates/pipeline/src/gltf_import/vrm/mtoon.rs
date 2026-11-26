@@ -1,7 +1,8 @@
 //! VRM MToon materials (0.x `materialProperties`, 1.0 `VRMC_materials_mtoon`) to the Toon model.
 
 use civbb_format::material::{
-    AlphaMode, ColorSpace, MatcapBlend, Material, MaterialModel, TextureSlot, Toon, ToonLight,
+    AlphaMode, ColorSpace, Emission, Matcap, MatcapBlend, Material, MaterialModel, Normal, Outline, Rim, TextureSlot,
+    Toon,
 };
 use serde_json::Value;
 
@@ -74,45 +75,43 @@ impl Importer<'_> {
             self.warnings.push(format!("material {i}: MToon UV animation dropped"));
         }
         let offset = x["renderQueueOffsetNumber"].as_i64().unwrap_or(0).clamp(-9, 9) as i32;
+        let shade_tex = self.mtoon_slot(&x["shadeMultiplyTexture"], ColorSpace::Srgb, None);
+        let outline_width_tex = self.mtoon_slot(&x["outlineWidthMultiplyTexture"], ColorSpace::Linear, None);
+        let matcap_strength = arr(&x["matcapFactor"], [1.0; 3]).into_iter().fold(0.0, f32::max);
         Material {
             model: MaterialModel::Toon(Toon {
                 base_color,
                 base_color_tex,
-                normal_tex,
-                normal_scale,
                 shade_color: arr(&x["shadeColorFactor"], [0.0; 3]),
-                shade_tex: self.mtoon_slot(&x["shadeMultiplyTexture"], ColorSpace::Srgb, None),
+                shade_tex,
                 shade_shift: num(&x["shadingShiftFactor"], 0.0),
                 shade_toony: num(&x["shadingToonyFactor"], 0.9),
-                rim_color: arr(&x["parametricRimColorFactor"], [0.0; 3]),
-                rim_power: num(&x["parametricRimFresnelPowerFactor"], 5.0),
+                light_clamp: None,
+                normal: normal_tex.map(|tex| Normal {
+                    tex,
+                    scale: normal_scale,
+                }),
+                emission: Some(Emission {
+                    color: emissive,
+                    tex: emissive_tex,
+                    main_strength: 0.0,
+                }),
+                matcaps: matcap_tex.map(|tex| matcap(tex, matcap_strength)).into_iter().collect(),
+                rim: Some(rim(
+                    arr(&x["parametricRimColorFactor"], [0.0; 3]),
+                    num(&x["parametricRimFresnelPowerFactor"], 5.0),
+                )),
                 rim_shade: None,
-                rim_ramp: None,
-                shade_bands: None,
-                tone: None,
-                matcap_strength: if matcap_tex.is_some() {
-                    arr(&x["matcapFactor"], [1.0; 3]).into_iter().fold(0.0, f32::max)
-                } else {
-                    0.0
-                },
-                matcap_tex,
-                matcap_blend: MatcapBlend::Add,
-                matcap_color: [1.0; 3],
-                matcap_mask_tex: None,
-                matcap_emission: 0.0,
-                second_matcap: None,
-                emissive,
-                emissive_tex,
-                emissive_main_strength: 0.0,
-                outline_width,
-                outline_color: arr(&x["outlineColorFactor"], [0.0; 3]),
-                outline_width_tex: self.mtoon_slot(&x["outlineWidthMultiplyTexture"], ColorSpace::Linear, None),
-                outline_tex: None,
-                light: ToonLight::Additive,
-                light_min: 0.0,
-                light_max: 1.0,
+                shade: None,
+                color_adjust: None,
+                outline: Some(Outline {
+                    width: outline_width,
+                    color: arr(&x["outlineColorFactor"], [0.0; 3]),
+                    width_tex: outline_width_tex,
+                    tex: None,
+                }),
             }),
-            render_queue: base.render_queue + offset,
+            order: base.order + offset,
             ..base
         }
     }
@@ -134,59 +133,84 @@ impl Importer<'_> {
             }
             _ => 0.0,
         };
-        let (alpha, default_queue) = match num(&f["_BlendMode"], 0.0) as i32 {
-            1 => (
-                AlphaMode::Mask {
-                    cutoff: num(&f["_Cutoff"], 0.5),
-                },
-                2450,
-            ),
-            2 | 3 => (AlphaMode::Blend, 3000),
-            _ => (AlphaMode::Opaque, 2000),
+        let alpha = match num(&f["_BlendMode"], 0.0) as i32 {
+            1 => AlphaMode::Mask {
+                cutoff: num(&f["_Cutoff"], 0.5),
+            },
+            2 | 3 => AlphaMode::Blend,
+            _ => AlphaMode::Opaque,
         };
         let color = |key: &str, default: [f32; 4]| srgb(arr(&v[key], default));
         let rgb = |c: [f32; 4]| [c[0], c[1], c[2]];
+        let normal_tex = self.mtoon_slot(&t["_BumpMap"], ColorSpace::Linear, None);
+        let shade_tex = self.mtoon_slot(&t["_ShadeTexture"], ColorSpace::Srgb, None);
+        let emissive_tex = self.mtoon_slot(&t["_EmissionMap"], ColorSpace::Srgb, None);
+        let outline_width_tex = self.mtoon_slot(&t["_OutlineWidthTexture"], ColorSpace::Linear, None);
         Material {
             name: self.materials[i].name.clone(),
             model: MaterialModel::Toon(Toon {
                 base_color: color("_Color", [1.0; 4]),
                 base_color_tex,
-                normal_tex: self.mtoon_slot(&t["_BumpMap"], ColorSpace::Linear, None),
-                normal_scale: num(&f["_BumpScale"], 1.0),
                 shade_color: rgb(color("_ShadeColor", [0.97, 0.81, 0.86, 1.0])),
-                shade_tex: self.mtoon_slot(&t["_ShadeTexture"], ColorSpace::Srgb, None),
+                shade_tex,
                 shade_shift: num(&f["_ShadeShift"], 0.0),
                 shade_toony: num(&f["_ShadeToony"], 0.9),
-                rim_color: rgb(color("_RimColor", [0.0, 0.0, 0.0, 1.0])),
-                rim_power: num(&f["_RimFresnelPower"], 1.0),
+                light_clamp: None,
+                normal: normal_tex.map(|tex| Normal {
+                    tex,
+                    scale: num(&f["_BumpScale"], 1.0),
+                }),
+                emission: Some(Emission {
+                    color: rgb(color("_EmissionColor", [0.0, 0.0, 0.0, 1.0])),
+                    tex: emissive_tex,
+                    main_strength: 0.0,
+                }),
+                matcaps: matcap_tex.map(|tex| matcap(tex, 1.0)).into_iter().collect(),
+                rim: Some(rim(
+                    rgb(color("_RimColor", [0.0, 0.0, 0.0, 1.0])),
+                    num(&f["_RimFresnelPower"], 1.0),
+                )),
                 rim_shade: None,
-                rim_ramp: None,
-                shade_bands: None,
-                tone: None,
-                matcap_strength: if matcap_tex.is_some() { 1.0 } else { 0.0 },
-                matcap_blend: MatcapBlend::Add,
-                matcap_color: [1.0; 3],
-                matcap_mask_tex: None,
-                matcap_emission: 0.0,
-                second_matcap: None,
-                matcap_tex,
-                emissive: rgb(color("_EmissionColor", [0.0, 0.0, 0.0, 1.0])),
-                emissive_tex: self.mtoon_slot(&t["_EmissionMap"], ColorSpace::Srgb, None),
-                emissive_main_strength: 0.0,
-                outline_width,
-                outline_color: rgb(color("_OutlineColor", [0.0, 0.0, 0.0, 1.0])),
-                outline_width_tex: self.mtoon_slot(&t["_OutlineWidthTexture"], ColorSpace::Linear, None),
-                outline_tex: None,
-                light: ToonLight::Additive,
-                light_min: 0.0,
-                light_max: 1.0,
+                shade: None,
+                color_adjust: None,
+                outline: Some(Outline {
+                    width: outline_width,
+                    color: rgb(color("_OutlineColor", [0.0, 0.0, 0.0, 1.0])),
+                    width_tex: outline_width_tex,
+                    tex: None,
+                }),
             }),
             alpha,
             double_sided: num(&f["_CullMode"], 2.0) as i32 == 0,
-            render_queue: p["renderQueue"]
+            // The render queue, as an offset within the pass (ADR 0090).
+            order: p["renderQueue"]
                 .as_i64()
-                .map_or(default_queue, |q| q.clamp(0, 5000) as i32),
+                .map_or(0, |q| q.clamp(0, 5000) as i32 - alpha.queue_base()),
         }
+    }
+}
+
+/// MToon's added matcap.
+fn matcap(tex: TextureSlot, strength: f32) -> Matcap {
+    Matcap {
+        tex: Some(tex),
+        strength,
+        blend: MatcapBlend::Add,
+        color: [1.0; 3],
+        mask_tex: None,
+        emission: 0.0,
+    }
+}
+
+/// MToon's parametric rim: a plain fresnel rim.
+fn rim(color: [f32; 3], power: f32) -> Rim {
+    Rim {
+        color,
+        power,
+        border: 0.5,
+        blur: 1.0,
+        shadow_mask: 0.0,
+        main_strength: 0.0,
     }
 }
 

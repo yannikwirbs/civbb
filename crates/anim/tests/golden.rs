@@ -382,7 +382,7 @@ fn unity_material(spec: &BTreeMap<String, Value>) -> Material {
         model,
         alpha: AlphaMode::Opaque,
         double_sided: false,
-        render_queue: 2000,
+        order: 0,
     }
 }
 
