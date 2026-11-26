@@ -10,7 +10,7 @@ use civbb_format::constraint::{Constraint, ConstraintKind, WorldUp};
 use civbb_format::dynamics::{Contacts, Dynamics};
 use civbb_format::expressions::Expressions;
 use civbb_format::face::{EyeDriver, Face, ShapeBind};
-use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, NodeIndex};
+use civbb_format::hierarchy::{BoneNode, HumanBone, Humanoid, MuscleFrame, NodeIndex};
 use civbb_format::math::{Quat, Vec3};
 use civbb_format::state::StateTable;
 use serde::Deserialize;
@@ -18,6 +18,7 @@ use serde_json::Value;
 
 use super::Importer;
 use super::unity_clip::{self, XClip};
+use super::unity_shapes;
 use super::unity_state::{self, XAnimatorParameters, XExpressions};
 
 /// The avatar parts the `X_*` extensions add to a plain glTF import.
@@ -106,7 +107,11 @@ impl Importer<'_> {
         self.unity_dialect()?;
         let mut s = Source::default();
         if let Some(v) = doc.extension_value("X_avatar") {
-            let mut x: XAvatar = parse("X_avatar", v)?;
+            let mut v = v.clone();
+            if let Some(f) = v.get_mut("face").filter(|f| f.is_object()) {
+                unity_shapes::face(f);
+            }
+            let mut x: XAvatar = parse("X_avatar", &v)?;
             if let Some(mut face) = x.face.take() {
                 self.face_meshes(&mut face)?;
                 s.face = Some(face);
@@ -119,12 +124,20 @@ impl Importer<'_> {
         let mut clips = Vec::new();
         if let Some(v) = doc.extension_value("X_animator") {
             let mut v = v.clone();
+            if let Some(c) = v.get_mut("clips") {
+                unity_shapes::clips(c);
+            }
             if let Some(a) = v.get_mut("animator") {
+                unity_shapes::animator(a);
                 unity_clip::mask_nodes(a, &self.nodes, self.caps.string_len);
                 unity_state::lower_states(a)?;
             }
-            let x: XAnimator = parse("X_animator", &v)?;
             params = parse::<XAnimatorParameters>("X_animator", &v["animator"])?.parameters;
+            // Dialect 1's parameters became the state table; the native animator has no such field.
+            if let Some(a) = v.get_mut("animator").and_then(Value::as_object_mut) {
+                a.remove("parameters");
+            }
+            let x: XAnimator = parse("X_animator", &v)?;
             let mut animator = x.animator;
             let base = u32::try_from(clip_base).map_err(|_| "X_animator: too many clips")?;
             for layer in &mut animator.layers {
@@ -138,7 +151,9 @@ impl Importer<'_> {
             clips = x.clips;
         }
         if let Some(v) = doc.extension_value("X_constraints") {
-            s.constraints = parse("X_constraints", v)?;
+            let mut v = v.clone();
+            unity_shapes::constraints(&mut v);
+            s.constraints = parse("X_constraints", &v)?;
             for c in &mut s.constraints {
                 self.constraint_nodes(c)?;
             }
@@ -157,6 +172,7 @@ impl Importer<'_> {
         }
         if let Some(v) = doc.extension_value("X_dynamics") {
             let mut v = v.clone();
+            unity_shapes::dynamics(&mut v);
             let chains = v.get_mut("chains").and_then(Value::as_array_mut);
             for c in chains.into_iter().flatten() {
                 let c = c.as_object_mut().ok_or("X_dynamics: a chain is not an object")?;
@@ -180,6 +196,7 @@ impl Importer<'_> {
         }
         if let Some(v) = doc.extension_value("X_contacts") {
             let mut v = v.clone();
+            unity_shapes::contacts(&mut v);
             let receivers = v.get_mut("receivers").and_then(Value::as_array_mut);
             for r in receivers.into_iter().flatten() {
                 let p = r
@@ -252,9 +269,12 @@ impl Importer<'_> {
             if h.node(bone).is_some() {
                 return Err(format!("X_avatar: bone {name} mapped twice"));
             }
-            h.bones.push((bone, self.x_node("X_avatar", i)?));
+            h.bones.push(BoneNode {
+                bone,
+                node: self.x_node("X_avatar", i)?,
+            });
         }
-        h.bones.sort_unstable_by_key(|&(b, _)| b);
+        h.bones.sort_unstable_by_key(|b| b.bone);
         for f in x.muscle_frames {
             h.muscle_frames.push(MuscleFrame {
                 bone: unity_bone(&f.bone)
@@ -306,7 +326,7 @@ impl Importer<'_> {
             }
             None => {}
         }
-        let binds = face.visemes.iter_mut().flat_map(|(_, b)| b.iter_mut());
+        let binds = face.visemes.iter_mut().flat_map(|v| v.binds.iter_mut());
         for b in binds.chain(face.blink.iter_mut()).chain(eye_binds) {
             b.mesh = mesh(b.mesh)?;
         }
@@ -321,7 +341,7 @@ impl Importer<'_> {
         }
         match &mut c.kind {
             ConstraintKind::Aim {
-                world_up: WorldUp::ObjectUp(n) | WorldUp::ObjectRotationUp(n, _),
+                world_up: WorldUp::ObjectUp { node: n } | WorldUp::ObjectRotationUp { node: n, up: _ },
                 ..
             }
             | ConstraintKind::LookAt {
@@ -336,7 +356,7 @@ impl Importer<'_> {
 /// Moves a motion's clip indices past the clips imported before the extension's.
 fn shift(m: &mut Motion, base: u32) -> Result<(), String> {
     match m {
-        Motion::Clip(i) => *i = i.checked_add(base).ok_or("X_animator: clip index overflows")?,
+        Motion::Clip { clip: i } => *i = i.checked_add(base).ok_or("X_animator: clip index overflows")?,
         Motion::BlendTree(t) => {
             for c in &mut t.children {
                 shift(&mut c.motion, base)?;

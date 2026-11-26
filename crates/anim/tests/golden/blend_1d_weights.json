@@ -1,7 +1,7 @@
 {
   "source": "Recorded in Unity (Goldens.cs): a 1D blend tree with thresholds -1, 0 and 2 over clips setting A.x to 1, B.x to 1 and C.x to 1, the parameter swept.",
   "nodes": [{ "name": "A" }, { "name": "B" }, { "name": "C" }],
-  "params": [{ "name": "t", "kind": "Float", "default": 0 }],
+  "params": [{ "name": "t", "kind": "float", "default": 0 }],
   "clips": {
     "A1": { "length": 1, "curves": [["A.x", [[0, 1]]]] },
     "B1": { "length": 1, "curves": [["B.x", [[0, 1]]]] },

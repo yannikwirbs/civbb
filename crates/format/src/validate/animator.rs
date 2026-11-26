@@ -30,17 +30,17 @@ impl V {
                     Target::Node { node, property } => {
                         self.index(*node as usize, a.hierarchy.nodes.len(), cp, "node");
                         match property {
-                            NodeProperty::Translation(i)
+                            NodeProperty::Translation { component: i }
                             | NodeProperty::EulerRotation { axis: i, .. }
-                            | NodeProperty::Scale(i) => *i < 3,
-                            NodeProperty::Rotation(i) => *i < 4,
+                            | NodeProperty::Scale { component: i } => *i < 3,
+                            NodeProperty::Rotation { component: i } => *i < 4,
                             NodeProperty::Active => true,
                         }
                     }
                     Target::Mesh { mesh, property } => {
                         self.index(*mesh as usize, a.meshes.len(), cp, "mesh");
                         match property {
-                            MeshProperty::Weight(s) => {
+                            MeshProperty::Weight { shape: s } => {
                                 let shapes = a.meshes.get(*mesh as usize).map_or(0, |m| m.blend_shapes.len());
                                 self.index(*s as usize, shapes, cp, "blend shape");
                                 true
@@ -48,12 +48,16 @@ impl V {
                             MeshProperty::Material { field, component, srgb } => {
                                 *component < field.components() && (!srgb || field.is_color())
                             }
-                            MeshProperty::Visible | MeshProperty::MaterialSlot(_) => true,
+                            MeshProperty::Visible | MeshProperty::MaterialSlot { submesh: _ } => true,
                         }
                     }
-                    Target::Humanoid(HumanoidProperty::Muscle { axis, .. }) => *axis < 3,
-                    Target::Humanoid(HumanoidProperty::Body(i)) => *i < 7,
-                    Target::Entry(e) => {
+                    Target::Humanoid {
+                        property: HumanoidProperty::Muscle { axis, .. },
+                    } => *axis < 3,
+                    Target::Humanoid {
+                        property: HumanoidProperty::Body { component: i },
+                    } => *i < 7,
+                    Target::Entry { entry: e } => {
                         self.written(*e, cp, "entry");
                         true
                     }
@@ -133,7 +137,7 @@ impl V {
                         }
                         Action::LayerWeight { layer, .. } => self.index(*layer as usize, a.layers.len(), sp, "layer"),
                         Action::GroupWeight { group, .. } => self.index(*group as usize, a.groups.len(), sp, "group"),
-                        Action::PoseSource(_) | Action::Locomotion { .. } => {}
+                        Action::PoseSource { .. } | Action::Locomotion { .. } => {}
                     }
                 }
             }
@@ -143,7 +147,7 @@ impl V {
     }
 
     fn transition(&mut self, t: &Transition, states: usize, params: usize, path: impl Fn() -> String) {
-        if let TransitionDest::State(s) = t.dest {
+        if let TransitionDest::State { state: s } = t.dest {
             self.index(s as usize, states, &path, "transition destination");
         }
         for cond in &t.conditions {
@@ -155,7 +159,7 @@ impl V {
     fn motion(&mut self, m: &Motion, depth: usize, params: usize, clips: usize, path: &dyn Fn() -> String) {
         let cap = self.caps.blend_tree_depth;
         match m {
-            Motion::Clip(c) => self.index(*c as usize, clips, path, "clip"),
+            Motion::Clip { clip: c } => self.index(*c as usize, clips, path, "clip"),
             Motion::BlendTree(_) if depth >= cap => self.fail(path, format!("blend trees nested deeper than {cap}")),
             Motion::BlendTree(tree) => {
                 let axes = match tree.kind {

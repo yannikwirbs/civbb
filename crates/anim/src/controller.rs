@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use civbb_format::Document;
-use civbb_format::animator::{Action, Animator, BodyPart, PoseSource, State, Unwritten};
+use civbb_format::animator::{Action, Animator, BodyPart, PartSource, PoseSource, State, Unwritten};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform};
 use civbb_format::state::{EntryIndex, Platform, StateTable};
@@ -347,8 +347,8 @@ impl Instance {
                         drive(ops, &c.state.entries, &mut self.params, &mut self.rng);
                     }
                 }
-                Action::PoseSource(parts) => {
-                    for &(part, mode) in parts {
+                Action::PoseSource { parts } => {
+                    for &PartSource { part, source: mode } in parts {
                         self.pose_sources[part_index(part)] = mode;
                     }
                 }

@@ -197,7 +197,7 @@ fn unity_bindings_resolve_by_path_or_are_dropped() {
         [
             &Target::Mesh {
                 mesh: 0,
-                property: MeshProperty::Weight(0)
+                property: MeshProperty::Weight { shape: 0 }
             },
             &Target::Node {
                 node: body,

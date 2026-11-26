@@ -236,14 +236,14 @@ fn prune_shapes(a: &mut Document) -> usize {
         .filter_map(|c| match c.target {
             Target::Mesh {
                 mesh,
-                property: MeshProperty::Weight(s),
+                property: MeshProperty::Weight { shape: s },
             } => Some((mesh, s)),
             _ => None,
         })
         .collect();
     let mut bound = HashSet::new();
     if let Some(face) = a.avatar().and_then(|r| r.face.as_ref()) {
-        let mut binds: Vec<_> = face.visemes.iter().flat_map(|(_, b)| b).chain(&face.blink).collect();
+        let mut binds: Vec<_> = face.visemes.iter().flat_map(|v| &v.binds).chain(&face.blink).collect();
         if let Some(EyeDriver::Shapes { up, down, left, right }) = face.eyes.as_ref().map(|e| &e.driver) {
             binds.extend(up.iter().chain(down).chain(left).chain(right));
         }
@@ -277,7 +277,7 @@ fn prune_shapes(a: &mut Document) -> usize {
         let mut binds: Vec<_> = face
             .visemes
             .iter_mut()
-            .flat_map(|(_, b)| b)
+            .flat_map(|v| &mut v.binds)
             .chain(&mut face.blink)
             .collect();
         if let Some(EyeDriver::Shapes { up, down, left, right }) = face.eyes.as_mut().map(|e| &mut e.driver) {
@@ -358,7 +358,7 @@ fn for_each_node(a: &mut Document, mut f: impl FnMut(&mut NodeIndex)) {
         }
     }
     if let Some(h) = a.avatar_mut().and_then(|r| r.humanoid.as_mut()) {
-        h.bones.iter_mut().for_each(|(_, n)| f(n));
+        h.bones.iter_mut().for_each(|b| f(&mut b.node));
     }
     if let Some(EyeDriver::Bones { left, right }) = a
         .avatar_mut()
@@ -380,7 +380,7 @@ fn for_each_node(a: &mut Document, mut f: impl FnMut(&mut NodeIndex)) {
         c.sources.iter_mut().for_each(|s| f(&mut s.node));
         match &mut c.kind {
             ConstraintKind::Aim {
-                world_up: WorldUp::ObjectUp(n) | WorldUp::ObjectRotationUp(n, _),
+                world_up: WorldUp::ObjectUp { node: n } | WorldUp::ObjectRotationUp { node: n, up: _ },
                 ..
             } => f(n),
             ConstraintKind::LookAt {

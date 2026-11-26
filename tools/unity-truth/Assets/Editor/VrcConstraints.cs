@@ -195,8 +195,8 @@ public static class VrcConstraints
     }
 
     static string FieldJson(string field) => field.StartsWith("Source")
-        ? "{\"SourceWeight\": " + field.Substring("Source".Length) + "}"
-        : "\"" + field + "\"";
+        ? "{\"type\": \"source_weight\", \"source\": " + field.Substring("Source".Length) + "}"
+        : "{\"type\": \"" + field.ToLowerInvariant() + "\"}";
 
     class Opt
     {
@@ -230,21 +230,21 @@ public static class VrcConstraints
                 Field(k, "PositionOffset", o.Offset);
                 Field(k, "PositionAtRest", o.RestP);
                 Axes("Position", o.Axes);
-                json = "{\"Position\": {\"offset\": " + V(o.Offset) + "}}";
+                json = "{\"type\": \"position\", \"offset\": " + V(o.Offset) + "}";
                 rest = Tr(o.RestP, Quaternion.identity, Vector3.one);
                 break;
             case "Rotation":
                 Field(k, "RotationOffset", o.Offset);
                 Field(k, "RotationAtRest", o.RestR);
                 Axes("Rotation", o.Axes);
-                json = "{\"Rotation\": {\"offset\": " + V(o.Offset) + "}}";
+                json = "{\"type\": \"rotation\", \"offset\": " + V(o.Offset) + "}";
                 rest = Tr(Vector3.zero, Quaternion.Euler(o.RestR), Vector3.one);
                 break;
             case "Scale":
                 Field(k, "ScaleOffset", o.ScaleOffset);
                 Field(k, "ScaleAtRest", o.RestS);
                 Axes("Scale", o.Axes);
-                json = "{\"Scale\": {\"offset\": " + V(o.ScaleOffset) + "}}";
+                json = "{\"type\": \"scale\", \"offset\": " + V(o.ScaleOffset) + "}";
                 rest = Tr(Vector3.zero, Quaternion.identity, o.RestS);
                 break;
             case "Parent":
@@ -252,7 +252,7 @@ public static class VrcConstraints
                 Field(k, "RotationAtRest", o.RestR);
                 Axes("Position", o.Axes);
                 Axes("Rotation", o.RotationAxes);
-                json = "{\"Parent\": {\"rotation_axes\": " + AxesJson(o.RotationAxes) + "}}";
+                json = "{\"type\": \"parent\", \"rotation_axes\": " + AxesJson(o.RotationAxes) + "}";
                 rest = Tr(o.RestP, Quaternion.Euler(o.RestR), Vector3.one);
                 break;
             case "Aim":
@@ -264,12 +264,12 @@ public static class VrcConstraints
                 Field(k, "WorldUp", o.WorldUp);
                 Field(k, "WorldUpVector", o.WorldUpVector);
                 Field(k, "WorldUpTransform", o.UpNode);
-                string w = o.WorldUp == "Vector" ? "{\"Vector\": " + V(o.WorldUpVector) + "}"
-                    : o.WorldUp == "ObjectUp" ? "{\"ObjectUp\": " + c.Index(o.UpNode) + "}"
-                    : o.WorldUp == "ObjectRotationUp" ? "{\"ObjectRotationUp\": [" + c.Index(o.UpNode) + ", " + V(o.WorldUpVector) + "]}"
-                    : "\"" + o.WorldUp + "\"";
-                json = "{\"Aim\": {\"offset\": " + V(o.Offset) + ", \"aim_axis\": " + V(o.Aim) + ", \"up_axis\": " + V(o.Up) +
-                       ", \"world_up\": " + w + "}}";
+                string w = o.WorldUp == "Vector" ? "{\"type\": \"vector\", \"up\": " + V(o.WorldUpVector) + "}"
+                    : o.WorldUp == "ObjectUp" ? "{\"type\": \"object_up\", \"node\": " + c.Index(o.UpNode) + "}"
+                    : o.WorldUp == "ObjectRotationUp" ? "{\"type\": \"object_rotation_up\", \"node\": " + c.Index(o.UpNode) + ", \"up\": " + V(o.WorldUpVector) + "}"
+                    : o.WorldUp == "SceneUp" ? "{\"type\": \"scene_up\"}" : "{\"type\": \"none\"}";
+                json = "{\"type\": \"aim\", \"offset\": " + V(o.Offset) + ", \"aim_axis\": " + V(o.Aim) + ", \"up_axis\": " + V(o.Up) +
+                       ", \"world_up\": " + w + "}";
                 rest = Tr(Vector3.zero, Quaternion.Euler(o.RestR), Vector3.one);
                 break;
             default:
@@ -278,8 +278,8 @@ public static class VrcConstraints
                 Field(k, "Roll", o.Roll);
                 Field(k, "UseUpTransform", o.UpNode != null);
                 Field(k, "WorldUpTransform", o.UpNode);
-                json = "{\"LookAt\": {\"offset\": " + V(o.Offset) + ", \"roll\": " + F(o.Roll) + ", \"world_up_node\": " +
-                       (o.UpNode == null ? "null" : c.Index(o.UpNode).ToString()) + "}}";
+                json = "{\"type\": \"look_at\", \"offset\": " + V(o.Offset) + ", \"roll\": " + F(o.Roll) + ", \"world_up_node\": " +
+                       (o.UpNode == null ? "null" : c.Index(o.UpNode).ToString()) + "}";
                 axes = "[true, true, true]";
                 rest = Tr(Vector3.zero, Quaternion.Euler(o.RestR), Vector3.one);
                 break;

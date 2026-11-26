@@ -13,9 +13,8 @@
       ],
       "layers": [
         {
-          "blending": "Override",
+          "blending": "override",
           "group": 0,
-          "mask": null,
           "name": "Base",
           "state_machine": {
             "any_state_transitions": [
@@ -23,19 +22,20 @@
                 "can_transition_to_self": true,
                 "conditions": [
                   {
-                    "mode": "If",
+                    "mode": "if",
                     "param": 3,
                     "threshold": 0.0
                   }
                 ],
                 "dest": {
-                  "State": 3
+                  "state": 3,
+                  "type": "state"
                 },
                 "duration": 0.25,
                 "exit_time": 0.75,
                 "fixed_duration": false,
                 "has_exit_time": true,
-                "interruption": "DestinationThenSource",
+                "interruption": "destination_then_source",
                 "offset": 0.10000000149011612,
                 "ordered_interruption": false
               }
@@ -46,19 +46,20 @@
                 "can_transition_to_self": true,
                 "conditions": [
                   {
-                    "mode": "Greater",
+                    "mode": "greater",
                     "param": 2,
                     "threshold": 0.0
                   }
                 ],
                 "dest": {
-                  "State": 2
+                  "state": 2,
+                  "type": "state"
                 },
                 "duration": 0.25,
                 "exit_time": 0.75,
                 "fixed_duration": false,
                 "has_exit_time": true,
-                "interruption": "None",
+                "interruption": "none",
                 "offset": 0.10000000149011612,
                 "ordered_interruption": false
               }
@@ -67,182 +68,169 @@
               {
                 "actions": [],
                 "cycle_offset": 0.0,
-                "cycle_offset_param": null,
                 "mirror": false,
-                "mirror_param": null,
-                "motion": null,
                 "name": "Empty",
                 "speed": 1.0,
-                "speed_param": null,
-                "time_param": null,
                 "transitions": [
                   {
                     "can_transition_to_self": true,
                     "conditions": [
                       {
-                        "mode": "If",
+                        "mode": "if",
                         "param": 0,
                         "threshold": 0.0
                       },
                       {
-                        "mode": "IfNot",
+                        "mode": "if_not",
                         "param": 6,
                         "threshold": 0.0
                       },
                       {
-                        "mode": "Greater",
+                        "mode": "greater",
                         "param": 1,
                         "threshold": 0.5
                       },
                       {
-                        "mode": "Less",
+                        "mode": "less",
                         "param": 1,
                         "threshold": 2.0
                       },
                       {
-                        "mode": "Equals",
+                        "mode": "equals",
                         "param": 2,
                         "threshold": 3.0
                       },
                       {
-                        "mode": "NotEqual",
+                        "mode": "not_equal",
                         "param": 2,
                         "threshold": 4.0
                       },
                       {
-                        "mode": "If",
+                        "mode": "if",
                         "param": 3,
                         "threshold": 0.0
                       }
                     ],
                     "dest": {
-                      "State": 1
+                      "state": 1,
+                      "type": "state"
                     },
                     "duration": 0.25,
                     "exit_time": 0.75,
                     "fixed_duration": false,
                     "has_exit_time": true,
-                    "interruption": "Source",
+                    "interruption": "source",
                     "offset": 0.10000000149011612,
                     "ordered_interruption": false
                   }
                 ],
-                "unwritten": "Rest"
+                "unwritten": "rest"
               },
               {
                 "actions": [
                   {
-                    "Entries": {
-                      "ops": [
-                        {
-                          "Set": {
-                            "param": 0,
-                            "value": 1.0
-                          }
+                    "ops": [
+                      {
+                        "param": 0,
+                        "type": "set",
+                        "value": 1.0
+                      },
+                      {
+                        "param": 2,
+                        "type": "add",
+                        "value": 1.0
+                      },
+                      {
+                        "chance": 0.5,
+                        "max": 1.0,
+                        "min": -1.0,
+                        "param": 1,
+                        "type": "random"
+                      },
+                      {
+                        "dst": 4,
+                        "src": 1,
+                        "type": "copy"
+                      },
+                      {
+                        "dst": 5,
+                        "remap": {
+                          "from": [
+                            0.0,
+                            10.0
+                          ],
+                          "to": [
+                            -1.0,
+                            1.0
+                          ]
                         },
-                        {
-                          "Add": {
-                            "param": 2,
-                            "value": 1.0
-                          }
-                        },
-                        {
-                          "Random": {
-                            "chance": 0.5,
-                            "max": 1.0,
-                            "min": -1.0,
-                            "param": 1
-                          }
-                        },
-                        {
-                          "Copy": {
-                            "dst": 4,
-                            "remap": null,
-                            "src": 1
-                          }
-                        },
-                        {
-                          "Copy": {
-                            "dst": 5,
-                            "remap": [
-                              [
-                                0.0,
-                                10.0
-                              ],
-                              [
-                                -1.0,
-                                1.0
-                              ]
-                            ],
-                            "src": 2
-                          }
-                        }
-                      ],
-                      "owner_only": false
-                    }
+                        "src": 2,
+                        "type": "copy"
+                      }
+                    ],
+                    "owner_only": false,
+                    "type": "entries"
                   },
                   {
-                    "PoseSource": [
-                      [
-                        "Head",
-                        "Tracking"
-                      ],
-                      [
-                        "LeftHand",
-                        "Animation"
-                      ],
-                      [
-                        "RightHand",
-                        "Tracking"
-                      ],
-                      [
-                        "Hip",
-                        "Animation"
-                      ],
-                      [
-                        "LeftFoot",
-                        "Tracking"
-                      ],
-                      [
-                        "RightFoot",
-                        "Animation"
-                      ],
-                      [
-                        "LeftFingers",
-                        "Tracking"
-                      ],
-                      [
-                        "RightFingers",
-                        "Animation"
-                      ],
-                      [
-                        "Eyes",
-                        "Tracking"
-                      ],
-                      [
-                        "Mouth",
-                        "Animation"
-                      ]
-                    ]
+                    "parts": [
+                      {
+                        "part": "head",
+                        "source": "tracking"
+                      },
+                      {
+                        "part": "left_hand",
+                        "source": "animation"
+                      },
+                      {
+                        "part": "right_hand",
+                        "source": "tracking"
+                      },
+                      {
+                        "part": "hip",
+                        "source": "animation"
+                      },
+                      {
+                        "part": "left_foot",
+                        "source": "tracking"
+                      },
+                      {
+                        "part": "right_foot",
+                        "source": "animation"
+                      },
+                      {
+                        "part": "left_fingers",
+                        "source": "tracking"
+                      },
+                      {
+                        "part": "right_fingers",
+                        "source": "animation"
+                      },
+                      {
+                        "part": "eyes",
+                        "source": "tracking"
+                      },
+                      {
+                        "part": "mouth",
+                        "source": "animation"
+                      }
+                    ],
+                    "type": "pose_source"
                   },
                   {
-                    "LayerWeight": {
-                      "duration": 0.20000000298023224,
-                      "goal": 0.5,
-                      "layer": 1
-                    }
+                    "duration": 0.20000000298023224,
+                    "goal": 0.5,
+                    "layer": 1,
+                    "type": "layer_weight"
                   },
                   {
-                    "GroupWeight": {
-                      "duration": 0.0,
-                      "goal": 0.0,
-                      "group": 1
-                    }
+                    "duration": 0.0,
+                    "goal": 0.0,
+                    "group": 1,
+                    "type": "group_weight"
                   },
                   {
-                    "Locomotion": {
-                      "disabled": true
-                    }
+                    "disabled": true,
+                    "type": "locomotion"
                   }
                 ],
                 "cycle_offset": 0.30000001192092896,
@@ -250,22 +238,24 @@
                 "mirror": true,
                 "mirror_param": 6,
                 "motion": {
-                  "Clip": 0
+                  "clip": 0,
+                  "type": "clip"
                 },
                 "name": "Clip",
                 "speed": 2.0,
                 "speed_param": 1,
-                "time_param": null,
                 "transitions": [
                   {
                     "can_transition_to_self": true,
                     "conditions": [],
-                    "dest": "Exit",
+                    "dest": {
+                      "type": "exit"
+                    },
                     "duration": 0.25,
                     "exit_time": 0.75,
                     "fixed_duration": false,
                     "has_exit_time": true,
-                    "interruption": "Destination",
+                    "interruption": "destination",
                     "offset": 0.10000000149011612,
                     "ordered_interruption": false
                   },
@@ -273,311 +263,288 @@
                     "can_transition_to_self": true,
                     "conditions": [
                       {
-                        "mode": "Greater",
+                        "mode": "greater",
                         "param": 1,
                         "threshold": 1.0
                       }
                     ],
                     "dest": {
-                      "State": 2
+                      "state": 2,
+                      "type": "state"
                     },
                     "duration": 0.25,
                     "exit_time": 0.75,
                     "fixed_duration": false,
                     "has_exit_time": true,
-                    "interruption": "SourceThenDestination",
+                    "interruption": "source_then_destination",
                     "offset": 0.10000000149011612,
                     "ordered_interruption": false
                   }
                 ],
-                "unwritten": "Hold"
+                "unwritten": "hold"
               },
               {
                 "actions": [],
                 "cycle_offset": 0.0,
-                "cycle_offset_param": null,
                 "mirror": false,
-                "mirror_param": null,
                 "motion": {
-                  "BlendTree": {
-                    "children": [
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": null,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 0
-                        },
-                        "position": [
-                          0.0,
-                          1.0
-                        ],
-                        "threshold": 0.0,
-                        "time_scale": 1.5
+                  "children": [
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 0,
+                        "type": "clip"
                       },
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": null,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 1
-                        },
-                        "position": [
-                          1.0,
-                          0.0
-                        ],
-                        "threshold": 1.0,
-                        "time_scale": 1.5
-                      }
-                    ],
-                    "kind": {
-                      "Simple1D": {
-                        "param": 1
-                      }
+                      "position": [
+                        0.0,
+                        1.0
+                      ],
+                      "threshold": 0.0,
+                      "time_scale": 1.5
                     },
-                    "normalize": false
-                  }
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 1,
+                        "type": "clip"
+                      },
+                      "position": [
+                        1.0,
+                        0.0
+                      ],
+                      "threshold": 1.0,
+                      "time_scale": 1.5
+                    }
+                  ],
+                  "kind": {
+                    "param": 1,
+                    "type": "simple_1d"
+                  },
+                  "normalize": false,
+                  "type": "blend_tree"
                 },
                 "name": "Simple1D",
                 "speed": 1.0,
-                "speed_param": null,
                 "time_param": 4,
                 "transitions": [],
-                "unwritten": "Hold"
+                "unwritten": "hold"
               },
               {
                 "actions": [],
                 "cycle_offset": 0.0,
-                "cycle_offset_param": null,
                 "mirror": false,
-                "mirror_param": null,
                 "motion": {
-                  "BlendTree": {
-                    "children": [
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": null,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 0
-                        },
-                        "position": [
-                          0.0,
-                          1.0
-                        ],
-                        "threshold": 0.0,
-                        "time_scale": 1.5
+                  "children": [
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 0,
+                        "type": "clip"
                       },
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": null,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 1
-                        },
-                        "position": [
-                          1.0,
-                          0.0
-                        ],
-                        "threshold": 1.0,
-                        "time_scale": 1.5
-                      }
-                    ],
-                    "kind": {
-                      "SimpleDirectional2D": {
-                        "x": 4,
-                        "y": 5
-                      }
+                      "position": [
+                        0.0,
+                        1.0
+                      ],
+                      "threshold": 0.0,
+                      "time_scale": 1.5
                     },
-                    "normalize": false
-                  }
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 1,
+                        "type": "clip"
+                      },
+                      "position": [
+                        1.0,
+                        0.0
+                      ],
+                      "threshold": 1.0,
+                      "time_scale": 1.5
+                    }
+                  ],
+                  "kind": {
+                    "type": "simple_directional_2d",
+                    "x": 4,
+                    "y": 5
+                  },
+                  "normalize": false,
+                  "type": "blend_tree"
                 },
                 "name": "Simple2D",
                 "speed": 1.0,
-                "speed_param": null,
-                "time_param": null,
                 "transitions": [],
-                "unwritten": "Hold"
+                "unwritten": "hold"
               },
               {
                 "actions": [],
                 "cycle_offset": 0.0,
-                "cycle_offset_param": null,
                 "mirror": false,
-                "mirror_param": null,
                 "motion": {
-                  "BlendTree": {
-                    "children": [
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": null,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 0
-                        },
-                        "position": [
-                          0.0,
-                          1.0
-                        ],
-                        "threshold": 0.0,
-                        "time_scale": 1.5
+                  "children": [
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 0,
+                        "type": "clip"
                       },
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": null,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 1
-                        },
-                        "position": [
-                          1.0,
-                          0.0
-                        ],
-                        "threshold": 1.0,
-                        "time_scale": 1.5
-                      }
-                    ],
-                    "kind": {
-                      "FreeformDirectional2D": {
-                        "x": 4,
-                        "y": 5
-                      }
+                      "position": [
+                        0.0,
+                        1.0
+                      ],
+                      "threshold": 0.0,
+                      "time_scale": 1.5
                     },
-                    "normalize": false
-                  }
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 1,
+                        "type": "clip"
+                      },
+                      "position": [
+                        1.0,
+                        0.0
+                      ],
+                      "threshold": 1.0,
+                      "time_scale": 1.5
+                    }
+                  ],
+                  "kind": {
+                    "type": "freeform_directional_2d",
+                    "x": 4,
+                    "y": 5
+                  },
+                  "normalize": false,
+                  "type": "blend_tree"
                 },
                 "name": "Freeform2D",
                 "speed": 1.0,
-                "speed_param": null,
-                "time_param": null,
                 "transitions": [],
-                "unwritten": "Hold"
+                "unwritten": "hold"
               },
               {
                 "actions": [],
                 "cycle_offset": 0.0,
-                "cycle_offset_param": null,
                 "mirror": false,
-                "mirror_param": null,
                 "motion": {
-                  "BlendTree": {
-                    "children": [
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": null,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 0
-                        },
-                        "position": [
-                          0.0,
-                          1.0
-                        ],
-                        "threshold": 0.0,
-                        "time_scale": 1.5
+                  "children": [
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 0,
+                        "type": "clip"
                       },
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": null,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 1
-                        },
-                        "position": [
-                          1.0,
-                          0.0
-                        ],
-                        "threshold": 1.0,
-                        "time_scale": 1.5
-                      }
-                    ],
-                    "kind": {
-                      "FreeformCartesian2D": {
-                        "x": 4,
-                        "y": 5
-                      }
+                      "position": [
+                        0.0,
+                        1.0
+                      ],
+                      "threshold": 0.0,
+                      "time_scale": 1.5
                     },
-                    "normalize": false
-                  }
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 1,
+                        "type": "clip"
+                      },
+                      "position": [
+                        1.0,
+                        0.0
+                      ],
+                      "threshold": 1.0,
+                      "time_scale": 1.5
+                    }
+                  ],
+                  "kind": {
+                    "type": "freeform_cartesian_2d",
+                    "x": 4,
+                    "y": 5
+                  },
+                  "normalize": false,
+                  "type": "blend_tree"
                 },
                 "name": "Cartesian2D",
                 "speed": 1.0,
-                "speed_param": null,
-                "time_param": null,
                 "transitions": [],
-                "unwritten": "Hold"
+                "unwritten": "hold"
               },
               {
                 "actions": [],
                 "cycle_offset": 0.0,
-                "cycle_offset_param": null,
                 "mirror": false,
-                "mirror_param": null,
                 "motion": {
-                  "BlendTree": {
-                    "children": [
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": 1,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 0
-                        },
-                        "position": [
-                          0.0,
-                          1.0
-                        ],
-                        "threshold": 0.0,
-                        "time_scale": 1.5
+                  "children": [
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "direct_param": 1,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 0,
+                        "type": "clip"
                       },
-                      {
-                        "cycle_offset": 0.20000000298023224,
-                        "direct_param": 4,
-                        "mirror": true,
-                        "motion": {
-                          "Clip": 1
-                        },
-                        "position": [
-                          1.0,
-                          0.0
-                        ],
-                        "threshold": 1.0,
-                        "time_scale": 1.5
-                      }
-                    ],
-                    "kind": "Direct",
-                    "normalize": true
-                  }
+                      "position": [
+                        0.0,
+                        1.0
+                      ],
+                      "threshold": 0.0,
+                      "time_scale": 1.5
+                    },
+                    {
+                      "cycle_offset": 0.20000000298023224,
+                      "direct_param": 4,
+                      "mirror": true,
+                      "motion": {
+                        "clip": 1,
+                        "type": "clip"
+                      },
+                      "position": [
+                        1.0,
+                        0.0
+                      ],
+                      "threshold": 1.0,
+                      "time_scale": 1.5
+                    }
+                  ],
+                  "kind": {
+                    "type": "direct"
+                  },
+                  "normalize": true,
+                  "type": "blend_tree"
                 },
                 "name": "Direct",
                 "speed": 1.0,
-                "speed_param": null,
-                "time_param": null,
                 "transitions": [],
-                "unwritten": "Rest"
+                "unwritten": "rest"
               }
             ]
           },
           "weight": 1.0
         },
         {
-          "blending": "Additive",
+          "blending": "additive",
           "group": 1,
           "mask": {
             "body_parts": [
-              "Root",
-              "Body",
-              "Head",
-              "LeftLeg",
-              "RightLeg",
-              "LeftArm",
-              "RightArm",
-              "LeftFingers",
-              "RightFingers",
-              "LeftFootIk",
-              "RightFootIk",
-              "LeftHandIk",
-              "RightHandIk"
+              "root",
+              "body",
+              "head",
+              "left_leg",
+              "right_leg",
+              "left_arm",
+              "right_arm",
+              "left_fingers",
+              "right_fingers",
+              "left_foot_ik",
+              "right_foot_ik",
+              "left_hand_ik",
+              "right_hand_ik"
             ],
             "transforms": [
               6,
@@ -593,18 +560,15 @@
               {
                 "actions": [],
                 "cycle_offset": 0.0,
-                "cycle_offset_param": null,
                 "mirror": false,
-                "mirror_param": null,
                 "motion": {
-                  "Clip": 1
+                  "clip": 1,
+                  "type": "clip"
                 },
                 "name": "Pose",
                 "speed": 1.0,
-                "speed_param": null,
-                "time_param": null,
                 "transitions": [],
-                "unwritten": "Hold"
+                "unwritten": "hold"
               }
             ]
           },
@@ -631,12 +595,12 @@
               }
             ],
             "target": {
-              "Node": {
-                "node": 1,
-                "property": {
-                  "Translation": 0
-                }
-              }
+              "node": 1,
+              "property": {
+                "component": 0,
+                "type": "translation"
+              },
+              "type": "node"
             }
           },
           {
@@ -655,12 +619,12 @@
               }
             ],
             "target": {
-              "Node": {
-                "node": 1,
-                "property": {
-                  "Rotation": 3
-                }
-              }
+              "node": 1,
+              "property": {
+                "component": 3,
+                "type": "rotation"
+              },
+              "type": "node"
             }
           },
           {
@@ -679,15 +643,13 @@
               }
             ],
             "target": {
-              "Node": {
-                "node": 2,
-                "property": {
-                  "EulerRotation": {
-                    "axis": 1,
-                    "order": "Zxy"
-                  }
-                }
-              }
+              "node": 2,
+              "property": {
+                "axis": 1,
+                "order": "zxy",
+                "type": "euler_rotation"
+              },
+              "type": "node"
             }
           },
           {
@@ -706,12 +668,12 @@
               }
             ],
             "target": {
-              "Node": {
-                "node": 3,
-                "property": {
-                  "Scale": 2
-                }
-              }
+              "node": 3,
+              "property": {
+                "component": 2,
+                "type": "scale"
+              },
+              "type": "node"
             }
           },
           {
@@ -730,12 +692,12 @@
               }
             ],
             "target": {
-              "Humanoid": {
-                "Muscle": {
-                  "axis": 2,
-                  "bone": "leftUpperArm"
-                }
-              }
+              "property": {
+                "axis": 2,
+                "bone": "leftUpperArm",
+                "type": "muscle"
+              },
+              "type": "humanoid"
             }
           },
           {
@@ -754,9 +716,11 @@
               }
             ],
             "target": {
-              "Humanoid": {
-                "Body": 5
-              }
+              "property": {
+                "component": 5,
+                "type": "body"
+              },
+              "type": "humanoid"
             }
           },
           {
@@ -775,12 +739,12 @@
               }
             ],
             "target": {
-              "Mesh": {
-                "mesh": 0,
-                "property": {
-                  "Weight": 0
-                }
-              }
+              "mesh": 0,
+              "property": {
+                "shape": 0,
+                "type": "weight"
+              },
+              "type": "mesh"
             }
           },
           {
@@ -799,10 +763,11 @@
               }
             ],
             "target": {
-              "Node": {
-                "node": 7,
-                "property": "Active"
-              }
+              "node": 7,
+              "property": {
+                "type": "active"
+              },
+              "type": "node"
             }
           },
           {
@@ -821,10 +786,11 @@
               }
             ],
             "target": {
-              "Mesh": {
-                "mesh": 0,
-                "property": "Visible"
-              }
+              "mesh": 0,
+              "property": {
+                "type": "visible"
+              },
+              "type": "mesh"
             }
           },
           {
@@ -843,16 +809,14 @@
               }
             ],
             "target": {
-              "Mesh": {
-                "mesh": 0,
-                "property": {
-                  "Material": {
-                    "component": 0,
-                    "field": "BaseColor",
-                    "srgb": true
-                  }
-                }
-              }
+              "mesh": 0,
+              "property": {
+                "component": 0,
+                "field": "base_color",
+                "srgb": true,
+                "type": "material"
+              },
+              "type": "mesh"
             }
           },
           {
@@ -871,31 +835,12 @@
               }
             ],
             "target": {
-              "Mesh": {
-                "mesh": 0,
-                "property": {
-                  "MaterialSlot": 0
-                }
-              }
-            }
-          },
-          {
-            "keys": [
-              {
-                "in_tangent": 0.0,
-                "out_tangent": null,
-                "time": 0.0,
-                "value": 0.0
+              "mesh": 0,
+              "property": {
+                "submesh": 0,
+                "type": "material_slot"
               },
-              {
-                "in_tangent": 0.0,
-                "out_tangent": 0.25,
-                "time": 0.5,
-                "value": 1.0
-              }
-            ],
-            "target": {
-              "Entry": 1
+              "type": "mesh"
             }
           },
           {
@@ -914,10 +859,8 @@
               }
             ],
             "target": {
-              "Constraint": {
-                "constraint": 1,
-                "field": "Weight"
-              }
+              "entry": 1,
+              "type": "entry"
             }
           },
           {
@@ -936,10 +879,11 @@
               }
             ],
             "target": {
-              "Constraint": {
-                "constraint": 1,
-                "field": "Active"
-              }
+              "constraint": 1,
+              "field": {
+                "type": "weight"
+              },
+              "type": "constraint"
             }
           },
           {
@@ -958,12 +902,11 @@
               }
             ],
             "target": {
-              "Constraint": {
-                "constraint": 1,
-                "field": {
-                  "SourceWeight": 0
-                }
-              }
+              "constraint": 1,
+              "field": {
+                "type": "active"
+              },
+              "type": "constraint"
             }
           },
           {
@@ -982,10 +925,35 @@
               }
             ],
             "target": {
-              "Constraint": {
-                "constraint": 1,
-                "field": "Freeze"
+              "constraint": 1,
+              "field": {
+                "source": 0,
+                "type": "source_weight"
+              },
+              "type": "constraint"
+            }
+          },
+          {
+            "keys": [
+              {
+                "in_tangent": 0.0,
+                "out_tangent": null,
+                "time": 0.0,
+                "value": 0.0
+              },
+              {
+                "in_tangent": 0.0,
+                "out_tangent": 0.25,
+                "time": 0.5,
+                "value": 1.0
               }
+            ],
+            "target": {
+              "constraint": 1,
+              "field": {
+                "type": "freeze"
+              },
+              "type": "constraint"
             }
           }
         ],
@@ -1022,19 +990,18 @@
               }
             ],
             "target": {
-              "Node": {
-                "node": 2,
-                "property": {
-                  "Rotation": 0
-                }
-              }
+              "node": 2,
+              "property": {
+                "component": 0,
+                "type": "rotation"
+              },
+              "type": "node"
             }
           }
         ],
         "length": 1.0,
         "looping": true,
-        "name": "Pose",
-        "root": null
+        "name": "Pose"
       }
     ],
     "constraints": [
@@ -1046,13 +1013,12 @@
           true
         ],
         "kind": {
-          "Position": {
-            "offset": [
-              0.10000000149011612,
-              0.0,
-              0.0
-            ]
-          }
+          "offset": [
+            0.10000000149011612,
+            0.0,
+            0.0
+          ],
+          "type": "position"
         },
         "options": {
           "freeze": false,
@@ -1112,13 +1078,12 @@
           true
         ],
         "kind": {
-          "Rotation": {
-            "offset": [
-              0.0,
-              10.0,
-              0.0
-            ]
-          }
+          "offset": [
+            0.0,
+            10.0,
+            0.0
+          ],
+          "type": "rotation"
         },
         "options": {
           "freeze": true,
@@ -1178,13 +1143,12 @@
           true
         ],
         "kind": {
-          "Scale": {
-            "offset": [
-              1.0,
-              1.0,
-              1.0
-            ]
-          }
+          "offset": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "type": "scale"
         },
         "options": {
           "freeze": false,
@@ -1244,13 +1208,12 @@
           true
         ],
         "kind": {
-          "Parent": {
-            "rotation_axes": [
-              true,
-              false,
-              true
-            ]
-          }
+          "rotation_axes": [
+            true,
+            false,
+            true
+          ],
+          "type": "parent"
         },
         "options": {
           "freeze": false,
@@ -1310,23 +1273,24 @@
           true
         ],
         "kind": {
-          "Aim": {
-            "aim_axis": [
-              0.0,
-              0.0,
-              1.0
-            ],
-            "offset": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "up_axis": [
-              0.0,
-              1.0,
-              0.0
-            ],
-            "world_up": "SceneUp"
+          "aim_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "type": "aim",
+          "up_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "world_up": {
+            "type": "scene_up"
           }
         },
         "options": {
@@ -1387,29 +1351,29 @@
           true
         ],
         "kind": {
-          "Aim": {
-            "aim_axis": [
-              0.0,
-              0.0,
-              1.0
-            ],
-            "offset": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "up_axis": [
+          "aim_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "type": "aim",
+          "up_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "world_up": {
+            "type": "vector",
+            "up": [
               0.0,
               1.0,
               0.0
-            ],
-            "world_up": {
-              "Vector": [
-                0.0,
-                1.0,
-                0.0
-              ]
-            }
+            ]
           }
         },
         "options": {
@@ -1470,25 +1434,25 @@
           true
         ],
         "kind": {
-          "Aim": {
-            "aim_axis": [
-              0.0,
-              0.0,
-              1.0
-            ],
-            "offset": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "up_axis": [
-              0.0,
-              1.0,
-              0.0
-            ],
-            "world_up": {
-              "ObjectUp": 2
-            }
+          "aim_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "type": "aim",
+          "up_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "world_up": {
+            "node": 2,
+            "type": "object_up"
           }
         },
         "options": {
@@ -1549,32 +1513,30 @@
           true
         ],
         "kind": {
-          "Aim": {
-            "aim_axis": [
-              0.0,
-              0.0,
-              1.0
-            ],
-            "offset": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "up_axis": [
-              0.0,
+          "aim_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "type": "aim",
+          "up_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "world_up": {
+            "node": 3,
+            "type": "object_rotation_up",
+            "up": [
               1.0,
+              0.0,
               0.0
-            ],
-            "world_up": {
-              "ObjectRotationUp": [
-                3,
-                [
-                  1.0,
-                  0.0,
-                  0.0
-                ]
-              ]
-            }
+            ]
           }
         },
         "options": {
@@ -1635,23 +1597,24 @@
           true
         ],
         "kind": {
-          "Aim": {
-            "aim_axis": [
-              0.0,
-              0.0,
-              1.0
-            ],
-            "offset": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "up_axis": [
-              0.0,
-              1.0,
-              0.0
-            ],
-            "world_up": "None"
+          "aim_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "type": "aim",
+          "up_axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "world_up": {
+            "type": "none"
           }
         },
         "options": {
@@ -1712,15 +1675,14 @@
           true
         ],
         "kind": {
-          "LookAt": {
-            "offset": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "roll": 5.0,
-            "world_up_node": 2
-          }
+          "offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "roll": 5.0,
+          "type": "look_at",
+          "world_up_node": 2
         },
         "options": {
           "freeze": false,
@@ -1779,7 +1741,9 @@
           true,
           true
         ],
-        "kind": "RestRotation",
+        "kind": {
+          "type": "rest_rotation"
+        },
         "options": {
           "freeze": true,
           "local_space": false,
@@ -1838,13 +1802,12 @@
           true
         ],
         "kind": {
-          "RestRoll": {
-            "axis": [
-              1.0,
-              0.0,
-              0.0
-            ]
-          }
+          "axis": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "type": "rest_roll"
         },
         "options": {
           "freeze": false,
@@ -1904,13 +1867,12 @@
           true
         ],
         "kind": {
-          "RestAim": {
-            "axis": [
-              0.0,
-              1.0,
-              0.0
-            ]
-          }
+          "axis": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "type": "rest_aim"
         },
         "options": {
           "freeze": false,
@@ -1969,7 +1931,7 @@
           "allow_others": false,
           "allow_self": true,
           "face": false,
-          "kind": "Constant",
+          "kind": "constant",
           "local_only": false,
           "min_velocity": 0.0,
           "parameter": 0,
@@ -1990,9 +1952,8 @@
               1.0
             ],
             "shape": {
-              "Sphere": {
-                "radius": 0.20000000298023224
-              }
+              "radius": 0.20000000298023224,
+              "type": "sphere"
             }
           }
         },
@@ -2000,7 +1961,7 @@
           "allow_others": true,
           "allow_self": false,
           "face": false,
-          "kind": "OnEnter",
+          "kind": "on_enter",
           "local_only": true,
           "min_velocity": 0.05000000074505806,
           "parameter": 3,
@@ -2022,10 +1983,9 @@
               1.0
             ],
             "shape": {
-              "Capsule": {
-                "height": 0.4000000059604645,
-                "radius": 0.10000000149011612
-              }
+              "height": 0.4000000059604645,
+              "radius": 0.10000000149011612,
+              "type": "capsule"
             }
           }
         },
@@ -2033,7 +1993,7 @@
           "allow_others": true,
           "allow_self": true,
           "face": true,
-          "kind": "Proximity",
+          "kind": "proximity",
           "local_only": false,
           "min_velocity": 0.0,
           "parameter": 1,
@@ -2054,13 +2014,12 @@
               1.0
             ],
             "shape": {
-              "Box": {
-                "size": [
-                  0.20000000298023224,
-                  0.20000000298023224,
-                  0.20000000298023224
-                ]
-              }
+              "size": [
+                0.20000000298023224,
+                0.20000000298023224,
+                0.20000000298023224
+              ],
+              "type": "box"
             }
           }
         }
@@ -2085,9 +2044,8 @@
               1.0
             ],
             "shape": {
-              "Sphere": {
-                "radius": 0.10000000149011612
-              }
+              "radius": 0.10000000149011612,
+              "type": "sphere"
             }
           }
         },
@@ -2112,10 +2070,9 @@
               1.0
             ],
             "shape": {
-              "Capsule": {
-                "height": 0.20000000298023224,
-                "radius": 0.05000000074505806
-              }
+              "height": 0.20000000298023224,
+              "radius": 0.05000000074505806,
+              "type": "capsule"
             }
           }
         },
@@ -2138,13 +2095,12 @@
               1.0
             ],
             "shape": {
-              "Box": {
-                "size": [
-                  0.10000000149011612,
-                  0.20000000298023224,
-                  0.30000001192092896
-                ]
-              }
+              "size": [
+                0.10000000149011612,
+                0.20000000298023224,
+                0.30000001192092896
+              ],
+              "type": "box"
             }
           }
         }
@@ -2178,9 +2134,11 @@
             "curve": [],
             "value": 0.25
           },
-          "immobile_type": "AllMotion",
-          "integration": "Simplified",
-          "limit": "None",
+          "immobile_type": "all_motion",
+          "integration": "simplified",
+          "limit": {
+            "type": "none"
+          },
           "max_squish": {
             "curve": [],
             "value": 0.05000000074505806
@@ -2189,14 +2147,8 @@
             "curve": [],
             "value": 0.10000000149011612
           },
-          "multi_child": "Ignore",
-          "outputs": {
-            "angle": null,
-            "is_grabbed": null,
-            "is_posed": null,
-            "squish": null,
-            "stretch": null
-          },
+          "multi_child": "ignore",
+          "outputs": {},
           "pull": {
             "curve": [],
             "value": 0.20000000298023224
@@ -2223,7 +2175,7 @@
             "curve": [],
             "value": 0.10000000149011612
           },
-          "version": "Version_1_0"
+          "version": "1.0"
         },
         {
           "allow_grab": true,
@@ -2251,20 +2203,19 @@
             "curve": [],
             "value": 0.25
           },
-          "immobile_type": "World",
-          "integration": "Advanced",
+          "immobile_type": "world",
+          "integration": "advanced",
           "limit": {
-            "Angle": {
-              "max_angle": {
-                "curve": [],
-                "value": 45.0
-              },
-              "rotation": [
-                0.0,
-                10.0,
-                0.0
-              ]
-            }
+            "max_angle": {
+              "curve": [],
+              "value": 45.0
+            },
+            "rotation": [
+              0.0,
+              10.0,
+              0.0
+            ],
+            "type": "angle"
           },
           "max_squish": {
             "curve": [],
@@ -2274,14 +2225,8 @@
             "curve": [],
             "value": 0.10000000149011612
           },
-          "multi_child": "First",
-          "outputs": {
-            "angle": null,
-            "is_grabbed": null,
-            "is_posed": null,
-            "squish": null,
-            "stretch": null
-          },
+          "multi_child": "first",
+          "outputs": {},
           "pull": {
             "curve": [],
             "value": 0.20000000298023224
@@ -2308,7 +2253,7 @@
             "curve": [],
             "value": 0.10000000149011612
           },
-          "version": "Version_1_1"
+          "version": "1.1"
         },
         {
           "allow_grab": true,
@@ -2336,20 +2281,19 @@
             "curve": [],
             "value": 0.25
           },
-          "immobile_type": "AllMotion",
-          "integration": "Simplified",
+          "immobile_type": "all_motion",
+          "integration": "simplified",
           "limit": {
-            "Hinge": {
-              "max_angle": {
-                "curve": [],
-                "value": 30.0
-              },
-              "rotation": [
-                5.0,
-                0.0,
-                0.0
-              ]
-            }
+            "max_angle": {
+              "curve": [],
+              "value": 30.0
+            },
+            "rotation": [
+              5.0,
+              0.0,
+              0.0
+            ],
+            "type": "hinge"
           },
           "max_squish": {
             "curve": [],
@@ -2359,14 +2303,8 @@
             "curve": [],
             "value": 0.10000000149011612
           },
-          "multi_child": "Average",
-          "outputs": {
-            "angle": null,
-            "is_grabbed": null,
-            "is_posed": null,
-            "squish": null,
-            "stretch": null
-          },
+          "multi_child": "average",
+          "outputs": {},
           "pull": {
             "curve": [],
             "value": 0.20000000298023224
@@ -2393,7 +2331,7 @@
             "curve": [],
             "value": 0.10000000149011612
           },
-          "version": "Version_1_1"
+          "version": "1.1"
         },
         {
           "allow_grab": true,
@@ -2421,24 +2359,23 @@
             "curve": [],
             "value": 0.25
           },
-          "immobile_type": "World",
-          "integration": "Advanced",
+          "immobile_type": "world",
+          "integration": "advanced",
           "limit": {
-            "Polar": {
-              "max_pitch": {
-                "curve": [],
-                "value": 20.0
-              },
-              "max_yaw": {
-                "curve": [],
-                "value": 40.0
-              },
-              "rotation": [
-                0.0,
-                0.0,
-                15.0
-              ]
-            }
+            "max_pitch": {
+              "curve": [],
+              "value": 20.0
+            },
+            "max_yaw": {
+              "curve": [],
+              "value": 40.0
+            },
+            "rotation": [
+              0.0,
+              0.0,
+              15.0
+            ],
+            "type": "polar"
           },
           "max_squish": {
             "curve": [],
@@ -2448,14 +2385,8 @@
             "curve": [],
             "value": 0.10000000149011612
           },
-          "multi_child": "Ignore",
-          "outputs": {
-            "angle": null,
-            "is_grabbed": null,
-            "is_posed": null,
-            "squish": null,
-            "stretch": null
-          },
+          "multi_child": "ignore",
+          "outputs": {},
           "pull": {
             "curve": [],
             "value": 0.20000000298023224
@@ -2482,7 +2413,7 @@
             "curve": [],
             "value": 0.10000000149011612
           },
-          "version": "Version_1_0"
+          "version": "1.0"
         }
       ],
       "colliders": [
@@ -2501,9 +2432,8 @@
             1.0
           ],
           "shape": {
-            "Sphere": {
-              "radius": 0.05000000074505806
-            }
+            "radius": 0.05000000074505806,
+            "type": "sphere"
           }
         },
         {
@@ -2521,10 +2451,9 @@
             1.0
           ],
           "shape": {
-            "Capsule": {
-              "height": 0.30000001192092896,
-              "radius": 0.05000000074505806
-            }
+            "height": 0.30000001192092896,
+            "radius": 0.05000000074505806,
+            "type": "capsule"
           }
         },
         {
@@ -2541,7 +2470,9 @@
             0.0,
             1.0
           ],
-          "shape": "Plane"
+          "shape": {
+            "type": "plane"
+          }
         }
       ]
     },
@@ -2550,7 +2481,6 @@
         {
           "active": true,
           "name": "Armature",
-          "parent": null,
           "rest": {
             "rotation": [
               0.0,
@@ -3218,30 +3148,26 @@
     },
     "materials": [
       {
-        "alpha": "Opaque",
+        "alpha": {
+          "type": "opaque"
+        },
         "double_sided": false,
         "model": {
-          "Pbr": {
-            "base_color": [
-              1.0,
-              0.0,
-              0.0,
-              0.0
-            ],
-            "base_color_tex": null,
-            "emissive": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "emissive_tex": null,
-            "metallic": 0.0,
-            "metallic_roughness_tex": null,
-            "normal_scale": 1.0,
-            "normal_tex": null,
-            "occlusion_tex": null,
-            "roughness": 1.0
-          }
+          "base_color": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "emissive": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "metallic": 0.0,
+          "normal_scale": 1.0,
+          "roughness": 1.0,
+          "type": "pbr"
         },
         "name": "Plain",
         "order": 0
@@ -3365,7 +3291,7 @@
             "name": "look_right"
           }
         ],
-        "first_person": "Auto",
+        "first_person": "auto",
         "indices": [
           0,
           1,
@@ -3408,7 +3334,6 @@
             0.0
           ]
         ],
-        "skin": null,
         "submeshes": [
           {
             "first_index": 0,
@@ -3436,428 +3361,423 @@
     ],
     "name": "Armature",
     "role": {
-      "Avatar": {
-        "expressions": {
-          "menu": {
-            "controls": [
-              {
-                "icon": null,
-                "kind": "Button",
-                "name": "Button",
-                "parameter": 2,
-                "sub_parameters": [],
-                "value": 1.0
+      "expressions": {
+        "menu": {
+          "controls": [
+            {
+              "kind": {
+                "type": "button"
               },
-              {
-                "icon": null,
-                "kind": "Toggle",
-                "name": "Toggle",
-                "parameter": 0,
-                "sub_parameters": [],
-                "value": 1.0
+              "name": "Button",
+              "parameter": 2,
+              "sub_parameters": [],
+              "value": 1.0
+            },
+            {
+              "kind": {
+                "type": "toggle"
               },
-              {
-                "icon": null,
-                "kind": {
-                  "SubMenu": {
-                    "controls": [
-                      {
-                        "icon": null,
-                        "kind": "TwoAxisPuppet",
-                        "name": "Two",
-                        "parameter": null,
-                        "sub_parameters": [
-                          4,
-                          5
-                        ],
-                        "value": 1.0
-                      },
-                      {
-                        "icon": null,
-                        "kind": "FourAxisPuppet",
-                        "name": "Four",
-                        "parameter": null,
-                        "sub_parameters": [
-                          4,
-                          5,
-                          4,
-                          5
-                        ],
-                        "value": 1.0
-                      },
-                      {
-                        "icon": null,
-                        "kind": "RadialPuppet",
-                        "name": "Radial",
-                        "parameter": null,
-                        "sub_parameters": [
-                          1
-                        ],
-                        "value": 1.0
-                      }
-                    ]
+              "name": "Toggle",
+              "parameter": 0,
+              "sub_parameters": [],
+              "value": 1.0
+            },
+            {
+              "kind": {
+                "controls": [
+                  {
+                    "kind": {
+                      "type": "two_axis_puppet"
+                    },
+                    "name": "Two",
+                    "sub_parameters": [
+                      4,
+                      5
+                    ],
+                    "value": 1.0
+                  },
+                  {
+                    "kind": {
+                      "type": "four_axis_puppet"
+                    },
+                    "name": "Four",
+                    "sub_parameters": [
+                      4,
+                      5,
+                      4,
+                      5
+                    ],
+                    "value": 1.0
+                  },
+                  {
+                    "kind": {
+                      "type": "radial_puppet"
+                    },
+                    "name": "Radial",
+                    "sub_parameters": [
+                      1
+                    ],
+                    "value": 1.0
                   }
-                },
-                "name": "More",
-                "parameter": 2,
-                "sub_parameters": [],
-                "value": 1.0
+                ],
+                "type": "sub_menu"
+              },
+              "name": "More",
+              "parameter": 2,
+              "sub_parameters": [],
+              "value": 1.0
+            }
+          ]
+        }
+      },
+      "face": {
+        "blink": [
+          {
+            "mesh": 0,
+            "shape": 1,
+            "weight": 1.0
+          }
+        ],
+        "eyes": {
+          "driver": {
+            "down": [
+              {
+                "mesh": 0,
+                "shape": 3,
+                "weight": 1.0
+              }
+            ],
+            "left": [
+              {
+                "mesh": 0,
+                "shape": 4,
+                "weight": 0.5
+              }
+            ],
+            "right": [
+              {
+                "mesh": 0,
+                "shape": 5,
+                "weight": 0.5
+              }
+            ],
+            "type": "shapes",
+            "up": [
+              {
+                "mesh": 0,
+                "shape": 2,
+                "weight": 1.0
               }
             ]
+          },
+          "horizontal_inner": {
+            "input_max": 30.0,
+            "output_scale": 0.800000011920929
+          },
+          "horizontal_outer": {
+            "input_max": 30.0,
+            "output_scale": 0.800000011920929
+          },
+          "vertical_down": {
+            "input_max": 30.0,
+            "output_scale": 0.800000011920929
+          },
+          "vertical_up": {
+            "input_max": 30.0,
+            "output_scale": 0.800000011920929
           }
         },
-        "face": {
-          "blink": [
-            {
-              "mesh": 0,
-              "shape": 1,
-              "weight": 1.0
-            }
-          ],
-          "eyes": {
-            "driver": {
-              "Shapes": {
-                "down": [
-                  {
-                    "mesh": 0,
-                    "shape": 3,
-                    "weight": 1.0
-                  }
-                ],
-                "left": [
-                  {
-                    "mesh": 0,
-                    "shape": 4,
-                    "weight": 0.5
-                  }
-                ],
-                "right": [
-                  {
-                    "mesh": 0,
-                    "shape": 5,
-                    "weight": 0.5
-                  }
-                ],
-                "up": [
-                  {
-                    "mesh": 0,
-                    "shape": 2,
-                    "weight": 1.0
-                  }
-                ]
+        "visemes": [
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.0
               }
-            },
-            "horizontal_inner": {
-              "input_max": 30.0,
-              "output_scale": 0.800000011920929
-            },
-            "horizontal_outer": {
-              "input_max": 30.0,
-              "output_scale": 0.800000011920929
-            },
-            "vertical_down": {
-              "input_max": 30.0,
-              "output_scale": 0.800000011920929
-            },
-            "vertical_up": {
-              "input_max": 30.0,
-              "output_scale": 0.800000011920929
-            }
+            ],
+            "viseme": "sil"
           },
-          "visemes": [
-            [
-              "Sil",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.0
-                }
-              ]
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.06666667014360428
+              }
             ],
-            [
-              "Pp",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.06666667014360428
-                }
-              ]
+            "viseme": "pp"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.13333334028720856
+              }
             ],
-            [
-              "Ff",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.13333334028720856
-                }
-              ]
+            "viseme": "ff"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.20000000298023224
+              }
             ],
-            [
-              "Th",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.20000000298023224
-                }
-              ]
+            "viseme": "th"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.2666666805744171
+              }
             ],
-            [
-              "Dd",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.2666666805744171
-                }
-              ]
+            "viseme": "dd"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.3333333432674408
+              }
             ],
-            [
-              "Kk",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.3333333432674408
-                }
-              ]
+            "viseme": "kk"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.4000000059604645
+              }
             ],
-            [
-              "Ch",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.4000000059604645
-                }
-              ]
+            "viseme": "ch"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.46666666865348816
+              }
             ],
-            [
-              "Ss",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.46666666865348816
-                }
-              ]
+            "viseme": "ss"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.5333333611488342
+              }
             ],
-            [
-              "Nn",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.5333333611488342
-                }
-              ]
+            "viseme": "nn"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.6000000238418579
+              }
             ],
-            [
-              "Rr",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.6000000238418579
-                }
-              ]
+            "viseme": "rr"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.6666666865348816
+              }
             ],
-            [
-              "Aa",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.6666666865348816
-                }
-              ]
+            "viseme": "aa"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.7333333492279053
+              }
             ],
-            [
-              "E",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.7333333492279053
-                }
-              ]
+            "viseme": "e"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.800000011920929
+              }
             ],
-            [
-              "I",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.800000011920929
-                }
-              ]
+            "viseme": "i"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.8666666746139526
+              }
             ],
-            [
-              "O",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.8666666746139526
-                }
-              ]
+            "viseme": "o"
+          },
+          {
+            "binds": [
+              {
+                "mesh": 0,
+                "shape": 0,
+                "weight": 0.9333333373069763
+              }
             ],
-            [
-              "U",
-              [
-                {
-                  "mesh": 0,
-                  "shape": 0,
-                  "weight": 0.9333333373069763
-                }
-              ]
-            ]
-          ]
-        },
-        "humanoid": {
-          "bones": [
-            [
-              "hips",
-              1
-            ],
-            [
-              "spine",
-              2
-            ],
-            [
-              "head",
-              3
-            ],
-            [
-              "leftEye",
-              4
-            ],
-            [
-              "rightEye",
-              5
-            ]
-          ],
-          "center_of_mass": [
-            0.0,
-            0.8500000238418579,
-            0.019999999552965164
-          ],
-          "human_scale": 1.100000023841858,
-          "muscle_frames": [
-            {
-              "bone": "spine",
-              "max": [
-                40.0,
-                30.0,
-                20.0
-              ],
-              "min": [
-                -40.0,
-                -30.0,
-                -20.0
-              ],
-              "post": [
-                0.6000000238418579,
-                0.0,
-                0.0,
-                0.800000011920929
-              ],
-              "pre": [
-                0.0,
-                0.6000000238418579,
-                0.0,
-                0.800000011920929
-              ],
-              "sign": [
-                1.0,
-                -1.0,
-                1.0
-              ],
-              "twist": 1.0
-            }
-          ]
-        },
-        "meta": null,
-        "viewpoint": [
-          0.0,
-          1.4500000476837158,
-          0.07999999821186066
+            "viseme": "u"
+          }
         ]
-      }
+      },
+      "humanoid": {
+        "bones": [
+          {
+            "bone": "hips",
+            "node": 1
+          },
+          {
+            "bone": "spine",
+            "node": 2
+          },
+          {
+            "bone": "head",
+            "node": 3
+          },
+          {
+            "bone": "leftEye",
+            "node": 4
+          },
+          {
+            "bone": "rightEye",
+            "node": 5
+          }
+        ],
+        "center_of_mass": [
+          0.0,
+          0.8500000238418579,
+          0.019999999552965164
+        ],
+        "human_scale": 1.100000023841858,
+        "muscle_frames": [
+          {
+            "bone": "spine",
+            "max": [
+              40.0,
+              30.0,
+              20.0
+            ],
+            "min": [
+              -40.0,
+              -30.0,
+              -20.0
+            ],
+            "post": [
+              0.6000000238418579,
+              0.0,
+              0.0,
+              0.800000011920929
+            ],
+            "pre": [
+              0.0,
+              0.6000000238418579,
+              0.0,
+              0.800000011920929
+            ],
+            "sign": [
+              1.0,
+              -1.0,
+              1.0
+            ],
+            "twist": 1.0
+          }
+        ]
+      },
+      "type": "avatar",
+      "viewpoint": [
+        0.0,
+        1.4500000476837158,
+        0.07999999821186066
+      ]
     },
     "state": {
       "entries": [
         {
           "default": 1.0,
           "external": true,
-          "kind": "Bool",
+          "kind": "bool",
           "name": "Toggle",
           "saved": true,
-          "sync": "Owner"
+          "sync": "owner"
         },
         {
           "default": 0.5,
           "external": true,
-          "kind": "Float",
+          "kind": "float",
           "name": "Speed",
           "range": {
-            "Float": {
-              "bits": 8,
-              "max": 1.0,
-              "min": -1.0
-            }
+            "bits": 8,
+            "max": 1.0,
+            "min": -1.0,
+            "type": "float"
           },
           "saved": true,
-          "sync": "None"
+          "sync": "none"
         },
         {
           "default": 3.0,
           "external": true,
-          "kind": "Int",
+          "kind": "int",
           "name": "Count",
           "range": {
-            "Int": {
-              "max": 255,
-              "min": 0
-            }
+            "max": 255,
+            "min": 0,
+            "type": "int"
           },
           "saved": false,
-          "sync": "Owner"
+          "sync": "owner"
         },
         {
           "default": 0.0,
           "external": false,
-          "kind": "Trigger",
+          "kind": "trigger",
           "name": "Fire",
           "saved": false,
-          "sync": "None"
+          "sync": "none"
         },
         {
           "default": 0.0,
           "external": false,
-          "kind": "Float",
+          "kind": "float",
           "name": "X",
           "saved": false,
-          "sync": "None"
+          "sync": "none"
         },
         {
           "default": 0.0,
           "external": false,
-          "kind": "Float",
+          "kind": "float",
           "name": "Y",
           "saved": false,
-          "sync": "None"
+          "sync": "none"
         },
         {
           "default": 0.0,
           "external": false,
-          "kind": "Bool",
+          "kind": "bool",
           "name": "Mirror",
           "saved": false,
-          "sync": "None"
+          "sync": "none"
         }
       ]
     },

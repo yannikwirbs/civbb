@@ -165,7 +165,7 @@ impl Importer<'_> {
         let mut meshes: Vec<(&str, &mut u32)> = Vec::new();
         let a = "CIVBB_avatar";
         if let Some(h) = &mut avatar.humanoid {
-            nodes.extend(h.bones.iter_mut().map(|(_, n)| (a, n)));
+            nodes.extend(h.bones.iter_mut().map(|b| (a, &mut b.node)));
         }
         if let Some(f) = &mut avatar.face {
             match f.eyes.as_mut().map(|e| &mut e.driver) {
@@ -175,7 +175,7 @@ impl Importer<'_> {
                 }
                 None => {}
             }
-            let binds = f.visemes.iter_mut().flat_map(|(_, b)| b).chain(&mut f.blink);
+            let binds = f.visemes.iter_mut().flat_map(|v| &mut v.binds).chain(&mut f.blink);
             meshes.extend(binds.map(|b| (a, &mut b.mesh)));
         }
         let b = "CIVBB_behaviour";
@@ -196,7 +196,7 @@ impl Importer<'_> {
             nodes.extend(k.sources.iter_mut().map(|s| (c, &mut s.node)));
             match &mut k.kind {
                 ConstraintKind::Aim {
-                    world_up: WorldUp::ObjectUp(n) | WorldUp::ObjectRotationUp(n, _),
+                    world_up: WorldUp::ObjectUp { node: n } | WorldUp::ObjectRotationUp { node: n, up: _ },
                     ..
                 }
                 | ConstraintKind::LookAt {
@@ -262,7 +262,7 @@ fn icons(menu: &mut civbb_format::expressions::Menu) -> Vec<&mut u32> {
 /// Moves a motion's clip indices past the clips imported from glTF animations.
 fn shift(m: &mut Motion, base: u32) -> Result<(), String> {
     match m {
-        Motion::Clip(i) => *i = i.checked_add(base).ok_or("CIVBB_behaviour: clip index overflows")?,
+        Motion::Clip { clip: i } => *i = i.checked_add(base).ok_or("CIVBB_behaviour: clip index overflows")?,
         Motion::BlendTree(t) => {
             for c in &mut t.children {
                 shift(&mut c.motion, base)?;

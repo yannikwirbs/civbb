@@ -2,7 +2,7 @@
 //! malformed or dangling ones fail the import with the extension's name.
 
 use base64::Engine;
-use civbb_format::animator::{Action, EntryOp, PosePart, PoseSource, Unwritten};
+use civbb_format::animator::{Action, EntryOp, PartSource, PosePart, PoseSource, Remap, Unwritten};
 use civbb_format::state::{Entry, EntryKind, Platform};
 use civbb_pipeline::gltf_import::{Limits, import};
 use serde_json::{Value, json};
@@ -41,7 +41,7 @@ fn corpus_round_trips_through_native_extensions() {
         // The generator makes no muscle frames; one with distinct values checks the field travels.
         let h = original.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap();
         h.muscle_frames.push(civbb_format::hierarchy::MuscleFrame {
-            bone: h.bones[0].0,
+            bone: h.bones[0].bone,
             pre: [0.0, 0.6, 0.0, 0.8],
             post: [0.6, 0.0, 0.0, 0.8],
             sign: [1.0, -1.0, 1.0],
@@ -61,11 +61,19 @@ fn corpus_round_trips_through_native_extensions() {
                     EntryOp::Copy {
                         src: 0,
                         dst: 0,
-                        remap: Some(([0.0, 1.0], [1.0, 0.0])),
+                        remap: Some(Remap {
+                            from: [0.0, 1.0],
+                            to: [1.0, 0.0],
+                        }),
                     },
                 ],
             },
-            Action::PoseSource(vec![(PosePart::LeftHand, PoseSource::Animation)]),
+            Action::PoseSource {
+                parts: vec![PartSource {
+                    part: PosePart::LeftHand,
+                    source: PoseSource::Animation,
+                }],
+            },
             Action::LayerWeight {
                 layer: 0,
                 goal: 0.5,
@@ -135,7 +143,7 @@ fn hostile_native_extensions_are_rejected() {
         d["extensions"] = json!({"CIVBB_avatar": blink(5)})
     });
     reject("CIVBB_node: node 0 has no mesh", &|d| {
-        d["nodes"][0]["extensions"] = json!({"CIVBB_node": {"version": 1, "first_person": "Both"}})
+        d["nodes"][0]["extensions"] = json!({"CIVBB_node": {"version": 1, "first_person": "both"}})
     });
     reject("CIVBB_materials_toon: texture 3 does not exist", &|d| {
         let lean = civbb_corpus::generate(&civbb_corpus::lean());

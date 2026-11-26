@@ -41,7 +41,7 @@ fn weighted_length(
     weight: &mut f32,
 ) {
     match m {
-        Motion::Clip(c) => {
+        Motion::Clip { clip: c } => {
             let len = clips[*c as usize].length;
             *sum += w * if len > 0.0 { len } else { 1.0 } / scale;
             *weight += w;
@@ -59,7 +59,7 @@ fn weighted_length(
 /// Whether a motion loops (any of its clips does), which repeats exit times below 1 every cycle.
 pub fn loops(motion: Option<&Motion>, clips: &[BoundClip]) -> bool {
     match motion {
-        Some(Motion::Clip(c)) => clips[*c as usize].looping,
+        Some(Motion::Clip { clip: c }) => clips[*c as usize].looping,
         Some(Motion::BlendTree(t)) => t.children.iter().any(|c| loops(Some(&c.motion), clips)),
         None => false,
     }
@@ -89,7 +89,7 @@ fn collect(
     out: &mut Vec<Leaf>,
 ) {
     match m {
-        Motion::Clip(c) => out.push(Leaf {
+        Motion::Clip { clip: c } => out.push(Leaf {
             clip: *c,
             time: clip_time(&clips[*c as usize], normalized),
             weight: w,

@@ -127,7 +127,7 @@ fn direct_weights_come_from_parameters_and_may_be_normalised() {
         children: (0..3)
             .map(|i| ChildMotion {
                 direct_param: Some(i),
-                ..child(Motion::Clip(0))
+                ..child(Motion::Clip { clip: 0 })
             })
             .collect(),
         normalize: false,
@@ -170,15 +170,27 @@ fn avatar(motion: Motion) -> Document {
             nodes: vec![node("Root", None), node("A", Some(0))],
         },
         clips: vec![
-            clip(1.0, vec![curve(NodeProperty::Translation(0), vec![key(0.0, 0.0, 0.0)])]),
+            clip(
+                1.0,
+                vec![curve(
+                    NodeProperty::Translation { component: 0 },
+                    vec![key(0.0, 0.0, 0.0)],
+                )],
+            ),
             clip(
                 3.0,
                 vec![curve(
-                    NodeProperty::Translation(0),
+                    NodeProperty::Translation { component: 0 },
                     vec![key(0.0, 0.0, 10.0 / 3.0), key(3.0, 10.0, 10.0 / 3.0)],
                 )],
             ),
-            clip(1.0, vec![curve(NodeProperty::Translation(1), vec![key(0.0, 4.0, 0.0)])]),
+            clip(
+                1.0,
+                vec![curve(
+                    NodeProperty::Translation { component: 1 },
+                    vec![key(0.0, 4.0, 0.0)],
+                )],
+            ),
         ],
         state: StateTable {
             entries: vec![param("p"), param("q")],
@@ -220,11 +232,11 @@ fn avatar(motion: Motion) -> Document {
 }
 
 fn tree_1d() -> Motion {
-    let mut ramp = child(Motion::Clip(1));
+    let mut ramp = child(Motion::Clip { clip: 1 });
     ramp.threshold = 1.0;
     Motion::BlendTree(Box::new(BlendTree {
         kind: BlendTreeKind::Simple1D { param: 0 },
-        children: vec![child(Motion::Clip(0)), ramp],
+        children: vec![child(Motion::Clip { clip: 0 }), ramp],
         normalize: false,
     }))
 }
@@ -256,7 +268,7 @@ fn nested_and_direct_trees_multiply_weights_and_leave_the_rest_at_default() {
     // Direct: child 0 is the 1D tree at weight q, child 1 holds A.y = 4 at weight p.
     let mut inner = child(tree_1d());
     inner.direct_param = Some(1);
-    let mut y = child(Motion::Clip(2));
+    let mut y = child(Motion::Clip { clip: 2 });
     y.direct_param = Some(0);
     let a = avatar(Motion::BlendTree(Box::new(BlendTree {
         kind: BlendTreeKind::Direct,

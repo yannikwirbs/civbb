@@ -37,13 +37,13 @@ impl Renumber {
             Target::Node { node, .. } => remap(&self.nodes, node),
             Target::Mesh { mesh, property } => {
                 match property {
-                    MeshProperty::Weight(s) if !self.shapes.is_empty() => {
+                    MeshProperty::Weight { shape: s } if !self.shapes.is_empty() => {
                         match self.shapes[*mesh as usize][*s as usize] {
                             Some(n) => *s = n,
                             None => return false,
                         }
                     }
-                    MeshProperty::MaterialSlot(_) if !self.materials.is_empty() => {
+                    MeshProperty::MaterialSlot { submesh: _ } if !self.materials.is_empty() => {
                         // Keys that are not material indices bind to nothing (`civbb_anim::bind`); left as they are.
                         for k in &mut c.keys {
                             if k.value >= 0.0
@@ -58,7 +58,7 @@ impl Renumber {
                 }
                 remap(&self.meshes, mesh)
             }
-            Target::Humanoid(_) | Target::Entry(_) | Target::Constraint { .. } => true,
+            Target::Humanoid { property: _ } | Target::Entry { entry: _ } | Target::Constraint { .. } => true,
         }
     }
 }

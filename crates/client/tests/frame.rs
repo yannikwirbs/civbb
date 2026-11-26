@@ -198,7 +198,7 @@ fn a_toggle_can_swap_a_material_slot_per_island() {
     let mut slot = on.curves[0].clone();
     slot.target = Target::Mesh {
         mesh: 0,
-        property: MeshProperty::MaterialSlot(0),
+        property: MeshProperty::MaterialSlot { submesh: 0 },
     };
     slot.keys[0].value = index as f32;
     on.curves.push(slot);

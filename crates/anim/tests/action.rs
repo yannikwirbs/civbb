@@ -169,7 +169,10 @@ fn parameter_drivers_run_on_enter_in_order() {
         EntryOp::Copy {
             src: 0,
             dst: 1,
-            remap: Some(([0.0, 5.0], [0.0, 10.0])),
+            remap: Some(Remap {
+                from: [0.0, 5.0],
+                to: [0.0, 10.0],
+            }),
         },
         EntryOp::Random {
             param: 2,
@@ -211,7 +214,7 @@ fn parameter_drivers_run_on_enter_in_order() {
 fn random_ints_cover_their_inclusive_range() {
     let params = vec![param("n", EntryKind::Int), param("go", EntryKind::Bool)];
     let reenter = Transition {
-        dest: TransitionDest::State(0),
+        dest: TransitionDest::State { state: 0 },
         conditions: vec![Condition {
             param: 1,
             mode: ConditionMode::IfNot,
@@ -248,7 +251,7 @@ fn random_ints_cover_their_inclusive_range() {
 #[test]
 fn layer_and_group_weight_control_blend_to_their_goals() {
     let go = Transition {
-        dest: TransitionDest::State(1),
+        dest: TransitionDest::State { state: 1 },
         conditions: vec![Condition {
             param: 0,
             mode: ConditionMode::If,
@@ -274,7 +277,12 @@ fn layer_and_group_weight_control_blend_to_their_goals() {
             goal: 0.25,
             duration: 0.0,
         },
-        Action::PoseSource(vec![(PosePart::LeftHand, PoseSource::Animation)]),
+        Action::PoseSource {
+            parts: vec![PartSource {
+                part: PosePart::LeftHand,
+                source: PoseSource::Animation,
+            }],
+        },
         Action::Locomotion { disabled: true },
     ];
     let base = layer(vec![state(vec![], vec![go]), state(control, vec![])], 0);

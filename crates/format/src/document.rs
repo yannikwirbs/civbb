@@ -14,6 +14,7 @@ use crate::state::StateTable;
 
 /// A complete document. Cross references are indices into the vectors here; `validate` checks them.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Document {
     /// Display name.
     pub name: String,
@@ -28,6 +29,7 @@ pub struct Document {
     /// Shared state: animator parameters, menu and network values (ADR 0088).
     pub state: StateTable,
     /// Animator controller; `None` plays the rest pose.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub animator: Option<Animator>,
     /// Clips referenced by the animator.
     pub clips: Vec<Clip>,
@@ -43,6 +45,7 @@ pub struct Document {
 
 /// The kind of document and the parts only that kind has.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Role {
     /// Worn by a user.
     Avatar(Avatar),

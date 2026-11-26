@@ -4,7 +4,7 @@
     { "name": "A", "materials": [{ "_Color": [1, 1, 1, 1], "_Metallic": 0.2 }] },
     { "name": "B", "materials": [{ "_Color": [1, 1, 1, 1], "_Metallic": 0.4 }] }
   ],
-  "params": [{ "name": "p", "kind": "Bool", "default": 0 }, { "name": "q", "kind": "Bool", "default": 0 }],
+  "params": [{ "name": "p", "kind": "bool", "default": 0 }, { "name": "q", "kind": "bool", "default": 0 }],
   "clips": {
     "Empty": { "length": 1, "curves": [] },
     "ShinyA": { "length": 1, "curves": [["A:_Metallic", [[0, 0.9]]]] },

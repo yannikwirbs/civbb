@@ -9,10 +9,12 @@ pub type NodeIndex = u32;
 
 /// A transform node: a bone, a toggleable object, or both.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Node {
     /// Name, unique among siblings. Animation bindings address nodes by their path of names.
     pub name: String,
     /// Parent node; `None` only for the root. A parent always has a lower index than its children.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<NodeIndex>,
     /// Local rest transform relative to the parent.
     pub rest: Transform,
@@ -22,6 +24,7 @@ pub struct Node {
 
 /// All nodes of an avatar, parents before children; node 0 is the root.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Hierarchy {
     /// Nodes in parent-first order.
     pub nodes: Vec<Node>,
@@ -92,9 +95,10 @@ pub enum HumanBone {
 
 /// Maps humanoid bones to nodes.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Humanoid {
     /// Each mapped humanoid bone and its node. A bone appears at most once.
-    pub bones: Vec<(HumanBone, NodeIndex)>,
+    pub bones: Vec<BoneNode>,
     /// Muscle frames of mapped bones, at most one each; empty when the source has none (glTF and VRM, #53).
     pub muscle_frames: Vec<MuscleFrame>,
     /// Metres per body position unit (Unity's `Animator.humanScale`, the T-pose's centre-of-mass height; ADR 0063);
@@ -102,14 +106,25 @@ pub struct Humanoid {
     pub human_scale: f32,
     /// Unity's centre of mass of the rest pose in avatar space (`bodyPosition * humanScale`), which anchors the
     /// runtime's mass model (ADR 0063); `None` when the source has none.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub center_of_mass: Option<Vec3>,
+}
+
+/// One humanoid bone and the node it maps to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BoneNode {
+    /// The bone.
+    pub bone: HumanBone,
+    /// Its node.
+    pub node: NodeIndex,
 }
 
 /// How muscle values turn one humanoid bone (Unity's per-bone axes, ADR 0014). With angles `a` in degrees from the
 /// bone's muscles, its local rotation is `pre * zyroll(a) * post⁻¹`, where `zyroll` twists about X, then swings
 /// about Y and Z.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MuscleFrame {
     /// The bone.
     pub bone: HumanBone,
@@ -131,7 +146,7 @@ pub struct MuscleFrame {
 impl Humanoid {
     /// The node mapped to `bone`, if any.
     pub fn node(&self, bone: HumanBone) -> Option<NodeIndex> {
-        self.bones.iter().find(|(b, _)| *b == bone).map(|(_, n)| *n)
+        self.bones.iter().find(|b| b.bone == bone).map(|b| b.node)
     }
 }
 

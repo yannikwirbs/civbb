@@ -122,7 +122,7 @@ impl Ctx<'_> {
     /// The first entry transition whose conditions hold, else the default state. Consumes its triggers.
     fn entry(&self, params: &mut [f32]) -> StateIndex {
         for t in &self.sm.entry_transitions {
-            if let TransitionDest::State(s) = t.dest
+            if let TransitionDest::State { state: s } = t.dest
                 && t.conditions.iter().all(|c| holds(c, params))
             {
                 self.consume(t, params);
@@ -260,7 +260,7 @@ impl LayerRun {
         }
         if matches!(t, TransitionRef::Any(_))
             && !tr.can_transition_to_self
-            && tr.dest == TransitionDest::State(self.target())
+            && tr.dest == (TransitionDest::State { state: self.target() })
         {
             return false;
         }
@@ -290,7 +290,7 @@ impl LayerRun {
         let tr = ctx.transition(t);
         ctx.consume(tr, params);
         let dest = match tr.dest {
-            TransitionDest::State(s) => s,
+            TransitionDest::State { state: s } => s,
             TransitionDest::Exit => ctx.entry(params),
         };
         let owner = match t {

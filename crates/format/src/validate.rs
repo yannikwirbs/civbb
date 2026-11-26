@@ -537,9 +537,9 @@ impl V {
                     world_up,
                 } => {
                     let (node, v) = match *world_up {
-                        WorldUp::Vector(v) => (None, v),
-                        WorldUp::ObjectUp(n) => (Some(n), [0.0; 3]),
-                        WorldUp::ObjectRotationUp(n, v) => (Some(n), v),
+                        WorldUp::Vector { up: v } => (None, v),
+                        WorldUp::ObjectUp { node: n } => (Some(n), [0.0; 3]),
+                        WorldUp::ObjectRotationUp { node: n, up: v } => (Some(n), v),
                         WorldUp::SceneUp | WorldUp::None => (None, [0.0; 3]),
                     };
                     ([offset.as_slice(), aim_axis, up_axis, &v].concat(), node)
@@ -659,7 +659,7 @@ mod tests {
         let cases: &[(&str, Mutation)] = &[
             ("hierarchy.nodes[1]", |a| a.hierarchy.nodes[1].parent = Some(5)),
             ("humanoid", |a| {
-                a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().bones[0].1 = 99
+                a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().bones[0].node = 99
             }),
             ("humanoid.muscle_frames[0]", |a| {
                 a.avatar_mut().and_then(|r| r.humanoid.as_mut()).unwrap().muscle_frames[0].bone =
@@ -699,10 +699,10 @@ mod tests {
                 a.meshes[0].blend_shapes[0].deltas[0].vertex = 3
             }),
             ("face.binds[0]", |a| {
-                a.avatar_mut().and_then(|r| r.face.as_mut()).unwrap().visemes[0].1[0].shape = 1
+                a.avatar_mut().and_then(|r| r.face.as_mut()).unwrap().visemes[0].binds[0].shape = 1
             }),
             ("face.binds[0]", |a| {
-                a.avatar_mut().and_then(|r| r.face.as_mut()).unwrap().visemes[0].1[0].mesh = 1
+                a.avatar_mut().and_then(|r| r.face.as_mut()).unwrap().visemes[0].binds[0].mesh = 1
             }),
             ("face.eyes", |a| {
                 a.avatar_mut()
@@ -726,7 +726,7 @@ mod tests {
             }),
             ("animator.layers[0]", |a| {
                 a.animator.as_mut().unwrap().layers[0].state_machine.states[0].transitions[0].dest =
-                    TransitionDest::State(9)
+                    TransitionDest::State { state: 9 }
             }),
             ("animator.layers[0]", |a| {
                 a.animator.as_mut().unwrap().layers[0].state_machine.states[0].transitions[0].conditions[0].param = 9

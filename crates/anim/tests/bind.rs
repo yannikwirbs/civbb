@@ -107,13 +107,19 @@ fn close(a: &[f32], b: &[f32]) {
 fn binds_targets_with_defaults_and_shares_slots_across_clips() {
     let a = avatar(vec![
         clip(vec![
-            curve(on(ARM, NodeProperty::Translation(1)), &[(0.0, 1.0), (1.0, 2.0)]),
-            curve(mesh(MeshProperty::Weight(0)), &[(0.0, 1.0)]),
+            curve(
+                on(ARM, NodeProperty::Translation { component: 1 }),
+                &[(0.0, 1.0), (1.0, 2.0)],
+            ),
+            curve(mesh(MeshProperty::Weight { shape: 0 }), &[(0.0, 1.0)]),
             curve(on(HAT, NodeProperty::Active), &[(0.0, 1.0)]),
             curve(mesh(MeshProperty::Visible), &[(0.0, 0.0)]),
-            curve(CurveTarget::Entry(0), &[(0.0, 0.75)]),
+            curve(CurveTarget::Entry { entry: 0 }, &[(0.0, 0.75)]),
         ]),
-        clip(vec![curve(on(ARM, NodeProperty::Translation(1)), &[(0.0, 3.0)])]),
+        clip(vec![curve(
+            on(ARM, NodeProperty::Translation { component: 1 }),
+            &[(0.0, 3.0)],
+        )]),
     ]);
     let b = bind(&a);
     assert!(b.unbound.is_empty(), "{:?}", b.unbound);
@@ -145,7 +151,7 @@ fn binds_targets_with_defaults_and_shares_slots_across_clips() {
 #[test]
 fn a_parameter_slot_defaults_to_the_entry_rest() {
     // Lowered Unity content: the entry starts at the expression default, Write Defaults restores the animator's (#115).
-    let mut a = avatar(vec![clip(vec![curve(CurveTarget::Entry(0), &[(0.0, 0.75)])])]);
+    let mut a = avatar(vec![clip(vec![curve(CurveTarget::Entry { entry: 0 }, &[(0.0, 0.75)])])]);
     a.state.entries[0].rest = Some(0.5);
     close(&bind(&a).bindings.defaults, &[0.5]);
 }
@@ -154,22 +160,29 @@ fn a_parameter_slot_defaults_to_the_entry_rest() {
 fn reports_what_does_not_bind() {
     let cases = [
         (
-            curve(CurveTarget::Entry(1), &[(0.0, 1.0)]),
+            curve(CurveTarget::Entry { entry: 1 }, &[(0.0, 1.0)]),
             "only float parameters can be animated",
         ),
         (curve(on(BODY, NodeProperty::Active), &[]), "no keys"),
         (
             curve(
-                CurveTarget::Humanoid(HumanoidProperty::Muscle {
-                    bone: HumanBone::Jaw,
-                    axis: 2,
-                }),
+                CurveTarget::Humanoid {
+                    property: HumanoidProperty::Muscle {
+                        bone: HumanBone::Jaw,
+                        axis: 2,
+                    },
+                },
                 &[(0.0, 1.0)],
             ),
             "no muscle frames (#53)",
         ),
         (
-            curve(CurveTarget::Humanoid(HumanoidProperty::Body(0)), &[(0.0, 1.0)]),
+            curve(
+                CurveTarget::Humanoid {
+                    property: HumanoidProperty::Body { component: 0 },
+                },
+                &[(0.0, 1.0)],
+            ),
             "no humanoid with hips, upper arms and upper legs",
         ),
         (
@@ -221,21 +234,21 @@ fn material_slots_bind_with_the_submesh_material_as_default_and_reject_other_ind
             .to_vec();
         bind(&a)
     };
-    let b = with(curve(mesh(MeshProperty::MaterialSlot(1)), &[(0.0, 2.0)]));
+    let b = with(curve(mesh(MeshProperty::MaterialSlot { submesh: 1 }), &[(0.0, 2.0)]));
     assert!(b.unbound.is_empty(), "{:?}", b.unbound);
     assert_eq!(b.bindings.targets, [Target::MaterialSlot(0, 1)]);
     assert_eq!(b.bindings.defaults, [1.0], "the submesh's own material");
     for (c, reason) in [
         (
-            curve(mesh(MeshProperty::MaterialSlot(2)), &[(0.0, 0.0)]),
+            curve(mesh(MeshProperty::MaterialSlot { submesh: 2 }), &[(0.0, 0.0)]),
             "no such material slot",
         ),
         (
-            curve(mesh(MeshProperty::MaterialSlot(0)), &[(0.0, 3.0)]),
+            curve(mesh(MeshProperty::MaterialSlot { submesh: 0 }), &[(0.0, 3.0)]),
             "material slot key is not a material index",
         ),
         (
-            curve(mesh(MeshProperty::MaterialSlot(0)), &[(0.0, 0.5)]),
+            curve(mesh(MeshProperty::MaterialSlot { submesh: 0 }), &[(0.0, 0.5)]),
             "material slot key is not a material index",
         ),
     ] {
@@ -249,8 +262,8 @@ fn duplicate_bindings_keep_the_first_curve() {
     let a = avatar(vec![clip(vec![
         curve(on(HAT, NodeProperty::Active), &[(0.0, 1.0)]),
         curve(on(HAT, NodeProperty::Active), &[(0.0, 0.0)]),
-        curve(on(ARM, NodeProperty::Rotation(3)), &[(0.0, 1.0)]),
-        curve(on(ARM, NodeProperty::Rotation(3)), &[(0.0, 0.0)]),
+        curve(on(ARM, NodeProperty::Rotation { component: 3 }), &[(0.0, 1.0)]),
+        curve(on(ARM, NodeProperty::Rotation { component: 3 }), &[(0.0, 0.0)]),
     ])]);
     let b = bind(&a);
     let reasons: Vec<_> = b.unbound.iter().map(|u| (u.curve, u.reason)).collect();
@@ -264,7 +277,7 @@ fn duplicate_bindings_keep_the_first_curve() {
 fn partial_quaternion_curves_fill_from_rest_and_normalise() {
     // Only w is animated, from 1 to 0: x, y, z hold the rest rotation; the result is renormalised.
     let a = avatar(vec![clip(vec![curve(
-        on(ARM, NodeProperty::Rotation(3)),
+        on(ARM, NodeProperty::Rotation { component: 3 }),
         &[(0.0, 0.0), (1.0, 2.0)],
     )])]);
     let b = bind(&a);
@@ -287,7 +300,10 @@ fn partial_quaternion_curves_fill_from_rest_and_normalise() {
 fn euler_curves_write_the_quaternion_slots() {
     let a = avatar(vec![
         clip(vec![curve(on(ARM, euler(1)), &[(0.0, 0.0), (1.0, PI)])]),
-        clip(vec![curve(on(ARM, NodeProperty::Rotation(0)), &[(0.0, 0.0)])]),
+        clip(vec![curve(
+            on(ARM, NodeProperty::Rotation { component: 0 }),
+            &[(0.0, 0.0)],
+        )]),
     ]);
     let b = bind(&a);
     assert!(b.unbound.is_empty());
@@ -311,7 +327,7 @@ fn euler(axis: u8) -> NodeProperty {
 fn quaternion_curves_win_over_euler_curves_on_one_node() {
     let a = avatar(vec![clip(vec![
         curve(on(ARM, euler(0)), &[(0.0, FRAC_PI_2)]),
-        curve(on(ARM, NodeProperty::Rotation(3)), &[(0.0, 1.0)]),
+        curve(on(ARM, NodeProperty::Rotation { component: 3 }), &[(0.0, 1.0)]),
     ])]);
     let b = bind(&a);
     let reasons: Vec<_> = b.unbound.iter().map(|u| (u.curve, u.reason)).collect();
@@ -397,9 +413,9 @@ fn constraint_fields_bind_with_the_stored_values_as_defaults() {
     let mut a = avatar(vec![clip(vec![
         curve(field(F::Weight), &[(0.0, 0.0)]),
         curve(field(F::Active), &[(0.0, 0.0)]),
-        curve(field(F::SourceWeight(0)), &[(0.0, 0.0)]),
+        curve(field(F::SourceWeight { source: 0 }), &[(0.0, 0.0)]),
         curve(field(F::Freeze), &[(0.0, 1.0)]),
-        curve(field(F::SourceWeight(1)), &[(0.0, 0.0)]),
+        curve(field(F::SourceWeight { source: 1 }), &[(0.0, 0.0)]),
     ])]);
     a.constraints = vec![
         constraint(ConstraintKind::Position { offset: [0.0; 3] }, 0.1),
@@ -412,7 +428,7 @@ fn constraint_fields_bind_with_the_stored_values_as_defaults() {
         [
             Target::Constraint(1, F::Weight),
             Target::Constraint(1, F::Active),
-            Target::Constraint(1, F::SourceWeight(0)),
+            Target::Constraint(1, F::SourceWeight { source: 0 }),
             Target::Constraint(1, F::Freeze),
         ]
     );

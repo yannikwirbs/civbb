@@ -7,6 +7,7 @@ use crate::math::{Transform, Vec3};
 
 /// A constraint. The runtime orders an avatar's constraints by dependency when it loads them; list order breaks ties.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Constraint {
     /// Constraint type.
     pub kind: ConstraintKind,
@@ -30,6 +31,7 @@ pub struct Constraint {
 
 /// VRChat constraint options Unity's constraints lack (ADR 0040, 0046).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConstraintOptions {
     /// Match the sources' local values instead of their world placements (*Solve In Local Space*).
     pub local_space: bool,
@@ -42,19 +44,24 @@ pub struct ConstraintOptions {
 
 /// What a clip can animate on a constraint (ADR 0040).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ConstraintField {
     /// [`Constraint::weight`].
     Weight,
     /// [`Constraint::active`].
     Active,
     /// The weight of source `n`.
-    SourceWeight(u8),
+    SourceWeight {
+        /// Index into [`Constraint::sources`].
+        source: u8,
+    },
     /// [`ConstraintOptions::freeze`].
     Freeze,
 }
 
 /// The component type a clip addresses on a node, as Unity and VRChat name constraint components by type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ConstraintType {
     /// Position constraint.
     Position,
@@ -89,6 +96,7 @@ impl ConstraintType {
 
 /// One constraint source.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConstraintSource {
     /// Source node.
     pub node: NodeIndex,
@@ -100,6 +108,7 @@ pub struct ConstraintSource {
 
 /// Constraint types.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ConstraintKind {
     /// Copies the weighted source position, plus `offset`.
     Position {
@@ -139,6 +148,7 @@ pub enum ConstraintKind {
         /// Roll in degrees around the look direction.
         roll: f32,
         /// Node the up vector points towards; `None` uses scene up.
+        #[serde(skip_serializing_if = "Option::is_none")]
         world_up_node: Option<NodeIndex>,
     },
     /// The first source's local rotation change from its rest, applied to the target's rest rotation (VRM
@@ -160,15 +170,27 @@ pub enum ConstraintKind {
 
 /// World-up references for aim constraints.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WorldUp {
     /// Scene up.
     SceneUp,
     /// A fixed vector.
-    Vector(Vec3),
+    Vector {
+        /// World-space up vector.
+        up: Vec3,
+    },
     /// Towards a node.
-    ObjectUp(NodeIndex),
+    ObjectUp {
+        /// The node whose direction is up.
+        node: NodeIndex,
+    },
     /// Rotation of a node applied to a vector.
-    ObjectRotationUp(NodeIndex, Vec3),
+    ObjectRotationUp {
+        /// The node whose rotation turns `up`.
+        node: NodeIndex,
+        /// Up vector in the node's space.
+        up: Vec3,
+    },
     /// No up constraint.
     None,
 }

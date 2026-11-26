@@ -131,7 +131,7 @@ pub fn to_source_glb(a: &Document) -> Vec<u8> {
         let binds = f
             .visemes
             .iter_mut()
-            .flat_map(|(_, b)| b)
+            .flat_map(|v| &mut v.binds)
             .chain(&mut f.blink)
             .chain(eyes);
         binds.for_each(|b| b.mesh = node_of[b.mesh as usize]);

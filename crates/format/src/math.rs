@@ -11,6 +11,7 @@ pub type Mat4 = [f32; 16];
 
 /// Translation, rotation and scale, applied scale first.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Transform {
     /// Translation in metres.
     pub translation: Vec3,

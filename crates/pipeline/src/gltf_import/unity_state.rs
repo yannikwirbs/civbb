@@ -3,7 +3,7 @@
 //!
 //! Names in the menu, contact receivers and PhysBone prefixes become entry references.
 
-use civbb_format::animator::{Action, Animator, EntryOp, PosePart, PoseSource, Unwritten};
+use civbb_format::animator::{Action, Animator, EntryOp, PartSource, PosePart, PoseSource, Unwritten};
 use civbb_format::dynamics::ChainOutputs;
 use civbb_format::expressions::{Control, ControlKind, Menu};
 use civbb_format::state::{Entry, EntryIndex, EntryKind, PLATFORM_NAMESPACE, Platform, Range, StateTable, SyncMode};
@@ -144,7 +144,11 @@ impl From<XBehaviour> for Action {
                 owner_only: local_only,
                 ops,
             },
-            XBehaviour::TrackingControl(parts) => Action::PoseSource(parts),
+            XBehaviour::TrackingControl(parts) => Action::PoseSource {
+                parts: (parts.into_iter())
+                    .map(|(part, source)| PartSource { part, source })
+                    .collect(),
+            },
             XBehaviour::LayerWeight { layer, goal, duration } => Action::LayerWeight { layer, goal, duration },
             XBehaviour::GroupWeight { group, goal, duration } => Action::GroupWeight { group, goal, duration },
             XBehaviour::Locomotion { disabled } => Action::Locomotion { disabled },

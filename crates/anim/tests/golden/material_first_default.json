@@ -7,7 +7,7 @@
       { "_Color": [0, 0.4, 1, 0.5], "_Metallic": 0.6, "_MainTex_ST": [2, 2, 0.5, 0.6] }
     ]
   }],
-  "params": [{ "name": "p", "kind": "Bool", "default": 0 }],
+  "params": [{ "name": "p", "kind": "bool", "default": 0 }],
   "clips": {
     "Empty": { "length": 1, "curves": [] },
     "Glow": { "length": 1, "curves": [

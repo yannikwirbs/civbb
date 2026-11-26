@@ -80,8 +80,8 @@ public static class Goldens
             var name = (string)p["name"];
             var kind = (string)p["kind"];
             kinds[name] = kind;
-            var type = kind == "Bool" ? AnimatorControllerParameterType.Bool : kind == "Int" ? AnimatorControllerParameterType.Int
-                : kind == "Trigger" ? AnimatorControllerParameterType.Trigger : AnimatorControllerParameterType.Float;
+            var type = kind == "bool" ? AnimatorControllerParameterType.Bool : kind == "int" ? AnimatorControllerParameterType.Int
+                : kind == "trigger" ? AnimatorControllerParameterType.Trigger : AnimatorControllerParameterType.Float;
             float def = Get(p, "default") == null ? 0f : N(p["default"]);
             ctrl.AddParameter(new AnimatorControllerParameter
             {
@@ -164,16 +164,16 @@ public static class Goldens
                 {
                     var tr = states[(string)st["name"]].AddTransition(states[(string)t["to"]]);
                     foreach (var p in L(Get(t, "if")))
-                        tr.AddCondition(kinds[(string)p] == "Float" ? AnimatorConditionMode.Greater : AnimatorConditionMode.If, 0f, (string)p);
+                        tr.AddCondition(kinds[(string)p] == "float" ? AnimatorConditionMode.Greater : AnimatorConditionMode.If, 0f, (string)p);
                     foreach (var p in L(Get(t, "if_not")))
-                        tr.AddCondition(kinds[(string)p] == "Float" ? AnimatorConditionMode.Less : AnimatorConditionMode.IfNot, kinds[(string)p] == "Float" ? 0.5f : 0f, (string)p);
+                        tr.AddCondition(kinds[(string)p] == "float" ? AnimatorConditionMode.Less : AnimatorConditionMode.IfNot, kinds[(string)p] == "float" ? 0.5f : 0f, (string)p);
                     tr.hasExitTime = Get(t, "exit_time") != null;
                     tr.exitTime = tr.hasExitTime ? N(t["exit_time"]) : 0f;
                     tr.hasFixedDuration = true;
                     tr.duration = Get(t, "duration") == null ? 0f : N(t["duration"]);
                     tr.offset = 0f;
                     tr.interruptionSource = Get(t, "interruption") == null ? TransitionInterruptionSource.None
-                        : (TransitionInterruptionSource)Enum.Parse(typeof(TransitionInterruptionSource), (string)t["interruption"]);
+                        : (TransitionInterruptionSource)Enum.Parse(typeof(TransitionInterruptionSource), ((string)t["interruption"]).Replace("_", ""), true);
                     tr.orderedInterruption = !(Get(t, "ordered") is bool o) || o;
                     tr.canTransitionToSelf = false;
                 }
@@ -216,9 +216,9 @@ public static class Goldens
                 float v = N(kv.Value);
                 switch (kinds[kv.Key])
                 {
-                    case "Bool": playable.SetBool(kv.Key, v != 0f); break;
-                    case "Int": playable.SetInteger(kv.Key, (int)v); break;
-                    case "Trigger": if (v != 0f) playable.SetTrigger(kv.Key); else playable.ResetTrigger(kv.Key); break;
+                    case "bool": playable.SetBool(kv.Key, v != 0f); break;
+                    case "int": playable.SetInteger(kv.Key, (int)v); break;
+                    case "trigger": if (v != 0f) playable.SetTrigger(kv.Key); else playable.ResetTrigger(kv.Key); break;
                     default: playable.SetFloat(kv.Key, v); break;
                 }
             }

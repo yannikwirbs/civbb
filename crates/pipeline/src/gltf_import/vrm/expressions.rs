@@ -2,7 +2,7 @@
 
 use civbb_format::animator::*;
 use civbb_format::expressions::{Control, ControlKind, Expressions, Menu};
-use civbb_format::face::{EyeDriver, EyeLook, Face, RangeMap, ShapeBind, Viseme};
+use civbb_format::face::{EyeDriver, EyeLook, Face, RangeMap, ShapeBind, Viseme, VisemeBinds};
 use civbb_format::hierarchy::{HumanBone, Humanoid};
 use civbb_format::state::{Entry, EntryIndex, EntryKind, Range, StateTable, SyncMode};
 use serde_json::Value;
@@ -109,7 +109,10 @@ impl Importer<'_> {
                 _ => None,
             };
             match (viseme, e.preset.as_deref()) {
-                (Some(v), _) if face.visemes.iter().all(|(x, _)| *x != v) => face.visemes.push((v, e.binds)),
+                (Some(v), _) if face.visemes.iter().all(|x| x.viseme != v) => face.visemes.push(VisemeBinds {
+                    viseme: v,
+                    binds: e.binds,
+                }),
                 (Some(_), _) => {}
                 (None, Some("blink")) => face.blink = e.binds,
                 // One-eye blinks have no format field yet.
@@ -143,7 +146,7 @@ impl Importer<'_> {
                 let shape = shapes.iter().position(|s| s.name == *name).unwrap_or(b.shape as usize);
                 let target = Target::Mesh {
                     mesh: b.mesh,
-                    property: MeshProperty::Weight(shape as u32),
+                    property: MeshProperty::Weight { shape: shape as u32 },
                 };
                 if curves.iter().any(|c| c.target == target) {
                     continue;
@@ -159,7 +162,9 @@ impl Importer<'_> {
                 });
             }
             children.push(ChildMotion {
-                motion: Motion::Clip(clips.len() as ClipIndex),
+                motion: Motion::Clip {
+                    clip: clips.len() as ClipIndex,
+                },
                 threshold: 0.0,
                 position: [0.0; 2],
                 direct_param: Some(i as EntryIndex),

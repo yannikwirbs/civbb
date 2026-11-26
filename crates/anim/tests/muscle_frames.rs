@@ -5,7 +5,7 @@ use std::path::Path;
 
 use civbb_anim::frames::derive;
 use civbb_core::math::{conj, length, mul};
-use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, Node};
+use civbb_format::hierarchy::{BoneNode, Hierarchy, HumanBone, Humanoid, Node};
 use civbb_format::math::{Quat, Transform, Vec3};
 use serde::Deserialize;
 
@@ -78,7 +78,14 @@ fn derived_frames_match_unity() {
                 .collect(),
         };
         let humanoid = Humanoid {
-            bones: v.frames.iter().map(|f| (f.bone, f.node)).collect(),
+            bones: v
+                .frames
+                .iter()
+                .map(|f| BoneNode {
+                    bone: f.bone,
+                    node: f.node,
+                })
+                .collect(),
             ..Humanoid::default()
         };
         let derived = derive(&hierarchy, &humanoid);

@@ -171,14 +171,14 @@ fn toggle(an: &Animator, entries: &[Entry], clips: &[Clip], li: usize) -> Option
     }
     let mut arms = [None; 2];
     for (s, st) in sm.states.iter().enumerate() {
-        let (Some(Motion::Clip(clip)), [t]) = (&st.motion, st.transitions.as_slice()) else {
+        let (Some(Motion::Clip { clip }), [t]) = (&st.motion, st.transitions.as_slice()) else {
             return None;
         };
         let [c] = t.conditions.as_slice() else { return None };
         if !st.actions.is_empty()
             || st.mirror
             || st.mirror_param.is_some()
-            || t.dest != TransitionDest::State(1 - s as u32)
+            || t.dest != (TransitionDest::State { state: 1 - s as u32 })
             || t.has_exit_time
             || t.duration != 0.0
             || !constant(&clips[*clip as usize])
@@ -243,8 +243,8 @@ fn layer(group: u32, ts: &[Toggle], one: EntryIndex) -> Layer {
             let tree = BlendTree {
                 kind: BlendTreeKind::Simple1D { param: t.param },
                 children: vec![
-                    child(Motion::Clip(t.off), 0.0, None),
-                    child(Motion::Clip(t.on), 1.0, None),
+                    child(Motion::Clip { clip: t.off }, 0.0, None),
+                    child(Motion::Clip { clip: t.on }, 1.0, None),
                 ],
                 normalize: false,
             };
@@ -293,7 +293,7 @@ fn any_wd_off(an: &Animator) -> bool {
 /// Appends every clip a motion plays.
 fn motion_clips(m: &Motion, out: &mut Vec<ClipIndex>) {
     match m {
-        Motion::Clip(c) => out.push(*c),
+        Motion::Clip { clip: c } => out.push(*c),
         Motion::BlendTree(t) => t.children.iter().for_each(|c| motion_clips(&c.motion, out)),
     }
 }

@@ -178,7 +178,7 @@ impl Constraints {
         match field {
             ConstraintField::Weight => l.weight = value,
             ConstraintField::Active => l.active = value >= 0.5,
-            ConstraintField::SourceWeight(s) => {
+            ConstraintField::SourceWeight { source: s } => {
                 if let Some(w) = l.sources.get_mut(s as usize) {
                     *w = value;
                 }
@@ -269,7 +269,7 @@ impl Constraints {
 fn reads(c: &Constraint) -> impl Iterator<Item = (NodeIndex, bool)> + '_ {
     let up = match c.kind {
         ConstraintKind::Aim {
-            world_up: WorldUp::ObjectUp(n) | WorldUp::ObjectRotationUp(n, _),
+            world_up: WorldUp::ObjectUp { node: n } | WorldUp::ObjectRotationUp { node: n, up: _ },
             ..
         } => Some(n),
         ConstraintKind::LookAt { world_up_node, .. } => world_up_node,
@@ -436,9 +436,9 @@ fn aimed(kind: &ConstraintKind, place: &dyn Fn(NodeIndex) -> Place, me: Vec3, go
         } => {
             let up = match world_up {
                 WorldUp::SceneUp => Some([0.0, 1.0, 0.0]),
-                WorldUp::Vector(v) => Some(v),
-                WorldUp::ObjectUp(n) => Some(sub(place(n).pos, me)),
-                WorldUp::ObjectRotationUp(n, v) => Some(rotate(place(n).rot, v)),
+                WorldUp::Vector { up: v } => Some(v),
+                WorldUp::ObjectUp { node: n } => Some(sub(place(n).pos, me)),
+                WorldUp::ObjectRotationUp { node: n, up: v } => Some(rotate(place(n).rot, v)),
                 WorldUp::None => None,
             };
             aim(aim_axis, up_axis, sub(goal, me), up)

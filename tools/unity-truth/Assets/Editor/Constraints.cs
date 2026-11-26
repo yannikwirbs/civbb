@@ -176,7 +176,7 @@ public static class Constraints
         k.translationOffset = offset;
         k.translationAtRest = rest;
         k.translationAxis = axes;
-        Common(c, k, t, weight, active, "{\"Position\": {\"offset\": " + V(offset) + "}}", Ax(axes),
+        Common(c, k, t, weight, active, "{\"type\": \"position\", \"offset\": " + V(offset) + "}", Ax(axes),
             Tr(rest, Quaternion.identity, One), sources);
     }
 
@@ -187,7 +187,7 @@ public static class Constraints
         k.rotationOffset = offset;
         k.rotationAtRest = rest;
         k.rotationAxis = axes;
-        Common(c, k, t, weight, true, "{\"Rotation\": {\"offset\": " + V(offset) + "}}", Ax(axes),
+        Common(c, k, t, weight, true, "{\"type\": \"rotation\", \"offset\": " + V(offset) + "}", Ax(axes),
             Tr(Vector3.zero, Quaternion.Euler(rest), One), sources);
     }
 
@@ -198,7 +198,7 @@ public static class Constraints
         k.scaleOffset = offset;
         k.scaleAtRest = rest;
         k.scalingAxis = axes;
-        Common(c, k, t, weight, true, "{\"Scale\": {\"offset\": " + V(offset) + "}}", Ax(axes),
+        Common(c, k, t, weight, true, "{\"type\": \"scale\", \"offset\": " + V(offset) + "}", Ax(axes),
             Tr(Vector3.zero, Quaternion.identity, rest), sources);
     }
 
@@ -213,7 +213,7 @@ public static class Constraints
         var list = new (Transform, float, string)[sources.Length];
         for (var i = 0; i < sources.Length; i++)
             list[i] = (sources[i].node, sources[i].w, Tr(sources[i].ot, Quaternion.Euler(sources[i].or), One));
-        Common(c, k, t, weight, true, "{\"Parent\": {\"rotation_axes\": " + Ax(rAxes) + "}}", Ax(tAxes),
+        Common(c, k, t, weight, true, "{\"type\": \"parent\", \"rotation_axes\": " + Ax(rAxes) + "}", Ax(tAxes),
             Tr(restT, Quaternion.Euler(restR), One), list);
         for (var i = 0; i < sources.Length; i++)
         {
@@ -237,14 +237,14 @@ public static class Constraints
         string w;
         switch (type)
         {
-            case AimConstraint.WorldUpType.SceneUp: w = "\"SceneUp\""; break;
-            case AimConstraint.WorldUpType.Vector: w = "{\"Vector\": " + V(worldUp) + "}"; break;
-            case AimConstraint.WorldUpType.ObjectUp: w = "{\"ObjectUp\": " + c.Index(upObject) + "}"; break;
-            case AimConstraint.WorldUpType.ObjectRotationUp: w = "{\"ObjectRotationUp\": [" + c.Index(upObject) + ", " + V(worldUp) + "]}"; break;
-            default: w = "\"None\""; break;
+            case AimConstraint.WorldUpType.SceneUp: w = "{\"type\": \"scene_up\"}"; break;
+            case AimConstraint.WorldUpType.Vector: w = "{\"type\": \"vector\", \"up\": " + V(worldUp) + "}"; break;
+            case AimConstraint.WorldUpType.ObjectUp: w = "{\"type\": \"object_up\", \"node\": " + c.Index(upObject) + "}"; break;
+            case AimConstraint.WorldUpType.ObjectRotationUp: w = "{\"type\": \"object_rotation_up\", \"node\": " + c.Index(upObject) + ", \"up\": " + V(worldUp) + "}"; break;
+            default: w = "{\"type\": \"none\"}"; break;
         }
-        Common(c, k, t, weight, true, "{\"Aim\": {\"offset\": " + V(offset) + ", \"aim_axis\": " + V(aim) +
-            ", \"up_axis\": " + V(up) + ", \"world_up\": " + w + "}}", Ax(axes),
+        Common(c, k, t, weight, true, "{\"type\": \"aim\", \"offset\": " + V(offset) + ", \"aim_axis\": " + V(aim) +
+            ", \"up_axis\": " + V(up) + ", \"world_up\": " + w + "}", Ax(axes),
             Tr(Vector3.zero, Quaternion.Euler(rest), One), sources);
     }
 
@@ -257,8 +257,8 @@ public static class Constraints
         k.worldUpObject = upObject;
         k.rotationOffset = offset;
         k.rotationAtRest = rest;
-        Common(c, k, t, weight, true, "{\"LookAt\": {\"offset\": " + V(offset) + ", \"roll\": " + F(roll) +
-            ", \"world_up_node\": " + (upObject == null ? "null" : c.Index(upObject).ToString()) + "}}",
+        Common(c, k, t, weight, true, "{\"type\": \"look_at\", \"offset\": " + V(offset) + ", \"roll\": " + F(roll) +
+            ", \"world_up_node\": " + (upObject == null ? "null" : c.Index(upObject).ToString()) + "}",
             "[true, true, true]", Tr(Vector3.zero, Quaternion.Euler(rest), One), sources);
     }
 

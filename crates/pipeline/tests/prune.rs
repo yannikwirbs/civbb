@@ -105,7 +105,7 @@ fn avatar() -> Document {
                 },
                 Target::Mesh {
                     mesh: 0,
-                    property: MeshProperty::Weight(1),
+                    property: MeshProperty::Weight { shape: 1 },
                 },
             ]
             .into_iter()
@@ -184,7 +184,7 @@ fn prunes_what_nothing_references_and_remaps_the_rest() {
             },
             Target::Mesh {
                 mesh: 0,
-                property: MeshProperty::Weight(0)
+                property: MeshProperty::Weight { shape: 0 }
             },
         ]
     );

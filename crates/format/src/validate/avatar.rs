@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use crate::avatar::Avatar;
 use crate::document::Document;
 use crate::expressions::{ControlKind, Expressions, Menu};
-use crate::face::{EyeDriver, Face, ShapeBind};
-use crate::hierarchy::Humanoid;
+use crate::face::{EyeDriver, Face, ShapeBind, VisemeBinds};
+use crate::hierarchy::{BoneNode, Humanoid};
 use crate::mesh::Mesh;
 use crate::meta::Meta;
 
@@ -35,9 +35,9 @@ impl V {
 
     pub(super) fn humanoid(&mut self, h: &Humanoid, nodes: usize) {
         let mut seen = HashSet::new();
-        for (bone, node) in &h.bones {
-            self.index(*node as usize, nodes, || format!("humanoid.{bone:?}"), "node");
-            self.ensure(seen.insert(*bone), || format!("humanoid.{bone:?}"), "mapped twice");
+        for &BoneNode { bone, node } in &h.bones {
+            self.index(node as usize, nodes, || format!("humanoid.{bone:?}"), "node");
+            self.ensure(seen.insert(bone), || format!("humanoid.{bone:?}"), "mapped twice");
         }
         self.ensure(
             h.human_scale.is_finite() && h.human_scale >= 0.0,
@@ -77,10 +77,10 @@ impl V {
 
     pub(super) fn face(&mut self, f: &Face, meshes: &[Mesh], nodes: usize) {
         let mut seen = HashSet::new();
-        for (v, _) in &f.visemes {
+        for VisemeBinds { viseme: v, .. } in &f.visemes {
             self.ensure(seen.insert(*v), || format!("face.{v:?}"), "mapped twice");
         }
-        let mut binds: Vec<&ShapeBind> = f.visemes.iter().flat_map(|(_, b)| b).chain(&f.blink).collect();
+        let mut binds: Vec<&ShapeBind> = f.visemes.iter().flat_map(|v| &v.binds).chain(&f.blink).collect();
         if let Some(e) = &f.eyes {
             let maps = [e.horizontal_inner, e.horizontal_outer, e.vertical_down, e.vertical_up];
             self.finite(&maps.map(|m| [m.input_max, m.output_scale]).concat(), || {

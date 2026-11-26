@@ -7,6 +7,7 @@ use crate::math::Vec3;
 
 /// A material: one of the native models plus shared render state (design doc §6).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Material {
     /// Name from the source asset.
     pub name: String,
@@ -29,6 +30,7 @@ impl Material {
 
 /// A material field curves can animate (ADR 0099), in the units the material stores it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MaterialField {
     /// Base colour (PBR, Toon) or colour (Unlit), linear RGBA.
     BaseColor,
@@ -89,6 +91,7 @@ impl MaterialField {
 
 /// Alpha handling.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AlphaMode {
     /// Alpha ignored.
     Opaque,
@@ -115,6 +118,7 @@ impl AlphaMode {
 /// The native shading models. Every source shader maps to one of these or is translated (design doc §10).
 #[allow(clippy::large_enum_variant)] // An avatar has tens of materials; boxing the toon variant saves nothing that matters.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum MaterialModel {
     /// Metallic-roughness PBR, as glTF 2.0.
     Pbr(Pbr),
@@ -126,6 +130,7 @@ pub enum MaterialModel {
 
 /// A texture used by a material slot.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TextureSlot {
     /// Index into [`crate::Document::textures`].
     pub texture: u32,
@@ -138,52 +143,69 @@ pub struct TextureSlot {
 /// Metallic-roughness PBR.
 #[allow(missing_docs)] // Field names follow glTF 2.0 and are documented there.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Pbr {
     pub base_color: [f32; 4],
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base_color_tex: Option<TextureSlot>,
     pub metallic: f32,
     pub roughness: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metallic_roughness_tex: Option<TextureSlot>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub normal_tex: Option<TextureSlot>,
     pub normal_scale: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub occlusion_tex: Option<TextureSlot>,
     pub emissive: Vec3,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub emissive_tex: Option<TextureSlot>,
 }
 
 /// Toon shading (ADR 0090): a lit colour that turns into a shade colour across a ramp, plus optional features, each
 /// computing one named thing. An absent feature computes nothing, and curves on its fields do nothing.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Toon {
     /// Lit colour multiplier, linear RGBA.
     pub base_color: [f32; 4],
     /// Lit colour texture.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub base_color_tex: Option<TextureSlot>,
     /// Colour in shadow, linear RGB.
     pub shade_color: Vec3,
     /// Shadow colour texture.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub shade_tex: Option<TextureSlot>,
     /// Shifts the light/shadow boundary, -1 to 1.
     pub shade_shift: f32,
     /// Hardness of the light/shadow boundary, 0 (soft) to 1 (hard).
     pub shade_toony: f32,
     /// Light plus ambient clamped per channel; `None` adds the ambient on top of the lit blend instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub light_clamp: Option<LightClamp>,
     /// Tangent-space normal map.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub normal: Option<Normal>,
     /// Light the surface emits.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub emission: Option<Emission>,
     /// Matcaps, blended in order; the renderer draws up to [`MATCAPS`].
     pub matcaps: Vec<Matcap>,
     /// Fresnel rim light.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rim: Option<Rim>,
     /// Darkens the lit colour towards grazing angles.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rim_shade: Option<RimShade>,
     /// The shadow beyond one colour: strength, a second shadow and a border colour.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub shade: Option<Shade>,
     /// Hue, saturation, value and gamma correction of the base colour texture.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color_adjust: Option<ColorAdjust>,
     /// An inverted-hull outline pass.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub outline: Option<Outline>,
 }
 
@@ -195,6 +217,7 @@ pub const MATCAPS: usize = 2;
 /// and the ambient adds on top, times the lit colour.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LightClamp {
     pub min: f32,
     pub max: f32,
@@ -203,6 +226,7 @@ pub struct LightClamp {
 /// A tangent-space normal map, its perturbation scaled by `scale`.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Normal {
     pub tex: TextureSlot,
     pub scale: f32,
@@ -212,8 +236,10 @@ pub struct Normal {
 /// added after lighting.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Emission {
     pub color: Vec3,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tex: Option<TextureSlot>,
     pub main_strength: f32,
 }
@@ -223,6 +249,7 @@ pub struct Emission {
 /// itself times the albedo by `main_strength`. Border 0.5 and blur 1 leave the fresnel term as it is.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Rim {
     pub color: Vec3,
     pub power: f32,
@@ -236,6 +263,7 @@ pub struct Rim {
 /// ramp linear from `border - blur / 2` to `border + blur / 2` (both clamped to 0 to 1).
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RimShade {
     pub color: Vec3,
     pub strength: f32,
@@ -251,6 +279,7 @@ pub struct RimShade {
 /// `border_color` times a ramp that starts `border_range` before the first one.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Shade {
     pub strength: f32,
     pub main_strength: f32,
@@ -266,6 +295,7 @@ pub struct Shade {
 /// and value factors, gamma.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ColorAdjust {
     pub hue: f32,
     pub saturation: f32,
@@ -277,17 +307,22 @@ pub struct ColorAdjust {
 /// channel, unlit in `color` (linear RGB) times the colour texture. Width 0 draws none.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Outline {
     pub width: f32,
     pub color: Vec3,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub width_tex: Option<TextureSlot>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tex: Option<TextureSlot>,
 }
 
 /// A matcap: a texture sampled by the view-space normal.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Matcap {
     /// Matcap texture; `None` disables it.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tex: Option<TextureSlot>,
     /// Blend strength.
     pub strength: f32,
@@ -296,6 +331,7 @@ pub struct Matcap {
     /// Tints the texture, linear RGB.
     pub color: Vec3,
     /// Scales the strength and the emission per texel by its red channel.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mask_tex: Option<TextureSlot>,
     /// The matcap times this (and the mask) adds after lighting, whatever the blend.
     pub emission: f32,
@@ -303,6 +339,7 @@ pub struct Matcap {
 
 /// How a matcap combines with the lit colour.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MatcapBlend {
     /// The matcap times the strength adds.
     Add,
@@ -314,15 +351,18 @@ pub enum MatcapBlend {
 
 /// Unlit colour or texture.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Unlit {
     /// Colour multiplier.
     pub color: [f32; 4],
     /// Colour texture.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color_tex: Option<TextureSlot>,
 }
 
 /// An image stored as a blob.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Texture {
     /// Name from the source asset.
     pub name: String,
@@ -337,6 +377,7 @@ pub struct Texture {
 /// Image encodings. Source packages carry PNG/JPEG; runtime packages carry KTX2.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ImageFormat {
     Png,
     Jpeg,
@@ -346,6 +387,7 @@ pub enum ImageFormat {
 /// Texel colour space.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ColorSpace {
     Srgb,
     Linear,

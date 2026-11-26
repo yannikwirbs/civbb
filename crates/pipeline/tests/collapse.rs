@@ -87,7 +87,7 @@ fn layers_that_are_not_plain_toggles_stay() {
     a.state.entries.push(Entry::new("Drive", EntryKind::Bool, 0.0));
     let an = a.animator.as_mut().unwrap();
     let go = |dest, mode| Transition {
-        dest: TransitionDest::State(dest),
+        dest: TransitionDest::State { state: dest },
         conditions: vec![Condition {
             param: drive,
             mode,
@@ -176,7 +176,7 @@ fn key(time: f32, value: f32) -> Key {
 /// The clip a corpus toggle layer's state plays.
 fn layer_clip(a: &Document, layer: usize, state: usize) -> usize {
     match a.animator.as_ref().unwrap().layers[layer].state_machine.states[state].motion {
-        Some(Motion::Clip(c)) => c as usize,
+        Some(Motion::Clip { clip: c }) => c as usize,
         _ => unreachable!("corpus toggles play clips"),
     }
 }

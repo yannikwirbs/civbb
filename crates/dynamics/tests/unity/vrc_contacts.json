@@ -2,7 +2,7 @@
   "unity": "2022.3.22f1",
   "cases": [
     {
-      "name": "sphere_constant", "kind": "Constant", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "sphere_constant", "kind": "constant", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -50,7 +50,7 @@
       ]
     },
     {
-      "name": "sphere_onenter", "kind": "OnEnter", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "sphere_onenter", "kind": "on_enter", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -98,7 +98,7 @@
       ]
     },
     {
-      "name": "sphere_proximity", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "sphere_proximity", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -146,7 +146,7 @@
       ]
     },
     {
-      "name": "on_enter_min_2", "kind": "OnEnter", "min_velocity": 2, "face": false, "root_scale": 1,
+      "name": "on_enter_min_2", "kind": "on_enter", "min_velocity": 2, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -194,7 +194,7 @@
       ]
     },
     {
-      "name": "on_enter_min_4", "kind": "OnEnter", "min_velocity": 4, "face": false, "root_scale": 1,
+      "name": "on_enter_min_4", "kind": "on_enter", "min_velocity": 4, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -242,7 +242,7 @@
       ]
     },
     {
-      "name": "sphere_sender_big", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "sphere_sender_big", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.3, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.2, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -290,7 +290,7 @@
       ]
     },
     {
-      "name": "sphere_offset", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "sphere_offset", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.4, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0.1, 0.2, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -338,7 +338,7 @@
       ]
     },
     {
-      "name": "sphere_scaled_root", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 2,
+      "name": "sphere_scaled_root", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 2,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -386,7 +386,7 @@
       ]
     },
     {
-      "name": "capsule_along_axis", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "capsule_along_axis", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Capsule", "radius": 0.2, "height": 1, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -442,7 +442,7 @@
       ]
     },
     {
-      "name": "capsule_across", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "capsule_across", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Capsule", "radius": 0.2, "height": 1, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -474,7 +474,7 @@
       ]
     },
     {
-      "name": "capsule_turned", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "capsule_turned", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Capsule", "radius": 0.2, "height": 1, "size": [0.2, 0.2, 0.2], "position": [0, 0.1, 0], "rotation": [0, 0, 0.707106769, 0.707106769]},
       "frames": [
@@ -530,7 +530,7 @@
       ]
     },
     {
-      "name": "capsule_short", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "capsule_short", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Capsule", "radius": 0.3, "height": 0.4, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -578,7 +578,7 @@
       ]
     },
     {
-      "name": "capsule_sender", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "capsule_sender", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Capsule", "radius": 0.1, "height": 0.6, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0.382683456, 0.9238795]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -626,7 +626,7 @@
       ]
     },
     {
-      "name": "capsule_constant", "kind": "Constant", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "capsule_constant", "kind": "constant", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Capsule", "radius": 0.2, "height": 1, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -658,7 +658,7 @@
       ]
     },
     {
-      "name": "box_x", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_x", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -706,7 +706,7 @@
       ]
     },
     {
-      "name": "box_y", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_y", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -754,7 +754,7 @@
       ]
     },
     {
-      "name": "box_z", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_z", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -802,7 +802,7 @@
       ]
     },
     {
-      "name": "box_diagonal", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_diagonal", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -850,7 +850,7 @@
       ]
     },
     {
-      "name": "box_constant", "kind": "Constant", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_constant", "kind": "constant", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -898,7 +898,7 @@
       ]
     },
     {
-      "name": "box_face_z", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "box_face_z", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -946,7 +946,7 @@
       ]
     },
     {
-      "name": "box_face_x", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "box_face_x", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -994,7 +994,7 @@
       ]
     },
     {
-      "name": "box_face_turned", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "box_face_turned", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0.707106769, 0, 0.707106769]},
       "frames": [
@@ -1042,7 +1042,7 @@
       ]
     },
     {
-      "name": "sphere_face", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "sphere_face", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1090,7 +1090,7 @@
       ]
     },
     {
-      "name": "box_sender", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_sender", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.6], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1138,7 +1138,7 @@
       ]
     },
     {
-      "name": "box_sender_turned", "kind": "Constant", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_sender_turned", "kind": "constant", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.6, 0.1, 0.1], "position": [0, 0, 0], "rotation": [0, 0, 0.382683456, 0.9238795]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1186,7 +1186,7 @@
       ]
     },
     {
-      "name": "box_constant_diagonal", "kind": "Constant", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_constant_diagonal", "kind": "constant", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1234,7 +1234,7 @@
       ]
     },
     {
-      "name": "box_capsule_sender", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_capsule_sender", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Capsule", "radius": 0.1, "height": 0.6, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0.382683456, 0.9238795]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1282,7 +1282,7 @@
       ]
     },
     {
-      "name": "box_capsule_sender_diagonal", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_capsule_sender_diagonal", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Capsule", "radius": 0.05, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0.224143863, -0.129409522, 0.4829629, 0.836516261]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1330,7 +1330,7 @@
       ]
     },
     {
-      "name": "box_box_sender", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_box_sender", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.2, 0.1, 0.3], "position": [0, 0, 0], "rotation": [0, 0, 0.258819044, 0.9659258]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1378,7 +1378,7 @@
       ]
     },
     {
-      "name": "box_box_constant", "kind": "Constant", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "box_box_constant", "kind": "constant", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.6, 0.1, 0.1], "position": [0, 0, 0], "rotation": [0, 0, 0.382683456, 0.9238795]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1426,7 +1426,7 @@
       ]
     },
     {
-      "name": "face_z_fine", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "face_z_fine", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1474,7 +1474,7 @@
       ]
     },
     {
-      "name": "face_z_outside_x", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "face_z_outside_x", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1522,7 +1522,7 @@
       ]
     },
     {
-      "name": "face_x_near_face", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "face_x_near_face", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1570,7 +1570,7 @@
       ]
     },
     {
-      "name": "face_diagonal", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "face_diagonal", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1618,7 +1618,7 @@
       ]
     },
     {
-      "name": "face_capsule_sender", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "face_capsule_sender", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Capsule", "radius": 0.05, "height": 0.4, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0.5, 0, 0, 0.8660254]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1666,7 +1666,7 @@
       ]
     },
     {
-      "name": "face_box_sender", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "face_box_sender", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.1, 0.1, 0.2], "position": [0, 0, 0], "rotation": [0.173648179, 0, 0, 0.9848077]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1714,7 +1714,7 @@
       ]
     },
     {
-      "name": "face_big_sender", "kind": "Proximity", "min_velocity": 0, "face": true, "root_scale": 1,
+      "name": "face_big_sender", "kind": "proximity", "min_velocity": 0, "face": true, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.3, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Box", "radius": 0.1, "height": 0.5, "size": [0.4, 0.6, 0.8], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1762,7 +1762,7 @@
       ]
     },
     {
-      "name": "component_off", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "component_off", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1799,7 +1799,7 @@
       ]
     },
     {
-      "name": "root_off", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "root_off", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [
@@ -1836,7 +1836,7 @@
       ]
     },
     {
-      "name": "component_elsewhere", "kind": "Proximity", "min_velocity": 0, "face": false, "root_scale": 1,
+      "name": "component_elsewhere", "kind": "proximity", "min_velocity": 0, "face": false, "root_scale": 1,
       "sender_shape": {"type": "Sphere", "radius": 0.1, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "receiver_shape": {"type": "Sphere", "radius": 0.5, "height": 0.5, "size": [0.2, 0.2, 0.2], "position": [0, 0, 0], "rotation": [0, 0, 0, 1]},
       "frames": [

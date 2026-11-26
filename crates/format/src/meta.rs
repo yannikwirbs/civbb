@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Creator information and licence terms.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Meta {
     /// Authors, in credit order.
     pub authors: Vec<String>,
@@ -21,6 +22,7 @@ pub struct Meta {
 
 /// Licence terms, modelled on VRM 1.0. Defaults are the most restrictive choice.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Licence {
     /// URL of the licence document.
     pub url: String,
@@ -48,6 +50,7 @@ pub struct Licence {
 
 /// Who may wear the avatar.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AvatarUse {
     /// Only the authors.
     #[default]
@@ -60,6 +63,7 @@ pub enum AvatarUse {
 
 /// Commercial use allowed.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Commercial {
     /// Personal, non-profit use only.
     #[default]
@@ -72,6 +76,7 @@ pub enum Commercial {
 
 /// Modification allowed.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Modification {
     /// No modification.
     #[default]

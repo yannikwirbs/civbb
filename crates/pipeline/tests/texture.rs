@@ -322,7 +322,7 @@ fn atlas_keeps_and_renumbers_a_material_a_slot_swaps_in() {
     after.avatar.clips[0].curves.push(Curve {
         target: Target::Mesh {
             mesh: 1,
-            property: MeshProperty::MaterialSlot(0),
+            property: MeshProperty::MaterialSlot { submesh: 0 },
         },
         keys: vec![Key {
             time: 0.0,

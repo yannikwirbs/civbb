@@ -137,7 +137,7 @@ pub fn bind(avatar: &Document) -> Bound {
 fn mirrors(animator: &Animator) -> bool {
     fn motion(m: &Motion) -> bool {
         match m {
-            Motion::Clip(_) => false,
+            Motion::Clip { clip: _ } => false,
             Motion::BlendTree(t) => t.children.iter().any(|c| c.mirror || motion(&c.motion)),
         }
     }
@@ -309,11 +309,13 @@ impl<'a> Binder<'a> {
 
     fn resolve(&self, curve: &Curve) -> Result<Resolved, &'static str> {
         let t = match &curve.target {
-            CurveTarget::Entry(p) => match self.avatar.state.entries[*p as usize].kind {
+            CurveTarget::Entry { entry: p } => match self.avatar.state.entries[*p as usize].kind {
                 EntryKind::Float => Target::Parameter(*p),
                 _ => return Err("only float parameters can be animated"),
             },
-            &CurveTarget::Humanoid(HumanoidProperty::Muscle { bone, axis }) => {
+            &CurveTarget::Humanoid {
+                property: HumanoidProperty::Muscle { bone, axis },
+            } => {
                 let m = muscle::index(bone, axis).ok_or("no such muscle")?;
                 let rig = self.rig.as_ref().ok_or("no muscle frames (#53)")?;
                 if !rig.has(MUSCLES[m as usize].bone) {
@@ -321,16 +323,18 @@ impl<'a> Binder<'a> {
                 }
                 Target::Muscle(m)
             }
-            CurveTarget::Humanoid(HumanoidProperty::Body(i)) => {
+            CurveTarget::Humanoid {
+                property: HumanoidProperty::Body { component: i },
+            } => {
                 self.body
                     .as_ref()
                     .ok_or("no humanoid with hips, upper arms and upper legs")?;
                 Target::Body(*i)
             }
             &CurveTarget::Node { node, property } => match property {
-                NodeProperty::Translation(i) => Target::Position(node, i),
-                NodeProperty::Scale(i) => Target::Scale(node, i),
-                NodeProperty::Rotation(i) => return Ok(Resolved::Rotation(node, false, i as usize)),
+                NodeProperty::Translation { component: i } => Target::Position(node, i),
+                NodeProperty::Scale { component: i } => Target::Scale(node, i),
+                NodeProperty::Rotation { component: i } => return Ok(Resolved::Rotation(node, false, i as usize)),
                 NodeProperty::EulerRotation {
                     axis,
                     order: EulerOrder::Zxy,
@@ -343,13 +347,13 @@ impl<'a> Binder<'a> {
                 let mesh = *mesh;
                 match property {
                     MeshProperty::Visible => Target::RendererEnabled(mesh),
-                    MeshProperty::Weight(s) => Target::BlendShape(mesh, *s),
+                    MeshProperty::Weight { shape: s } => Target::BlendShape(mesh, *s),
                     &MeshProperty::Material { field, component, srgb } => {
                         renderer_default(self.avatar, mesh, field)
                             .ok_or("no material on the renderer has the field")?;
                         Target::Material(mesh, field, component, srgb)
                     }
-                    MeshProperty::MaterialSlot(s) => {
+                    MeshProperty::MaterialSlot { submesh: s } => {
                         if *s as usize >= self.avatar.meshes[mesh as usize].submeshes.len() {
                             return Err("no such material slot");
                         }
@@ -363,7 +367,7 @@ impl<'a> Binder<'a> {
             }
             &CurveTarget::Constraint { constraint, field } => {
                 let c = &self.avatar.constraints[constraint as usize];
-                if let ConstraintField::SourceWeight(s) = field
+                if let ConstraintField::SourceWeight { source: s } = field
                     && s as usize >= c.sources.len()
                 {
                     return Err("no such constraint source");
@@ -403,7 +407,7 @@ impl<'a> Binder<'a> {
                 match field {
                     ConstraintField::Weight => c.weight,
                     ConstraintField::Active => f32::from(u8::from(c.active)),
-                    ConstraintField::SourceWeight(s) => c.sources[s as usize].weight,
+                    ConstraintField::SourceWeight { source: s } => c.sources[s as usize].weight,
                     ConstraintField::Freeze => f32::from(u8::from(c.options.freeze)),
                 }
             }

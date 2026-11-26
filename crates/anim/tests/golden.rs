@@ -169,19 +169,19 @@ impl Case {
             }))
         };
         match m {
-            MotionSpec::Clip(c) => Motion::Clip(self.clip(c)),
+            MotionSpec::Clip(c) => Motion::Clip { clip: self.clip(c) },
             MotionSpec::Simple1d(p, children) => tree(
                 BlendTreeKind::Simple1D { param: self.param(p) },
                 children
                     .iter()
-                    .map(|(t, c)| child(Motion::Clip(self.clip(c)), *t, None))
+                    .map(|(t, c)| child(Motion::Clip { clip: self.clip(c) }, *t, None))
                     .collect(),
             ),
             MotionSpec::Direct(children) => tree(
                 BlendTreeKind::Direct,
                 children
                     .iter()
-                    .map(|(p, c)| child(Motion::Clip(self.clip(c)), 0.0, Some(self.param(p))))
+                    .map(|(p, c)| child(Motion::Clip { clip: self.clip(c) }, 0.0, Some(self.param(p))))
                     .collect(),
             ),
         }
@@ -325,7 +325,7 @@ impl Case {
             }));
         }
         Transition {
-            dest: TransitionDest::State(dest),
+            dest: TransitionDest::State { state: dest },
             conditions,
             has_exit_time: t.exit_time.is_some(),
             exit_time: t.exit_time.unwrap_or(0.0),
@@ -486,9 +486,9 @@ fn curve(nodes: &[NodeSpec], target: &str, keys: &[(f32, f32)]) -> Curve {
                 .rsplit_once('.')
                 .unwrap_or_else(|| panic!("bad curve target {target}"));
             let property = match prop {
-                "x" => NodeProperty::Translation(0),
-                "y" => NodeProperty::Translation(1),
-                "z" => NodeProperty::Translation(2),
+                "x" => NodeProperty::Translation { component: 0 },
+                "y" => NodeProperty::Translation { component: 1 },
+                "z" => NodeProperty::Translation { component: 2 },
                 "active" => NodeProperty::Active,
                 _ => panic!("unknown property {prop}"),
             };

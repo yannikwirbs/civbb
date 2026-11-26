@@ -325,7 +325,7 @@ fn eligible(a: &Document, blobs: &BTreeMap<BlobId, Vec<u8>>) -> (Vec<Option<Size
     for c in a.clips.iter().flat_map(|c| &c.curves) {
         if let Target::Mesh {
             mesh,
-            property: MeshProperty::Material { .. } | MeshProperty::MaterialSlot(_),
+            property: MeshProperty::Material { .. } | MeshProperty::MaterialSlot { submesh: _ },
         } = c.target
         {
             animated[mesh as usize] = true;
@@ -599,7 +599,7 @@ fn slot_materials(a: &Document) -> Vec<u32> {
             matches!(
                 c.target,
                 Target::Mesh {
-                    property: MeshProperty::MaterialSlot(_),
+                    property: MeshProperty::MaterialSlot { submesh: _ },
                     ..
                 }
             )

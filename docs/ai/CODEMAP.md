@@ -133,6 +133,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `src/gltf_import/unity_clip/material.rs`: Unity material curves lowered to native material fields (ADR 0099): property names by the renderer's shader
 - `src/gltf_import/unity_clip.rs`: Unity dialect 1's clips and avatar masks lowered to typed targets (ADR 0089): `/`-separated node paths and Unity
 - `src/gltf_import/unity_material.rs`: Unity materials from the source package's `X_toon_material` (ADR 0043): the shader family fingerprinted by shader
+- `src/gltf_import/unity_shapes.rs`: Unity dialect 1's JSON shapes rewritten into the native ones (ADRs 0086, 0102): dialect 1 is the format types'
 - `src/gltf_import/unity_state.rs`: Unity dialect 1's animator and expression parameters lowered to state entries (ADR 0088, 0095), and its state
 - `src/gltf_import/vrm/expressions.rs`: VRM expressions to visemes, blink and a Direct blend tree of toggles, and look-at to eye look.
 - `src/gltf_import/vrm/meta.rs`: VRM `meta` (0.x and 1.0) to the format's creator, licence and permission fields.
@@ -314,6 +315,7 @@ Internal deps: none
 - `docs/adr/0099-native-material-curves.md`: 0099: Material curves drive native fields; Unity's unanimated vector components are baked into materials
 - `docs/adr/0100-toon-features-presence.md`: 0100: When a toon feature is present, and what an absent one means
 - `docs/adr/0101-civbb-extension-layout.md`: 0101: CIVBB_* extensions: document parts at the root, glTF indices, node flags and toon materials local
+- `docs/adr/0102-dialect-1-as-a-json-rewrite.md`: 0102: Native JSON shapes, and Unity dialect 1 read through a JSON rewrite instead of copied types
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

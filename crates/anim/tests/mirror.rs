@@ -8,7 +8,7 @@ use civbb_anim::{Controller, Instance, Target};
 use civbb_format::Document;
 use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
-use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, MuscleFrame, Node};
+use civbb_format::hierarchy::{BoneNode, Hierarchy, HumanBone, Humanoid, MuscleFrame, Node};
 use civbb_format::math::Transform;
 use civbb_format::state::{Entry, EntryIndex, EntryKind, StateTable};
 use civbb_format::{Avatar, Role};
@@ -69,7 +69,14 @@ fn humanoid(clips: Vec<Clip>, animator: Animator) -> Document {
         },
         role: Role::Avatar(Avatar {
             humanoid: Some(Humanoid {
-                bones: bones.iter().enumerate().map(|(i, b)| (*b, i as u32 + 1)).collect(),
+                bones: bones
+                    .iter()
+                    .enumerate()
+                    .map(|(i, b)| BoneNode {
+                        bone: *b,
+                        node: i as u32 + 1,
+                    })
+                    .collect(),
                 human_scale: 0.0,
                 center_of_mass: None,
                 muscle_frames: bones
@@ -103,7 +110,9 @@ fn clip(curves: &[(&str, f32)]) -> Clip {
         curves: curves
             .iter()
             .map(|(m, v)| Curve {
-                target: CurveTarget::Humanoid(property(find(m).expect("a Unity muscle"))),
+                target: CurveTarget::Humanoid {
+                    property: property(find(m).expect("a Unity muscle")),
+                },
                 keys: vec![Key {
                     time: 0.0,
                     value: *v,
@@ -187,7 +196,7 @@ fn mirrored_states_and_children_swap_sides_and_negate_the_body_by_exclusive_or()
         Motion::BlendTree(Box::new(BlendTree {
             kind: BlendTreeKind::Direct,
             children: vec![ChildMotion {
-                motion: Motion::Clip(0),
+                motion: Motion::Clip { clip: 0 },
                 threshold: 0.0,
                 position: [0.0, 0.0],
                 direct_param: Some(0),
@@ -199,9 +208,15 @@ fn mirrored_states_and_children_swap_sides_and_negate_the_body_by_exclusive_or()
         }))
     };
     let cases = [
-        ("plain", Motion::Clip(0), false, None, plain),
-        ("mirrored state", Motion::Clip(0), true, None, mirrored),
-        ("mirror parameter on", Motion::Clip(0), false, Some(0), mirrored),
+        ("plain", Motion::Clip { clip: 0 }, false, None, plain),
+        ("mirrored state", Motion::Clip { clip: 0 }, true, None, mirrored),
+        (
+            "mirror parameter on",
+            Motion::Clip { clip: 0 },
+            false,
+            Some(0),
+            mirrored,
+        ),
         ("mirrored child", child(true), false, None, mirrored),
         ("mirrored child in a mirrored state", child(true), true, None, plain),
     ];

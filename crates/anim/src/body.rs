@@ -5,7 +5,7 @@
 use civbb_core::math::{Pose, add, conj, cross, mul, normalize, qnormalize, rotate, scale, sub, world_poses};
 use civbb_format::animator::RootSettings;
 use civbb_format::hierarchy::HumanBone::{self, *};
-use civbb_format::hierarchy::{Hierarchy, Humanoid, NodeIndex};
+use civbb_format::hierarchy::{BoneNode, Hierarchy, Humanoid, NodeIndex};
 use civbb_format::math::{Quat, Transform, Vec3};
 
 /// Places a humanoid's hips from a body pose (`RootT` then `RootQ`, Unity's units; ADR 0063).
@@ -42,7 +42,7 @@ impl BodyRig {
         }
         above.reverse();
         let mut chains = Vec::new();
-        for &(bone, node) in &h.bones {
+        for &BoneNode { bone, node } in &h.bones {
             if bone == Hips || !MASSES.iter().any(|m| m.0 == bone) {
                 continue;
             }

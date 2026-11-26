@@ -6,8 +6,8 @@ use civbb_format::animator::*;
 use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
 use civbb_format::dynamics::*;
 use civbb_format::expressions::*;
-use civbb_format::face::{Face, ShapeBind, Viseme};
-use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, Node, NodeIndex};
+use civbb_format::face::{Face, ShapeBind, Viseme, VisemeBinds};
+use civbb_format::hierarchy::{BoneNode, Hierarchy, HumanBone, Humanoid, Node, NodeIndex};
 use civbb_format::material::{AlphaMode, Emission, Material, MaterialModel, Toon};
 use civbb_format::math::{Transform, Vec3};
 use civbb_format::mesh::{BlendShape, Mesh, ShapeDelta, Skin, Submesh};
@@ -397,7 +397,7 @@ pub fn generate(spec: &Spec) -> Document {
         };
         let n = b.add(name, Some(parent), *offset, true);
         if let Some(h) = human {
-            humanoid.bones.push((*h, n));
+            humanoid.bones.push(BoneNode { bone: *h, node: n });
         }
     }
 
@@ -616,7 +616,7 @@ pub fn generate(spec: &Spec) -> Document {
         clips.push(toggle_clip(format!("{name}_Off"), node, false));
         clips.push(toggle_clip(format!("{name}_On"), node, true));
         let to = |state, mode| Transition {
-            dest: TransitionDest::State(state),
+            dest: TransitionDest::State { state },
             conditions: vec![Condition {
                 param,
                 mode,
@@ -633,7 +633,7 @@ pub fn generate(spec: &Spec) -> Document {
         };
         let state = |label: &str, clip, transition| State {
             name: label.into(),
-            motion: Some(Motion::Clip(clip)),
+            motion: Some(Motion::Clip { clip }),
             speed: 1.0,
             speed_param: None,
             cycle_offset: 0.0,
@@ -754,15 +754,13 @@ pub fn generate(spec: &Spec) -> Document {
                 visemes: Viseme::ALL
                     .into_iter()
                     .zip(0..spec.shape_keys.min(15))
-                    .map(|(v, shape)| {
-                        (
-                            v,
-                            vec![ShapeBind {
-                                mesh: 0,
-                                shape,
-                                weight: 1.0,
-                            }],
-                        )
+                    .map(|(viseme, shape)| VisemeBinds {
+                        viseme,
+                        binds: vec![ShapeBind {
+                            mesh: 0,
+                            shape,
+                            weight: 1.0,
+                        }],
                     })
                     .collect(),
                 blink: vec![],

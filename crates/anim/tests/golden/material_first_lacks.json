@@ -7,7 +7,7 @@
       { "_Color": [0, 0, 1, 1], "_Metallic": 0.6 }
     ]
   }],
-  "params": [{ "name": "p", "kind": "Bool", "default": 0 }],
+  "params": [{ "name": "p", "kind": "bool", "default": 0 }],
   "clips": {
     "Empty": { "length": 1, "curves": [] },
     "Shiny": { "length": 1, "curves": [["Body:_Metallic", [[0, 0.9]]]] }

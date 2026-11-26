@@ -165,7 +165,7 @@ fn edge_cases_import() {
         tx.target,
         Target::Node {
             node: 2,
-            property: NodeProperty::Translation(0)
+            property: NodeProperty::Translation { component: 0 }
         }
     );
     assert_eq!(
@@ -177,7 +177,7 @@ fn edge_cases_import() {
         w.target,
         Target::Mesh {
             mesh: 0,
-            property: MeshProperty::Weight(0)
+            property: MeshProperty::Weight { shape: 0 }
         }
     );
     assert_eq!(w.keys[1].value, 1.0);
@@ -293,7 +293,7 @@ fn source_extensions_map_nodes_and_clips() {
         "channels": [{"sampler": 0, "target": {"node": 0, "path": "weights"}}]}]);
     let state = State {
         name: "S".into(),
-        motion: Some(Motion::Clip(0)),
+        motion: Some(Motion::Clip { clip: 0 }),
         speed: 1.0,
         speed_param: None,
         cycle_offset: 0.0,
@@ -358,13 +358,14 @@ fn source_extensions_map_nodes_and_clips() {
     assert_eq!(names, [("Root", true), ("A", true), ("B", false)]);
     let r = a.avatar().unwrap();
     let h = r.humanoid.as_ref().unwrap();
-    assert_eq!(h.bones, [(HumanBone::Hips, 2), (HumanBone::LeftThumbMetacarpal, 1)]);
+    let bones: Vec<_> = h.bones.iter().map(|b| (b.bone, b.node)).collect();
+    assert_eq!(bones, [(HumanBone::Hips, 2), (HumanBone::LeftThumbMetacarpal, 1)]);
     assert_eq!(h.muscle_frames[0].bone, HumanBone::LeftThumbMetacarpal);
     assert_eq!(r.viewpoint, [0.0; 3], "no head: origin");
     assert_eq!(a.clips.len(), 2);
     assert_eq!(a.clips[1].name, "X");
     let motion = &a.animator.unwrap().layers[0].state_machine.states[0].motion;
-    assert_eq!(motion, &Some(Motion::Clip(1)));
+    assert_eq!(motion, &Some(Motion::Clip { clip: 1 }));
     assert_eq!((a.constraints[0].target, a.constraints[0].sources[0].node), (2, 1));
 }
 
@@ -648,7 +649,11 @@ fn vrm0_imports() {
         shape,
         weight: 1.0,
     };
-    assert_eq!(face.visemes, [(Viseme::Aa, vec![bind(0)])]);
+    assert_eq!(face.visemes.len(), 1);
+    assert_eq!(
+        (face.visemes[0].viseme, &face.visemes[0].binds[..]),
+        (Viseme::Aa, &[bind(0)][..])
+    );
     assert_eq!(face.blink, [bind(1)]);
     let eyes = face.eyes.as_ref().unwrap();
     assert_eq!(
@@ -693,7 +698,7 @@ fn vrm0_imports() {
     let joy = a.clips.iter().find(|c| c.name == "Joy").unwrap();
     let Target::Mesh {
         mesh,
-        property: MeshProperty::Weight(s),
+        property: MeshProperty::Weight { shape: s },
     } = joy.curves[0].target
     else {
         panic!("{:?}", joy.curves[0].target);
@@ -809,7 +814,7 @@ fn vrm1_imports() {
     );
 
     let face = a.avatar().and_then(|r| r.face.as_ref()).unwrap();
-    assert_eq!(face.visemes[0].0, Viseme::Aa);
+    assert_eq!(face.visemes[0].viseme, Viseme::Aa);
     assert_eq!(face.blink[0].shape, 1);
     let names: Vec<&str> = a.clips.iter().map(|c| c.name.as_str()).collect();
     assert_eq!(names, ["happy", "Wink"], "look expressions are not toggles");

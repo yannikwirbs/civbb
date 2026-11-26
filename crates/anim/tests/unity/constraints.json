@@ -13,7 +13,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -35,7 +35,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0.1, 0.2, 0.3]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0.1, 0.2, 0.3]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -57,7 +57,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 0.25, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 0.25, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -79,7 +79,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 0.9, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.8, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 5, "weight": 0.7, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 0.9, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.8, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 5, "weight": 0.7, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -101,7 +101,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.5, "active": true, "axes": [true, true, true], "rest": {"translation": [1, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.5, "active": true, "axes": [true, true, true], "rest": {"translation": [1, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -123,7 +123,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, false, true], "rest": {"translation": [1, 2, 3], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, false, true], "rest": {"translation": [1, 2, 3], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -145,7 +145,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 0, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [1, 2, 3], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 0, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [1, 2, 3], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -167,7 +167,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0, 0, 0]}}, "target": 2, "sources": [], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [1, 2, 3], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0, 0, 0]}, "target": 2, "sources": [], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [1, 2, 3], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -189,7 +189,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": false, "axes": [true, true, true], "rest": {"translation": [1, 2, 3], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": false, "axes": [true, true, true], "rest": {"translation": [1, 2, 3], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -211,7 +211,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -233,7 +233,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [10, 20, 30]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [10, 20, 30]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -255,7 +255,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 0.3, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.7, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 0.3, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.7, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -277,7 +277,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 0.2, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 5, "weight": 0.9, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 0.2, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 5, "weight": 0.9, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -299,7 +299,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 0, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.6, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 5, "weight": 0.3, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 0, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.6, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 5, "weight": 0.3, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -322,7 +322,7 @@
         {"name": "D", "parent": 0, "rest": {"translation": [0, 0, 1], "rotation": [-0.431711763, 0.28053847, 0.5975258, 0.614724457], "scale": [1, 1, 1]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 5, "weight": 0.4, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 6, "weight": 0.1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 3, "weight": 0.7, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.25, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 5, "weight": 0.4, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 6, "weight": 0.1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 3, "weight": 0.7, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.25, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -345,7 +345,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.4, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.4, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -367,7 +367,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [false, true, false], "rest": {"translation": [0, 0, 0], "rotation": [0.3097265, 0.210110232, 0.411274016, 0.8311298], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [false, true, false], "rest": {"translation": [0, 0, 0], "rotation": [0.3097265, 0.210110232, 0.411274016, 0.8311298], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -389,7 +389,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 15]}}, "target": 2, "sources": [{"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.7, "active": true, "axes": [true, false, true], "rest": {"translation": [0, 0, 0], "rotation": [0.3097265, 0.210110232, 0.411274016, 0.8311298], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 15]}, "target": 2, "sources": [{"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.7, "active": true, "axes": [true, false, true], "rest": {"translation": [0, 0, 0], "rotation": [0.3097265, 0.210110232, 0.411274016, 0.8311298], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -411,7 +411,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Scale": {"offset": [1, 1, 1]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "scale", "offset": [1, 1, 1]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -433,7 +433,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Scale": {"offset": [2, 1, 0.5]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "scale", "offset": [2, 1, 0.5]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -455,7 +455,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Scale": {"offset": [1, 1, 1]}}, "target": 2, "sources": [{"node": 3, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "scale", "offset": [1, 1, 1]}, "target": 2, "sources": [{"node": 3, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -477,7 +477,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Scale": {"offset": [1, 1, 1]}}, "target": 2, "sources": [{"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.5, "active": true, "axes": [true, true, false], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [3, 2, 1]}}
+        {"kind": {"type": "scale", "offset": [1, 1, 1]}, "target": 2, "sources": [{"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.5, "active": true, "axes": [true, true, false], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [3, 2, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -502,7 +502,7 @@
         {"name": "F", "parent": 0, "rest": {"translation": [0, 0, 1], "rotation": [0, 0, 0, 1], "scale": [1.5, 0.25, 2]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Scale": {"offset": [1, 1, 1]}}, "target": 2, "sources": [{"node": 6, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 7, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "scale", "offset": [1, 1, 1]}, "target": 2, "sources": [{"node": 6, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 7, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -530,7 +530,7 @@
         {"name": "F", "parent": 0, "rest": {"translation": [0, 0, 1], "rotation": [0, 0, 0, 1], "scale": [1.5, 0.25, 2]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Scale": {"offset": [1, 1, 1]}}, "target": 2, "sources": [{"node": 6, "weight": 0.25, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 7, "weight": 0.75, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "scale", "offset": [1, 1, 1]}, "target": 2, "sources": [{"node": 6, "weight": 0.25, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 7, "weight": 0.75, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -558,7 +558,7 @@
         {"name": "F", "parent": 0, "rest": {"translation": [0, 0, 1], "rotation": [0, 0, 0, 1], "scale": [1.5, 0.25, 2]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Scale": {"offset": [1, 1, 1]}}, "target": 2, "sources": [{"node": 6, "weight": 0.2, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 7, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 8, "weight": 0.9, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "scale", "offset": [1, 1, 1]}, "target": 2, "sources": [{"node": 6, "weight": 0.2, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 7, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 8, "weight": 0.9, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -583,7 +583,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Scale": {"offset": [1, 1, 1]}}, "target": 2, "sources": [{"node": 3, "weight": 0.25, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.75, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "scale", "offset": [1, 1, 1]}, "target": 2, "sources": [{"node": 3, "weight": 0.25, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 0.75, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -605,7 +605,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Parent": {"rotation_axes": [true, true, true]}}, "target": 2, "sources": [{"node": 5, "weight": 1, "offset": {"translation": [0.1, 0, 0.2], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "parent", "rotation_axes": [true, true, true]}, "target": 2, "sources": [{"node": 5, "weight": 1, "offset": {"translation": [0.1, 0, 0.2], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -627,7 +627,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Parent": {"rotation_axes": [true, true, true]}}, "target": 2, "sources": [{"node": 5, "weight": 0.5, "offset": {"translation": [0.1, 0, 0.2], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}, {"node": 3, "weight": 0.25, "offset": {"translation": [0, 0.3, 0], "rotation": [0.257834166, -0.0225575641, 0.08418597, 0.9622502], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "parent", "rotation_axes": [true, true, true]}, "target": 2, "sources": [{"node": 5, "weight": 0.5, "offset": {"translation": [0.1, 0, 0.2], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}, {"node": 3, "weight": 0.25, "offset": {"translation": [0, 0.3, 0], "rotation": [0.257834166, -0.0225575641, 0.08418597, 0.9622502], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -649,7 +649,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Parent": {"rotation_axes": [true, true, true]}}, "target": 2, "sources": [{"node": 5, "weight": 1, "offset": {"translation": [0.1, 0, 0.2], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}], "weight": 0.3, "active": true, "axes": [true, true, true], "rest": {"translation": [0.5, 0.5, 0.5], "rotation": [0, 0.382683456, 0, 0.9238795], "scale": [1, 1, 1]}}
+        {"kind": {"type": "parent", "rotation_axes": [true, true, true]}, "target": 2, "sources": [{"node": 5, "weight": 1, "offset": {"translation": [0.1, 0, 0.2], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}], "weight": 0.3, "active": true, "axes": [true, true, true], "rest": {"translation": [0.5, 0.5, 0.5], "rotation": [0, 0.382683456, 0, 0.9238795], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -671,7 +671,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Parent": {"rotation_axes": [false, true, false]}}, "target": 2, "sources": [{"node": 5, "weight": 1, "offset": {"translation": [0.1, 0, 0.2], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, false, false], "rest": {"translation": [0.5, 0.5, 0.5], "rotation": [0.09707366, 0.3773521, 0.006824393, 0.9209428], "scale": [1, 1, 1]}}
+        {"kind": {"type": "parent", "rotation_axes": [false, true, false]}, "target": 2, "sources": [{"node": 5, "weight": 1, "offset": {"translation": [0.1, 0, 0.2], "rotation": [0, 0.707106769, 0, 0.707106769], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, false, false], "rest": {"translation": [0.5, 0.5, 0.5], "rotation": [0.09707366, 0.3773521, 0.006824393, 0.9209428], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -693,7 +693,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Aim": {"offset": [0, 0, 0], "aim_axis": [1, 0, 0], "up_axis": [0, 1, 0], "world_up": "SceneUp"}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "aim", "offset": [0, 0, 0], "aim_axis": [1, 0, 0], "up_axis": [0, 1, 0], "world_up": {"type": "scene_up"}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -715,7 +715,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Aim": {"offset": [0, 0, 0], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": {"Vector": [1, 0, 0]}}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "aim", "offset": [0, 0, 0], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": {"type": "vector", "up": [1, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -737,7 +737,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Aim": {"offset": [0, 0, 0], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": {"ObjectUp": 5}}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "aim", "offset": [0, 0, 0], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": {"type": "object_up", "node": 5}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -759,7 +759,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Aim": {"offset": [0, 0, 0], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": {"ObjectRotationUp": [5, [0, 0, 1]]}}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "aim", "offset": [0, 0, 0], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": {"type": "object_rotation_up", "node": 5, "up": [0, 0, 1]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -781,7 +781,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Aim": {"offset": [0, 0, 0], "aim_axis": [0, -1, 0], "up_axis": [0, 0, 1], "world_up": "None"}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "aim", "offset": [0, 0, 0], "aim_axis": [0, -1, 0], "up_axis": [0, 0, 1], "world_up": {"type": "none"}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -803,7 +803,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Aim": {"offset": [0, 0, 0], "aim_axis": [1, 1, 0], "up_axis": [0, 0, -1], "world_up": "SceneUp"}}, "target": 2, "sources": [{"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "aim", "offset": [0, 0, 0], "aim_axis": [1, 1, 0], "up_axis": [0, 0, -1], "world_up": {"type": "scene_up"}}, "target": 2, "sources": [{"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -825,7 +825,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Aim": {"offset": [0, 0, 30], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": "SceneUp"}}, "target": 2, "sources": [{"node": 3, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.6, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0.08715574, 0, 0.9961947], "scale": [1, 1, 1]}}
+        {"kind": {"type": "aim", "offset": [0, 0, 30], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": {"type": "scene_up"}}, "target": 2, "sources": [{"node": 3, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.6, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0.08715574, 0, 0.9961947], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -847,7 +847,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Aim": {"offset": [0, 0, 0], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": "SceneUp"}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [false, true, false], "rest": {"translation": [0, 0, 0], "rotation": [0.1729874, -0.0151344351, 0.08583164, 0.981060266], "scale": [1, 1, 1]}}
+        {"kind": {"type": "aim", "offset": [0, 0, 0], "aim_axis": [0, 0, 1], "up_axis": [0, 1, 0], "world_up": {"type": "scene_up"}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [false, true, false], "rest": {"translation": [0, 0, 0], "rotation": [0.1729874, -0.0151344351, 0.08583164, 0.981060266], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -869,7 +869,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"LookAt": {"offset": [0, 0, 0], "roll": 30, "world_up_node": null}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "look_at", "offset": [0, 0, 0], "roll": 30, "world_up_node": null}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -891,7 +891,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"LookAt": {"offset": [0, 0, 0], "roll": 30, "world_up_node": 5}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "look_at", "offset": [0, 0, 0], "roll": 30, "world_up_node": 5}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -913,7 +913,7 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"LookAt": {"offset": [0, 20, 0], "roll": 0, "world_up_node": null}}, "target": 2, "sources": [{"node": 3, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.5, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0.08715574, 0, 0, 0.9961947], "scale": [1, 1, 1]}}
+        {"kind": {"type": "look_at", "offset": [0, 20, 0], "roll": 0, "world_up_node": null}, "target": 2, "sources": [{"node": 3, "weight": 0.5, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}, {"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 0.5, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0.08715574, 0, 0, 0.9961947], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -936,8 +936,8 @@
         {"name": "U", "parent": 0, "rest": {"translation": [0, 0.5, 0], "rotation": [0, 0, 0.382683456, 0.9238795], "scale": [1, 1, 1]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}},
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 6, "sources": [{"node": 2, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}},
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 6, "sources": [{"node": 2, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -961,8 +961,8 @@
         {"name": "U", "parent": 0, "rest": {"translation": [0, 0.5, 0], "rotation": [0, 0, 0.382683456, 0.9238795], "scale": [1, 1, 1]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 6, "sources": [{"node": 2, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}},
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 6, "sources": [{"node": 2, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}},
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},
@@ -985,8 +985,8 @@
         {"name": "C", "parent": 0, "rest": {"translation": [0.4, -1, 0.7], "rotation": [0.5938583, -0.293152571, 0.2459842, 0.7077328], "scale": [0.8, 0.8, 0.8]}, "active": true}
       ],
       "constraints": [
-        {"kind": {"Position": {"offset": [0, 0, 0]}}, "target": 2, "sources": [{"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}},
-        {"kind": {"Rotation": {"offset": [0, 0, 0]}}, "target": 1, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
+        {"kind": {"type": "position", "offset": [0, 0, 0]}, "target": 2, "sources": [{"node": 4, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}},
+        {"kind": {"type": "rotation", "offset": [0, 0, 0]}, "target": 1, "sources": [{"node": 3, "weight": 1, "offset": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}], "weight": 1, "active": true, "axes": [true, true, true], "rest": {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]}}
       ],
       "out": [
         {"translation": [0, 0, 0], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1]},

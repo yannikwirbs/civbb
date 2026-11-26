@@ -28,7 +28,7 @@ pub use validate::{Caps, validate};
 
 /// Version of the runtime package's data model. Bump on any change to the types in this crate; readers refuse
 /// packages of any other version, which are rebuilt from their kept source (ADR 0087).
-pub const FORMAT_VERSION: u32 = 35;
+pub const FORMAT_VERSION: u32 = 36;
 
 #[cfg(test)]
 pub(crate) mod testutil {
@@ -37,7 +37,7 @@ pub(crate) mod testutil {
     use crate::dynamics::*;
     use crate::expressions::*;
     use crate::face::*;
-    use crate::hierarchy::{HumanBone, Humanoid, MuscleFrame, Node};
+    use crate::hierarchy::{BoneNode, HumanBone, Humanoid, MuscleFrame, Node};
     use crate::material::*;
     use crate::math::Transform;
     use crate::mesh::*;
@@ -170,7 +170,7 @@ pub(crate) mod testutil {
                 curves: vec![Curve {
                     target: Target::Mesh {
                         mesh: 0,
-                        property: MeshProperty::Weight(0),
+                        property: MeshProperty::Weight { shape: 0 },
                     },
                     keys: vec![Key {
                         time: 0.0,
@@ -260,7 +260,10 @@ pub(crate) mod testutil {
             }],
             role: Role::Avatar(Avatar {
                 humanoid: Some(Humanoid {
-                    bones: vec![(HumanBone::Hips, 1)],
+                    bones: vec![BoneNode {
+                        bone: HumanBone::Hips,
+                        node: 1,
+                    }],
                     human_scale: 1.0,
                     center_of_mass: None,
                     muscle_frames: vec![MuscleFrame {
@@ -275,14 +278,14 @@ pub(crate) mod testutil {
                 }),
                 viewpoint: [0.0, 1.5, 0.1],
                 face: Some(Face {
-                    visemes: vec![(
-                        Viseme::Aa,
-                        vec![ShapeBind {
+                    visemes: vec![VisemeBinds {
+                        viseme: Viseme::Aa,
+                        binds: vec![ShapeBind {
                             mesh: 0,
                             shape: 0,
                             weight: 1.0,
                         }],
-                    )],
+                    }],
                     blink: vec![],
                     eyes: Some(EyeLook {
                         driver: EyeDriver::Bones {
@@ -329,7 +332,7 @@ pub(crate) mod testutil {
 
     fn sample_animator() -> Animator {
         let transition = Transition {
-            dest: TransitionDest::State(1),
+            dest: TransitionDest::State { state: 1 },
             conditions: vec![Condition {
                 param: 0,
                 mode: ConditionMode::If,
@@ -365,7 +368,7 @@ pub(crate) mod testutil {
             Some(Motion::BlendTree(Box::new(BlendTree {
                 kind: BlendTreeKind::Direct,
                 children: vec![ChildMotion {
-                    motion: Motion::Clip(0),
+                    motion: Motion::Clip { clip: 0 },
                     threshold: 0.0,
                     position: [0.0; 2],
                     direct_param: Some(0),
@@ -381,7 +384,10 @@ pub(crate) mod testutil {
             ops: vec![EntryOp::Copy {
                 src: 0,
                 dst: 0,
-                remap: Some(([0.0, 1.0], [1.0, 0.0])),
+                remap: Some(Remap {
+                    from: [0.0, 1.0],
+                    to: [1.0, 0.0],
+                }),
             }],
         });
         Animator {

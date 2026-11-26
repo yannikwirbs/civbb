@@ -306,8 +306,8 @@ fn animated_values_are_per_island_and_fall_back_to_the_stored_ones() {
         (&[(ConstraintField::Active, 0.4)], [1.0, 0.0, 0.0]),
         (
             &[
-                (ConstraintField::SourceWeight(0), 0.0),
-                (ConstraintField::SourceWeight(1), 1.0),
+                (ConstraintField::SourceWeight { source: 0 }, 0.0),
+                (ConstraintField::SourceWeight { source: 1 }, 1.0),
             ],
             [0.0, 0.0, 3.0],
         ),
@@ -321,7 +321,9 @@ fn animated_values_are_per_island_and_fall_back_to_the_stored_ones() {
         assert_eq!(got[0][1], want, "{set:?}");
     }
     // A source index past the list is ignored.
-    let got = frames(&a, 1, |_, c, s, _| c.set(s, 0, ConstraintField::SourceWeight(9), 1.0));
+    let got = frames(&a, 1, |_, c, s, _| {
+        c.set(s, 0, ConstraintField::SourceWeight { source: 9 }, 1.0)
+    });
     assert_eq!(got[0][1], [0.0, 2.0, 0.0]);
 }
 

@@ -17,7 +17,7 @@ fn value_clip(k: usize, looping: bool) -> Clip {
         looping,
         Target::Node {
             node: A,
-            property: NodeProperty::Translation(0),
+            property: NodeProperty::Translation { component: 0 },
         },
     )
 }
@@ -49,7 +49,7 @@ fn keyed_clip(keys: &[(f32, f32)], length: f32, looping: bool, target: Target) -
 fn state(clip: u32) -> State {
     State {
         name: format!("S{clip}"),
-        motion: Some(Motion::Clip(clip)),
+        motion: Some(Motion::Clip { clip }),
         speed: 1.0,
         speed_param: None,
         cycle_offset: 0.0,
@@ -65,7 +65,7 @@ fn state(clip: u32) -> State {
 
 fn to(dest: u32, conditions: Vec<Condition>) -> Transition {
     Transition {
-        dest: TransitionDest::State(dest),
+        dest: TransitionDest::State { state: dest },
         conditions,
         has_exit_time: false,
         exit_time: 0.0,
@@ -505,7 +505,7 @@ fn motion_time_and_cycle_offset_pick_the_sample_time() {
         false,
         Target::Node {
             node: A,
-            property: NodeProperty::Translation(0),
+            property: NodeProperty::Translation { component: 0 },
         },
     );
     let mut s = state(0);
@@ -528,7 +528,7 @@ fn layers_override_by_weight_and_add_deltas_within_masks() {
         false,
         Target::Node {
             node: A,
-            property: NodeProperty::Translation(0),
+            property: NodeProperty::Translation { component: 0 },
         },
     );
     let clips = vec![value_clip(0, false), value_clip(2, false), ramp];
@@ -570,7 +570,7 @@ fn layers_override_by_weight_and_add_deltas_within_masks() {
 
 #[test]
 fn animated_parameters_take_effect_next_frame() {
-    let drive = keyed_clip(&[(0.0, 1.0)], 1.0, false, Target::Entry(5));
+    let drive = keyed_clip(&[(0.0, 1.0)], 1.0, false, Target::Entry { entry: 5 });
     let mut s0 = state(0);
     s0.transitions = vec![to(
         1,
@@ -597,7 +597,7 @@ fn rotation_clip(q: [f32; 4]) -> Clip {
         false,
         Target::Node {
             node: A,
-            property: NodeProperty::Rotation(0),
+            property: NodeProperty::Rotation { component: 0 },
         },
     );
     for (k, &v) in q.iter().enumerate().skip(1) {
@@ -607,7 +607,7 @@ fn rotation_clip(q: [f32; 4]) -> Clip {
             false,
             Target::Node {
                 node: A,
-                property: NodeProperty::Rotation(k as u8),
+                property: NodeProperty::Rotation { component: k as u8 },
             },
         );
         c.curves.extend(extra.curves);

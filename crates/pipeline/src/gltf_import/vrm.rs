@@ -11,7 +11,7 @@ use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
 use civbb_format::dynamics::Dynamics;
 use civbb_format::expressions::Expressions;
 use civbb_format::face::Face;
-use civbb_format::hierarchy::{HumanBone, Humanoid, NodeIndex};
+use civbb_format::hierarchy::{BoneNode, HumanBone, Humanoid, NodeIndex};
 use civbb_format::math::{Quat, Transform, Vec3};
 use civbb_format::mesh::FirstPerson;
 use civbb_format::meta::Meta;
@@ -174,7 +174,7 @@ impl Importer<'_> {
                 self.warnings.push(format!("VRM humanoid bone `{name}` mapped twice"));
                 continue;
             }
-            h.bones.push((bone, node));
+            h.bones.push(BoneNode { bone, node });
         }
         let world = self.world();
         let (bone, offset) = if v1 {

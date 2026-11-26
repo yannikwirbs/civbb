@@ -146,7 +146,7 @@ fn avatar() -> Document {
                 }),
                 curve(Target::Mesh {
                     mesh: 1,
-                    property: MeshProperty::Weight(0),
+                    property: MeshProperty::Weight { shape: 0 },
                 }),
                 curve(Target::Mesh {
                     mesh: 4,
@@ -209,7 +209,7 @@ fn merges_meshes_that_show_together_and_keeps_the_rest_apart() {
             before.clips[0].curves[0].target.clone(),
             Target::Mesh {
                 mesh: 0,
-                property: MeshProperty::Weight(1)
+                property: MeshProperty::Weight { shape: 1 }
             },
             Target::Mesh {
                 mesh: 3,

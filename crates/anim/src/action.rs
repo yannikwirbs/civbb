@@ -1,6 +1,6 @@
 //! Platform values at rest and state actions: entry operations, pose sources, layer weights and locomotion.
 
-use civbb_format::animator::{EntryOp, PosePart, PoseSource};
+use civbb_format::animator::{EntryOp, PosePart, PoseSource, Remap};
 use civbb_format::state::{Entry, EntryKind, Platform};
 
 /// A platform value's value for an avatar standing still on the ground at its own scale, which an instance starts
@@ -64,8 +64,11 @@ pub fn drive(ops: &[EntryOp], decls: &[Entry], params: &mut [f32], rng: &mut Rng
             EntryOp::Copy { src, dst, remap } => {
                 let v = params[src as usize];
                 let v = match remap {
-                    Some(([a, b], [c, d])) if b != a => c + (v - a) / (b - a) * (d - c),
-                    Some((_, [c, _])) => c,
+                    Some(Remap {
+                        from: [a, b],
+                        to: [c, d],
+                    }) if b != a => c + (v - a) / (b - a) * (d - c),
+                    Some(Remap { to: [c, _], .. }) => c,
                     None => v,
                 };
                 (dst, v)

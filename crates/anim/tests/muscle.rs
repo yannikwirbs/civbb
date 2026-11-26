@@ -8,7 +8,7 @@ use civbb_anim::muscle::{COUNT, MUSCLES, find};
 use civbb_anim::{Controller, Instance, Rig, Target, bind};
 use civbb_format::animator::Target as CurveTarget;
 use civbb_format::animator::*;
-use civbb_format::hierarchy::{HumanBone, Humanoid, MuscleFrame, Node, NodeIndex};
+use civbb_format::hierarchy::{BoneNode, HumanBone, Humanoid, MuscleFrame, Node, NodeIndex};
 use civbb_format::math::{Quat, Transform};
 use civbb_format::state::{Entry, EntryKind};
 use civbb_format::{Avatar, Role};
@@ -163,7 +163,14 @@ fn check_recording(file: &str) {
         },
         role: Role::Avatar(Avatar {
             humanoid: Some(Humanoid {
-                bones: r.axes.iter().map(|a| (bone(a), a.node)).collect(),
+                bones: r
+                    .axes
+                    .iter()
+                    .map(|a| BoneNode {
+                        bone: bone(a),
+                        node: a.node,
+                    })
+                    .collect(),
                 human_scale: 0.0,
                 center_of_mass: None,
                 muscle_frames: r
@@ -296,7 +303,14 @@ fn arm(twist: f32, arm_rest: Quat, clips: Vec<Clip>) -> Document {
         },
         role: Role::Avatar(Avatar {
             humanoid: Some(Humanoid {
-                bones: bones.iter().enumerate().map(|(i, b)| (*b, i as u32 + 1)).collect(),
+                bones: bones
+                    .iter()
+                    .enumerate()
+                    .map(|(i, b)| BoneNode {
+                        bone: *b,
+                        node: i as u32 + 1,
+                    })
+                    .collect(),
                 human_scale: 0.0,
                 center_of_mass: None,
                 muscle_frames: bones
@@ -449,7 +463,9 @@ fn key(value: f32) -> Vec<Key> {
 }
 
 fn muscle(name: &str) -> CurveTarget {
-    CurveTarget::Humanoid(civbb_anim::muscle::property(find(name).expect("a Unity muscle")))
+    CurveTarget::Humanoid {
+        property: civbb_anim::muscle::property(find(name).expect("a Unity muscle")),
+    }
 }
 
 fn muscle_clip(curves: &[(CurveTarget, f32)]) -> Clip {
@@ -474,14 +490,21 @@ fn muscle_curves_bind_to_slots_with_zero_defaults() {
         (muscle("Left Arm Down-Up"), 1.0),
         // The jaw has no muscle about X.
         (
-            CurveTarget::Humanoid(HumanoidProperty::Muscle {
-                bone: HumanBone::Jaw,
-                axis: 0,
-            }),
+            CurveTarget::Humanoid {
+                property: HumanoidProperty::Muscle {
+                    bone: HumanBone::Jaw,
+                    axis: 0,
+                },
+            },
             1.0,
         ),
         (muscle("Spine Front-Back"), 1.0),
-        (CurveTarget::Humanoid(HumanoidProperty::Body(0)), 1.0),
+        (
+            CurveTarget::Humanoid {
+                property: HumanoidProperty::Body { component: 0 },
+            },
+            1.0,
+        ),
     ]);
     let a = arm(0.5, about(2, 50.0), vec![clip.clone()]);
     let b = bind(&a);
@@ -513,7 +536,7 @@ fn muscle_curves_bind_to_slots_with_zero_defaults() {
 fn state(clip: u32) -> State {
     State {
         name: format!("s{clip}"),
-        motion: Some(Motion::Clip(clip)),
+        motion: Some(Motion::Clip { clip }),
         speed: 1.0,
         speed_param: None,
         cycle_offset: 0.0,
@@ -618,7 +641,7 @@ fn write_defaults_off_never_holds_muscles() {
         ];
         let mut a = arm(0.5, I, clips);
         let child = |clip: u32, threshold: f32| ChildMotion {
-            motion: Motion::Clip(clip),
+            motion: Motion::Clip { clip },
             threshold,
             position: [0.0, 0.0],
             direct_param: None,
@@ -629,7 +652,7 @@ fn write_defaults_off_never_holds_muscles() {
         let mut first = state(0);
         first.unwritten = Unwritten::Hold;
         first.transitions = vec![Transition {
-            dest: TransitionDest::State(1),
+            dest: TransitionDest::State { state: 1 },
             conditions: vec![Condition {
                 param: 0,
                 mode: ConditionMode::Greater,

@@ -260,7 +260,7 @@ public static class VrcContacts
         for (int k = 0; k < cases.Count; k++)
         {
             var c = cases[k];
-            s.Append(k == 0 ? "\n    " : ",\n    ").Append("{\n      \"name\": \"").Append(c.Name).Append("\", \"kind\": \"").Append(c.Kind)
+            s.Append(k == 0 ? "\n    " : ",\n    ").Append("{\n      \"name\": \"").Append(c.Name).Append("\", \"kind\": \"").Append(c.Kind == "OnEnter" ? "on_enter" : c.Kind.ToLowerInvariant())
                 .Append("\", \"min_velocity\": ").Append(F(c.MinVelocity)).Append(", \"face\": ").Append(B(c.Face))
                 .Append(", \"root_scale\": ").Append(F(c.Root.localScale.x))
                 .Append(",\n      \"sender_shape\": ").Append(ShapeJson(c.SenderShape)).Append(",\n      \"receiver_shape\": ").Append(ShapeJson(c.ReceiverShape))

@@ -28,14 +28,18 @@ impl Importer<'_> {
                 };
                 let on_node = |property| Target::Node { node: at, property };
                 let targets: Vec<Target> = match ch.target().property() {
-                    GltfProperty::Translation => (0..3).map(|i| on_node(NodeProperty::Translation(i))).collect(),
-                    GltfProperty::Rotation => (0..4).map(|i| on_node(NodeProperty::Rotation(i))).collect(),
-                    GltfProperty::Scale => (0..3).map(|i| on_node(NodeProperty::Scale(i))).collect(),
+                    GltfProperty::Translation => (0..3)
+                        .map(|i| on_node(NodeProperty::Translation { component: i }))
+                        .collect(),
+                    GltfProperty::Rotation => (0..4)
+                        .map(|i| on_node(NodeProperty::Rotation { component: i }))
+                        .collect(),
+                    GltfProperty::Scale => (0..3).map(|i| on_node(NodeProperty::Scale { component: i })).collect(),
                     GltfProperty::MorphTargetWeights => match self.node_meshes.get(&at) {
                         Some(&mi) => (0..self.meshes[mi].blend_shapes.len())
                             .map(|s| Target::Mesh {
                                 mesh: mi as MeshIndex,
-                                property: MeshProperty::Weight(s as u32),
+                                property: MeshProperty::Weight { shape: s as u32 },
                             })
                             .collect(),
                         None => return Err(err("morph weights on a node without a mesh".into())),

@@ -202,13 +202,23 @@ fn resolve(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Resu
             if platform.is_some() || Platform::from_name(&name).is_some() {
                 return Err("writes a platform value");
             }
-            return s.state.find(&name).map(Target::Entry).ok_or("no such parameter");
+            return s
+                .state
+                .find(&name)
+                .map(|entry| Target::Entry { entry })
+                .ok_or("no such parameter");
         }
         XProperty::Muscle(name) => {
             let m = civbb_anim::muscle::find(&name).ok_or("no such muscle")?;
-            return Ok(Target::Humanoid(civbb_anim::muscle::property(m)));
+            return Ok(Target::Humanoid {
+                property: civbb_anim::muscle::property(m),
+            });
         }
-        XProperty::RootMotion(i) => return Ok(Target::Humanoid(HumanoidProperty::Body(i))),
+        XProperty::RootMotion(i) => {
+            return Ok(Target::Humanoid {
+                property: HumanoidProperty::Body { component: i },
+            });
+        }
         XProperty::Component { .. } => return Err("unsupported component property"),
         _ => {}
     }
@@ -220,23 +230,23 @@ fn resolve(b: XBinding, s: &Scope, by_path: &HashMap<String, NodeIndex>) -> Resu
         Ok(Target::Mesh { mesh, property })
     };
     match b.property {
-        XProperty::Position(i) => on_node(NodeProperty::Translation(i)),
-        XProperty::Rotation(i) => on_node(NodeProperty::Rotation(i)),
+        XProperty::Position(i) => on_node(NodeProperty::Translation { component: i }),
+        XProperty::Rotation(i) => on_node(NodeProperty::Rotation { component: i }),
         XProperty::EulerRotation(axis) => on_node(NodeProperty::EulerRotation {
             axis,
             order: EulerOrder::Zxy,
         }),
-        XProperty::Scale(i) => on_node(NodeProperty::Scale(i)),
+        XProperty::Scale(i) => on_node(NodeProperty::Scale { component: i }),
         XProperty::Active => on_node(NodeProperty::Active),
         XProperty::RendererEnabled => on_mesh(MeshProperty::Visible),
         XProperty::BlendShape(name) => {
             let m = mesh.ok_or("no mesh at path")?;
             let shapes = &s.meshes[m as usize].blend_shapes;
             let i = shapes.iter().position(|x| x.name == name).ok_or("no such blendshape")?;
-            on_mesh(MeshProperty::Weight(i as u32))
+            on_mesh(MeshProperty::Weight { shape: i as u32 })
         }
         XProperty::Material(name) => material::target(&name, mesh.ok_or("no mesh at path")?, s.meshes, s.families),
-        XProperty::MaterialSlot(i) => on_mesh(MeshProperty::MaterialSlot(i)),
+        XProperty::MaterialSlot(i) => on_mesh(MeshProperty::MaterialSlot { submesh: i }),
         XProperty::Constraint { kind, field } => {
             let i = (s.constraints.iter())
                 .position(|c| c.target == node && ConstraintType::of(&c.kind) == Some(kind))

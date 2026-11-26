@@ -9,7 +9,7 @@
   "params": [
     {
       "name": "p",
-      "kind": "Bool",
+      "kind": "bool",
       "default": 0
     }
   ],

@@ -23,6 +23,7 @@ mod native;
 mod source;
 mod unity_clip;
 mod unity_material;
+mod unity_shapes;
 mod unity_state;
 mod vrm;
 

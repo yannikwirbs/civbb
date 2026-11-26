@@ -10,6 +10,7 @@ pub type MeshIndex = u32;
 
 /// A triangle mesh attached to a node. All vertex streams have the same length, or are empty when optional.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Mesh {
     /// Name, used by animation bindings (blendshape and toggle paths).
     pub name: String,
@@ -26,6 +27,7 @@ pub struct Mesh {
     /// Secondary UVs (lightmaps, decals); empty if absent.
     pub uv1: Vec<[f32; 2]>,
     /// Skinning data; `None` for rigid meshes, which follow `node`.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub skin: Option<Skin>,
     /// Triangle list indices.
     pub indices: Vec<u32>,
@@ -42,6 +44,7 @@ pub struct Mesh {
 /// A lower level of detail: simplified triangles over a prefix of the mesh's vertices, so skinning and shapes of
 /// that level stop at [`Lod::vertices`] (ADR 0031).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Lod {
     /// Vertices this level uses: the mesh's first `vertices`, at most the previous level's.
     pub vertices: u32,
@@ -96,6 +99,7 @@ impl Mesh {
 
 /// First-person visibility of a mesh (VRM `firstPerson.meshAnnotations`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FirstPerson {
     /// Visible, except the parts skinned to the head (legacy head shrinking).
     #[default]
@@ -110,6 +114,7 @@ pub enum FirstPerson {
 
 /// Linear blend skinning with up to four influences per vertex.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Skin {
     /// The nodes acting as joints; vertex joint indices index into this list.
     pub joints: Vec<NodeIndex>,
@@ -123,6 +128,7 @@ pub struct Skin {
 
 /// A contiguous index range drawn with one material.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Submesh {
     /// First index in [`Mesh::indices`].
     pub first_index: u32,
@@ -134,6 +140,7 @@ pub struct Submesh {
 
 /// A morph target stored as sparse deltas: only vertices it moves are listed (design doc §6).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BlendShape {
     /// Name, as animations, visemes and face tracking refer to it.
     pub name: String,
@@ -145,6 +152,7 @@ pub struct BlendShape {
 
 /// One vertex's offset in a blendshape.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ShapeDelta {
     /// Vertex index in the mesh.
     pub vertex: u32,

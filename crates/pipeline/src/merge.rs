@@ -50,7 +50,8 @@ pub fn merge(a: &mut Document) -> Merged {
             } => toggled[node as usize] = true,
             Target::Mesh {
                 mesh,
-                property: MeshProperty::Visible | MeshProperty::Material { .. } | MeshProperty::MaterialSlot(_),
+                property:
+                    MeshProperty::Visible | MeshProperty::Material { .. } | MeshProperty::MaterialSlot { submesh: _ },
             } => renderer[mesh as usize] = true,
             _ => {}
         }
@@ -153,7 +154,7 @@ pub fn merge(a: &mut Document) -> Merged {
         let mut binds: Vec<_> = face
             .visemes
             .iter_mut()
-            .flat_map(|(_, b)| b)
+            .flat_map(|v| &mut v.binds)
             .chain(&mut face.blink)
             .collect();
         if let Some(EyeDriver::Shapes { up, down, left, right }) = face.eyes.as_mut().map(|e| &mut e.driver) {

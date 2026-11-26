@@ -7,7 +7,7 @@ use std::path::Path;
 
 use civbb_anim::body::{BodyRig, center_of_mass, orientation};
 use civbb_core::math::{Pose, conj, length, mul, rotate, scale, sub};
-use civbb_format::hierarchy::{Hierarchy, HumanBone, Humanoid, Node};
+use civbb_format::hierarchy::{BoneNode, Hierarchy, HumanBone, Humanoid, Node};
 use civbb_format::math::{Quat, Transform, Vec3};
 use serde::Deserialize;
 
@@ -132,11 +132,14 @@ fn hips_placement_matches_unity() {
                 })
                 .collect(),
         };
-        let bones: Vec<(HumanBone, u32)> = (s.nodes.iter().enumerate())
+        let bones: Vec<BoneNode> = (s.nodes.iter().enumerate())
             .filter(|(_, n)| !s.unmapped.contains(&n.name))
-            .filter_map(|(i, n)| Some((civbb_anim::muscle::unity_bone(&n.name)?, i as u32)))
+            .filter_map(|(i, n)| {
+                let bone = civbb_anim::muscle::unity_bone(&n.name)?;
+                Some(BoneNode { bone, node: i as u32 })
+            })
             .collect();
-        let hips = bones.iter().find(|b| b.0 == HumanBone::Hips).unwrap().1 as usize;
+        let hips = bones.iter().find(|b| b.bone == HumanBone::Hips).unwrap().node as usize;
         // Anchored to Unity's rest centre of mass, as exports are: the rest case is the rest pose moved to body
         // position (0, 1, 0), so move its centre back by the hips' offset.
         let rest = s.cases.iter().find(|c| c.name == "rest").expect("rest case");
