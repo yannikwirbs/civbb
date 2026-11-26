@@ -41,3 +41,7 @@ run that takes minutes.
 - Measuring Claude Code itself: `claude -p "..." --model haiku --output-format json --no-session-persistence` gives
   the usage of a throwaway session (first-call context = input + cache read + cache write). Without a transcript
   (`--no-session-persistence`) hooks that read `transcript_path` see nothing; `-p` needs `--allowedTools` for Bash.
+- `tools/parity.sh --against` compares only the rest state's view means. To prove "equal in every state", compare
+  every state's view means and the red count in both runs' `parity.json` (a short Python loop over the score dirs).
+- A round trip (raise, then lower) cannot catch a raise that leaves a value unchanged when the lowering accepts both
+  forms (native `platform/` names lowered as-is): also assert on the raised text itself.

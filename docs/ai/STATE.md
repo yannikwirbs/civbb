@@ -119,14 +119,18 @@ What exists, by area. Read the section for the area you touch; update it when th
 
 - glTF input (ADR 0076): `KHR_mesh_quantization` accepted (integer attributes, morph deltas and animation outputs
   through the normalising accessor reader); required Draco or meshopt compression refused with an export hint.
-- State table (ADR 0088, 0095, #115, format v26): `civbb_format::state` (`StateTable`, `Entry {name, kind, default,
+- State table (ADR 0088, 0095, 0096, #115 to #117, format v28): `civbb_format::state` (`StateTable`, `Entry {name, kind, default,
   rest, sync, saved, external}`, `EntryIndex`), `Avatar::state`. Animator conditions, blend inputs, speed/offset/
-  time/mirror inputs, drivers, menu controls (`Option<EntryIndex>`, puppet axes `Vec<Option<_>>`) and contact
-  receivers reference entries; the animator has no parameter table and `Expressions` only the menu. The Unity
+  time/mirror inputs, drivers, menu controls (`Option<EntryIndex>`, puppet axes `Vec<Option<_>>`), contact
+  receivers and chain outputs (`Chain::outputs`, one per grabbed/posed/angle/stretch/squish; dialect 1's prefix
+  resolves `<prefix>_IsGrabbed` etc.) reference entries; the animator has no parameter table and `Expressions` only the menu. The Unity
   importer lowers dialect 1 in `gltf_import/unity_state.rs` (animator parameters in order, then expression-only ones;
   expression default starts, animator default is `rest`; unknown names `None`); `civbb_corpus::gltf` raises entries
   back to dialect 1. Validation checks every reference and unique names; synced bits count the entry's type until
-  #118. Still by name: built-ins (#117), curve targets (#119), chain outputs' prefix (#116).
+  #118. Platform values (ADR 0096): `state::Platform`, entries named `platform/...`
+  (VRChat's names via `vrchat_name`, renamed by the importer, raised back by the corpus writer and the parity
+  hand-off), never synced/saved/external and written by no content (validated; the importer drops driver writes).
+  Still by name: curve targets (#119).
 - Importer layout (health check): `gltf_import.rs` (entry, parsing, URI resolver, buffers, hierarchy) with
   `gltf_import/{material,mesh,animation,source,unity_material,unity_state}.rs` and `vrm.rs` (entry, humanoid, node constraints,
   first person) with `vrm/{springs,mtoon,expressions,meta}.rs`. vrm keeps its own `qmul`/`rotate`/`from_to` (core's
@@ -267,15 +271,16 @@ What exists, by area. Read the section for the area you touch; update it when th
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
   human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056), the start time does not reach one and a transition fired at its exit time starts with the overshoot elapsed; the first update advances like any other; a Write Defaults on state without a motion writes nothing (ADR 0065, recorded); instances start entries at `Entry::default` (`Controller::start`; the expression default for lowered Unity content,
-  #85) and Write Defaults restores a curve-written entry to `Entry::rest` (the animator default, ADR 0095) and built-ins
-  standing on the ground (`Builtin::at_rest`, ADR 0055). Material slots swap per island
+  #85) and Write Defaults restores a curve-written entry to `Entry::rest` (the animator default, ADR 0095) and platform
+  values standing on the ground (`behaviour::at_rest`, `Instance::set_platform`, ADR 0055). Material slots swap per island
   (`Target::MaterialSlot`, `Island::submesh_materials`, a per-submesh override in `MeshData::draws`; ADR 0059).
   Mirrored states and blend tree children map muscles as Unity records (`muscle::mirror`, exclusive or; ADR 0060). `civbb-dynamics`: PhysBone chains as the SDK
   steps them (ADR 0049, 0068: fixed 1/60 s steps counted in f32, between them the shown direction blended from the
   last step towards the frame's by `r / (1 - pull (1 - r))`, steps against the pose interpolated from the last step's,
   colliders from the last frame's, ADR 0074; versions 1.0/1.1, simplified and advanced
   integration, immobile, limits with their rotation composed `qz qy qx` as the SDK does (#108), segment colliders;
-  not the hand and finger colliders that `allowCollision` chains meet, #92) with grab/pose (ADR 0015's, unverified), and contacts with the
+  not the hand and finger colliders that `allowCollision` chains meet, #92) with grab/pose (ADR 0015's, unverified; outputs written to their entries before the next frame's animator update,
+  as receivers are), and contacts with the
   cross-avatar grid broadphase (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the
   component's node apart from the root transform, Proximity from a sender's second frame (ADR 0047). Format v13
   (`rebake` ADR 0046, contact shapes ADR 0047, PhysBone `version` ADR 0049, `Toon::light` ADR 0050).
