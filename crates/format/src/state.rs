@@ -1,5 +1,6 @@
 //! The document's state table (ADR 0088): typed entries every reader and writer references by index.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Index into [`StateTable::entries`].
@@ -7,7 +8,7 @@ pub type EntryIndex = u32;
 
 /// The shared state of a document. Animator conditions, blend inputs, drivers, menu controls and contact receivers
 /// reference entries by index; names are looked up only at the edges (OSC, plugins, tools).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StateTable {
     /// Entries; names are unique.
@@ -34,7 +35,7 @@ impl StateTable {
 }
 
 /// One typed value of the state table.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Entry {
     /// The creator's name; `/` separates namespaces.
@@ -125,7 +126,7 @@ impl Entry {
 }
 
 /// The values a ranged int or float takes (ADR 0098).
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Range {
     /// Integers `min ..= max`.
@@ -178,7 +179,7 @@ fn float_steps(bits: u8) -> u32 {
 
 /// Entry types.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EntryKind {
     Float,
@@ -365,7 +366,7 @@ impl Platform {
 }
 
 /// Network sync of an entry.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SyncMode {
     /// Local only.

@@ -48,7 +48,8 @@ fn main() -> ExitCode {
         Some("rules") => rules(),
         Some("codemap") => codemap(check),
         Some("shaders") => shaders(check),
-        _ => Err("usage: cargo xtask <ci|test|arch|rules|codemap [--check]|shaders [--check]>".into()),
+        Some("schema") => schema(),
+        _ => Err("usage: cargo xtask <ci|test|arch|rules|codemap [--check]|shaders [--check]|schema>".into()),
     };
     match result {
         Ok(()) => {
@@ -516,6 +517,21 @@ fn source_hash(path: &Path) -> Result<String, String> {
             (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
         });
     Ok(format!("{hash:016x}\n"))
+}
+
+/// Rewrites `docs/spec/schema/*.schema.json` from the format types (ADR 0086 point 2); the gate's test
+/// `civbb-pipeline --test schema` fails while they are stale.
+fn schema() -> Result<(), String> {
+    let status = Command::new("cargo")
+        .args(["test", "-p", "civbb-pipeline", "--test", "schema", "--quiet"])
+        .env("CIVBB_BLESS", "1")
+        .current_dir(root())
+        .status()
+        .map_err(|e| e.to_string())?;
+    status
+        .success()
+        .then_some(())
+        .ok_or_else(|| "schema generation failed".into())
 }
 
 /// Each `crates/<name>/shaders/<shader>.slang` compiles to `shaders/spv/<shader>.spv`, with its source's hash in

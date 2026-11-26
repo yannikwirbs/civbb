@@ -1,5 +1,6 @@
 //! The avatar role: what a document needs to be worn (ADR 0085 point 5).
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::expressions::Expressions;
@@ -9,7 +10,7 @@ use crate::math::Vec3;
 use crate::meta::Meta;
 
 /// The parts only an avatar has. Node, mesh and entry references index the owning [`crate::Document`].
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Avatar {
     /// Humanoid mapping; `None` for non-humanoid avatars.

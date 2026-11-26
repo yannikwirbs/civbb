@@ -1,5 +1,6 @@
 //! Bone dynamics (PhysBone-compatible chains and colliders) and contact senders and receivers.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::hierarchy::NodeIndex;
@@ -7,7 +8,7 @@ use crate::math::{Quat, Vec3};
 use crate::state::EntryIndex;
 
 /// All dynamics of an avatar.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Dynamics {
     /// Simulated bone chains.
@@ -17,7 +18,7 @@ pub struct Dynamics {
 }
 
 /// A value scaled along the chain by an optional curve over normalised depth (0 at root, 1 at tip).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Graded {
     /// Base value.
@@ -37,7 +38,7 @@ impl Graded {
 }
 
 /// One simulated chain, mirroring the documented PhysBone parameters.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Chain {
     /// Root transform; every descendant not in `ignore` is simulated.
@@ -85,7 +86,7 @@ pub struct Chain {
 }
 
 /// The state entries a chain writes after each frame (ADR 0088); `None` writes nothing.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ChainOutputs {
     /// 1 while any bone is grabbed.
@@ -114,7 +115,7 @@ impl ChainOutputs {
 
 /// Root behaviour with several children.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MultiChild {
     Ignore,
@@ -124,7 +125,7 @@ pub enum MultiChild {
 
 /// PhysBone versions, `1.0` and `1.1` as the VRChat SDK numbers them.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Version {
     #[serde(rename = "1.0")]
@@ -135,7 +136,7 @@ pub enum Version {
 
 /// Integration models.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Integration {
     Simplified,
@@ -144,7 +145,7 @@ pub enum Integration {
 
 /// What `immobile` measures motion against.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ImmobileType {
     AllMotion,
@@ -152,7 +153,7 @@ pub enum ImmobileType {
 }
 
 /// Rotation limits.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Limit {
     /// Unlimited.
@@ -183,7 +184,7 @@ pub enum Limit {
 }
 
 /// A collider attached to a node.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Collider {
     /// Parent node.
@@ -199,7 +200,7 @@ pub struct Collider {
 }
 
 /// Collision and contact shapes.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Shape {
     /// Sphere.
@@ -219,7 +220,7 @@ pub enum Shape {
 }
 
 /// Contact senders and receivers (design doc §7).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Contacts {
     /// Senders.
@@ -229,7 +230,7 @@ pub struct Contacts {
 }
 
 /// Contact shapes (ADR 0017, 0047).
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ContactShape {
     /// Sphere.
@@ -252,7 +253,7 @@ pub enum ContactShape {
 }
 
 /// A shape on a node, shared by senders and receivers.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ContactVolume {
     /// Node it is placed on (VRChat's *Root Transform*).
@@ -269,7 +270,7 @@ pub struct ContactVolume {
 }
 
 /// Emits tags other avatars' receivers can detect.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ContactSender {
     /// Volume.
@@ -281,7 +282,7 @@ pub struct ContactSender {
 }
 
 /// Detects senders with matching tags and writes an animator parameter.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ContactReceiver {
     /// Volume.
@@ -307,7 +308,7 @@ pub struct ContactReceiver {
 }
 
 /// Receiver types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReceiverKind {
     /// 1 while any sender overlaps.

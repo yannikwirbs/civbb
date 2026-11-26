@@ -1,0 +1,509 @@
+{
+  "$defs": {
+    "Chain": {
+      "additionalProperties": false,
+      "description": "One simulated chain, mirroring the documented PhysBone parameters.",
+      "properties": {
+        "allow_grab": {
+          "description": "Grabbing allowed.",
+          "type": "boolean"
+        },
+        "allow_posing": {
+          "description": "Posing (leaving grabbed bones in place) allowed.",
+          "type": "boolean"
+        },
+        "colliders": {
+          "description": "Indices into [`Dynamics::colliders`].",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "endpoint": {
+          "description": "Virtual tip bone offset added to each leaf, in leaf space.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "gravity": {
+          "$ref": "#/$defs/Graded",
+          "description": "Gravity, -1 to 1."
+        },
+        "gravity_falloff": {
+          "$ref": "#/$defs/Graded",
+          "description": "How much gravity is reduced at rest pose, 0 to 1."
+        },
+        "ignore": {
+          "description": "Excluded subtrees.",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "immobile": {
+          "$ref": "#/$defs/Graded",
+          "description": "Resistance to the avatar's own motion, 0 to 1."
+        },
+        "immobile_type": {
+          "$ref": "#/$defs/ImmobileType",
+          "description": "What `immobile` resists."
+        },
+        "integration": {
+          "$ref": "#/$defs/Integration",
+          "description": "Integration model."
+        },
+        "limit": {
+          "$ref": "#/$defs/Limit",
+          "description": "Rotation limit."
+        },
+        "max_squish": {
+          "$ref": "#/$defs/Graded",
+          "description": "Allowed squish as a fraction of bone length."
+        },
+        "max_stretch": {
+          "$ref": "#/$defs/Graded",
+          "description": "Allowed stretch as a fraction of bone length."
+        },
+        "multi_child": {
+          "$ref": "#/$defs/MultiChild",
+          "description": "How the root behaves when it has several children."
+        },
+        "outputs": {
+          "$ref": "#/$defs/ChainOutputs",
+          "description": "State entries the chain writes every frame."
+        },
+        "pull": {
+          "$ref": "#/$defs/Graded",
+          "description": "Pull back to rest pose, 0 to 1."
+        },
+        "radius": {
+          "$ref": "#/$defs/Graded",
+          "description": "Collision radius."
+        },
+        "root": {
+          "description": "Root transform; every descendant not in `ignore` is simulated.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "spring": {
+          "$ref": "#/$defs/Graded",
+          "description": "Spring (simplified) or momentum (advanced), 0 to 1."
+        },
+        "stiffness": {
+          "$ref": "#/$defs/Graded",
+          "description": "Stiffness (advanced only), 0 to 1."
+        },
+        "version": {
+          "$ref": "#/$defs/Version",
+          "description": "Solver version: 1.1 bends the rest direction towards gravity, 1.0 pulls with a force."
+        }
+      },
+      "required": [
+        "root",
+        "ignore",
+        "endpoint",
+        "multi_child",
+        "version",
+        "integration",
+        "pull",
+        "spring",
+        "stiffness",
+        "gravity",
+        "gravity_falloff",
+        "immobile",
+        "immobile_type",
+        "limit",
+        "radius",
+        "colliders",
+        "max_stretch",
+        "max_squish",
+        "allow_grab",
+        "allow_posing",
+        "outputs"
+      ],
+      "type": "object"
+    },
+    "ChainOutputs": {
+      "additionalProperties": false,
+      "description": "The state entries a chain writes after each frame (ADR 0088); `None` writes nothing.",
+      "properties": {
+        "angle": {
+          "description": "The tip bone's angle from its rest direction, 0 to 1 for 0 to 180 degrees.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "is_grabbed": {
+          "description": "1 while any bone is grabbed.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "is_posed": {
+          "description": "1 while the chain is posed.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "squish": {
+          "description": "How close the most squished bone is to its max squish, 0 to 1.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stretch": {
+          "description": "How close the most stretched bone is to its max stretch, 0 to 1.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Collider": {
+      "additionalProperties": false,
+      "description": "A collider attached to a node.",
+      "properties": {
+        "inside": {
+          "description": "Keep bones inside the shape instead of outside.",
+          "type": "boolean"
+        },
+        "node": {
+          "description": "Parent node.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "description": "Offset from the node.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "rotation": {
+          "description": "Rotation relative to the node.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "shape": {
+          "$ref": "#/$defs/Shape",
+          "description": "Shape."
+        }
+      },
+      "required": [
+        "node",
+        "shape",
+        "position",
+        "rotation",
+        "inside"
+      ],
+      "type": "object"
+    },
+    "Graded": {
+      "additionalProperties": false,
+      "description": "A value scaled along the chain by an optional curve over normalised depth (0 at root, 1 at tip).",
+      "properties": {
+        "curve": {
+          "description": "`(depth, factor)` points, linearly interpolated; empty means a constant factor of 1.",
+          "items": {
+            "items": {
+              "format": "float",
+              "type": "number"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "value": {
+          "description": "Base value.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "curve"
+      ],
+      "type": "object"
+    },
+    "ImmobileType": {
+      "description": "What `immobile` measures motion against.",
+      "enum": [
+        "all_motion",
+        "world"
+      ],
+      "type": "string"
+    },
+    "Integration": {
+      "description": "Integration models.",
+      "enum": [
+        "simplified",
+        "advanced"
+      ],
+      "type": "string"
+    },
+    "Limit": {
+      "description": "Rotation limits.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Unlimited.",
+          "properties": {
+            "type": {
+              "const": "none",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Cone around the rest direction.",
+          "properties": {
+            "max_angle": {
+              "$ref": "#/$defs/Graded",
+              "description": "Max angle in degrees."
+            },
+            "rotation": {
+              "description": "Limit frame rotation, Euler degrees.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "angle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "max_angle",
+            "rotation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Plane of rotation.",
+          "properties": {
+            "max_angle": {
+              "$ref": "#/$defs/Graded",
+              "description": "Max angle in degrees."
+            },
+            "rotation": {
+              "description": "Limit frame rotation, Euler degrees.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "hinge",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "max_angle",
+            "rotation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Elliptical cone.",
+          "properties": {
+            "max_pitch": {
+              "$ref": "#/$defs/Graded",
+              "description": "Max pitch in degrees."
+            },
+            "max_yaw": {
+              "$ref": "#/$defs/Graded",
+              "description": "Max yaw in degrees."
+            },
+            "rotation": {
+              "description": "Limit frame rotation, Euler degrees.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "polar",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "max_pitch",
+            "max_yaw",
+            "rotation"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MultiChild": {
+      "description": "Root behaviour with several children.",
+      "enum": [
+        "ignore",
+        "first",
+        "average"
+      ],
+      "type": "string"
+    },
+    "Shape": {
+      "description": "Collision and contact shapes.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Sphere.",
+          "properties": {
+            "radius": {
+              "description": "Radius.",
+              "format": "float",
+              "type": "number"
+            },
+            "type": {
+              "const": "sphere",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "radius"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Capsule along local Y.",
+          "properties": {
+            "height": {
+              "description": "Total height including caps.",
+              "format": "float",
+              "type": "number"
+            },
+            "radius": {
+              "description": "Radius.",
+              "format": "float",
+              "type": "number"
+            },
+            "type": {
+              "const": "capsule",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "radius",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Infinite plane with normal along local Y.",
+          "properties": {
+            "type": {
+              "const": "plane",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Version": {
+      "description": "PhysBone versions, `1.0` and `1.1` as the VRChat SDK numbers them.",
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "All dynamics of an avatar.",
+  "properties": {
+    "chains": {
+      "description": "Simulated bone chains.",
+      "items": {
+        "$ref": "#/$defs/Chain"
+      },
+      "type": "array"
+    },
+    "colliders": {
+      "description": "Colliders chains can reference.",
+      "items": {
+        "$ref": "#/$defs/Collider"
+      },
+      "type": "array"
+    },
+    "version": {
+      "description": "Extension version (ADR 0087).",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "chains",
+    "colliders"
+  ],
+  "title": "CIVBB_dynamics",
+  "type": "object"
+}

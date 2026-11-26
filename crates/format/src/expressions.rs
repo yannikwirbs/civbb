@@ -1,11 +1,12 @@
 //! Expression menu (design doc §7).
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::state::EntryIndex;
 
 /// The radial menu; the parameters it writes are state entries (ADR 0088).
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Expressions {
     /// Root menu.
@@ -13,7 +14,7 @@ pub struct Expressions {
 }
 
 /// A menu page.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Menu {
     /// Up to 8 controls in legacy content.
@@ -21,7 +22,7 @@ pub struct Menu {
 }
 
 /// One menu entry.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Control {
     /// Label.
@@ -41,7 +42,7 @@ pub struct Control {
 }
 
 /// Control kinds.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ControlKind {
     /// Sets the parameter while held.

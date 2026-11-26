@@ -1,5 +1,6 @@
 //! Plain math types used by the format: vectors, quaternions and transforms as arrays.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// `[x, y, z]`. Right-handed, Y up, metres, avatars facing +Z (glTF conventions, ADR 0006).
@@ -10,7 +11,7 @@ pub type Quat = [f32; 4];
 pub type Mat4 = [f32; 16];
 
 /// Translation, rotation and scale, applied scale first.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Transform {
     /// Translation in metres.

@@ -1,12 +1,13 @@
 //! Face setup: blendshapes driven by lip sync, automatic blinking and eye look (design doc §7, `X_avatar`).
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::hierarchy::NodeIndex;
 use crate::mesh::MeshIndex;
 
 /// Which blendshapes lip sync and blinking drive.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Face {
     /// Binds per viseme. A viseme appears at most once; missing visemes stay at rest.
@@ -19,7 +20,7 @@ pub struct Face {
 }
 
 /// The blendshapes one viseme drives.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VisemeBinds {
     /// The viseme.
@@ -30,7 +31,7 @@ pub struct VisemeBinds {
 
 /// Eye look (VRM `lookAt`, legacy eye-look settings). Each range map turns a look angle in one direction into
 /// a bone rotation or a blendshape weight.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EyeLook {
     /// What moves.
@@ -46,7 +47,7 @@ pub struct EyeLook {
 }
 
 /// What eye look moves.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum EyeDriver {
     /// Eye bones rotate; range map outputs are degrees.
@@ -72,7 +73,7 @@ pub enum EyeDriver {
 }
 
 /// Linear from 0 to `output_scale` as the look angle goes from 0 to `input_max` degrees, held beyond.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RangeMap {
     /// Angle in degrees at which the output is full.
@@ -82,7 +83,7 @@ pub struct RangeMap {
 }
 
 /// One blendshape at a weight.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ShapeBind {
     /// Index into [`crate::Document::meshes`].
@@ -95,7 +96,7 @@ pub struct ShapeBind {
 
 /// The 15 standard visemes, in legacy order.
 #[allow(missing_docs)] // The names are the documentation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Viseme {
     Sil,

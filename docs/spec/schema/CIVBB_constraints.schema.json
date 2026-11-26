@@ -1,0 +1,556 @@
+{
+  "$defs": {
+    "Constraint": {
+      "additionalProperties": false,
+      "description": "A constraint. The runtime orders an avatar's constraints by dependency when it loads them; list order breaks ties.",
+      "properties": {
+        "active": {
+          "description": "Enabled at start.",
+          "type": "boolean"
+        },
+        "axes": {
+          "description": "Constrained axes (x, y, z) of position, rotation (Euler) or scale; a parent constraint's position axes. Other\naxes keep the animated value.",
+          "items": {
+            "type": "boolean"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/ConstraintKind",
+          "description": "Constraint type."
+        },
+        "options": {
+          "$ref": "#/$defs/ConstraintOptions",
+          "default": {
+            "freeze": false,
+            "local_space": false,
+            "rebake": false
+          },
+          "description": "VRChat constraint options (ADR 0040); Unity constraints keep the defaults."
+        },
+        "rest": {
+          "$ref": "#/$defs/Transform",
+          "description": "Local at-rest values `weight` blends from (the parts the kind constrains)."
+        },
+        "sources": {
+          "description": "Sources with their weights.",
+          "items": {
+            "$ref": "#/$defs/ConstraintSource"
+          },
+          "type": "array"
+        },
+        "target": {
+          "description": "The constrained node.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "weight": {
+          "description": "Overall weight, 0 to 1.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "target",
+        "sources",
+        "weight",
+        "active",
+        "axes",
+        "rest"
+      ],
+      "type": "object"
+    },
+    "ConstraintKind": {
+      "description": "Constraint types.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Copies the weighted source position, plus `offset`.",
+          "properties": {
+            "offset": {
+              "description": "Position offset.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "position",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "offset"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Copies the weighted source rotation, plus `offset` (Euler degrees).",
+          "properties": {
+            "offset": {
+              "description": "Rotation offset.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "rotation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "offset"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Copies the weighted source scale, times `offset`.",
+          "properties": {
+            "offset": {
+              "description": "Scale factor.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "scale",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "offset"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Follows sources as if parented, with per-source offsets.",
+          "properties": {
+            "rotation_axes": {
+              "description": "Constrained rotation axes (Euler x, y, z).",
+              "items": {
+                "type": "boolean"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "parent",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "rotation_axes"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Points `aim_axis` at the weighted source position.",
+          "properties": {
+            "aim_axis": {
+              "description": "Local axis that points at the target.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "offset": {
+              "description": "Rotation offset (Euler degrees), applied in local space.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "aim",
+              "type": "string"
+            },
+            "up_axis": {
+              "description": "Local up axis.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "world_up": {
+              "$ref": "#/$defs/WorldUp",
+              "description": "World up reference."
+            }
+          },
+          "required": [
+            "type",
+            "offset",
+            "aim_axis",
+            "up_axis",
+            "world_up"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Points local Z at the weighted source position.",
+          "properties": {
+            "offset": {
+              "description": "Rotation offset (Euler degrees), applied in local space.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "roll": {
+              "description": "Roll in degrees around the look direction.",
+              "format": "float",
+              "type": "number"
+            },
+            "type": {
+              "const": "look_at",
+              "type": "string"
+            },
+            "world_up_node": {
+              "description": "Node the up vector points towards; `None` uses scene up.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "offset",
+            "roll"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The first source's local rotation change from its rest, applied to the target's rest rotation (VRM\n`rotation`; Blender's local-to-local copy rotation). `weight` slerps from `rest`; `axes` are ignored.",
+          "properties": {
+            "type": {
+              "const": "rest_rotation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "As [`ConstraintKind::RestRotation`], keeping only the change's twist about `axis` in the target's rest space\n(VRM `roll`).",
+          "properties": {
+            "axis": {
+              "description": "Unit roll axis.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "rest_roll",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "axis"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Turns the target from its rest rotation by the shortest rotation pointing local `axis` at the first source\n(VRM `aim`, no up vector). `weight` slerps from `rest`; `axes` are ignored.",
+          "properties": {
+            "axis": {
+              "description": "Unit aim axis.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "rest_aim",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "axis"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ConstraintOptions": {
+      "additionalProperties": false,
+      "description": "VRChat constraint options Unity's constraints lack (ADR 0040, 0046).",
+      "properties": {
+        "freeze": {
+          "description": "Hold the target where it is in world space, ignoring the sources (*Freeze To World*), at start.",
+          "type": "boolean"
+        },
+        "local_space": {
+          "description": "Match the sources' local values instead of their world placements (*Solve In Local Space*).",
+          "type": "boolean"
+        },
+        "rebake": {
+          "default": false,
+          "description": "On unfreezing, bake offsets that keep the target where it is (*Rebake Offsets When Unfrozen*, ADR 0046).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "local_space",
+        "freeze"
+      ],
+      "type": "object"
+    },
+    "ConstraintSource": {
+      "additionalProperties": false,
+      "description": "One constraint source.",
+      "properties": {
+        "node": {
+          "description": "Source node.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "offset": {
+          "$ref": "#/$defs/Transform",
+          "description": "Offset applied relative to this source (parent constraints)."
+        },
+        "weight": {
+          "description": "Weight.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "node",
+        "weight",
+        "offset"
+      ],
+      "type": "object"
+    },
+    "Transform": {
+      "additionalProperties": false,
+      "description": "Translation, rotation and scale, applied scale first.",
+      "properties": {
+        "rotation": {
+          "description": "Rotation as a unit quaternion.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "scale": {
+          "description": "Non-uniform scale.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "translation": {
+          "description": "Translation in metres.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "translation",
+        "rotation",
+        "scale"
+      ],
+      "type": "object"
+    },
+    "WorldUp": {
+      "description": "World-up references for aim constraints.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Scene up.",
+          "properties": {
+            "type": {
+              "const": "scene_up",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A fixed vector.",
+          "properties": {
+            "type": {
+              "const": "vector",
+              "type": "string"
+            },
+            "up": {
+              "description": "World-space up vector.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "up"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Towards a node.",
+          "properties": {
+            "node": {
+              "description": "The node whose direction is up.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "object_up",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "node"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Rotation of a node applied to a vector.",
+          "properties": {
+            "node": {
+              "description": "The node whose rotation turns `up`.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "object_rotation_up",
+              "type": "string"
+            },
+            "up": {
+              "description": "Up vector in the node's space.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "node",
+            "up"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "No up constraint.",
+          "properties": {
+            "type": {
+              "const": "none",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`CIVBB_constraints`: transform constraints.",
+  "properties": {
+    "constraints": {
+      "description": "In the order curves index them.",
+      "items": {
+        "$ref": "#/$defs/Constraint"
+      },
+      "type": "array"
+    },
+    "version": {
+      "description": "Extension version (ADR 0087).",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "constraints"
+  ],
+  "title": "CIVBB_constraints",
+  "type": "object"
+}

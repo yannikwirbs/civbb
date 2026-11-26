@@ -5,6 +5,7 @@
 //! Exporters flatten sub-state machines into one state list per layer and drop muted transitions, so the
 //! runtime only sees states, entry transitions, any-state transitions and per-state transitions.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::hierarchy::{HumanBone, NodeIndex};
@@ -18,7 +19,7 @@ pub type ClipIndex = u32;
 pub type StateIndex = u32;
 
 /// An animator: one layer list in evaluation order, each layer tagged with its [`LayerGroup`].
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Animator {
     /// Layer groups, each weighted as a whole.
@@ -31,7 +32,7 @@ pub struct Animator {
 pub const COMPILER_PARAMETER_PREFIX: &str = "civbb/";
 
 /// A group of layers with a shared weight.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LayerGroup {
     /// Name, e.g. `FX`.
@@ -41,7 +42,7 @@ pub struct LayerGroup {
 }
 
 /// One animator layer.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Layer {
     /// Name.
@@ -61,7 +62,7 @@ pub struct Layer {
 
 /// Layer blending modes.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LayerBlending {
     Override,
@@ -69,7 +70,7 @@ pub enum LayerBlending {
 }
 
 /// A layer mask: humanoid body parts plus an optional node allowlist.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Mask {
     /// Enabled humanoid body parts.
@@ -81,7 +82,7 @@ pub struct Mask {
 
 /// Humanoid body parts of a layer mask.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BodyPart {
     Root,
@@ -100,7 +101,7 @@ pub enum BodyPart {
 }
 
 /// A flattened state machine.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StateMachine {
     /// States.
@@ -114,7 +115,7 @@ pub struct StateMachine {
 }
 
 /// A state.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct State {
     /// Name.
@@ -150,7 +151,7 @@ pub struct State {
 }
 
 /// What a state does to targets its layer animates and its motion does not (ADR 0085).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Unwritten {
     /// They keep the value last written.
@@ -160,7 +161,7 @@ pub enum Unwritten {
 }
 
 /// What a state or blend tree child plays.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Motion {
     /// A clip.
@@ -173,7 +174,7 @@ pub enum Motion {
 }
 
 /// A blend tree.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BlendTree {
     /// Blend algorithm and its parameters.
@@ -186,7 +187,7 @@ pub struct BlendTree {
 
 /// Blend algorithms.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum BlendTreeKind {
     #[serde(rename = "simple_1d")]
@@ -212,7 +213,7 @@ pub enum BlendTreeKind {
 }
 
 /// A child of a blend tree.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ChildMotion {
     /// The child's motion.
@@ -234,7 +235,7 @@ pub struct ChildMotion {
 }
 
 /// A transition.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Transition {
     /// Target.
@@ -260,7 +261,7 @@ pub struct Transition {
 }
 
 /// Transition targets.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TransitionDest {
     /// A state of the same layer.
@@ -273,7 +274,7 @@ pub enum TransitionDest {
 }
 
 /// One transition condition.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Condition {
     /// Tested parameter.
@@ -286,7 +287,7 @@ pub struct Condition {
 
 /// Condition comparisons.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConditionMode {
     If,
@@ -299,7 +300,7 @@ pub enum ConditionMode {
 
 /// Which transitions may interrupt a running transition.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum InterruptionSource {
     None,
@@ -310,7 +311,7 @@ pub enum InterruptionSource {
 }
 
 /// What a state does on enter (ADR 0085).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Action {
     /// Changes state entries.
@@ -352,7 +353,7 @@ pub enum Action {
 
 /// Operations on state entries.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum EntryOp {
     Set {
@@ -380,7 +381,7 @@ pub enum EntryOp {
 }
 
 /// A linear remap of [`EntryOp::Copy`]: `from[0]..from[1]` maps onto `to[0]..to[1]`.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Remap {
     /// Source range.
@@ -391,7 +392,7 @@ pub struct Remap {
 
 /// Body parts with a pose source.
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PosePart {
     Head,
@@ -407,7 +408,7 @@ pub enum PosePart {
 }
 
 /// Where a body part takes its pose from.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PoseSource {
     /// The user's tracking (or the locomotion and IK standing in for it).
@@ -417,7 +418,7 @@ pub enum PoseSource {
 }
 
 /// One body part's pose source, set by [`Action::PoseSource`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PartSource {
     /// The body part.
@@ -427,7 +428,7 @@ pub struct PartSource {
 }
 
 /// An animation clip.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Clip {
     /// Name.
@@ -446,7 +447,7 @@ pub struct Clip {
 /// A humanoid clip's root-motion settings (ADR 0063). Avatars run with root motion
 /// discarded, so what is not baked into the pose is lost: the body pose plays relative to a root that follows the
 /// body (or, keeping the original, follows its change since the clip's start).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RootSettings {
     /// The body's yaw stays in the pose.
@@ -470,7 +471,7 @@ pub struct RootSettings {
 }
 
 /// One animated property.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Curve {
     /// What it animates.
@@ -482,14 +483,16 @@ pub struct Curve {
 /// A Hermite key. Infinite tangents mean a constant (stepped) segment. JSON has no infinity
 /// (`serde_json` writes `null`), so a `null` tangent reads as +infinity (ADR 0041).
 #[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Key {
     pub time: f32,
     pub value: f32,
     #[serde(deserialize_with = "tangent")]
+    #[schemars(with = "Option<f32>")]
     pub in_tangent: f32,
     #[serde(deserialize_with = "tangent")]
+    #[schemars(with = "Option<f32>")]
     pub out_tangent: f32,
 }
 
@@ -499,7 +502,7 @@ fn tangent<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f32, D::Error> {
 
 /// What a curve animates: an element of the document by index and one of its properties (ADR 0089). Values are in
 /// each property's units. Importers resolve source paths and names; stages that renumber elements remap targets.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Target {
     /// A property of a node in [`Hierarchy::nodes`](crate::hierarchy::Hierarchy::nodes).
@@ -536,7 +539,7 @@ pub enum Target {
 }
 
 /// Animatable node properties.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum NodeProperty {
     /// Local translation component (0 = x, 1 = y, 2 = z), metres.
@@ -567,7 +570,7 @@ pub enum NodeProperty {
 }
 
 /// Orders of Euler rotations. One so far; others come with an importer whose source uses them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EulerOrder {
     /// About Z, then X, then Y (`q = qy qx qz`, ADR 0007).
@@ -575,7 +578,7 @@ pub enum EulerOrder {
 }
 
 /// Animatable mesh instance properties.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum MeshProperty {
     /// Visible flag, 0 or 1.
@@ -606,7 +609,7 @@ pub enum MeshProperty {
 }
 
 /// Animatable humanoid properties.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HumanoidProperty {
     /// A muscle: the rotation of `bone` about one axis of its muscle frame, -1 to 1 over the muscle's range (ADR

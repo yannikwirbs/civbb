@@ -13,6 +13,7 @@ use civbb_format::material::{ColorSpace, MaterialModel, TextureSlot, Toon};
 use civbb_format::mesh::FirstPerson;
 use civbb_format::state::StateTable;
 use civbb_format::{Avatar, Document, Role};
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -32,23 +33,34 @@ pub(super) const NAMES: [&str; 6] = [
     "CIVBB_contacts",
 ];
 
-#[derive(Deserialize)]
+/// `CIVBB_behaviour`: the layered state machine and the clips it plays.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct Behaviour {
+    /// The state machine; absent when nothing plays.
     #[serde(default)]
     animator: Option<Animator>,
+    /// Clips, indexed after the glTF animations.
     #[serde(default)]
     clips: Vec<Clip>,
 }
 
-#[derive(Deserialize)]
+/// `CIVBB_constraints`: transform constraints.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct Constraints {
+    /// In the order curves index them.
     constraints: Vec<Constraint>,
 }
 
-#[derive(Deserialize)]
+/// `CIVBB_node`: what a glTF node lacks.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct NodeFlags {
+    /// Whether the node starts active.
     #[serde(default = "yes")]
     active: bool,
+    /// First-person visibility of the node's mesh; only on a node carrying a mesh.
     #[serde(default)]
     first_person: FirstPerson,
 }
@@ -57,12 +69,43 @@ fn yes() -> bool {
     true
 }
 
-#[derive(Deserialize)]
+/// `CIVBB_materials_toon`: the toon model; name, alpha and double-sidedness stay core glTF. Only its schema is
+/// derived: serde's `flatten` would accept unknown fields, so the importer takes `order` out and parses [`Toon`].
+#[allow(dead_code)]
+#[derive(JsonSchema)]
 struct ToonMaterial {
+    /// Draw order among materials, lowest first.
     #[serde(default)]
     order: i32,
     #[serde(flatten)]
     toon: Toon,
+}
+
+/// The JSON Schema (2020-12) of every `CIVBB_*` extension object, by extension name (ADR 0086 point 2).
+pub fn schemas() -> Vec<(&'static str, Value)> {
+    fn with_version<T: JsonSchema>(name: &'static str) -> (&'static str, Value) {
+        let mut s = schemars::schema_for!(T).to_value();
+        s["title"] = name.into();
+        // Unknown fields fail the import (ADR 0086 point 5); a flattened struct's schema does not say so itself.
+        s["additionalProperties"] = false.into();
+        s["properties"]["version"] = serde_json::json!({"description": "Extension version (ADR 0087).", "type": "integer", "minimum": 1, "maximum": VERSION});
+        if let Some(r) = s["required"].as_array_mut() {
+            r.insert(0, "version".into());
+        } else {
+            s["required"] = serde_json::json!(["version"]);
+        }
+        (name, s)
+    }
+    vec![
+        with_version::<Avatar>("CIVBB_avatar"),
+        with_version::<StateTable>("CIVBB_state"),
+        with_version::<Behaviour>("CIVBB_behaviour"),
+        with_version::<Constraints>("CIVBB_constraints"),
+        with_version::<Dynamics>("CIVBB_dynamics"),
+        with_version::<Contacts>("CIVBB_contacts"),
+        with_version::<NodeFlags>("CIVBB_node"),
+        with_version::<ToonMaterial>("CIVBB_materials_toon"),
+    ]
 }
 
 /// Parses one extension object after checking and removing its `version`.
@@ -134,8 +177,13 @@ impl Importer<'_> {
             let Some(v) = m.extension_value("CIVBB_materials_toon") else {
                 continue;
             };
-            let mut t: ToonMaterial = parse("CIVBB_materials_toon", v)?;
-            for (slot, space) in toon_slots(&mut t.toon) {
+            let mut v = v.clone();
+            let order = v.as_object_mut().and_then(|o| o.remove("order"));
+            let order = order.map_or(Ok(0), |n| {
+                i32::deserialize(n).map_err(|e| format!("CIVBB_materials_toon: {e}"))
+            })?;
+            let mut toon: Toon = parse("CIVBB_materials_toon", &v)?;
+            for (slot, space) in toon_slots(&mut toon) {
                 let n = slot.texture;
                 let texture = (doc.textures().nth(n as usize))
                     .ok_or_else(|| format!("CIVBB_materials_toon: texture {n} does not exist"))?;
@@ -143,8 +191,8 @@ impl Importer<'_> {
                     .slot(&texture, slot.uv_set.into(), Some(slot.scale_offset), space)
                     .ok_or_else(|| format!("CIVBB_materials_toon: texture {n} unreadable"))?;
             }
-            self.materials[i].model = MaterialModel::Toon(t.toon);
-            self.materials[i].order = t.order;
+            self.materials[i].model = MaterialModel::Toon(toon);
+            self.materials[i].order = order;
         }
         Ok(())
     }

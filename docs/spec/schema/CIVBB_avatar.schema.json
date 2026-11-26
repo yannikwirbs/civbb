@@ -1,0 +1,875 @@
+{
+  "$defs": {
+    "AvatarUse": {
+      "description": "Who may wear the avatar.",
+      "oneOf": [
+        {
+          "const": "only_author",
+          "description": "Only the authors.",
+          "type": "string"
+        },
+        {
+          "const": "only_separately_licensed",
+          "description": "People the authors licensed separately.",
+          "type": "string"
+        },
+        {
+          "const": "everyone",
+          "description": "Everyone.",
+          "type": "string"
+        }
+      ]
+    },
+    "BoneNode": {
+      "additionalProperties": false,
+      "description": "One humanoid bone and the node it maps to.",
+      "properties": {
+        "bone": {
+          "$ref": "#/$defs/HumanBone",
+          "description": "The bone."
+        },
+        "node": {
+          "description": "Its node.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bone",
+        "node"
+      ],
+      "type": "object"
+    },
+    "Commercial": {
+      "description": "Commercial use allowed.",
+      "oneOf": [
+        {
+          "const": "personal_non_profit",
+          "description": "Personal, non-profit use only.",
+          "type": "string"
+        },
+        {
+          "const": "personal_profit",
+          "description": "Personal use, profit allowed.",
+          "type": "string"
+        },
+        {
+          "const": "corporation",
+          "description": "Corporate use too.",
+          "type": "string"
+        }
+      ]
+    },
+    "Control": {
+      "additionalProperties": false,
+      "description": "One menu entry.",
+      "properties": {
+        "icon": {
+          "description": "Icon texture index.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/ControlKind",
+          "description": "Behaviour."
+        },
+        "name": {
+          "description": "Label.",
+          "type": "string"
+        },
+        "parameter": {
+          "description": "Entry set while active (buttons, toggles, submenus).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sub_parameters": {
+          "description": "Axis entries of puppets, in legacy order; `None` for an axis without one.",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "type": "array"
+        },
+        "value": {
+          "description": "Value written to `parameter`.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "value",
+        "sub_parameters"
+      ],
+      "type": "object"
+    },
+    "ControlKind": {
+      "description": "Control kinds.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Sets the parameter while held.",
+          "properties": {
+            "type": {
+              "const": "button",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Sets the parameter until toggled off.",
+          "properties": {
+            "type": {
+              "const": "toggle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Opens a nested menu.",
+          "properties": {
+            "controls": {
+              "description": "Up to 8 controls in legacy content.",
+              "items": {
+                "$ref": "#/$defs/Control"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "sub_menu",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "controls"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Two-axis joystick.",
+          "properties": {
+            "type": {
+              "const": "two_axis_puppet",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Four-direction joystick.",
+          "properties": {
+            "type": {
+              "const": "four_axis_puppet",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Radial dial.",
+          "properties": {
+            "type": {
+              "const": "radial_puppet",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Expressions": {
+      "additionalProperties": false,
+      "description": "The radial menu; the parameters it writes are state entries (ADR 0088).",
+      "properties": {
+        "menu": {
+          "$ref": "#/$defs/Menu",
+          "description": "Root menu."
+        }
+      },
+      "required": [
+        "menu"
+      ],
+      "type": "object"
+    },
+    "EyeDriver": {
+      "description": "What eye look moves.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Eye bones rotate; range map outputs are degrees.",
+          "properties": {
+            "left": {
+              "description": "Left eye node.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "right": {
+              "description": "Right eye node.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "bones",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Blendshapes; range map outputs are weights, 0 to 1.",
+          "properties": {
+            "down": {
+              "description": "Binds for looking down.",
+              "items": {
+                "$ref": "#/$defs/ShapeBind"
+              },
+              "type": "array"
+            },
+            "left": {
+              "description": "Binds for looking left.",
+              "items": {
+                "$ref": "#/$defs/ShapeBind"
+              },
+              "type": "array"
+            },
+            "right": {
+              "description": "Binds for looking right.",
+              "items": {
+                "$ref": "#/$defs/ShapeBind"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "shapes",
+              "type": "string"
+            },
+            "up": {
+              "description": "Binds for looking up.",
+              "items": {
+                "$ref": "#/$defs/ShapeBind"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "up",
+            "down",
+            "left",
+            "right"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EyeLook": {
+      "additionalProperties": false,
+      "description": "Eye look (VRM `lookAt`, legacy eye-look settings). Each range map turns a look angle in one direction into\na bone rotation or a blendshape weight.",
+      "properties": {
+        "driver": {
+          "$ref": "#/$defs/EyeDriver",
+          "description": "What moves."
+        },
+        "horizontal_inner": {
+          "$ref": "#/$defs/RangeMap",
+          "description": "Each eye turning towards the nose."
+        },
+        "horizontal_outer": {
+          "$ref": "#/$defs/RangeMap",
+          "description": "Each eye turning away from the nose."
+        },
+        "vertical_down": {
+          "$ref": "#/$defs/RangeMap",
+          "description": "Looking down."
+        },
+        "vertical_up": {
+          "$ref": "#/$defs/RangeMap",
+          "description": "Looking up."
+        }
+      },
+      "required": [
+        "driver",
+        "horizontal_inner",
+        "horizontal_outer",
+        "vertical_down",
+        "vertical_up"
+      ],
+      "type": "object"
+    },
+    "Face": {
+      "additionalProperties": false,
+      "description": "Which blendshapes lip sync and blinking drive.",
+      "properties": {
+        "blink": {
+          "description": "Binds that close both eyes, for automatic blinking; empty disables it.",
+          "items": {
+            "$ref": "#/$defs/ShapeBind"
+          },
+          "type": "array"
+        },
+        "eyes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EyeLook"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the eyes follow a look target; `None` leaves them still."
+        },
+        "visemes": {
+          "description": "Binds per viseme. A viseme appears at most once; missing visemes stay at rest.",
+          "items": {
+            "$ref": "#/$defs/VisemeBinds"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "visemes",
+        "blink"
+      ],
+      "type": "object"
+    },
+    "HumanBone": {
+      "description": "Humanoid bones: VRM 1.0's humanoid bone set and names (ADR 0085 point 6), serialised as VRM writes them\n(`leftThumbMetacarpal`). Importers map other names (Unity's `HumanBodyBones`) by table.",
+      "enum": [
+        "hips",
+        "spine",
+        "chest",
+        "upperChest",
+        "neck",
+        "head",
+        "jaw",
+        "leftEye",
+        "rightEye",
+        "leftShoulder",
+        "leftUpperArm",
+        "leftLowerArm",
+        "leftHand",
+        "rightShoulder",
+        "rightUpperArm",
+        "rightLowerArm",
+        "rightHand",
+        "leftUpperLeg",
+        "leftLowerLeg",
+        "leftFoot",
+        "leftToes",
+        "rightUpperLeg",
+        "rightLowerLeg",
+        "rightFoot",
+        "rightToes",
+        "leftThumbMetacarpal",
+        "leftThumbProximal",
+        "leftThumbDistal",
+        "leftIndexProximal",
+        "leftIndexIntermediate",
+        "leftIndexDistal",
+        "leftMiddleProximal",
+        "leftMiddleIntermediate",
+        "leftMiddleDistal",
+        "leftRingProximal",
+        "leftRingIntermediate",
+        "leftRingDistal",
+        "leftLittleProximal",
+        "leftLittleIntermediate",
+        "leftLittleDistal",
+        "rightThumbMetacarpal",
+        "rightThumbProximal",
+        "rightThumbDistal",
+        "rightIndexProximal",
+        "rightIndexIntermediate",
+        "rightIndexDistal",
+        "rightMiddleProximal",
+        "rightMiddleIntermediate",
+        "rightMiddleDistal",
+        "rightRingProximal",
+        "rightRingIntermediate",
+        "rightRingDistal",
+        "rightLittleProximal",
+        "rightLittleIntermediate",
+        "rightLittleDistal"
+      ],
+      "type": "string"
+    },
+    "Humanoid": {
+      "additionalProperties": false,
+      "description": "Maps humanoid bones to nodes.",
+      "properties": {
+        "bones": {
+          "description": "Each mapped humanoid bone and its node. A bone appears at most once.",
+          "items": {
+            "$ref": "#/$defs/BoneNode"
+          },
+          "type": "array"
+        },
+        "center_of_mass": {
+          "description": "Unity's centre of mass of the rest pose in avatar space (`bodyPosition * humanScale`), which anchors the\nruntime's mass model (ADR 0063); `None` when the source has none.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "human_scale": {
+          "description": "Metres per body position unit (Unity's `Animator.humanScale`, the T-pose's centre-of-mass height; ADR 0063);\n0 when the source has none.",
+          "format": "float",
+          "type": "number"
+        },
+        "muscle_frames": {
+          "description": "Muscle frames of mapped bones, at most one each; empty when the source has none (glTF and VRM, #53).",
+          "items": {
+            "$ref": "#/$defs/MuscleFrame"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "bones",
+        "muscle_frames",
+        "human_scale"
+      ],
+      "type": "object"
+    },
+    "Licence": {
+      "additionalProperties": false,
+      "description": "Licence terms, modelled on VRM 1.0. Defaults are the most restrictive choice.",
+      "properties": {
+        "antisocial_or_hate": {
+          "description": "Antisocial or hateful use allowed.",
+          "type": "boolean"
+        },
+        "avatar_use": {
+          "$ref": "#/$defs/AvatarUse",
+          "description": "Who may wear the avatar."
+        },
+        "commercial": {
+          "$ref": "#/$defs/Commercial",
+          "description": "Commercial use allowed."
+        },
+        "credit_required": {
+          "description": "Credit to the authors required.",
+          "type": "boolean"
+        },
+        "modification": {
+          "$ref": "#/$defs/Modification",
+          "description": "Modification allowed."
+        },
+        "other_terms_url": {
+          "description": "URL of further terms.",
+          "type": "string"
+        },
+        "political_or_religious": {
+          "description": "Political or religious use allowed.",
+          "type": "boolean"
+        },
+        "redistribution": {
+          "description": "Redistribution allowed.",
+          "type": "boolean"
+        },
+        "sexual": {
+          "description": "Excessively sexual use allowed.",
+          "type": "boolean"
+        },
+        "url": {
+          "description": "URL of the licence document.",
+          "type": "string"
+        },
+        "violent": {
+          "description": "Excessively violent use allowed.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "url",
+        "avatar_use",
+        "violent",
+        "sexual",
+        "political_or_religious",
+        "antisocial_or_hate",
+        "commercial",
+        "credit_required",
+        "redistribution",
+        "modification",
+        "other_terms_url"
+      ],
+      "type": "object"
+    },
+    "Menu": {
+      "additionalProperties": false,
+      "description": "A menu page.",
+      "properties": {
+        "controls": {
+          "description": "Up to 8 controls in legacy content.",
+          "items": {
+            "$ref": "#/$defs/Control"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "controls"
+      ],
+      "type": "object"
+    },
+    "Meta": {
+      "additionalProperties": false,
+      "description": "Creator information and licence terms.",
+      "properties": {
+        "authors": {
+          "description": "Authors, in credit order.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "contact": {
+          "description": "How to contact the creator.",
+          "type": "string"
+        },
+        "copyright": {
+          "description": "Copyright notice.",
+          "type": "string"
+        },
+        "licence": {
+          "$ref": "#/$defs/Licence",
+          "description": "What others may do with it."
+        },
+        "references": {
+          "description": "Works this avatar is based on.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "The creator's version string.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "authors",
+        "version",
+        "copyright",
+        "contact",
+        "references",
+        "licence"
+      ],
+      "type": "object"
+    },
+    "Modification": {
+      "description": "Modification allowed.",
+      "oneOf": [
+        {
+          "const": "prohibited",
+          "description": "No modification.",
+          "type": "string"
+        },
+        {
+          "const": "allow",
+          "description": "Modification, not redistributing the result.",
+          "type": "string"
+        },
+        {
+          "const": "allow_redistribution",
+          "description": "Modification and redistributing the result.",
+          "type": "string"
+        }
+      ]
+    },
+    "MuscleFrame": {
+      "additionalProperties": false,
+      "description": "How muscle values turn one humanoid bone (Unity's per-bone axes, ADR 0014). With angles `a` in degrees from the\nbone's muscles, its local rotation is `pre * zyroll(a) * post⁻¹`, where `zyroll` twists about X, then swings\nabout Y and Z.",
+      "properties": {
+        "bone": {
+          "$ref": "#/$defs/HumanBone",
+          "description": "The bone."
+        },
+        "max": {
+          "description": "Per axis, the angle at muscle +1 in degrees (zero or positive).",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "min": {
+          "description": "Per axis, the angle at muscle -1 in degrees (zero or negative).",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "post": {
+          "description": "Muscle space to the bone node's space.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "pre": {
+          "description": "Muscle space to the parent node's space.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "sign": {
+          "description": "Per axis (X twist, Y, Z), the sign applied to muscle angles: 1 or -1.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "twist": {
+          "description": "Share of the X twist the bone keeps; the rest turns the next bone of the limb about the same axis. Unity's\narm and leg twist settings (default 0.5) on upper and lower arms and legs, 1 on every other bone.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "bone",
+        "pre",
+        "post",
+        "sign",
+        "min",
+        "max",
+        "twist"
+      ],
+      "type": "object"
+    },
+    "RangeMap": {
+      "additionalProperties": false,
+      "description": "Linear from 0 to `output_scale` as the look angle goes from 0 to `input_max` degrees, held beyond.",
+      "properties": {
+        "input_max": {
+          "description": "Angle in degrees at which the output is full.",
+          "format": "float",
+          "type": "number"
+        },
+        "output_scale": {
+          "description": "Output at full: degrees for bones, weight for shapes.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "input_max",
+        "output_scale"
+      ],
+      "type": "object"
+    },
+    "ShapeBind": {
+      "additionalProperties": false,
+      "description": "One blendshape at a weight.",
+      "properties": {
+        "mesh": {
+          "description": "Index into [`crate::Document::meshes`].",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "shape": {
+          "description": "Index into that mesh's blend shapes.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "weight": {
+          "description": "Weight at full activation, 0 to 1.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "mesh",
+        "shape",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "Viseme": {
+      "description": "The 15 standard visemes, in legacy order.",
+      "enum": [
+        "sil",
+        "pp",
+        "ff",
+        "th",
+        "dd",
+        "kk",
+        "ch",
+        "ss",
+        "nn",
+        "rr",
+        "aa",
+        "e",
+        "i",
+        "o",
+        "u"
+      ],
+      "type": "string"
+    },
+    "VisemeBinds": {
+      "additionalProperties": false,
+      "description": "The blendshapes one viseme drives.",
+      "properties": {
+        "binds": {
+          "description": "Its blendshapes.",
+          "items": {
+            "$ref": "#/$defs/ShapeBind"
+          },
+          "type": "array"
+        },
+        "viseme": {
+          "$ref": "#/$defs/Viseme",
+          "description": "The viseme."
+        }
+      },
+      "required": [
+        "viseme",
+        "binds"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The parts only an avatar has. Node, mesh and entry references index the owning [`crate::Document`].",
+  "properties": {
+    "expressions": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Expressions"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Expression menu."
+    },
+    "face": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Face"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Lip sync, blink and eye look; `None` for avatars without a face."
+    },
+    "humanoid": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Humanoid"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Humanoid mapping; `None` for non-humanoid avatars."
+    },
+    "meta": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Meta"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Creator and licence metadata; `None` when the source has none."
+    },
+    "version": {
+      "description": "Extension version (ADR 0087).",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "viewpoint": {
+      "description": "Eye position in avatar space, used for first-person view and eye-height calibration.",
+      "items": {
+        "format": "float",
+        "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    }
+  },
+  "required": [
+    "version",
+    "viewpoint"
+  ],
+  "title": "CIVBB_avatar",
+  "type": "object"
+}

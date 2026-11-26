@@ -1,0 +1,1832 @@
+{
+  "$defs": {
+    "Action": {
+      "description": "What a state does on enter (ADR 0085).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Changes state entries.",
+          "properties": {
+            "ops": {
+              "description": "Operations, in order.",
+              "items": {
+                "$ref": "#/$defs/EntryOp"
+              },
+              "type": "array"
+            },
+            "owner_only": {
+              "description": "Run only for the avatar's owner.",
+              "type": "boolean"
+            },
+            "type": {
+              "const": "entries",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "owner_only",
+            "ops"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Sets where body parts take their pose from.",
+          "properties": {
+            "parts": {
+              "description": "Each part and its new source.",
+              "items": {
+                "$ref": "#/$defs/PartSource"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "pose_source",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "parts"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Blends a layer's weight.",
+          "properties": {
+            "duration": {
+              "description": "Blend time in seconds.",
+              "format": "float",
+              "type": "number"
+            },
+            "goal": {
+              "description": "Goal weight.",
+              "format": "float",
+              "type": "number"
+            },
+            "layer": {
+              "description": "Target layer.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "layer_weight",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "layer",
+            "goal",
+            "duration"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Blends a layer group's weight.",
+          "properties": {
+            "duration": {
+              "description": "Blend time in seconds.",
+              "format": "float",
+              "type": "number"
+            },
+            "goal": {
+              "description": "Goal weight.",
+              "format": "float",
+              "type": "number"
+            },
+            "group": {
+              "description": "Target group.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "group_weight",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "group",
+            "goal",
+            "duration"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Enables or disables locomotion.",
+          "properties": {
+            "disabled": {
+              "description": "Locomotion disabled while true.",
+              "type": "boolean"
+            },
+            "type": {
+              "const": "locomotion",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "disabled"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Animator": {
+      "additionalProperties": false,
+      "description": "An animator: one layer list in evaluation order, each layer tagged with its [`LayerGroup`].",
+      "properties": {
+        "groups": {
+          "description": "Layer groups, each weighted as a whole.",
+          "items": {
+            "$ref": "#/$defs/LayerGroup"
+          },
+          "type": "array"
+        },
+        "layers": {
+          "description": "Layers, evaluated in order.",
+          "items": {
+            "$ref": "#/$defs/Layer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "groups",
+        "layers"
+      ],
+      "type": "object"
+    },
+    "BlendTreeKind": {
+      "description": "Blend algorithms.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "param": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "simple_1d",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "param"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "simple_directional_2d",
+              "type": "string"
+            },
+            "x": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "y": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "x",
+            "y"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "freeform_directional_2d",
+              "type": "string"
+            },
+            "x": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "y": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "x",
+            "y"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "freeform_cartesian_2d",
+              "type": "string"
+            },
+            "x": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "y": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "x",
+            "y"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "direct",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "BodyPart": {
+      "description": "Humanoid body parts of a layer mask.",
+      "enum": [
+        "root",
+        "body",
+        "head",
+        "left_leg",
+        "right_leg",
+        "left_arm",
+        "right_arm",
+        "left_fingers",
+        "right_fingers",
+        "left_foot_ik",
+        "right_foot_ik",
+        "left_hand_ik",
+        "right_hand_ik"
+      ],
+      "type": "string"
+    },
+    "ChildMotion": {
+      "additionalProperties": false,
+      "description": "A child of a blend tree.",
+      "properties": {
+        "cycle_offset": {
+          "description": "Normalised time offset.",
+          "format": "float",
+          "type": "number"
+        },
+        "direct_param": {
+          "description": "Weight parameter for `Direct` trees.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mirror": {
+          "default": false,
+          "description": "Mirrors the child's humanoid muscles; combines with its state's and parents' mirrors by exclusive or.",
+          "type": "boolean"
+        },
+        "motion": {
+          "$ref": "#/$defs/Motion",
+          "description": "The child's motion."
+        },
+        "position": {
+          "description": "2D position.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "threshold": {
+          "description": "1D threshold.",
+          "format": "float",
+          "type": "number"
+        },
+        "time_scale": {
+          "description": "Speed multiplier.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "motion",
+        "threshold",
+        "position",
+        "time_scale",
+        "cycle_offset"
+      ],
+      "type": "object"
+    },
+    "Clip": {
+      "additionalProperties": false,
+      "description": "An animation clip.",
+      "properties": {
+        "curves": {
+          "description": "Animated properties.",
+          "items": {
+            "$ref": "#/$defs/Curve"
+          },
+          "type": "array"
+        },
+        "length": {
+          "description": "Length in seconds.",
+          "format": "float",
+          "type": "number"
+        },
+        "looping": {
+          "description": "Loop time.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Name.",
+          "type": "string"
+        },
+        "root": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RootSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the body pose curves (`HumanoidProperty::Body`) reach the pose; `None` takes them as keyed (ADR 0063)."
+        }
+      },
+      "required": [
+        "name",
+        "length",
+        "looping",
+        "curves"
+      ],
+      "type": "object"
+    },
+    "Condition": {
+      "additionalProperties": false,
+      "description": "One transition condition.",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/ConditionMode",
+          "description": "Comparison."
+        },
+        "param": {
+          "description": "Tested parameter.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "threshold": {
+          "description": "Comparison value for numeric modes.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "param",
+        "mode",
+        "threshold"
+      ],
+      "type": "object"
+    },
+    "ConditionMode": {
+      "description": "Condition comparisons.",
+      "enum": [
+        "if",
+        "if_not",
+        "greater",
+        "less",
+        "equals",
+        "not_equal"
+      ],
+      "type": "string"
+    },
+    "ConstraintField": {
+      "description": "What a clip can animate on a constraint (ADR 0040).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "[`Constraint::weight`].",
+          "properties": {
+            "type": {
+              "const": "weight",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "[`Constraint::active`].",
+          "properties": {
+            "type": {
+              "const": "active",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The weight of source `n`.",
+          "properties": {
+            "source": {
+              "description": "Index into [`Constraint::sources`].",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "source_weight",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "source"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "[`ConstraintOptions::freeze`].",
+          "properties": {
+            "type": {
+              "const": "freeze",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Curve": {
+      "additionalProperties": false,
+      "description": "One animated property.",
+      "properties": {
+        "keys": {
+          "description": "Keys in ascending time.",
+          "items": {
+            "$ref": "#/$defs/Key"
+          },
+          "type": "array"
+        },
+        "target": {
+          "$ref": "#/$defs/Target",
+          "description": "What it animates."
+        }
+      },
+      "required": [
+        "target",
+        "keys"
+      ],
+      "type": "object"
+    },
+    "EntryOp": {
+      "description": "Operations on state entries.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "param": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "set",
+              "type": "string"
+            },
+            "value": {
+              "format": "float",
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "param",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "param": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "add",
+              "type": "string"
+            },
+            "value": {
+              "format": "float",
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "param",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Random in `[min, max]`; for bools, true with probability `chance`.",
+          "properties": {
+            "chance": {
+              "format": "float",
+              "type": "number"
+            },
+            "max": {
+              "format": "float",
+              "type": "number"
+            },
+            "min": {
+              "format": "float",
+              "type": "number"
+            },
+            "param": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "random",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "param",
+            "min",
+            "max",
+            "chance"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Copies `src` to `dst`, optionally remapping `from` range to `to` range.",
+          "properties": {
+            "dst": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "remap": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Remap"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "src": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "copy",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "src",
+            "dst"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EulerOrder": {
+      "description": "Orders of Euler rotations. One so far; others come with an importer whose source uses them.",
+      "oneOf": [
+        {
+          "const": "zxy",
+          "description": "About Z, then X, then Y (`q = qy qx qz`, ADR 0007).",
+          "type": "string"
+        }
+      ]
+    },
+    "HumanBone": {
+      "description": "Humanoid bones: VRM 1.0's humanoid bone set and names (ADR 0085 point 6), serialised as VRM writes them\n(`leftThumbMetacarpal`). Importers map other names (Unity's `HumanBodyBones`) by table.",
+      "enum": [
+        "hips",
+        "spine",
+        "chest",
+        "upperChest",
+        "neck",
+        "head",
+        "jaw",
+        "leftEye",
+        "rightEye",
+        "leftShoulder",
+        "leftUpperArm",
+        "leftLowerArm",
+        "leftHand",
+        "rightShoulder",
+        "rightUpperArm",
+        "rightLowerArm",
+        "rightHand",
+        "leftUpperLeg",
+        "leftLowerLeg",
+        "leftFoot",
+        "leftToes",
+        "rightUpperLeg",
+        "rightLowerLeg",
+        "rightFoot",
+        "rightToes",
+        "leftThumbMetacarpal",
+        "leftThumbProximal",
+        "leftThumbDistal",
+        "leftIndexProximal",
+        "leftIndexIntermediate",
+        "leftIndexDistal",
+        "leftMiddleProximal",
+        "leftMiddleIntermediate",
+        "leftMiddleDistal",
+        "leftRingProximal",
+        "leftRingIntermediate",
+        "leftRingDistal",
+        "leftLittleProximal",
+        "leftLittleIntermediate",
+        "leftLittleDistal",
+        "rightThumbMetacarpal",
+        "rightThumbProximal",
+        "rightThumbDistal",
+        "rightIndexProximal",
+        "rightIndexIntermediate",
+        "rightIndexDistal",
+        "rightMiddleProximal",
+        "rightMiddleIntermediate",
+        "rightMiddleDistal",
+        "rightRingProximal",
+        "rightRingIntermediate",
+        "rightRingDistal",
+        "rightLittleProximal",
+        "rightLittleIntermediate",
+        "rightLittleDistal"
+      ],
+      "type": "string"
+    },
+    "HumanoidProperty": {
+      "description": "Animatable humanoid properties.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A muscle: the rotation of `bone` about one axis of its muscle frame, -1 to 1 over the muscle's range (ADR\n0014). The bones and axes that have muscles are listed in `civbb_anim::muscle::MUSCLES`.",
+          "properties": {
+            "axis": {
+              "description": "Axis of the bone's muscle frame: 0 twist (X), 1 Y, 2 Z.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "bone": {
+              "$ref": "#/$defs/HumanBone",
+              "description": "The bone it turns."
+            },
+            "type": {
+              "const": "muscle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "bone",
+            "axis"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The body pose: position (0..3) or rotation (3..7) component (ADR 0063).",
+          "properties": {
+            "component": {
+              "description": "Position (0..3) or rotation (3..7) component.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "body",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "component"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "InterruptionSource": {
+      "description": "Which transitions may interrupt a running transition.",
+      "enum": [
+        "none",
+        "source",
+        "destination",
+        "source_then_destination",
+        "destination_then_source"
+      ],
+      "type": "string"
+    },
+    "Key": {
+      "additionalProperties": false,
+      "description": "A Hermite key. Infinite tangents mean a constant (stepped) segment. JSON has no infinity\n(`serde_json` writes `null`), so a `null` tangent reads as +infinity (ADR 0041).",
+      "properties": {
+        "in_tangent": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "out_tangent": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "time": {
+          "format": "float",
+          "type": "number"
+        },
+        "value": {
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "time",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Layer": {
+      "additionalProperties": false,
+      "description": "One animator layer.",
+      "properties": {
+        "blending": {
+          "$ref": "#/$defs/LayerBlending",
+          "description": "How the layer combines with the layers below."
+        },
+        "group": {
+          "description": "Index into [`Animator::groups`].",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mask": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Mask"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Which bones and transforms the layer may write; `None` writes everything."
+        },
+        "name": {
+          "description": "Name.",
+          "type": "string"
+        },
+        "state_machine": {
+          "$ref": "#/$defs/StateMachine",
+          "description": "The layer's states."
+        },
+        "weight": {
+          "description": "Initial weight, 0 to 1. A group's first layer always plays at weight 1.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "group",
+        "weight",
+        "blending",
+        "state_machine"
+      ],
+      "type": "object"
+    },
+    "LayerBlending": {
+      "description": "Layer blending modes.",
+      "enum": [
+        "override",
+        "additive"
+      ],
+      "type": "string"
+    },
+    "LayerGroup": {
+      "additionalProperties": false,
+      "description": "A group of layers with a shared weight.",
+      "properties": {
+        "name": {
+          "description": "Name, e.g. `FX`.",
+          "type": "string"
+        },
+        "weight": {
+          "description": "Initial weight, 0 to 1.",
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "Mask": {
+      "additionalProperties": false,
+      "description": "A layer mask: humanoid body parts plus an optional node allowlist.",
+      "properties": {
+        "body_parts": {
+          "description": "Enabled humanoid body parts.",
+          "items": {
+            "$ref": "#/$defs/BodyPart"
+          },
+          "type": "array"
+        },
+        "transforms": {
+          "description": "Nodes the layer may animate (curves on their meshes and constraints too); `None` allows all.",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "body_parts"
+      ],
+      "type": "object"
+    },
+    "MaterialField": {
+      "description": "A material field curves can animate (ADR 0099), in the units the material stores it.",
+      "oneOf": [
+        {
+          "const": "base_color",
+          "description": "Base colour (PBR, Toon) or colour (Unlit), linear RGBA.",
+          "type": "string"
+        },
+        {
+          "const": "emission",
+          "description": "Emission colour, linear RGB.",
+          "type": "string"
+        },
+        {
+          "const": "shade_color",
+          "description": "Toon shade colour, linear RGB.",
+          "type": "string"
+        },
+        {
+          "const": "rim_color",
+          "description": "Toon rim colour, linear RGB.",
+          "type": "string"
+        },
+        {
+          "const": "outline_color",
+          "description": "Toon outline colour, linear RGB.",
+          "type": "string"
+        },
+        {
+          "const": "metallic",
+          "description": "PBR metallic.",
+          "type": "string"
+        },
+        {
+          "const": "roughness",
+          "description": "PBR roughness.",
+          "type": "string"
+        },
+        {
+          "const": "normal_scale",
+          "description": "Normal map strength.",
+          "type": "string"
+        },
+        {
+          "const": "cutoff",
+          "description": "Alpha cutoff of a masked material.",
+          "type": "string"
+        },
+        {
+          "const": "shade_shift",
+          "description": "Toon shade shift.",
+          "type": "string"
+        },
+        {
+          "const": "shade_toony",
+          "description": "Toon shade toony.",
+          "type": "string"
+        },
+        {
+          "const": "rim_power",
+          "description": "Toon rim power.",
+          "type": "string"
+        },
+        {
+          "const": "matcap_strength",
+          "description": "The first toon matcap's strength.",
+          "type": "string"
+        },
+        {
+          "const": "base_color_transform",
+          "description": "The base colour texture's [`TextureSlot::scale_offset`].",
+          "type": "string"
+        },
+        {
+          "const": "light_min",
+          "description": "Toon light clamp's lower bound.",
+          "type": "string"
+        },
+        {
+          "const": "light_max",
+          "description": "Toon light clamp's upper bound.",
+          "type": "string"
+        }
+      ]
+    },
+    "MeshProperty": {
+      "description": "Animatable mesh instance properties.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Visible flag, 0 or 1.",
+          "properties": {
+            "type": {
+              "const": "visible",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Morph target (blendshape) weight, by index into the mesh's blend shapes, 0 to 1.",
+          "properties": {
+            "shape": {
+              "description": "Index into the mesh's blend shapes.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "weight",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "shape"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A component of a material field, overridden on every submesh of this mesh instance whose material has the\nfield; its default is the value in the first submesh's material, 0 when that material lacks the field (ADRs\n0025, 0067, 0099).",
+          "properties": {
+            "component": {
+              "description": "Component, below [`MaterialField::components`].",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "field": {
+              "$ref": "#/$defs/MaterialField",
+              "description": "The field."
+            },
+            "srgb": {
+              "description": "Colour keys are sRGB-encoded and decoded when applied (values above 1 by the power 2.2); only for\n[`MaterialField::is_color`] fields. Without it colours are linear.",
+              "type": "boolean"
+            },
+            "type": {
+              "const": "material",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "field",
+            "component",
+            "srgb"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The material of a submesh: key values are indices into [`Document::materials`](crate::Document::materials),\nheld until the next key.",
+          "properties": {
+            "submesh": {
+              "description": "Index into the mesh's submeshes.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "material_slot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "submesh"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Motion": {
+      "description": "What a state or blend tree child plays.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A clip.",
+          "properties": {
+            "clip": {
+              "description": "Index into [`Document::clips`](crate::Document::clips).",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "clip",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "clip"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A blend tree.",
+          "properties": {
+            "children": {
+              "description": "Children.",
+              "items": {
+                "$ref": "#/$defs/ChildMotion"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "$ref": "#/$defs/BlendTreeKind",
+              "description": "Blend algorithm and its parameters."
+            },
+            "normalize": {
+              "description": "Normalise child weights for `Direct` trees.",
+              "type": "boolean"
+            },
+            "type": {
+              "const": "blend_tree",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "kind",
+            "children",
+            "normalize"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "NodeProperty": {
+      "description": "Animatable node properties.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Local translation component (0 = x, 1 = y, 2 = z), metres.",
+          "properties": {
+            "component": {
+              "description": "0 = x, 1 = y, 2 = z.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "translation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "component"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Local rotation quaternion component (0 = x .. 3 = w).",
+          "properties": {
+            "component": {
+              "description": "0 = x .. 3 = w.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "rotation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "component"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Local Euler angle component (0 = x, 1 = y, 2 = z) in radians about the node's axes, applied in `order`. A\nnode's Euler curves in one clip share an order.",
+          "properties": {
+            "axis": {
+              "description": "Component.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "order": {
+              "$ref": "#/$defs/EulerOrder",
+              "description": "The order the three rotations apply in."
+            },
+            "type": {
+              "const": "euler_rotation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "axis",
+            "order"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Local scale component.",
+          "properties": {
+            "component": {
+              "description": "0 = x, 1 = y, 2 = z.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "scale",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "component"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Active flag, 0 or 1.",
+          "properties": {
+            "type": {
+              "const": "active",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PartSource": {
+      "additionalProperties": false,
+      "description": "One body part's pose source, set by [`Action::PoseSource`].",
+      "properties": {
+        "part": {
+          "$ref": "#/$defs/PosePart",
+          "description": "The body part."
+        },
+        "source": {
+          "$ref": "#/$defs/PoseSource",
+          "description": "Its new source."
+        }
+      },
+      "required": [
+        "part",
+        "source"
+      ],
+      "type": "object"
+    },
+    "PosePart": {
+      "description": "Body parts with a pose source.",
+      "enum": [
+        "head",
+        "left_hand",
+        "right_hand",
+        "hip",
+        "left_foot",
+        "right_foot",
+        "left_fingers",
+        "right_fingers",
+        "eyes",
+        "mouth"
+      ],
+      "type": "string"
+    },
+    "PoseSource": {
+      "description": "Where a body part takes its pose from.",
+      "oneOf": [
+        {
+          "const": "tracking",
+          "description": "The user's tracking (or the locomotion and IK standing in for it).",
+          "type": "string"
+        },
+        {
+          "const": "animation",
+          "description": "The animator.",
+          "type": "string"
+        }
+      ]
+    },
+    "Remap": {
+      "additionalProperties": false,
+      "description": "A linear remap of [`EntryOp::Copy`]: `from[0]..from[1]` maps onto `to[0]..to[1]`.",
+      "properties": {
+        "from": {
+          "description": "Source range.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "to": {
+          "description": "Destination range.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "RootSettings": {
+      "additionalProperties": false,
+      "description": "A humanoid clip's root-motion settings (ADR 0063). Avatars run with root motion\ndiscarded, so what is not baked into the pose is lost: the body pose plays relative to a root that follows the\nbody (or, keeping the original, follows its change since the clip's start).",
+      "properties": {
+        "bake_orientation": {
+          "description": "The body's yaw stays in the pose.",
+          "type": "boolean"
+        },
+        "bake_position_xz": {
+          "description": "The body's horizontal position stays in the pose.",
+          "type": "boolean"
+        },
+        "bake_position_y": {
+          "description": "The body's height stays in the pose.",
+          "type": "boolean"
+        },
+        "level": {
+          "description": "Root height offset, in body position units.",
+          "format": "float",
+          "type": "number"
+        },
+        "loop_pose": {
+          "description": "Loop pose: the baked part of the pose blends towards the clip's start over each cycle.",
+          "type": "boolean"
+        },
+        "orientation_offset": {
+          "description": "Root rotation offset, degrees about +Y in the format's coordinates.",
+          "format": "float",
+          "type": "number"
+        },
+        "original_orientation": {
+          "description": "Rotation based upon the original (the clip's start) rather than the body orientation.",
+          "type": "boolean"
+        },
+        "original_position_xz": {
+          "description": "Horizontal position based upon the original rather than the centre of mass.",
+          "type": "boolean"
+        },
+        "original_position_y": {
+          "description": "Height based upon the original rather than the centre of mass.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "bake_orientation",
+        "bake_position_y",
+        "bake_position_xz",
+        "original_orientation",
+        "original_position_y",
+        "original_position_xz",
+        "loop_pose",
+        "orientation_offset",
+        "level"
+      ],
+      "type": "object"
+    },
+    "State": {
+      "additionalProperties": false,
+      "description": "A state.",
+      "properties": {
+        "actions": {
+          "description": "Actions run on enter, in order.",
+          "items": {
+            "$ref": "#/$defs/Action"
+          },
+          "type": "array"
+        },
+        "cycle_offset": {
+          "description": "Normalised start offset.",
+          "format": "float",
+          "type": "number"
+        },
+        "cycle_offset_param": {
+          "description": "Parameter replacing `cycle_offset`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mirror": {
+          "default": false,
+          "description": "Plays humanoid muscles mirrored left to right (ADR 0060).",
+          "type": "boolean"
+        },
+        "mirror_param": {
+          "description": "Bool parameter replacing `mirror`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "motion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Motion"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the state plays; `None` is an empty state."
+        },
+        "name": {
+          "description": "Name.",
+          "type": "string"
+        },
+        "speed": {
+          "description": "Playback speed multiplier.",
+          "format": "float",
+          "type": "number"
+        },
+        "speed_param": {
+          "description": "Parameter multiplied into `speed`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "time_param": {
+          "description": "Parameter driving normalised time directly.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "transitions": {
+          "description": "Outgoing transitions, checked in order.",
+          "items": {
+            "$ref": "#/$defs/Transition"
+          },
+          "type": "array"
+        },
+        "unwritten": {
+          "$ref": "#/$defs/Unwritten",
+          "description": "What the state does to targets its layer animates and its motion does not."
+        }
+      },
+      "required": [
+        "name",
+        "speed",
+        "cycle_offset",
+        "unwritten",
+        "transitions",
+        "actions"
+      ],
+      "type": "object"
+    },
+    "StateMachine": {
+      "additionalProperties": false,
+      "description": "A flattened state machine.",
+      "properties": {
+        "any_state_transitions": {
+          "description": "Checked every update before the current state's transitions.",
+          "items": {
+            "$ref": "#/$defs/Transition"
+          },
+          "type": "array"
+        },
+        "default_state": {
+          "description": "State entered when no entry transition matches.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entry_transitions": {
+          "description": "Checked on entry (layer start and after an exit), in order; only conditions apply.",
+          "items": {
+            "$ref": "#/$defs/Transition"
+          },
+          "type": "array"
+        },
+        "states": {
+          "description": "States.",
+          "items": {
+            "$ref": "#/$defs/State"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "states",
+        "default_state",
+        "entry_transitions",
+        "any_state_transitions"
+      ],
+      "type": "object"
+    },
+    "Target": {
+      "description": "What a curve animates: an element of the document by index and one of its properties (ADR 0089). Values are in\neach property's units. Importers resolve source paths and names; stages that renumber elements remap targets.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A property of a node in [`Hierarchy::nodes`](crate::hierarchy::Hierarchy::nodes).",
+          "properties": {
+            "node": {
+              "description": "Node index.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "property": {
+              "$ref": "#/$defs/NodeProperty",
+              "description": "Animated property."
+            },
+            "type": {
+              "const": "node",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "node",
+            "property"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A property of a mesh instance in [`Document::meshes`](crate::Document::meshes).",
+          "properties": {
+            "mesh": {
+              "description": "Mesh index.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "property": {
+              "$ref": "#/$defs/MeshProperty",
+              "description": "Animated property."
+            },
+            "type": {
+              "const": "mesh",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "mesh",
+            "property"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A property of the humanoid.",
+          "properties": {
+            "property": {
+              "$ref": "#/$defs/HumanoidProperty",
+              "description": "Animated property."
+            },
+            "type": {
+              "const": "humanoid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "property"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The value of a state entry (a float entry; ADR 0088).",
+          "properties": {
+            "entry": {
+              "description": "Index into the state table.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "entry"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A field of a constraint in [`Document::constraints`](crate::Document::constraints) (ADR 0040).",
+          "properties": {
+            "constraint": {
+              "description": "Constraint index.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "field": {
+              "$ref": "#/$defs/ConstraintField",
+              "description": "Animated field."
+            },
+            "type": {
+              "const": "constraint",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "constraint",
+            "field"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Transition": {
+      "additionalProperties": false,
+      "description": "A transition.",
+      "properties": {
+        "can_transition_to_self": {
+          "description": "Any-state transitions only: may re-enter the current state.",
+          "type": "boolean"
+        },
+        "conditions": {
+          "description": "All must hold.",
+          "items": {
+            "$ref": "#/$defs/Condition"
+          },
+          "type": "array"
+        },
+        "dest": {
+          "$ref": "#/$defs/TransitionDest",
+          "description": "Target."
+        },
+        "duration": {
+          "description": "Cross-fade duration.",
+          "format": "float",
+          "type": "number"
+        },
+        "exit_time": {
+          "description": "Normalised source time at which the transition may fire.",
+          "format": "float",
+          "type": "number"
+        },
+        "fixed_duration": {
+          "description": "`duration` in seconds when true, else normalised to the source state length.",
+          "type": "boolean"
+        },
+        "has_exit_time": {
+          "description": "Only fire at or after `exit_time`.",
+          "type": "boolean"
+        },
+        "interruption": {
+          "$ref": "#/$defs/InterruptionSource",
+          "description": "Which transitions may interrupt this one."
+        },
+        "offset": {
+          "description": "Normalised start time in the destination.",
+          "format": "float",
+          "type": "number"
+        },
+        "ordered_interruption": {
+          "description": "Only higher-priority transitions of the source may interrupt.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "dest",
+        "conditions",
+        "has_exit_time",
+        "exit_time",
+        "fixed_duration",
+        "duration",
+        "offset",
+        "interruption",
+        "ordered_interruption",
+        "can_transition_to_self"
+      ],
+      "type": "object"
+    },
+    "TransitionDest": {
+      "description": "Transition targets.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A state of the same layer.",
+          "properties": {
+            "state": {
+              "description": "Index into the layer's states.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "state",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Leave through the layer's exit, then re-run entry transitions.",
+          "properties": {
+            "type": {
+              "const": "exit",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Unwritten": {
+      "description": "What a state does to targets its layer animates and its motion does not (ADR 0085).",
+      "oneOf": [
+        {
+          "const": "hold",
+          "description": "They keep the value last written.",
+          "type": "string"
+        },
+        {
+          "const": "rest",
+          "description": "They return to their rest values. A state without a motion writes nothing (ADR 0065).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`CIVBB_behaviour`: the layered state machine and the clips it plays.",
+  "properties": {
+    "animator": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Animator"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The state machine; absent when nothing plays."
+    },
+    "clips": {
+      "default": [],
+      "description": "Clips, indexed after the glTF animations.",
+      "items": {
+        "$ref": "#/$defs/Clip"
+      },
+      "type": "array"
+    },
+    "version": {
+      "description": "Extension version (ADR 0087).",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "title": "CIVBB_behaviour",
+  "type": "object"
+}

@@ -1,5 +1,6 @@
 //! Node hierarchy (bones and other transforms) and the humanoid bone mapping.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::math::{Quat, Transform, Vec3};
@@ -8,7 +9,7 @@ use crate::math::{Quat, Transform, Vec3};
 pub type NodeIndex = u32;
 
 /// A transform node: a bone, a toggleable object, or both.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Node {
     /// Name, unique among siblings. Animation bindings address nodes by their path of names.
@@ -23,7 +24,7 @@ pub struct Node {
 }
 
 /// All nodes of an avatar, parents before children; node 0 is the root.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Hierarchy {
     /// Nodes in parent-first order.
@@ -33,7 +34,7 @@ pub struct Hierarchy {
 /// Humanoid bones: VRM 1.0's humanoid bone set and names (ADR 0085 point 6), serialised as VRM writes them
 /// (`leftThumbMetacarpal`). Importers map other names (Unity's `HumanBodyBones`) by table.
 #[allow(missing_docs)] // The names are the documentation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum HumanBone {
     Hips,
@@ -94,7 +95,7 @@ pub enum HumanBone {
 }
 
 /// Maps humanoid bones to nodes.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Humanoid {
     /// Each mapped humanoid bone and its node. A bone appears at most once.
@@ -111,7 +112,7 @@ pub struct Humanoid {
 }
 
 /// One humanoid bone and the node it maps to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BoneNode {
     /// The bone.
@@ -123,7 +124,7 @@ pub struct BoneNode {
 /// How muscle values turn one humanoid bone (Unity's per-bone axes, ADR 0014). With angles `a` in degrees from the
 /// bone's muscles, its local rotation is `pre * zyroll(a) * post⁻¹`, where `zyroll` twists about X, then swings
 /// about Y and Z.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MuscleFrame {
     /// The bone.

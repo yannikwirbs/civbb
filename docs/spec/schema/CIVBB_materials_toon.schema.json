@@ -1,0 +1,578 @@
+{
+  "$defs": {
+    "ColorAdjust": {
+      "additionalProperties": false,
+      "description": "Colour correction of the base colour texture's linear texels, before `base_color`: hue shift (turns), saturation\nand value factors, gamma.",
+      "properties": {
+        "gamma": {
+          "format": "float",
+          "type": "number"
+        },
+        "hue": {
+          "format": "float",
+          "type": "number"
+        },
+        "saturation": {
+          "format": "float",
+          "type": "number"
+        },
+        "value": {
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "hue",
+        "saturation",
+        "value",
+        "gamma"
+      ],
+      "type": "object"
+    },
+    "Emission": {
+      "additionalProperties": false,
+      "description": "Emission: `color` (linear RGB) times the texture, multiplied towards itself times the albedo by `main_strength`,\nadded after lighting.",
+      "properties": {
+        "color": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "main_strength": {
+          "format": "float",
+          "type": "number"
+        },
+        "tex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureSlot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "color",
+        "main_strength"
+      ],
+      "type": "object"
+    },
+    "LightClamp": {
+      "additionalProperties": false,
+      "description": "The clamped light model: light plus ambient, clamped per channel to `min` and `max`, lights the shade-to-lit\nblend, so with bounds 0 and 1 a lit surface shows its own colour at most. Without it, the light lights the blend\nand the ambient adds on top, times the lit colour.",
+      "properties": {
+        "max": {
+          "format": "float",
+          "type": "number"
+        },
+        "min": {
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "type": "object"
+    },
+    "Matcap": {
+      "additionalProperties": false,
+      "description": "A matcap: a texture sampled by the view-space normal.",
+      "properties": {
+        "blend": {
+          "$ref": "#/$defs/MatcapBlend",
+          "description": "How it combines with the colour."
+        },
+        "color": {
+          "description": "Tints the texture, linear RGB.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "emission": {
+          "description": "The matcap times this (and the mask) adds after lighting, whatever the blend.",
+          "format": "float",
+          "type": "number"
+        },
+        "mask_tex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureSlot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Scales the strength and the emission per texel by its red channel."
+        },
+        "strength": {
+          "description": "Blend strength.",
+          "format": "float",
+          "type": "number"
+        },
+        "tex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureSlot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Matcap texture; `None` disables it."
+        }
+      },
+      "required": [
+        "strength",
+        "blend",
+        "color",
+        "emission"
+      ],
+      "type": "object"
+    },
+    "MatcapBlend": {
+      "description": "How a matcap combines with the lit colour.",
+      "oneOf": [
+        {
+          "const": "add",
+          "description": "The matcap times the strength adds.",
+          "type": "string"
+        },
+        {
+          "const": "multiply",
+          "description": "The colour times the matcap, faded in by the strength.",
+          "type": "string"
+        },
+        {
+          "const": "replace",
+          "description": "The colour turns towards the matcap, lit as the colour is, by the strength.",
+          "type": "string"
+        }
+      ]
+    },
+    "Normal": {
+      "additionalProperties": false,
+      "description": "A tangent-space normal map, its perturbation scaled by `scale`.",
+      "properties": {
+        "scale": {
+          "format": "float",
+          "type": "number"
+        },
+        "tex": {
+          "$ref": "#/$defs/TextureSlot"
+        }
+      },
+      "required": [
+        "tex",
+        "scale"
+      ],
+      "type": "object"
+    },
+    "Outline": {
+      "additionalProperties": false,
+      "description": "An outline: the mesh's back faces pushed out along the normal by `width` metres times the width texture's G\nchannel, unlit in `color` (linear RGB) times the colour texture. Width 0 draws none.",
+      "properties": {
+        "color": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "tex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureSlot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "width": {
+          "format": "float",
+          "type": "number"
+        },
+        "width_tex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureSlot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "width",
+        "color"
+      ],
+      "type": "object"
+    },
+    "Rim": {
+      "additionalProperties": false,
+      "description": "The fresnel rim: `(1 - |n . v|)^power` ramps linearly from `border - blur / 2` to `border + blur / 2` (both\nclamped to 0 to 1), fades towards the shadow by `shadow_mask`, and adds `color` (linear RGB), multiplied towards\nitself times the albedo by `main_strength`. Border 0.5 and blur 1 leave the fresnel term as it is.",
+      "properties": {
+        "blur": {
+          "format": "float",
+          "type": "number"
+        },
+        "border": {
+          "format": "float",
+          "type": "number"
+        },
+        "color": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "main_strength": {
+          "format": "float",
+          "type": "number"
+        },
+        "power": {
+          "format": "float",
+          "type": "number"
+        },
+        "shadow_mask": {
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "color",
+        "power",
+        "border",
+        "blur",
+        "shadow_mask",
+        "main_strength"
+      ],
+      "type": "object"
+    },
+    "RimShade": {
+      "additionalProperties": false,
+      "description": "Rim shade: after lighting, the colour is multiplied towards `color` by `strength * ramp((1 - |n . v|)^power)`, the\nramp linear from `border - blur / 2` to `border + blur / 2` (both clamped to 0 to 1).",
+      "properties": {
+        "blur": {
+          "format": "float",
+          "type": "number"
+        },
+        "border": {
+          "format": "float",
+          "type": "number"
+        },
+        "color": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "power": {
+          "format": "float",
+          "type": "number"
+        },
+        "strength": {
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "color",
+        "strength",
+        "power",
+        "border",
+        "blur"
+      ],
+      "type": "object"
+    },
+    "Shade": {
+      "additionalProperties": false,
+      "description": "The shadow beyond one colour: `Toon::shade_color` is the full shadow colour (times the shadow texture), and the\nshadow mixes in by `strength`. Where the half-Lambert term is below the second band's ramp (`second_border`,\n`second_blur`, as the rim's), the shadow turns towards the albedo times `second_color` by `second_strength`; then\nit is multiplied towards itself times the albedo by `main_strength`; then it turns towards the lit colour by\n`border_color` times a ramp that starts `border_range` before the first one.",
+      "properties": {
+        "border_color": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "border_range": {
+          "format": "float",
+          "type": "number"
+        },
+        "main_strength": {
+          "format": "float",
+          "type": "number"
+        },
+        "second_blur": {
+          "format": "float",
+          "type": "number"
+        },
+        "second_border": {
+          "format": "float",
+          "type": "number"
+        },
+        "second_color": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "second_strength": {
+          "format": "float",
+          "type": "number"
+        },
+        "strength": {
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "strength",
+        "main_strength",
+        "second_color",
+        "second_strength",
+        "second_border",
+        "second_blur",
+        "border_color",
+        "border_range"
+      ],
+      "type": "object"
+    },
+    "TextureSlot": {
+      "additionalProperties": false,
+      "description": "A texture used by a material slot.",
+      "properties": {
+        "scale_offset": {
+          "description": "`[scale_u, scale_v, offset_u, offset_v]`.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "texture": {
+          "description": "Index into [`crate::Document::textures`].",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "uv_set": {
+          "description": "Which UV set to sample (0 or 1).",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "texture",
+        "uv_set",
+        "scale_offset"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`CIVBB_materials_toon`: the toon model; name, alpha and double-sidedness stay core glTF. Only its schema is\nderived: serde's `flatten` would accept unknown fields, so the importer takes `order` out and parses [`Toon`].",
+  "properties": {
+    "base_color": {
+      "description": "Lit colour multiplier, linear RGBA.",
+      "items": {
+        "format": "float",
+        "type": "number"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "type": "array"
+    },
+    "base_color_tex": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TextureSlot"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Lit colour texture."
+    },
+    "color_adjust": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ColorAdjust"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Hue, saturation, value and gamma correction of the base colour texture."
+    },
+    "emission": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Emission"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Light the surface emits."
+    },
+    "light_clamp": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LightClamp"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Light plus ambient clamped per channel; `None` adds the ambient on top of the lit blend instead."
+    },
+    "matcaps": {
+      "description": "Matcaps, blended in order; the renderer draws up to [`MATCAPS`].",
+      "items": {
+        "$ref": "#/$defs/Matcap"
+      },
+      "type": "array"
+    },
+    "normal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Normal"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Tangent-space normal map."
+    },
+    "order": {
+      "default": 0,
+      "description": "Draw order among materials, lowest first.",
+      "format": "int32",
+      "type": "integer"
+    },
+    "outline": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Outline"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "An inverted-hull outline pass."
+    },
+    "rim": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Rim"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Fresnel rim light."
+    },
+    "rim_shade": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RimShade"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Darkens the lit colour towards grazing angles."
+    },
+    "shade": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Shade"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The shadow beyond one colour: strength, a second shadow and a border colour."
+    },
+    "shade_color": {
+      "description": "Colour in shadow, linear RGB.",
+      "items": {
+        "format": "float",
+        "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    },
+    "shade_shift": {
+      "description": "Shifts the light/shadow boundary, -1 to 1.",
+      "format": "float",
+      "type": "number"
+    },
+    "shade_tex": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TextureSlot"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Shadow colour texture."
+    },
+    "shade_toony": {
+      "description": "Hardness of the light/shadow boundary, 0 (soft) to 1 (hard).",
+      "format": "float",
+      "type": "number"
+    },
+    "version": {
+      "description": "Extension version (ADR 0087).",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "base_color",
+    "shade_color",
+    "shade_shift",
+    "shade_toony",
+    "matcaps"
+  ],
+  "title": "CIVBB_materials_toon",
+  "type": "object"
+}

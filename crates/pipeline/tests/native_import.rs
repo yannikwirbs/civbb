@@ -145,15 +145,25 @@ fn hostile_native_extensions_are_rejected() {
     reject("CIVBB_node: node 0 has no mesh", &|d| {
         d["nodes"][0]["extensions"] = json!({"CIVBB_node": {"version": 1, "first_person": "both"}})
     });
-    reject("CIVBB_materials_toon: texture 3 does not exist", &|d| {
+    let toon = |f: &dyn Fn(&mut Value)| {
         let lean = civbb_corpus::generate(&civbb_corpus::lean());
         let mut toon = match &lean.materials[0].model {
             civbb_format::material::MaterialModel::Toon(t) => serde_json::to_value(t).unwrap(),
             m => panic!("corpus material {m:?}"),
         };
         toon["version"] = json!(1);
-        toon["base_color_tex"] = json!({"texture": 3, "uv_set": 0, "scale_offset": [1.0, 1.0, 0.0, 0.0]});
-        d["materials"][0]["extensions"] = json!({"CIVBB_materials_toon": toon});
+        f(&mut toon);
+        json!({"CIVBB_materials_toon": toon})
+    };
+    reject("CIVBB_materials_toon: texture 3 does not exist", &|d| {
+        d["materials"][0]["extensions"] =
+            toon(&|t| t["base_color_tex"] = json!({"texture": 3, "uv_set": 0, "scale_offset": [1.0, 1.0, 0.0, 0.0]}));
+    });
+    reject("CIVBB_materials_toon: unknown field", &|d| {
+        d["materials"][0]["extensions"] = toon(&|t| t["unknown"] = json!(1));
+    });
+    reject("CIVBB_node: unknown field", &|d| {
+        d["nodes"][0]["extensions"] = json!({"CIVBB_node": {"version": 1, "unknown": 1}})
     });
     reject(
         "more than one of VRM, X_* and CIVBB_*",

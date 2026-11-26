@@ -1,0 +1,273 @@
+{
+  "$defs": {
+    "ContactReceiver": {
+      "additionalProperties": false,
+      "description": "Detects senders with matching tags and writes an animator parameter.",
+      "properties": {
+        "allow_others": {
+          "description": "Senders on other avatars count.",
+          "type": "boolean"
+        },
+        "allow_self": {
+          "description": "Senders on the same avatar count.",
+          "type": "boolean"
+        },
+        "face": {
+          "default": false,
+          "description": "Box receivers: proximity towards the +Z face instead of the centre (*Use Face Proximity*, ADR 0047).",
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/ReceiverKind",
+          "description": "How the parameter is driven."
+        },
+        "local_only": {
+          "description": "Exists only on the avatar owner's client.",
+          "type": "boolean"
+        },
+        "min_velocity": {
+          "description": "Minimum sender speed relative to the receiver for `OnEnter`, metres per second.",
+          "format": "float",
+          "type": "number"
+        },
+        "parameter": {
+          "description": "Entry written; `None` writes nothing.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tags": {
+          "description": "Accepted tags; any match counts.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "volume": {
+          "$ref": "#/$defs/ContactVolume",
+          "description": "Volume."
+        }
+      },
+      "required": [
+        "volume",
+        "tags",
+        "kind",
+        "allow_self",
+        "allow_others",
+        "local_only",
+        "min_velocity"
+      ],
+      "type": "object"
+    },
+    "ContactSender": {
+      "additionalProperties": false,
+      "description": "Emits tags other avatars' receivers can detect.",
+      "properties": {
+        "local_only": {
+          "description": "Exists only on the avatar owner's client.",
+          "type": "boolean"
+        },
+        "tags": {
+          "description": "Collision tags.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "volume": {
+          "$ref": "#/$defs/ContactVolume",
+          "description": "Volume."
+        }
+      },
+      "required": [
+        "volume",
+        "tags",
+        "local_only"
+      ],
+      "type": "object"
+    },
+    "ContactShape": {
+      "description": "Contact shapes (ADR 0017, 0047).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Sphere.",
+          "properties": {
+            "radius": {
+              "description": "Radius.",
+              "format": "float",
+              "type": "number"
+            },
+            "type": {
+              "const": "sphere",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "radius"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Capsule along local Y.",
+          "properties": {
+            "height": {
+              "description": "Total height including caps.",
+              "format": "float",
+              "type": "number"
+            },
+            "radius": {
+              "description": "Radius.",
+              "format": "float",
+              "type": "number"
+            },
+            "type": {
+              "const": "capsule",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "radius",
+            "height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Box centred on the volume's position.",
+          "properties": {
+            "size": {
+              "description": "Edge lengths along local X, Y and Z.",
+              "items": {
+                "format": "float",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "type": {
+              "const": "box",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "size"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ContactVolume": {
+      "additionalProperties": false,
+      "description": "A shape on a node, shared by senders and receivers.",
+      "properties": {
+        "component": {
+          "description": "Node whose activity enables the contact (the component's GameObject) when it is not `node` (ADR 0047).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "node": {
+          "description": "Node it is placed on (VRChat's *Root Transform*).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "description": "Offset from the node.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "rotation": {
+          "description": "Rotation relative to the node.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "shape": {
+          "$ref": "#/$defs/ContactShape",
+          "description": "Sphere, capsule or box."
+        }
+      },
+      "required": [
+        "node",
+        "shape",
+        "position",
+        "rotation"
+      ],
+      "type": "object"
+    },
+    "ReceiverKind": {
+      "description": "Receiver types.",
+      "oneOf": [
+        {
+          "const": "constant",
+          "description": "1 while any sender overlaps.",
+          "type": "string"
+        },
+        {
+          "const": "on_enter",
+          "description": "1 for one frame when a sender enters.",
+          "type": "string"
+        },
+        {
+          "const": "proximity",
+          "description": "0 to 1 by how deep the nearest sender is.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Contact senders and receivers (design doc §7).",
+  "properties": {
+    "receivers": {
+      "description": "Receivers.",
+      "items": {
+        "$ref": "#/$defs/ContactReceiver"
+      },
+      "type": "array"
+    },
+    "senders": {
+      "description": "Senders.",
+      "items": {
+        "$ref": "#/$defs/ContactSender"
+      },
+      "type": "array"
+    },
+    "version": {
+      "description": "Extension version (ADR 0087).",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "senders",
+    "receivers"
+  ],
+  "title": "CIVBB_contacts",
+  "type": "object"
+}

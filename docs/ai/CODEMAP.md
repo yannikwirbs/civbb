@@ -161,6 +161,7 @@ Internal deps: civbb-anim, civbb-core, civbb-format
 - `tests/parity.rs`: FLIP parity on a device (ADR 0033): the lean and bloated corpus avatars after every compiler stage render like
 - `tests/prune.rs`: Pruning (ADR 0026): unused skin joints, unreferenced nodes and undriven blendshapes go; everything referenced,
 - `tests/report.rs`: The per-avatar report (ADR 0032): the lean corpus avatar's counts per stage against a golden JSON, the package
+- `tests/schema.rs`: The `CIVBB_*` JSON Schemas (ADR 0086 point 2): `docs/spec/schema/*.schema.json` equal what the format types
 - `tests/texture.rs`: Texture atlasing and KTX2 compression (ADR 0029): every vertex samples the same texel through the atlas as
 - `tests/unity_dialect.rs`: Unity dialect 1 (ADR 0085): the exporter's `X_*` extensions as format v25 wrote them, frozen in
 - `tests/unity_export.rs`: The Unity exporter's output against Unity itself (#36): clips sampled by civbb-anim on an exported GLB match

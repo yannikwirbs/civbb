@@ -1,12 +1,13 @@
 //! Transform constraints (position, rotation, scale, parent, aim, look-at) with Unity's semantics (ADR 0018).
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::hierarchy::NodeIndex;
 use crate::math::{Transform, Vec3};
 
 /// A constraint. The runtime orders an avatar's constraints by dependency when it loads them; list order breaks ties.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Constraint {
     /// Constraint type.
@@ -30,7 +31,7 @@ pub struct Constraint {
 }
 
 /// VRChat constraint options Unity's constraints lack (ADR 0040, 0046).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConstraintOptions {
     /// Match the sources' local values instead of their world placements (*Solve In Local Space*).
@@ -43,7 +44,7 @@ pub struct ConstraintOptions {
 }
 
 /// What a clip can animate on a constraint (ADR 0040).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ConstraintField {
     /// [`Constraint::weight`].
@@ -60,7 +61,7 @@ pub enum ConstraintField {
 }
 
 /// The component type a clip addresses on a node, as Unity and VRChat name constraint components by type.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConstraintType {
     /// Position constraint.
@@ -95,7 +96,7 @@ impl ConstraintType {
 }
 
 /// One constraint source.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConstraintSource {
     /// Source node.
@@ -107,7 +108,7 @@ pub struct ConstraintSource {
 }
 
 /// Constraint types.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ConstraintKind {
     /// Copies the weighted source position, plus `offset`.
@@ -169,7 +170,7 @@ pub enum ConstraintKind {
 }
 
 /// World-up references for aim constraints.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WorldUp {
     /// Scene up.

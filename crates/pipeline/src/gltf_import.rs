@@ -20,6 +20,7 @@ mod animation;
 mod material;
 mod mesh;
 mod native;
+pub use native::schemas;
 mod source;
 mod unity_clip;
 mod unity_material;

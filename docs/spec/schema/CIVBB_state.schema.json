@@ -1,0 +1,185 @@
+{
+  "$defs": {
+    "Entry": {
+      "additionalProperties": false,
+      "description": "One typed value of the state table.",
+      "properties": {
+        "default": {
+          "description": "Value an instance starts at; bools and triggers use 0 or 1.",
+          "format": "float",
+          "type": "number"
+        },
+        "external": {
+          "description": "Inputs from outside the content (menu, OSC, plugins) may write it.",
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/EntryKind",
+          "description": "Type."
+        },
+        "name": {
+          "description": "The creator's name; `/` separates namespaces.",
+          "type": "string"
+        },
+        "range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Range"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The values an int or float takes, which decide its sync encoding (ADR 0098); `None`: unbounded."
+        },
+        "rest": {
+          "description": "Value a state with `unwritten: Rest` restores where an animation curve writes this entry, when it is not\n`default` (lowered Unity content: the animator parameter's default, while `default` is the expression\nparameter's).",
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "saved": {
+          "description": "Persisted per user across sessions.",
+          "type": "boolean"
+        },
+        "sync": {
+          "$ref": "#/$defs/SyncMode",
+          "description": "Who sends it over the network."
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "default",
+        "sync",
+        "saved",
+        "external"
+      ],
+      "type": "object"
+    },
+    "EntryKind": {
+      "description": "Entry types.",
+      "oneOf": [
+        {
+          "enum": [
+            "float",
+            "int",
+            "bool"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "trigger",
+          "description": "A bool that a transition testing it resets.",
+          "type": "string"
+        }
+      ]
+    },
+    "Range": {
+      "description": "The values a ranged int or float takes (ADR 0098).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Integers `min ..= max`.",
+          "properties": {
+            "max": {
+              "description": "Greatest value, at least `min`.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "min": {
+              "description": "Least value.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": {
+              "const": "int",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "min",
+            "max"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`min ..= max` quantised to `bits` bits, 2 to 16.",
+          "properties": {
+            "bits": {
+              "description": "Wire bits.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "max": {
+              "description": "Greatest value, finite and above `min`.",
+              "format": "float",
+              "type": "number"
+            },
+            "min": {
+              "description": "Least value, finite.",
+              "format": "float",
+              "type": "number"
+            },
+            "type": {
+              "const": "float",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "min",
+            "max",
+            "bits"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SyncMode": {
+      "description": "Network sync of an entry.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "Local only.",
+          "type": "string"
+        },
+        {
+          "const": "owner",
+          "description": "The owning client sends it.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The shared state of a document. Animator conditions, blend inputs, drivers, menu controls and contact receivers\nreference entries by index; names are looked up only at the edges (OSC, plugins, tools).",
+  "properties": {
+    "entries": {
+      "description": "Entries; names are unique.",
+      "items": {
+        "$ref": "#/$defs/Entry"
+      },
+      "type": "array"
+    },
+    "version": {
+      "description": "Extension version (ADR 0087).",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "entries"
+  ],
+  "title": "CIVBB_state",
+  "type": "object"
+}

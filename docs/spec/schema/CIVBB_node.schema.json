@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "FirstPerson": {
+      "description": "First-person visibility of a mesh (VRM `firstPerson.meshAnnotations`).",
+      "oneOf": [
+        {
+          "const": "auto",
+          "description": "Visible, except the parts skinned to the head (legacy head shrinking).",
+          "type": "string"
+        },
+        {
+          "const": "both",
+          "description": "Visible in both views.",
+          "type": "string"
+        },
+        {
+          "const": "first_person_only",
+          "description": "Only in the owner's first-person view.",
+          "type": "string"
+        },
+        {
+          "const": "third_person_only",
+          "description": "Hidden from the owner's first-person view.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`CIVBB_node`: what a glTF node lacks.",
+  "properties": {
+    "active": {
+      "default": true,
+      "description": "Whether the node starts active.",
+      "type": "boolean"
+    },
+    "first_person": {
+      "$ref": "#/$defs/FirstPerson",
+      "default": "auto",
+      "description": "First-person visibility of the node's mesh; only on a node carrying a mesh."
+    },
+    "version": {
+      "description": "Extension version (ADR 0087).",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "title": "CIVBB_node",
+  "type": "object"
+}
