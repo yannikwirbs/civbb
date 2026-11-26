@@ -209,6 +209,9 @@ impl Importer<'_> {
             let volumes = s.contacts.senders.iter_mut().map(|c| &mut c.volume);
             for v in volumes.chain(s.contacts.receivers.iter_mut().map(|c| &mut c.volume)) {
                 v.node = self.x_node("X_contacts", v.node)?;
+                if let Some(c) = &mut v.component {
+                    *c = self.x_node("X_contacts", *c)?;
+                }
             }
         }
         s.expressions = expressions.map(|x| Expressions {

@@ -352,6 +352,10 @@ fn source_extensions_map_nodes_and_clips() {
             "max": [0.0, 0.0, 0.0], "twist": 1.0}]},
         "X_animator": {"animator": animator_with_parameters, "clips": [clip]},
         "X_constraints": [constraint],
+        // A contact on A enabled by B (#129).
+        "X_contacts": {"senders": [{"volume": {"node": 0, "component": 1, "shape": {"Sphere": {"radius": 0.1}},
+            "position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0, 1.0]}, "tags": ["Hand"], "local_only": false}],
+            "receivers": []},
     });
     let a = import(&gltf(doc, &bin), &Limits::default(), no_files).unwrap().avatar;
     let names: Vec<(&str, bool)> = a.hierarchy.nodes.iter().map(|n| (n.name.as_str(), n.active)).collect();
@@ -367,6 +371,8 @@ fn source_extensions_map_nodes_and_clips() {
     let motion = &a.animator.unwrap().layers[0].state_machine.states[0].motion;
     assert_eq!(motion, &Some(Motion::Clip { clip: 1 }));
     assert_eq!((a.constraints[0].target, a.constraints[0].sources[0].node), (2, 1));
+    let v = &a.contacts.senders[0].volume;
+    assert_eq!((v.node, v.component), (1, Some(2)));
 }
 
 fn triangle_doc() -> (Value, Vec<u8>) {

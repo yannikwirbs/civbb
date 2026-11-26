@@ -4,6 +4,7 @@
 
 use civbb_format::animator::{Clip, Curve, Key, MeshProperty, NodeProperty, Target};
 use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};
+use civbb_format::dynamics::{ContactSender, ContactShape, ContactVolume};
 use civbb_format::face::{Face, ShapeBind};
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::{Mat4, Transform};
@@ -143,6 +144,18 @@ fn avatar() -> Document {
 #[test]
 fn prunes_what_nothing_references_and_remaps_the_rest() {
     let mut a = avatar();
+    // A contact on Hips enabled by Toggle (7, renumbered to 5), #129.
+    a.contacts.senders.push(ContactSender {
+        volume: ContactVolume {
+            node: 2,
+            component: Some(7),
+            shape: ContactShape::Sphere { radius: 0.1 },
+            position: [0.0; 3],
+            rotation: [0.0, 0.0, 0.0, 1.0],
+        },
+        tags: vec!["Hand".into()],
+        local_only: false,
+    });
     valid(&a);
     let pruned = prune(&mut a);
     valid(&a);
@@ -169,6 +182,13 @@ fn prunes_what_nothing_references_and_remaps_the_rest() {
     assert_eq!(skin.vertex_joints, [[0, 0, 0, 0], [0, 0, 0, 0]]);
     assert_eq!((a.constraints[0].target, a.constraints[0].sources[0].node), (4, 5));
     assert_eq!(a.dynamics.chains[0].root, 6);
+    assert_eq!(
+        (
+            a.contacts.senders[0].volume.node,
+            a.contacts.senders[0].volume.component
+        ),
+        (2, Some(5))
+    );
     // Animated, resting at a weight, face tracking (any case) and face-bound shapes stay.
     let shapes: Vec<_> = a.meshes[0].blend_shapes.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(shapes, ["Smile", "Rest", "jawopen", "Blink"]);

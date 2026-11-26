@@ -373,8 +373,11 @@ fn for_each_node(a: &mut Document, mut f: impl FnMut(&mut NodeIndex)) {
         c.ignore.iter_mut().for_each(&mut f);
     }
     a.dynamics.colliders.iter_mut().for_each(|c| f(&mut c.node));
-    a.contacts.senders.iter_mut().for_each(|s| f(&mut s.volume.node));
-    a.contacts.receivers.iter_mut().for_each(|r| f(&mut r.volume.node));
+    let volumes = a.contacts.senders.iter_mut().map(|s| &mut s.volume);
+    for v in volumes.chain(a.contacts.receivers.iter_mut().map(|r| &mut r.volume)) {
+        f(&mut v.node);
+        v.component.iter_mut().for_each(&mut f);
+    }
     for c in &mut a.constraints {
         f(&mut c.target);
         c.sources.iter_mut().for_each(|s| f(&mut s.node));
