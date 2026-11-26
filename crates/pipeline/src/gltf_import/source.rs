@@ -123,6 +123,14 @@ impl Importer<'_> {
             .map(|v| parse("X_expressions", v))
             .transpose()?;
         s.state = unity_state::lower(params, expressions.as_ref());
+        if let Some(a) = &mut s.animator {
+            let dropped = unity_state::drop_platform_writes(a, &s.state);
+            if dropped > 0 {
+                self.warnings.push(format!(
+                    "X_animator: {dropped} driver operations write VRChat built-ins; dropped"
+                ));
+            }
+        }
         if let Some(v) = doc.extension_value("X_dynamics") {
             let mut v = v.clone();
             let chains = v.get_mut("chains").and_then(Value::as_array_mut);

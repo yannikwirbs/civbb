@@ -108,7 +108,7 @@ impl V {
                                     DriverOp::Copy { src, dst, .. } => (src, dst),
                                 };
                                 self.index(a as usize, params, sp, "driver parameter");
-                                self.index(b as usize, params, sp, "driver parameter");
+                                self.written(b, sp, "driver parameter");
                             }
                         }
                         Behaviour::LayerWeight { layer, .. } => {

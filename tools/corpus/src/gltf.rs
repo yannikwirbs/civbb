@@ -8,7 +8,7 @@ use civbb_format::Avatar;
 use civbb_format::face::{EyeDriver, ShapeBind};
 use civbb_format::material::MaterialModel;
 use civbb_format::mesh::Mesh;
-use civbb_format::state::{EntryIndex, EntryKind, SyncMode};
+use civbb_format::state::{EntryIndex, EntryKind, Platform, SyncMode};
 use serde_json::{Value, json};
 
 const FLOAT: u32 = 5126;
@@ -132,12 +132,12 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
     // Unity dialect 1's parameters (the inverse of the importer's lowering): every entry an animator parameter with
     // its rest value as default, every external one an expression parameter, references as names.
     let entries = &a.state.entries;
-    let name = |e: Option<EntryIndex>| e.map_or("", |i| entries[i as usize].name.as_str());
+    let name = |e: Option<EntryIndex>| e.map_or("", |i| dialect(&entries[i as usize].name));
     if let Some(animator) = &a.animator {
         let mut x = json!(animator);
         let params = entries
             .iter()
-            .map(|e| json!({"name": e.name, "kind": e.kind, "default": e.rest()}));
+            .map(|e| json!({"name": dialect(&e.name), "kind": e.kind, "default": e.rest()}));
         x["parameters"] = json!(params.collect::<Vec<_>>());
         ext.insert("X_animator".into(), json!({"animator": x, "clips": a.clips}));
     }
@@ -185,6 +185,11 @@ pub fn to_source_glb(a: &Avatar) -> Vec<u8> {
     doc["extensionsUsed"] = json!(ext.keys().collect::<Vec<_>>());
     doc["extensions"] = Value::Object(ext);
     glb(serde_json::to_vec(&doc).expect("json"), bin)
+}
+
+/// An entry's name in dialect 1: platform values under VRChat's names.
+fn dialect(name: &str) -> &str {
+    Platform::from_name(name).map_or(name, |p| p.vrchat_name())
 }
 
 /// A serialised menu's entry references as dialect 1's names.

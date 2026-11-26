@@ -15,7 +15,7 @@ use crate::material::{MaterialModel, TextureSlot};
 use crate::math::Transform;
 use crate::mesh::{Mesh, Skin};
 use crate::meta::Meta;
-use crate::state::StateTable;
+use crate::state::{EntryIndex, PLATFORM_NAMESPACE, Platform, StateTable, SyncMode};
 
 mod animator;
 
@@ -104,6 +104,7 @@ pub fn validate(a: &Avatar, caps: &Caps, has_blob: impl Fn(BlobId) -> bool) -> R
     let mut v = V {
         errors: Vec::new(),
         caps: *caps,
+        platform: Vec::new(),
     };
     v.avatar(a, &has_blob);
     if v.errors.is_empty() { Ok(()) } else { Err(v.errors) }
@@ -112,6 +113,8 @@ pub fn validate(a: &Avatar, caps: &Caps, has_blob: impl Fn(BlobId) -> bool) -> R
 struct V {
     errors: Vec<ValidationError>,
     caps: Caps,
+    /// Per state entry, whether it is a platform value (read-only to content).
+    platform: Vec<bool>,
 }
 
 /// Counts summed over every mesh, capped once all are seen.
@@ -141,6 +144,13 @@ impl V {
 
     fn index(&mut self, i: usize, len: usize, path: impl FnOnce() -> String, what: &str) {
         self.ensure(i < len, path, format!("{what} index {i} out of range ({len})"));
+    }
+
+    /// An entry content writes: in range and not a platform value.
+    fn written(&mut self, e: EntryIndex, path: impl Fn() -> String, what: &str) {
+        let platform = self.platform.get(e as usize).copied();
+        self.index(e as usize, self.platform.len(), &path, what);
+        self.ensure(platform != Some(true), path, format!("{what} {e} is a platform value"));
     }
 
     fn cap(&mut self, n: usize, cap: usize, what: &str) {
@@ -195,10 +205,10 @@ impl V {
             self.animator(anim, a.clips.len(), entries);
         }
         if let Some(e) = &a.expressions {
-            self.expressions(e, a.textures.len(), entries);
+            self.expressions(e, a.textures.len());
         }
-        self.dynamics(&a.dynamics, nodes, entries);
-        self.contacts(&a.contacts, nodes, entries);
+        self.dynamics(&a.dynamics, nodes);
+        self.contacts(&a.contacts, nodes);
         self.constraints(&a.constraints, nodes);
     }
 
@@ -513,16 +523,23 @@ impl V {
                 p,
                 format!("name {:?} used twice", e.name),
             );
+            let platform = e.name.starts_with(PLATFORM_NAMESPACE);
+            if platform {
+                self.ensure(Platform::from_name(&e.name).is_some(), p, "unknown platform value");
+                let own = e.sync != SyncMode::None || e.saved || e.external;
+                self.ensure(!own, p, "a platform value is not synced, saved or external");
+            }
+            self.platform.push(platform);
         }
     }
 
-    fn expressions(&mut self, e: &Expressions, textures: usize, entries: usize) {
+    fn expressions(&mut self, e: &Expressions, textures: usize) {
         let mut controls = 0;
-        self.menu(&e.menu, 0, textures, entries, &mut controls);
+        self.menu(&e.menu, 0, textures, &mut controls);
         self.cap(controls, self.caps.menu_controls, "expressions.menu controls");
     }
 
-    fn dynamics(&mut self, d: &Dynamics, nodes: usize, entries: usize) {
+    fn dynamics(&mut self, d: &Dynamics, nodes: usize) {
         let colliders = d.colliders.len();
         self.cap(d.chains.len(), self.caps.chains, "dynamics.chains");
         self.cap(colliders, self.caps.colliders, "dynamics.colliders");
@@ -566,7 +583,7 @@ impl V {
                 self.graded(g, p);
             }
             for e in ch.outputs.entries().into_iter().flatten() {
-                self.index(e as usize, entries, p, "entry");
+                self.written(e, p, "entry");
             }
         }
         for (i, col) in d.colliders.iter().enumerate() {
@@ -581,7 +598,7 @@ impl V {
         }
     }
 
-    fn contacts(&mut self, c: &Contacts, nodes: usize, entries: usize) {
+    fn contacts(&mut self, c: &Contacts, nodes: usize) {
         self.cap(c.senders.len() + c.receivers.len(), self.caps.contacts, "contacts");
         let senders = c.senders.iter().map(|s| (&s.volume, &s.tags, None));
         let receivers = c.receivers.iter().map(|r| (&r.volume, &r.tags, r.parameter));
@@ -592,7 +609,7 @@ impl V {
                 self.string(t, p);
             }
             if let Some(e) = param {
-                self.index(e as usize, entries, p, "entry");
+                self.written(e, p, "entry");
             }
         }
     }
@@ -663,7 +680,7 @@ impl V {
         self.finite(&[v.position.as_slice(), &v.rotation, &dims].concat(), path);
     }
 
-    fn menu(&mut self, m: &Menu, depth: usize, textures: usize, entries: usize, controls: &mut usize) {
+    fn menu(&mut self, m: &Menu, depth: usize, textures: usize, controls: &mut usize) {
         let cap = self.caps.menu_depth;
         if depth > cap {
             self.fail(|| "expressions.menu".into(), format!("nested deeper than {cap}"));
@@ -677,10 +694,10 @@ impl V {
                 self.index(icon as usize, textures, p, "icon texture");
             }
             for &e in ctl.parameter.iter().chain(ctl.sub_parameters.iter().flatten()) {
-                self.index(e as usize, entries, p, "entry");
+                self.written(e, p, "entry");
             }
             if let ControlKind::SubMenu(sub) = &ctl.kind {
-                self.menu(sub, depth + 1, textures, entries, controls);
+                self.menu(sub, depth + 1, textures, controls);
             }
         }
     }
@@ -690,7 +707,7 @@ impl V {
 mod tests {
     use super::*;
     use crate::animator::TransitionDest;
-    use crate::state::{Entry, SyncMode};
+    use crate::state::{Entry, EntryKind};
     use crate::testutil::sample_avatar;
 
     fn check(a: &Avatar) -> Result<(), Vec<ValidationError>> {
@@ -929,6 +946,41 @@ mod tests {
         }
         a.expressions.as_mut().unwrap().menu = menu;
         expect_error(&a, "expressions.menu");
+    }
+
+    /// Platform values (ADR 0096) only the platform writes: content reads them, nothing in it writes them.
+    #[test]
+    fn platform_values_are_read_only_to_content() {
+        let platform = |name: &str| Entry::new(name, EntryKind::Bool, 0.0);
+        let mut a = sample_avatar();
+        a.state.entries.push(platform(Platform::Grounded.name()));
+        check(&a).unwrap();
+
+        a.state.entries[2] = platform("platform/flying");
+        expect_error(&a, "state.entries[2]");
+        a.state.entries[2] = Entry {
+            external: true,
+            ..platform(Platform::Seated.name())
+        };
+        expect_error(&a, "state.entries[2]");
+
+        // Entry 0 is written by the menu and a driver, entry 1 by a contact receiver and a chain output.
+        let mut a = sample_avatar();
+        a.state.entries[0] = platform(Platform::Afk.name());
+        a.state.entries[1] = platform(Platform::Upright.name());
+        let errors = check(&a).unwrap_err();
+        for path in [
+            "expressions.menu(depth 0)[0]",
+            "animator.layers[0].states[1]",
+            "contacts[0]",
+            "dynamics.chains[0]",
+        ] {
+            let e = errors.iter().find(|e| e.path == path);
+            assert!(
+                e.is_some_and(|e| e.problem.contains("platform value")),
+                "{path}: {errors:?}"
+            );
+        }
     }
 
     #[test]

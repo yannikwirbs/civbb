@@ -6,6 +6,7 @@
 
 use std::path::Path;
 
+use civbb_format::animator::{Behaviour, DriverOp};
 use civbb_format::state::{EntryKind, SyncMode};
 use civbb_pipeline::gltf_import::{Limits, import};
 use serde_json::{Value, json};
@@ -89,4 +90,57 @@ fn unity_parameters_lower_to_state_entries() {
     assert!(!e[3].external && e[3].sync == SyncMode::None);
     assert_eq!(a.expressions.unwrap().menu.controls[0].parameter, None);
     assert_eq!(a.contacts.receivers[0].parameter, None);
+}
+
+/// VRChat's built-ins lower to platform values (ADR 0096): renamed into `platform/`, keeping the animator's type,
+/// never synced, saved or external even when an expression parameter declares one; the menu and drivers no longer
+/// write them, and every reference by index still reads them.
+#[test]
+fn vrchat_builtins_lower_to_platform_values() {
+    let mut doc: Value = serde_json::from_slice(&fixture("unity-dialect-1.gltf")).unwrap();
+    let ext = &mut doc["extensions"];
+    let params = ext["X_animator"]["animator"]["parameters"].as_array_mut().unwrap();
+    params.push(json!({"name": "Grounded", "kind": "Float", "default": 0.0})); // 7
+    params.push(json!({"name": "GestureLeft", "kind": "Int", "default": 0.0})); // 8
+    let ops = &mut ext["X_animator"]["animator"]["layers"][0]["state_machine"]["states"][1]["behaviours"][0]["ParameterDriver"]
+        ["ops"];
+    let before = ops.as_array().unwrap().len();
+    let ops = ops.as_array_mut().unwrap();
+    ops.push(json!({"Set": {"param": 7, "value": 1.0}}));
+    ops.push(json!({"Copy": {"src": 8, "dst": 0, "remap": null}}));
+    (ext["X_expressions"]["parameters"].as_array_mut().unwrap())
+        .push(json!({"name": "InStation", "kind": "Bool", "default": 0.0, "saved": true, "synced": true}));
+    ext["X_expressions"]["menu"]["controls"][0]["parameter"] = json!("InStation");
+    let imported = import(&serde_json::to_vec(&doc).unwrap(), &Limits::default(), no_files).unwrap();
+    let a = imported.avatar;
+    civbb_format::validate(&a, &civbb_format::Caps::default(), |_| true).unwrap();
+
+    let e = &a.state.entries;
+    let names: Vec<&str> = e.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(
+        names[7..],
+        ["platform/grounded", "platform/gesture_left", "platform/in_station"]
+    );
+    assert_eq!((e[7].kind, e[8].kind), (EntryKind::Float, EntryKind::Int));
+    assert!(
+        e[7..]
+            .iter()
+            .all(|e| e.sync == SyncMode::None && !e.saved && !e.external)
+    );
+    assert_eq!(a.expressions.unwrap().menu.controls[0].parameter, None);
+    let state = &a.animator.unwrap().layers[0].state_machine.states[1];
+    let Behaviour::ParameterDriver { ops, .. } = &state.behaviours[0] else {
+        panic!("not a driver")
+    };
+    assert_eq!(
+        ops.len(),
+        before + 1,
+        "the write to Grounded is dropped, the read of GestureLeft kept"
+    );
+    assert!(matches!(ops[before], DriverOp::Copy { src: 8, dst: 0, .. }));
+    assert!(
+        imported.warnings.iter().any(|w| w.contains("1 driver operations")),
+        "{:?}",
+        imported.warnings
+    );
 }

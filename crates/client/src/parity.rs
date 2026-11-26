@@ -10,6 +10,7 @@ use civbb_format::Avatar;
 use civbb_format::animator::COMPILER_PARAMETER_PREFIX;
 use civbb_format::cost::{Light, Parity, Region, Rig, RigView, StateParity, Thresholds, ViewScore};
 use civbb_format::math::{Mat4, Vec3};
+use civbb_format::state::Platform;
 use civbb_render::Renderer;
 use civbb_render::forward::{AMBIENT, LIGHT_COLOR, LIGHT_TOWARDS};
 use serde::{Deserialize, Serialize};
@@ -163,13 +164,15 @@ pub fn handoff(avatar: &Avatar) -> Handoff {
 }
 
 /// Each state entry of an avatar with an animator, with the value a fresh local instance starts it at
-/// (`Controller::start`; a built-in's `Builtin::at_rest`).
+/// (`Controller::start`; a platform value's `at_rest`). Platform values go under VRChat's names, as Unity sets
+/// them (ADR 0096).
 fn start(avatar: &Avatar) -> Vec<(String, f32)> {
     let Some(c) = Controller::new(avatar) else {
         return Vec::new();
     };
     let i = Instance::new(&c, true);
-    c.state.entries.iter().map(|e| e.name.clone()).zip(i.params).collect()
+    let name = |e: &str| Platform::from_name(e).map_or(e.to_owned(), |p| p.vrchat_name().to_owned());
+    c.state.entries.iter().map(|e| name(&e.name)).zip(i.params).collect()
 }
 
 /// Each state entry with the value away from its start it takes in [`states`]. Entries the compiler added are left
@@ -182,8 +185,8 @@ pub fn toggles(avatar: &Avatar) -> Vec<(String, f32)> {
         .collect()
 }
 
-/// Steps one island per avatar through the same states: rest, then each of `params` set (by entry name; [`toggles`]
-/// of the first avatar, or a hand-off's states) on top of the state before, [`FRAMES_PER_STATE`] frames each.
+/// Steps one island per avatar through the same states: rest, then each of `params` set (by entry name, VRChat's for
+/// a platform value; [`toggles`] of the first avatar, or a hand-off's states) on top of the state before, [`FRAMES_PER_STATE`] frames each.
 /// Calls `check` with the state number, its name (`rest`, `Hat=1`) and the islands after each.
 pub fn states(avatars: &[&Avatar], params: &[(String, f32)], mut check: impl FnMut(usize, &str, &[Island])) {
     let mut islands: Vec<Island> = avatars
@@ -194,7 +197,10 @@ pub fn states(avatars: &[&Avatar], params: &[(String, f32)], mut check: impl FnM
         for island in &mut islands {
             if state > 0 {
                 let (p, v) = &params[state - 1];
-                let i = island.model().controller().and_then(|c| c.param(p));
+                let i = island.model().controller().and_then(|c| {
+                    let platform = || Platform::from_vrchat_name(p).and_then(|x| c.param(x.name()));
+                    c.param(p).or_else(platform)
+                });
                 if let (Some(i), Some(animator)) = (i, island.animator_mut()) {
                     animator.params[i as usize] = *v;
                 }

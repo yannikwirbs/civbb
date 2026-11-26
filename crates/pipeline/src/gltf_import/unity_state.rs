@@ -2,9 +2,10 @@
 //!
 //! Names in the menu, contact receivers and PhysBone prefixes become entry references.
 
+use civbb_format::animator::{Animator, Behaviour, DriverOp};
 use civbb_format::dynamics::ChainOutputs;
 use civbb_format::expressions::{Control, ControlKind, Menu};
-use civbb_format::state::{Entry, EntryKind, StateTable, SyncMode};
+use civbb_format::state::{Entry, EntryIndex, EntryKind, PLATFORM_NAMESPACE, Platform, StateTable, SyncMode};
 use serde::Deserialize;
 
 /// An animator parameter as dialect 1 writes it (`X_animator.animator.parameters`).
@@ -103,7 +104,36 @@ pub(super) fn lower(animator: Vec<XParameter>, expressions: Option<&XExpressions
             entries.push(lowered(e, kind));
         }
     }
+    // VRChat's built-ins are platform values (ADR 0096): the platform sets them, so they are not synced, saved or
+    // written from outside, and references by their VRChat names (menu, receivers) no longer find them.
+    for e in &mut entries {
+        if let Some(p) = Platform::from_vrchat_name(&e.name) {
+            e.name = p.name().into();
+            (e.sync, e.saved, e.external) = (SyncMode::None, false, false);
+        }
+    }
     StateTable { entries }
+}
+
+/// Removes parameter driver operations that write a platform value, returning how many: VRChat sets its built-ins
+/// every frame over whatever a driver wrote.
+pub(super) fn drop_platform_writes(animator: &mut Animator, state: &StateTable) -> usize {
+    let platform = |e: EntryIndex| state.entries[e as usize].name.starts_with(PLATFORM_NAMESPACE);
+    let mut dropped = 0;
+    let states = animator.layers.iter_mut().flat_map(|l| &mut l.state_machine.states);
+    for b in states.flat_map(|s| &mut s.behaviours) {
+        if let Behaviour::ParameterDriver { ops, .. } = b {
+            let before = ops.len();
+            ops.retain(|op| match *op {
+                DriverOp::Set { param, .. } | DriverOp::Add { param, .. } | DriverOp::Random { param, .. } => {
+                    !platform(param)
+                }
+                DriverOp::Copy { dst, .. } => !platform(dst),
+            });
+            dropped += before - ops.len();
+        }
+    }
+    dropped
 }
 
 /// The suffixes VRChat appends to a PhysBone's parameter prefix, in [`ChainOutputs::entries`] order.

@@ -9,7 +9,7 @@ Animation runtime: compile-time curve binding, clip sampling, Mecanim state mach
 
 Internal deps: civbb-core, civbb-format
 
-- `src/behaviour.rs`: Legacy built-in parameters and state behaviours: parameter drivers, tracking, layer and locomotion control.
+- `src/behaviour.rs`: Platform values at rest and state behaviours: parameter drivers, tracking, layer and locomotion control.
 - `src/bind.rs`: Compile-time binding: resolves curve paths to slots in one flat buffer with per-slot defaults (ADR 0007).
 - `src/body.rs`: Unity's humanoid body pose (#52): a pose's centre of mass and body orientation from its bones' positions, the
 - `src/clip.rs`: A clip bound to slots, and sampling it into the slot buffer.
@@ -23,7 +23,7 @@ Internal deps: civbb-core, civbb-format
 - `src/mix.rs`: Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
 - `src/muscle.rs`: Humanoid muscles: Unity's muscle table, and muscle values to human bones' local rotations (ADR 0014).
-- `tests/behaviour.rs`: Built-in parameters and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
+- `tests/behaviour.rs`: Platform values (ADR 0096) and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
 - `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order,
 - `tests/blend.rs`: Blend tree weights, hand-derived (ADR 0009): 1D, 2D simple directional, freeform cartesian and polar gradient
 - `tests/body_pose.rs`: Unity's humanoid body pose (#52) against `HumanPoseHandler` recordings on the generated test skeleton, plain and
@@ -300,6 +300,7 @@ Internal deps: none
 - `docs/adr/0093-gate-runs-tests-with-nextest.md`: 0093: The gate runs tests with cargo-nextest when it is installed
 - `docs/adr/0094-rust-navigation-through-lsp.md`: 0094: Sessions navigate Rust through the LSP tool
 - `docs/adr/0095-lowering-unity-parameters-to-state-entries.md`: 0095: Lowering Unity parameters to state entries; an entry's rest value
+- `docs/adr/0096-platform-values.md`: 0096: Platform values: the `platform/` namespace, VRChat's units, lowered built-ins
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

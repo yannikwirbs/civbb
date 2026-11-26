@@ -15,7 +15,6 @@ mod mix;
 pub mod motion;
 pub mod muscle;
 
-pub use behaviour::Builtin;
 pub use bind::{Bindings, Bound, Slot, Target, Unbound, bind};
 pub use clip::BoundClip;
 pub use constraint::Constraints;

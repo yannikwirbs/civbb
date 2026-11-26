@@ -6,9 +6,9 @@ use civbb_format::Avatar;
 use civbb_format::animator::{Animator, Behaviour, BodyPart, State, TrackingMode};
 use civbb_format::hierarchy::NodeIndex;
 use civbb_format::math::{Quat, Transform};
-use civbb_format::state::{EntryIndex, StateTable};
+use civbb_format::state::{EntryIndex, Platform, StateTable};
 
-use crate::behaviour::{Builtin, Rng, Tracking, coerce, drive, part_index};
+use crate::behaviour::{Rng, Tracking, at_rest, coerce, drive, part_index};
 use crate::bind::{Bound, Slot, Target, bind, node_paths};
 use crate::constraint::{Constraints, Scratch};
 use crate::machine::{Ctx, LayerRun};
@@ -173,9 +173,8 @@ struct Blend {
 }
 
 impl Instance {
-    /// A fresh instance at [`Controller::start`], built-ins at [`Builtin::at_rest`]; the first
-    /// [`Instance::update`] enters the start states. `local` is true for the owner's own avatar; it also sets the
-    /// `IsLocal` built-in.
+    /// A fresh instance at [`Controller::start`], platform values at [`at_rest`]; the first [`Instance::update`]
+    /// enters the start states. `local` is true for the owner's own avatar; it also sets `platform/is_local`.
     pub fn new(c: &Controller, local: bool) -> Self {
         let a = &c.animator;
         let n = c.bound.bindings.len();
@@ -193,18 +192,18 @@ impl Instance {
             written: vec![false; n],
             mixer: Mixer::new(n),
         };
-        for b in Builtin::ALL {
-            if let Some(v) = b.at_rest() {
-                i.set_builtin(c, b, v);
+        for p in Platform::ALL {
+            if let Some(v) = at_rest(p) {
+                i.set_platform(c, p, v);
             }
         }
-        i.set_builtin(c, Builtin::IsLocal, f32::from(u8::from(local)));
+        i.set_platform(c, Platform::IsLocal, f32::from(u8::from(local)));
         i
     }
 
-    /// Sets a built-in parameter if the animator declares it, converted to the declared type.
-    pub fn set_builtin(&mut self, c: &Controller, b: Builtin, value: f32) {
-        if let Some(p) = c.param(b.name()) {
+    /// Sets a platform value if the state table has its entry, converted to the entry's type.
+    pub fn set_platform(&mut self, c: &Controller, platform: Platform, value: f32) {
+        if let Some(p) = c.param(platform.name()) {
             self.params[p as usize] = coerce(c.state.entries[p as usize].kind, value);
         }
     }

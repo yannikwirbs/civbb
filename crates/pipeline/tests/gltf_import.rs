@@ -3,6 +3,7 @@
 use base64::Engine;
 use civbb_format::animator::Property;
 use civbb_format::material::MaterialModel;
+use civbb_format::state::{Entry, EntryKind, Platform};
 use civbb_pipeline::gltf_import::{Limits, dir_resolver, import};
 use serde_json::{Value, json};
 
@@ -59,12 +60,19 @@ fn corpus_round_trips_through_source_extensions() {
             max: [40.0, 30.0, 20.0],
             twist: 1.0,
         });
+        // A platform value travels under VRChat's name (ADR 0096).
+        let grounded = Platform::Grounded.name();
+        (original.state.entries).push(Entry::new(grounded, EntryKind::Bool, 1.0));
         assert!(
             original.hierarchy.nodes.iter().any(|n| !n.active),
             "{}: no inactive node",
             spec.name
         );
         let glb = civbb_corpus::gltf::to_source_glb(&original);
+        assert!(
+            !String::from_utf8_lossy(&glb).contains("platform/"),
+            "native names in dialect 1"
+        );
         let imported = import(&glb, &Limits::default(), no_files).unwrap_or_else(|e| panic!("{}: {e}", spec.name));
         let a = imported.avatar;
         assert_eq!(a.hierarchy.nodes, original.hierarchy.nodes, "{}", spec.name);

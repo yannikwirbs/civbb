@@ -1,15 +1,19 @@
-//! Built-in parameters and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
+//! Platform values (ADR 0096) and state behaviours (ADR 0011): names and types, parameter drivers, local-only drivers,
 //! layer and group weight control, tracking and locomotion control.
 
-use civbb_anim::{Builtin, Controller, Instance};
+use civbb_anim::{Controller, Instance};
 use civbb_format::Avatar;
 use civbb_format::animator::*;
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::math::Transform;
-use civbb_format::state::{Entry, EntryKind, StateTable};
+use civbb_format::state::{Entry, EntryKind, Platform, StateTable};
 
 fn param(name: &str, kind: EntryKind) -> Entry {
     Entry::new(name, kind, 0.0)
+}
+
+fn platform(p: Platform, kind: EntryKind) -> Entry {
+    param(p.name(), kind)
 }
 
 fn state(behaviours: Vec<Behaviour>, transitions: Vec<Transition>) -> State {
@@ -72,32 +76,41 @@ fn controller(entries: Vec<Entry>, layers: Vec<Layer>) -> Controller {
 }
 
 #[test]
-fn builtins_have_legacy_names_and_convert_to_the_declared_type() {
-    let names: Vec<&str> = Builtin::ALL.iter().map(|b| b.name()).collect();
-    let mut unique = names.clone();
-    unique.sort_unstable();
-    unique.dedup();
-    assert_eq!(unique.len(), names.len());
-    assert!(names.contains(&"AFK") && names.contains(&"VRMode") && names.contains(&"GestureLeftWeight"));
-    assert_eq!(Builtin::GestureLeft.kind(), EntryKind::Int);
-    assert_eq!(Builtin::Upright.kind(), EntryKind::Float);
-    assert_eq!(Builtin::Seated.kind(), EntryKind::Bool);
+fn platform_values_have_unique_names_and_convert_to_the_declared_type() {
+    for names in [
+        Platform::ALL.map(Platform::name),
+        Platform::ALL.map(Platform::vrchat_name),
+    ] {
+        let mut unique = names.to_vec();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), names.len());
+    }
+    assert!(Platform::ALL.iter().all(|p| p.name().starts_with("platform/")));
+    assert_eq!(Platform::from_vrchat_name("AFK"), Some(Platform::Afk));
+    assert_eq!(
+        Platform::from_vrchat_name("EyeHeightAsMeters"),
+        Some(Platform::EyeHeight)
+    );
+    assert_eq!(Platform::GestureLeft.kind(), EntryKind::Int);
+    assert_eq!(Platform::Upright.kind(), EntryKind::Float);
+    assert_eq!(Platform::Seated.kind(), EntryKind::Bool);
 
     let params = vec![
-        param("IsLocal", EntryKind::Bool),
-        param("GestureLeft", EntryKind::Int),
-        param("VelocityX", EntryKind::Float),
+        platform(Platform::IsLocal, EntryKind::Bool),
+        platform(Platform::GestureLeft, EntryKind::Int),
+        platform(Platform::VelocityX, EntryKind::Float),
         // Declared with another type than the engine's: converted to the declared one.
-        param("GestureRightWeight", EntryKind::Bool),
+        platform(Platform::GestureRightWeight, EntryKind::Bool),
     ];
     let c = controller(params, vec![layer(vec![state(vec![], vec![])], 0)]);
     assert_eq!(Instance::new(&c, false).params[0], 0.0);
     let mut i = Instance::new(&c, true);
     assert_eq!(i.params[0], 1.0);
-    i.set_builtin(&c, Builtin::GestureLeft, 3.4);
-    i.set_builtin(&c, Builtin::VelocityX, 1.5);
-    i.set_builtin(&c, Builtin::GestureRightWeight, 0.3);
-    i.set_builtin(&c, Builtin::Viseme, 7.0); // Not declared: ignored.
+    i.set_platform(&c, Platform::GestureLeft, 3.4);
+    i.set_platform(&c, Platform::VelocityX, 1.5);
+    i.set_platform(&c, Platform::GestureRightWeight, 0.3);
+    i.set_platform(&c, Platform::Viseme, 7.0); // No entry: ignored.
     assert_eq!(i.params, [1.0, 3.0, 1.5, 1.0]);
 }
 
@@ -105,12 +118,12 @@ fn builtins_have_legacy_names_and_convert_to_the_declared_type() {
 fn instances_start_standing_on_the_ground() {
     // Creators often leave Grounded and Upright at 0; VRChat's locomotion would then start in SmallHop (#86).
     let params = vec![
-        param("Grounded", EntryKind::Bool),
-        param("Upright", EntryKind::Float),
-        param("AvatarVersion", EntryKind::Int),
-        param("ScaleFactor", EntryKind::Float),
-        param("VelocityY", EntryKind::Float),
-        param("Seated", EntryKind::Bool),
+        platform(Platform::Grounded, EntryKind::Bool),
+        platform(Platform::Upright, EntryKind::Float),
+        platform(Platform::AvatarVersion, EntryKind::Int),
+        platform(Platform::ScaleFactor, EntryKind::Float),
+        platform(Platform::VelocityY, EntryKind::Float),
+        platform(Platform::Seated, EntryKind::Bool),
         param("user", EntryKind::Float),
     ];
     let c = controller(params, vec![layer(vec![state(vec![], vec![])], 0)]);
@@ -128,7 +141,7 @@ fn instances_start_at_the_entry_defaults_in_their_types() {
             rest: Some(0.0),
             ..Entry::new("local", EntryKind::Float, 0.25)
         },
-        param("Grounded", EntryKind::Bool),
+        platform(Platform::Grounded, EntryKind::Bool),
     ];
     let c = controller(params, vec![layer(vec![state(vec![], vec![])], 0)]);
     assert_eq!(c.start, [0.5, 1.0, 2.0, 0.25, 0.0]);

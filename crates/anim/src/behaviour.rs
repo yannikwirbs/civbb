@@ -1,140 +1,17 @@
-//! Legacy built-in parameters and state behaviours: parameter drivers, tracking, layer and locomotion control.
+//! Platform values at rest and state behaviours: parameter drivers, tracking, layer and locomotion control.
 
 use civbb_format::animator::{DriverOp, TrackingMode, TrackingPart};
-use civbb_format::state::{Entry, EntryKind};
+use civbb_format::state::{Entry, EntryKind, Platform};
 
-/// Built-in parameters the engine sets each frame, with their legacy names and types (design doc §7).
-#[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Builtin {
-    IsLocal,
-    PreviewMode,
-    Viseme,
-    Voice,
-    GestureLeft,
-    GestureRight,
-    GestureLeftWeight,
-    GestureRightWeight,
-    AngularY,
-    VelocityX,
-    VelocityY,
-    VelocityZ,
-    VelocityMagnitude,
-    Upright,
-    Grounded,
-    Seated,
-    Afk,
-    TrackingType,
-    VrMode,
-    MuteSelf,
-    InStation,
-    Earmuffs,
-    IsOnFriendsList,
-    AvatarVersion,
-    IsAnimatorEnabled,
-    ScaleModified,
-    ScaleFactor,
-    ScaleFactorInverse,
-    EyeHeightAsMeters,
-    EyeHeightAsPercent,
-}
-
-impl Builtin {
-    /// Every built-in.
-    pub const ALL: [Builtin; 30] = {
-        use Builtin::*;
-        [
-            IsLocal,
-            PreviewMode,
-            Viseme,
-            Voice,
-            GestureLeft,
-            GestureRight,
-            GestureLeftWeight,
-            GestureRightWeight,
-            AngularY,
-            VelocityX,
-            VelocityY,
-            VelocityZ,
-            VelocityMagnitude,
-            Upright,
-            Grounded,
-            Seated,
-            Afk,
-            TrackingType,
-            VrMode,
-            MuteSelf,
-            InStation,
-            Earmuffs,
-            IsOnFriendsList,
-            AvatarVersion,
-            IsAnimatorEnabled,
-            ScaleModified,
-            ScaleFactor,
-            ScaleFactorInverse,
-            EyeHeightAsMeters,
-            EyeHeightAsPercent,
-        ]
-    };
-
-    /// The legacy parameter name animators use.
-    pub fn name(self) -> &'static str {
-        use Builtin::*;
-        match self {
-            IsLocal => "IsLocal",
-            PreviewMode => "PreviewMode",
-            Viseme => "Viseme",
-            Voice => "Voice",
-            GestureLeft => "GestureLeft",
-            GestureRight => "GestureRight",
-            GestureLeftWeight => "GestureLeftWeight",
-            GestureRightWeight => "GestureRightWeight",
-            AngularY => "AngularY",
-            VelocityX => "VelocityX",
-            VelocityY => "VelocityY",
-            VelocityZ => "VelocityZ",
-            VelocityMagnitude => "VelocityMagnitude",
-            Upright => "Upright",
-            Grounded => "Grounded",
-            Seated => "Seated",
-            Afk => "AFK",
-            TrackingType => "TrackingType",
-            VrMode => "VRMode",
-            MuteSelf => "MuteSelf",
-            InStation => "InStation",
-            Earmuffs => "Earmuffs",
-            IsOnFriendsList => "IsOnFriendsList",
-            AvatarVersion => "AvatarVersion",
-            IsAnimatorEnabled => "IsAnimatorEnabled",
-            ScaleModified => "ScaleModified",
-            ScaleFactor => "ScaleFactor",
-            ScaleFactorInverse => "ScaleFactorInverse",
-            EyeHeightAsMeters => "EyeHeightAsMeters",
-            EyeHeightAsPercent => "EyeHeightAsPercent",
-        }
-    }
-
-    /// Its value for an avatar standing still on the ground at its own scale, which an instance starts at (#86);
-    /// `None` leaves the animator's default until the engine sets it. A creator's default of 0 for `Grounded`
-    /// would start the avatar falling (VRChat's locomotion layer leaves Standing for SmallHop).
-    pub fn at_rest(self) -> Option<f32> {
-        use Builtin::*;
-        match self {
-            Grounded | Upright | IsAnimatorEnabled | ScaleFactor | ScaleFactorInverse => Some(1.0),
-            AvatarVersion => Some(3.0),
-            _ => None,
-        }
-    }
-
-    /// The type the engine provides it as.
-    pub fn kind(self) -> EntryKind {
-        use Builtin::*;
-        match self {
-            IsLocal | Grounded | Seated | Afk | MuteSelf | InStation | Earmuffs | IsOnFriendsList
-            | IsAnimatorEnabled | ScaleModified => EntryKind::Bool,
-            PreviewMode | Viseme | GestureLeft | GestureRight | TrackingType | VrMode | AvatarVersion => EntryKind::Int,
-            _ => EntryKind::Float,
-        }
+/// A platform value's value for an avatar standing still on the ground at its own scale, which an instance starts
+/// at (#86); `None` leaves the entry's default until the engine sets it. A creator's default of 0 for `Grounded`
+/// would start the avatar falling (VRChat's locomotion layer leaves Standing for SmallHop).
+pub fn at_rest(p: Platform) -> Option<f32> {
+    use Platform::*;
+    match p {
+        Grounded | Upright | IsAnimatorEnabled | ScaleFactor | ScaleFactorInverse => Some(1.0),
+        AvatarVersion => Some(3.0),
+        _ => None,
     }
 }
 
