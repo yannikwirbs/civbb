@@ -7,11 +7,10 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#146, the rest of it: calibration (T-pose offsets per tracker and the user's height ratio, per user and avatar,
-round-trip test), a tracker input API that fills device poses which calibration turns into `Island::targets`, and a
-viewer debug mode with scripted trackers. The solver part is done (ADR 0112; issue comment lists what is where). Then
-the queue in order (#147, #148, #149, #153, #154, #70). M1.2 stays open only for #136's owner check (Tracy
-screenshot); close M1.2 once posted.
+#147 (avatar scaling, eye height, stations; desktop scope). Scaling must carry into IK: `Calibration::ratio`
+(ADR 0113) is eye height over the head device's, so a scaled avatar's viewpoint changes it; tracker goals are in
+avatar space (before `Island::origin.scale`). Then the queue in order (#148, #149, #153, #154, #70). M1.2 stays open
+only for #136's owner check (Tracy screenshot); close M1.2 once posted.
 
 ## Now
 
@@ -21,7 +20,8 @@ screenshot); close M1.2 once posted.
   #144 test world and character controller (ADR 0110: own capsule controller, Jolt deferred to Phase 2;
   `civbb-client view --world`).
   #145 full-body IK, 3-point (ADR 0111: `civbb_anim::ik`, goals in avatar space on `Island::targets`, desktop
-  view pitch shared over chest, neck and head); #146 started (ADR 0112: 6- and 10-point goals, FABRIK spine).
+  view pitch shared over chest, neck and head); #146 (ADR 0112: 6- and 10-point goals, FABRIK spine; ADR 0113:
+  tracker devices by role, calibration, `Trackers` resource, `view --trackers 3|6|10`).
 - **Phase 0's gate is passed** (ADR 0084; table of all 13 Unity exports there, every red state after rest
   itemised with a Phase 1 issue). Phase 1 is split into milestones M1.1 to M1.9: M1.1 Native content model (#100)
   first, then ECS client runtime, desktop mode/locomotion/IK, OpenXR, protocol/instance server/nodes, voice,
@@ -58,12 +58,10 @@ screenshot); close M1.2 once posted.
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-27 (20): #143 closed (ADR 0108: `civbb_anim::defaults`, generated locomotion, proxy substitutes, default
-  Base and Action layers, grounded per avatar; viewer only, parity untouched) and #152 (ADR 0109: default Gesture
-  layer per hand). All 13 corpus exports validate merged; KohzieBoi captured idle, walking, running, crouched,
-  prone. Filed #151, #153. Next: #144.
 - 2026-11-27 (21): #144 closed (ADR 0110: `controller.rs` capsule controller over static triangles, step edges stood
   on, step-up, snap down; `civbb_corpus::world()` shown by `view --world`). Filed #154. Next: #145.
 - 2026-11-27 (22): #145 closed (ADR 0111: `civbb_anim::ik::Solver`, 3-point goals and the view pitch; bench sets
   goals on every island, IK 4.5 µs per avatar). #146 half done (ADR 0112: 6- and 10-point goals, FABRIK spine,
   scripted-pose tests). Next: the rest of #146.
+- 2026-11-27 (23): #146 closed (ADR 0113: `civbb_anim::tracking` devices and calibration, round trip through the
+  10-point solver within 1 mm; client `Trackers` resource and system, `view --trackers`). Filed #155. Next: #147.

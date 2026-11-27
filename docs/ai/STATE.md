@@ -407,8 +407,14 @@ What exists, by area. Read the section for the area you touch; update it when th
   and back, knees forward); unreachable stretches straight. Pose sources `Animation` (tracking control) skip a part.
   The desktop player sets `look` (chest 0.2, neck 0.3, head the rest). 6- and 10-point (#146, ADR 0112): `hips`,
   `chest`, `feet` goals and `elbows`/`knees` hint points; the spine is FABRIK (up to 40 passes, fixed arrays; CCD
-  stalled with pinned hips); 3.5 to 4.4 µs per solve for 3, 6 and 10 points (lean, release). Calibration, the
-  tracker input API and scripted trackers in the viewer are still open (#146). Bones are placed by walking parents up to an
+  stalled with pinned hips); 3.5 to 4.4 µs per solve for 3, 6 and 10 points (lean, release). Trackers (#146, ADR
+  0113): `civbb_anim::tracking` (`Role`, `Devices` = an optional pose per role in tracking space, `rest(avatar)`,
+  `Calibration { ratio, offsets }`: ratio = viewpoint height over the head device's, offsets = rest bones in the
+  scaled device frames; `targets(&devices)` allocates nothing). Client `tracking.rs`: the `Trackers` resource
+  (devices, `calibrate` request, calibrations by package id, in memory only, #155) and `trackers_system` after the
+  player's in `PosesIn` (overwrites the player island's targets, `look` included, once its avatar is calibrated);
+  `Runtime::add_trackers(Option<Scripted>)`; `view --trackers 3|6|10` plays scripted paths on a user 1.1x the
+  avatar, calibrating on the first frame. Mapping play space to avatar space is the source's job (M1.4). Bones are placed by walking parents up to an
   anchor (no pose cache). Bench (`reach` in `bench.rs` sets all three goals and the pitch on every island):
   IK 4.5 µs per avatar on 1 worker (lean and bloated alike), bloated 100 avatars 6.96 to 7.74 ms/frame on 1 worker,
   unchanged at 13 workers (0.81 ms).
