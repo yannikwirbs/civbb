@@ -87,3 +87,5 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
 - `powershell -File script.ps1 -Args a,b` hands a `[string[]]` parameter one string `"a,b"` (no array parsing with
   `-File`): the viewer got bad arguments and exited before its window opened. Take one `[string]` of space-separated
   arguments for `Start-Process -ArgumentList`.
+- Window captures by title prefix: match `civbb-client`, not `CIVBB`: the VS Code window's title starts with the repo
+  name and gets captured instead (with the owner's account details on it; delete such a capture unread).
