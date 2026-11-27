@@ -206,9 +206,9 @@ fn reach(rest: &[Goal; 3], t: f32) -> Targets {
             pos: [head.pos[0], head.pos[1] - 0.05 - 0.05 * s, head.pos[2] + 0.05 * s],
             ..head
         }),
-        left_hand: Some(hand(left)),
-        right_hand: Some(hand(right)),
+        hands: [Some(hand(left)), Some(hand(right))],
         look: 0.3 * s,
+        ..Targets::default()
     }
 }
 

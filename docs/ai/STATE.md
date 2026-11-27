@@ -402,10 +402,13 @@ What exists, by area. Read the section for the area you touch; update it when th
 - Full-body IK, 3-point (#145, ADR 0111): `civbb_anim::ik::Solver` (per `Model`, `None` unless hips, spine, head,
   arms and legs are mapped) runs in `Island::step` between constraints and dynamics on `Island::targets`
   (`ik::Targets`: head and hand `Goal`s in avatar space, `look` = view pitch; the default changes nothing, so parity
-  is untouched). Head goal: hips follow its height, the spine bends towards it (2 passes), hips take the rest, legs
+  is untouched). Head goal: hips follow its height, the spine bends towards it, hips take the rest, legs
   keep their animated feet. Limbs: two-bone, bend towards the animated middle joint, else a rest pole (elbows down
   and back, knees forward); unreachable stretches straight. Pose sources `Animation` (tracking control) skip a part.
-  The desktop player sets `look` (chest 0.2, neck 0.3, head the rest). Bones are placed by walking parents up to an
+  The desktop player sets `look` (chest 0.2, neck 0.3, head the rest). 6- and 10-point (#146, ADR 0112): `hips`,
+  `chest`, `feet` goals and `elbows`/`knees` hint points; the spine is FABRIK (up to 40 passes, fixed arrays; CCD
+  stalled with pinned hips); 3.5 to 4.4 µs per solve for 3, 6 and 10 points (lean, release). Calibration, the
+  tracker input API and scripted trackers in the viewer are still open (#146). Bones are placed by walking parents up to an
   anchor (no pose cache). Bench (`reach` in `bench.rs` sets all three goals and the pitch on every island):
   IK 4.5 µs per avatar on 1 worker (lean and bloated alike), bloated 100 avatars 6.96 to 7.74 ms/frame on 1 worker,
   unchanged at 13 workers (0.81 ms).

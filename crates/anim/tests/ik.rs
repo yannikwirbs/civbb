@@ -1,9 +1,10 @@
-//! Full-body IK (ADR 0111) on the lean corpus humanoid: reachable targets are met within 1 mm with bone lengths
-//! kept, unreachable ones stretch the limb straight, the view pitch turns the head, tracking control skips parts.
+//! Full-body IK (ADRs 0111, 0112) on the lean corpus humanoid: reachable targets are met within 1 mm with bone
+//! lengths kept, unreachable ones stretch the limb straight, the view pitch turns the head, tracking control skips
+//! parts, and 6- and 10-point goals taken from a scripted pose sequence put every tracked bone back where it was.
 
 use civbb_anim::action::{PoseSources, part_index};
 use civbb_anim::ik::{Goal, Solver, Targets};
-use civbb_core::math::{Pose, dot, length, rotate, sub, world_poses};
+use civbb_core::math::{Pose, dot, euler_to_quat, length, mul, rotate, sub, world_poses};
 use civbb_format::Document;
 use civbb_format::animator::{PosePart, PoseSource};
 use civbb_format::hierarchy::{HumanBone, NodeIndex};
@@ -63,10 +64,12 @@ fn distance(a: Vec3, b: Vec3) -> f32 {
     length(sub(a, b))
 }
 
-/// The angle between two rotations, radians.
+/// How far two rotations differ: the largest component difference with `b`'s sign matched to `a` (about half the angle
+/// in radians; `acos` of the dot product is too noisy in f32 near zero).
 fn angle(a: Quat, b: Quat) -> f32 {
     let d: f32 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
-    2.0 * d.abs().min(1.0).acos()
+    let s = if d < 0.0 { -1.0 } else { 1.0 };
+    a.iter().zip(&b).map(|(x, y)| (x - s * y).abs()).fold(0.0, f32::max)
 }
 
 #[test]
@@ -83,8 +86,7 @@ fn reachable_hand_targets_are_met_within_a_millimetre_and_keep_bone_lengths() {
         rot: [0.0, 0.0, 0.0, 1.0],
     };
     let targets = Targets {
-        left_hand: Some(left),
-        right_hand: Some(right),
+        hands: [Some(left), Some(right)],
         ..Targets::default()
     };
     let (_, world) = a.solve(&targets, &TRACKED);
@@ -124,7 +126,7 @@ fn unreachable_targets_stretch_the_arm_straight_at_them() {
             rot: [0.0, 0.0, 0.0, 1.0],
         };
         let targets = Targets {
-            left_hand: Some(goal),
+            hands: [Some(goal), None],
             ..Targets::default()
         };
         let (locals, world) = a.solve(&targets, &TRACKED);
@@ -215,9 +217,9 @@ fn no_targets_and_animation_sources_leave_the_pose_untouched() {
     };
     let targets = Targets {
         head: Some(goal),
-        left_hand: Some(goal),
-        right_hand: Some(goal),
+        hands: [Some(goal); 2],
         look: 0.5,
+        ..Targets::default()
     };
     let mut animated = TRACKED;
     for part in [PosePart::Head, PosePart::LeftHand, PosePart::RightHand] {
@@ -231,4 +233,103 @@ fn no_targets_and_animation_sources_leave_the_pose_untouched() {
     let moved: Vec<usize> = (0..locals.len()).filter(|&i| locals[i] != a.rest[i]).collect();
     let arm = [HumanBone::LeftUpperArm, HumanBone::LeftLowerArm, HumanBone::LeftHand].map(|b| a.node(b));
     assert_eq!(moved, arm);
+}
+
+/// A scripted pose `t` seconds in: hips lowered, shifted and turned, the spine bent, arms and legs bent, all moving.
+fn truth(a: &Avatar, t: f32) -> Vec<Pose> {
+    use HumanBone as H;
+    let s = t.sin();
+    let mut locals = a.rest.clone();
+    let hips = a.node(H::Hips);
+    locals[hips].translation[0] += 0.05 * s;
+    locals[hips].translation[1] -= 0.15 + 0.05 * s;
+    locals[hips].translation[2] += 0.1;
+    // Degrees about X, Y, Z (Unity's order): +X bends the spine forward, legs forward are -X, knees +X.
+    let turns = [
+        (H::Hips, [0.0, 20.0 * s, 0.0]),
+        (H::Spine, [10.0, 0.0, 0.0]),
+        (H::Chest, [10.0 + 5.0 * s, 5.0 * s, 0.0]),
+        (H::Neck, [-10.0, 0.0, 0.0]),
+        (H::Head, [0.0, 20.0 * s, 0.0]),
+        (H::LeftUpperArm, [0.0, -30.0, -50.0 + 10.0 * s]),
+        (H::LeftLowerArm, [0.0, -60.0 - 20.0 * s, 0.0]),
+        (H::RightUpperArm, [0.0, 30.0, 50.0]),
+        (H::RightLowerArm, [0.0, 60.0 + 20.0 * s, 0.0]),
+        (H::LeftUpperLeg, [-40.0 - 10.0 * s, 0.0, 0.0]),
+        (H::LeftLowerLeg, [60.0 + 10.0 * s, 0.0, 0.0]),
+        (H::LeftFoot, [10.0 * s, 0.0, 0.0]),
+        (H::RightUpperLeg, [-20.0, 0.0, 0.0]),
+        (H::RightLowerLeg, [30.0, 0.0, 0.0]),
+    ];
+    for (bone, deg) in turns {
+        let i = a.node(bone);
+        locals[i].rotation = mul(locals[i].rotation, euler_to_quat(deg));
+    }
+    a.world(&locals)
+}
+
+/// Solves from the rest pose towards `targets(world)` for a sequence of scripted poses and checks that every bone in
+/// `met` lands where the scripted pose has it, within 1 mm and 1 mrad, with bone lengths kept.
+fn follows_the_script(targets: impl Fn(&Avatar, &[Pose]) -> Targets, met: &[(HumanBone, bool)]) {
+    let a = avatar();
+    let rest = a.world(&a.rest);
+    for frame in 0..20 {
+        let truth = truth(&a, frame as f32 * 0.3);
+        let (_, world) = a.solve(&targets(&a, &truth), &TRACKED);
+        for &(bone, rotation) in met {
+            let (got, want) = (world[a.node(bone)], truth[a.node(bone)]);
+            assert!(
+                distance(got.pos, want.pos) < 1e-3,
+                "frame {frame}: {bone:?} at {:?}, scripted {:?}",
+                got.pos,
+                want.pos
+            );
+            let turned = angle(got.rot, want.rot);
+            assert!(!rotation || turned < 1e-3, "frame {frame}: {bone:?} turned {turned}");
+        }
+        for (i, (r, s)) in a.lengths(&rest).iter().zip(a.lengths(&world)).enumerate() {
+            assert!((r - s).abs() < 1e-4, "frame {frame}: node {i}: {r} became {s}");
+        }
+    }
+}
+
+fn goal(a: &Avatar, world: &[Pose], bone: HumanBone) -> Option<Goal> {
+    let p = world[a.node(bone)];
+    Some(Goal { pos: p.pos, rot: p.rot })
+}
+
+fn six_point(a: &Avatar, world: &[Pose]) -> Targets {
+    use HumanBone as H;
+    Targets {
+        head: goal(a, world, H::Head),
+        hands: [goal(a, world, H::LeftHand), goal(a, world, H::RightHand)],
+        hips: goal(a, world, H::Hips),
+        feet: [goal(a, world, H::LeftFoot), goal(a, world, H::RightFoot)],
+        ..Targets::default()
+    }
+}
+
+#[test]
+fn six_point_targets_follow_a_scripted_pose() {
+    use HumanBone as H;
+    let met = [H::Hips, H::Head, H::LeftHand, H::RightHand, H::LeftFoot, H::RightFoot].map(|b| (b, true));
+    follows_the_script(six_point, &met);
+}
+
+#[test]
+fn ten_point_targets_place_the_chest_elbows_and_knees_too() {
+    use HumanBone as H;
+    let ten_point = |a: &Avatar, world: &[Pose]| {
+        let at = |b| Some(world[a.node(b)].pos);
+        Targets {
+            chest: goal(a, world, H::Chest),
+            elbows: [at(H::LeftLowerArm), at(H::RightLowerArm)],
+            knees: [at(H::LeftLowerLeg), at(H::RightLowerLeg)],
+            ..six_point(a, world)
+        }
+    };
+    let mut met = vec![(H::Chest, true)];
+    met.extend([H::Hips, H::Head, H::LeftHand, H::RightHand, H::LeftFoot, H::RightFoot].map(|b| (b, true)));
+    met.extend([H::LeftLowerArm, H::RightLowerArm, H::LeftLowerLeg, H::RightLowerLeg].map(|b| (b, false)));
+    follows_the_script(ten_point, &met);
 }

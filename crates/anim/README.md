@@ -19,8 +19,8 @@ The avatar animation runtime (design doc §7 "Animation"). Engine crate: depends
 - `mix` and `controller`: a `Controller` (compiled, shared) and per-avatar `Instance`s that update parameters,
   layers and the pose, with `unwritten` rules `Rest`, `Hold` and mixed (ADR 0010); `Instance::write_nodes` writes the pose
   into node transforms and activity.
-- `ik`: full-body IK (ADR 0111): head and hand goals in avatar space and the desktop view pitch, met by a spine and
-  hips solver and two-bone limbs on top of the animated pose, gated by the pose sources (tracking control).
+- `ik`: full-body IK (ADRs 0111, 0112): 3-, 6- and 10-point goals in avatar space and the desktop view pitch, met by
+  a FABRIK spine, the hips and two-bone limbs on top of the animated pose, gated by the pose sources (tracking control).
 
 Conformance: `tests/curve.rs` (key semantics), `tests/machine.rs` (state machine), `tests/blend.rs` (weights),
 `tests/action.rs` (platform values and actions), `tests/ik.rs` (targets met, bone lengths kept), `tests/muscle.rs` and `tests/constraint.rs` (muscle space and
