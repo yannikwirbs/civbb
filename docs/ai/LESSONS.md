@@ -59,6 +59,8 @@ Add a line to the matching file whenever something costs more than one attempt.
 - `while let Some(x) = mutex.lock().unwrap().next() { body }` holds the guard for the whole body (temporaries in a
   `while let` scrutinee live to the end of the iteration): parallel workers ran serially (#140). Take through a
   closure or a `let` first.
+- A dependency that links a Linux system library (gilrs: libudev) breaks the Ubuntu jobs of `ci.yml` and `fuzz.yml`
+  (fuzz builds `civbb-client` too) though the Windows gate passes: apt-install its `-dev` package in both.
 - Removing a probe line with the Edit tool: an `old_string` that starts with the newline before the line, replaced
   by an empty string, joined the lines around it (`...;    assert!(`). Match the line with its own indentation and
   trailing newline, or restore the file with `git checkout --` when the probe was its only change.

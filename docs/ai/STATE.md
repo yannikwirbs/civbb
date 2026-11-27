@@ -379,7 +379,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   copy). WASD, Shift runs (walk 2, run 4, strafe 2 m/s), Space jumps (3 m/s, gravity 9.81), mouse look, V
   cycles orbit/first/third person (own head hidden in first person), C/Z toggle crouch/prone (`Upright` 0.55/0.25,
   half/quarter speed), Shift+F1..F8 gestures, AFK while unfocused; it sets the island's platform values each frame
-  (`Island::set_platform`).
+  (`Island::set_platform`). Gamepads (#148, ADR 0115): `gamepad.rs`, `Pad` (all pads merged; `button`, `axis`,
+  `reset`, `apply` adds the sticks to the keys' `Input` each frame), `Turning::Smooth(rad/s)`/`Snap(rad)`; the
+  viewer polls gilrs in `Viewer::frame`, `view --turn smooth|snap`. Start is unbound (menu, #149).
 - Scaling and stations (#147, ADR 0114): `Player::eye_height` (`None` = the avatar's viewpoint height; chosen within
   0.2 to 5 m, `=`/`-` multiply by 1.1) gives `Player::scale` = eye over own, written to `Island::origin.scale`
   (viewpoint, cameras, bones, IK goals in avatar space follow); speeds and `Body::scale` (capsule, step) scale by
