@@ -329,10 +329,14 @@ What exists, by area. Read the section for the area you touch; update it when th
   records through `Forward::add`'s upload pass. As recorded (ADR 0067): defaults from the renderer's material 0 (0
   when it lacks the field), components no curve animates are 0 (baked by the importer, ADR 0099), animated colours
   converted from gamma even when `[HDR]` (an `[HDR]` default still round-trips, #93).
-- `civbb-core`: shared math, `jobs::islands` (one rayon job per avatar), per-system `Counters`. `civbb-client`:
-  `Model`/`Island` (animator, constraints, IK stub, dynamics, world poses) and `frame::step` with the contact pass
-  feeding next frame's parameters (ADR 0020); `civbb-client bench [--package <pkg> --key <key>]` prints JSON (#23,
-  #57).
+- `civbb-core`: shared math, `jobs::islands` (one rayon job per avatar), per-system `Counters` (a resource),
+  `schedule::frame()` (ADR 0103: the `Frame` schedule, `Step` sets in design doc §5's order, chained; `Dt`).
+  `civbb-client`: `Model`/`Island` (a component; animator, constraints, IK stub, dynamics, world poses),
+  `frame::step` (plain: islands then the contact pass feeding next frame's parameters, ADR 0020; parity and the
+  collapse tests use it) and `frame::Runtime` (bevy_ecs world, one entity per island in spawn order, the island and
+  contact systems in `Avatars`/`CrossAvatar`, `Permits` resource; the bench and viewer use it, #131). bevy_ecs has
+  default features off: the derive macros need it as a direct dependency of each crate that derives.
+  `civbb-client bench [--package <pkg> --key <key>]` prints JSON (#23, #57).
 - Benchmark on the reference PC (release): 100 bloated avatars 3.23 ms/frame on 1 thread, 0.43 ms on 16 (7.5x);
   1000 avatars 32.6 ms to 3.7 ms (8.9x), measured before the corpus got constraints. Corpus constraints (#57): lean
   2 twist helpers, bloated 67 (twists and tail bones). The constraint pass places only the nodes constraints read

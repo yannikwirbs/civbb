@@ -10,8 +10,9 @@ use civbb_format::Document;
 use civbb_format::cost::Pinned;
 use serde::Serialize;
 
+use crate::affinity;
+use crate::frame::Runtime;
 use crate::island::{Island, Model};
-use crate::{affinity, frame};
 
 /// Simulation step, seconds: one frame at the 90 Hz target of design doc §1.
 pub const DT: f32 = 1.0 / 90.0;
@@ -152,32 +153,33 @@ pub fn run(cfg: &Config, avatar: &Document) -> Option<Report> {
 }
 
 /// Fresh islands on a square grid 1 m apart, so neighbours share contact cells; avatar 0 is the local one.
-fn scene(model: &Arc<Model>, avatars: u32) -> Vec<Island> {
+fn scene(model: &Arc<Model>, avatars: u32) -> Runtime {
     let side = f64::from(avatars).sqrt().ceil().max(1.0) as u32;
-    (0..avatars)
-        .map(|id| {
-            let origin = Pose {
-                pos: [(id % side) as f32, 0.0, (id / side) as f32],
-                ..Pose::IDENTITY
-            };
-            Island::new(Arc::clone(model), u64::from(id), id == 0, origin)
-        })
-        .collect()
+    let mut runtime = Runtime::default();
+    for id in 0..avatars {
+        let origin = Pose {
+            pos: [(id % side) as f32, 0.0, (id / side) as f32],
+            ..Pose::IDENTITY
+        };
+        runtime.spawn(Island::new(Arc::clone(model), u64::from(id), id == 0, origin));
+    }
+    runtime
 }
 
 /// Warm-up then measured frames on a fresh scene; returns each measured frame's wall time in milliseconds and the
 /// summed counters. Each avatar sways sideways so its chains keep moving, and flips one parameter every
 /// [`FLIP_EVERY`] frames.
 fn measure(model: &Arc<Model>, cfg: &Config) -> (Vec<f64>, Counters) {
-    let mut islands = scene(model, cfg.avatars);
-    let homes: Vec<Pose> = islands.iter().map(|i| i.origin).collect();
+    let mut runtime = scene(model, cfg.avatars);
+    let homes: Vec<Pose> = runtime.islands().iter().map(|i| i.origin).collect();
     let params = model.controller().map_or(0, |c| c.state.entries.len());
     let mut frame_ms = Vec::with_capacity(cfg.frames as usize);
     let mut total = Counters::default();
     for f in 0..cfg.warmup + cfg.frames {
         let t = f as f32 * DT;
-        for (k, island) in islands.iter_mut().enumerate() {
-            island.origin.pos[0] = homes[k].pos[0] + 0.1 * (t * 3.0 + k as f32).sin();
+        for (k, home) in homes.iter().enumerate() {
+            let mut island = runtime.island_mut(k);
+            island.origin.pos[0] = home.pos[0] + 0.1 * (t * 3.0 + k as f32).sin();
             if params > 0 && f % FLIP_EVERY == 0 {
                 let p = (f / FLIP_EVERY) as usize % params;
                 if let Some(a) = island.animator_mut() {
@@ -186,7 +188,7 @@ fn measure(model: &Arc<Model>, cfg: &Config) -> (Vec<f64>, Counters) {
             }
         }
         let start = Instant::now();
-        let c = frame::step(&mut islands, |_, _| true, DT);
+        let c = runtime.step(DT);
         let ms = start.elapsed().as_secs_f64() * 1e3;
         if f >= cfg.warmup {
             frame_ms.push(ms);

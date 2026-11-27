@@ -24,7 +24,7 @@ use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::WindowId;
 
 use crate::cull::{Frustum, MeshBounds};
-use crate::frame;
+use crate::frame::Runtime;
 use crate::island::{Island, Model};
 
 /// Largest texture side the viewer decodes; larger textures are left out.
@@ -507,7 +507,7 @@ struct Viewer {
     avatar: Document,
     textures: Vec<Option<TextureImage>>,
     model: Arc<Model>,
-    islands: Vec<Island>,
+    runtime: Runtime,
     copies: u32,
     limit: Option<u32>,
     /// Warm-up frames still to present.
@@ -530,14 +530,11 @@ impl Viewer {
         let spacing = (width * 1.5).max(0.8);
         let origins = grid(cfg.copies, spacing);
         let model = Arc::new(Model::new(&cfg.avatar));
-        let islands = origins
-            .iter()
-            .enumerate()
-            .map(|(i, &pos)| {
-                let origin = Pose { pos, ..Pose::IDENTITY };
-                Island::new(model.clone(), i as u64, i == 0, origin)
-            })
-            .collect();
+        let mut runtime = Runtime::default();
+        for (i, &pos) in origins.iter().enumerate() {
+            let origin = Pose { pos, ..Pose::IDENTITY };
+            runtime.spawn(Island::new(model.clone(), i as u64, i == 0, origin));
+        }
         let cols = (cfg.copies as f32).sqrt().ceil();
         let rows = (cfg.copies as f32 / cols).ceil();
         let camera = Orbit {
@@ -553,7 +550,7 @@ impl Viewer {
             avatar: cfg.avatar,
             textures: cfg.textures,
             model,
-            islands,
+            runtime,
             copies: cfg.copies,
             limit: cfg.frames,
             warmup: cfg.warmup,
@@ -619,7 +616,7 @@ impl Viewer {
             .map_or(0.0, |l| start.duration_since(l).as_secs_f32())
             .min(0.1);
         self.last = Some(start);
-        frame::step(&mut self.islands, |_, _| true, dt);
+        self.runtime.step(dt);
         let systems = start.elapsed().as_secs_f32() * 1000.0;
 
         let (Some(renderer), Some(gpu)) = (&mut self.renderer, &self.gpu) else {
@@ -631,7 +628,7 @@ impl Viewer {
             renderer,
             gpu,
             &self.avatar,
-            &self.islands,
+            &self.runtime.islands(),
             &mut self.scratch,
             eye,
             target,
@@ -694,7 +691,7 @@ pub(crate) fn draw(
     renderer: &mut Renderer,
     gpu: &Gpu,
     avatar: &Document,
-    islands: &[Island],
+    islands: &[&Island],
     s: &mut Scratch,
     eye: Vec3,
     target: Vec3,

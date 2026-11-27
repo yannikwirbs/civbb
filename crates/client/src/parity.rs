@@ -374,7 +374,7 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
                     &mut renderer,
                     &gpus[k],
                     side.avatar,
-                    std::slice::from_ref(&islands[k]),
+                    &[&islands[k]],
                     &mut scratch[k],
                     v.eye,
                     v.target,

@@ -68,9 +68,10 @@ Internal deps: civbb-format
 
 - `src/counters.rs`: Per-system timing counters: lightweight, always-on time and run counts for each system of a frame (design doc §5).
 - `src/jobs.rs`: The job runner: one job per avatar island, run in parallel across islands with rayon (ADR 0003, ADR 0020).
-- `src/lib.rs`: Engine core: math, the job runner for per-avatar islands and per-system timing counters (design doc §5, ADR 0020).
+- `src/lib.rs`: Engine core: math, the frame schedule, the job runner for per-avatar islands and per-system timing counters
 - `src/math.rs`: Vector and quaternion helpers on the format's array types, and world placements of a node hierarchy.
 - `src/mips.rs`: Texture mip chains made on the CPU, the one definition the compiler encodes and the renderer uploads (ADR 0035).
+- `src/schedule.rs`: The frame schedule: one simulation frame's system sets in design doc §5's order, run chained (ADR 0103).
 - `tests/mips.rs`: CPU mip chains (ADR 0035): 2x2 boxes for even sides, linear-light averages for sRGB colour, linear alpha,
 
 ## `crates/dynamics` (civbb-dynamics)

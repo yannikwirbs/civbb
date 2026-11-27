@@ -1,10 +1,11 @@
 //! Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
-//! later, every system reports per island, results do not depend on the number of workers, and animated materials
-//! (ADR 0025) and constraint fields (ADR 0040) belong to their island.
+//! later, every system reports per island, results do not depend on the number of workers or on running as the frame
+//! schedule (ADR 0103), and animated materials (ADR 0025) and constraint fields (ADR 0040) belong to their island.
 
 use std::sync::Arc;
 
-use civbb_client::{Island, Model, frame};
+use civbb_client::frame::{self, Runtime};
+use civbb_client::{Island, Model};
 use civbb_core::math::Pose;
 use civbb_core::{System, jobs};
 use civbb_format::Document;
@@ -122,6 +123,38 @@ fn results_do_not_depend_on_the_worker_count() {
             .collect::<Vec<_>>()
     };
     assert_eq!(run(1), run(4));
+}
+
+#[test]
+fn the_frame_schedule_steps_islands_as_the_plain_frame_does() {
+    let avatar = civbb_corpus::generate(&civbb_corpus::bloated());
+    let model = Arc::new(Model::new(&avatar));
+    let scene = || {
+        (0..6).map(|id| {
+            let origin = Pose {
+                pos: [id as f32 * 0.3, 0.0, 0.0],
+                ..Pose::IDENTITY
+            };
+            Island::new(Arc::clone(&model), id, id == 0, origin)
+        })
+    };
+    let mut plain: Vec<Island> = scene().collect();
+    let mut runtime = Runtime::default();
+    for island in scene() {
+        runtime.spawn(island);
+    }
+    for _ in 0..30 {
+        let a = frame::step(&mut plain, |_, _| true, DT);
+        let b = runtime.step(DT);
+        assert_eq!(a.runs, b.runs);
+    }
+    let state = |i: &Island| (i.world().to_vec(), i.active().to_vec(), i.contact_values().to_vec());
+    let expected: Vec<_> = plain.iter().map(state).collect();
+    assert!(
+        expected.iter().any(|(_, _, v)| v.iter().any(|&v| v > 0.0)),
+        "no contact to compare"
+    );
+    assert_eq!(runtime.islands().into_iter().map(state).collect::<Vec<_>>(), expected);
 }
 
 #[test]

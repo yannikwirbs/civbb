@@ -45,7 +45,7 @@ impl System {
 
 /// Time spent and runs per system, summed over every job that reported. Time summed over parallel jobs is CPU
 /// time, not wall time.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(bevy_ecs::resource::Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Counters {
     /// Nanoseconds per system, indexed by `System as usize`.
     pub nanos: [u64; System::ALL.len()],

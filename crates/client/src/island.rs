@@ -150,6 +150,7 @@ impl Model {
 }
 
 /// One avatar in the scene: a [`Model`] and the state of every system running it.
+#[derive(bevy_ecs::component::Component)]
 pub struct Island {
     /// Stable avatar id, the same every frame.
     pub id: u64,
