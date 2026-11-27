@@ -1,12 +1,14 @@
-//! The desktop player on the frame schedule (ADR 0106): input moves and turns only the player's island, the camera
+//! The desktop player on the frame schedule (ADRs 0106, 0107): input moves and turns only the player's island and sets
+//! its platform values, the camera
 //! sits at its viewpoint in first person with its own head shrunk away, and the extract step sees the moved island.
 
 use civbb_client::extract::{Camera, Snapshot};
 use civbb_client::frame::Runtime;
 use civbb_client::package::Package;
-use civbb_client::player::{Input, Player, View, WALK};
+use civbb_client::player::{Input, Player, Posture, RUN, View, WALK};
 use civbb_core::math::Pose;
 use civbb_format::hierarchy::HumanBone;
+use civbb_format::state::{Entry, Platform};
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -57,6 +59,38 @@ fn input_moves_the_players_island_and_the_camera_follows() {
     let snapshot = runtime.world.resource::<Snapshot>();
     assert!(close(snapshot.islands[0].origin, expected));
     assert_eq!(snapshot.camera, camera);
+}
+
+#[test]
+fn the_players_animator_gets_its_platform_values_and_others_keep_theirs() {
+    let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());
+    let declared = [Platform::VelocityZ, Platform::GestureLeft, Platform::Upright];
+    let first = avatar.state.entries.len();
+    for p in declared {
+        avatar.state.entries.push(Entry::new(p.name(), p.kind(), 0.0));
+    }
+    let package = Package::new(avatar, Vec::new());
+    let mut runtime = Runtime::default();
+    runtime.add_player();
+    let e = runtime.spawn_package(&package, 0, true, Pose::IDENTITY);
+    runtime.spawn_package(&package, 1, false, Pose::IDENTITY);
+    runtime.world.resource_mut::<Player>().island = Some(e);
+    runtime.world.insert_resource(Input {
+        forward: 1.0,
+        run: true,
+        gestures: [3, 0],
+        crouch: true,
+        ..Default::default()
+    });
+    runtime.step(DT);
+    let params =
+        |runtime: &mut Runtime, k| runtime.island_mut(k).animator_mut().expect("an animator").params[first..].to_vec();
+    let player = params(&mut runtime, 0);
+    // Crouching halves the run.
+    assert!((player[0] - RUN / 2.0).abs() < 1e-3, "{player:?}");
+    assert_eq!(player[1..], [3.0, Posture::Crouching.upright()]);
+    // A remote copy stands still at rest.
+    assert_eq!(params(&mut runtime, 1), [0.0, 0.0, 1.0]);
 }
 
 #[test]

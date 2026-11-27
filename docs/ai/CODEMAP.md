@@ -64,7 +64,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 - `tests/measure.rs`: `civbb-client measure` (ADR 0032): debug builds refuse, release builds print CPU times and, with a device, GPU
 - `tests/parity.rs`: FLIP parity scoring without a device (ADR 0033): FLIP of an image against itself is 0, a known perturbation
-- `tests/player.rs`: The desktop player on the frame schedule (ADR 0106): input moves and turns only the player's island, the camera
+- `tests/player.rs`: The desktop player on the frame schedule (ADRs 0106, 0107): input moves and turns only the player's island and sets
 - `tests/view.rs`: Viewer helpers without a window (ADR 0024): placement matrices agree with `Pose::point`, the grid is centred,
 
 ## `crates/core` (civbb-core)
@@ -333,6 +333,7 @@ Internal deps: none
 - `docs/adr/0104-package-handles-and-runtime-spawning.md`: 0104: Packages as shared handles, islands spawned and despawned at runtime, GPU instances keyed by island
 - `docs/adr/0105-fork-join-worker-pool.md`: 0105: Island jobs on an own fork-join pool that wakes every worker at once and spins briefly
 - `docs/adr/0106-desktop-player.md`: 0106: The desktop player: input resource, kinematic root, first- and third-person camera
+- `docs/adr/0107-desktop-platform-values.md`: 0107: Platform values from the desktop player
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

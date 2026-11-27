@@ -14,7 +14,7 @@ use civbb_format::hierarchy::{HumanBone, NodeIndex};
 use civbb_format::material::{Material, MaterialField};
 use civbb_format::math::Transform;
 use civbb_format::mesh::MeshIndex;
-use civbb_format::state::{EntryIndex, EntryKind};
+use civbb_format::state::{EntryIndex, EntryKind, Platform};
 
 /// An avatar's systems compiled once, shared by every island showing that avatar.
 #[derive(Clone, Debug)]
@@ -210,6 +210,13 @@ impl Island {
     /// The compiled avatar.
     pub fn model(&self) -> &Model {
         &self.model
+    }
+
+    /// Sets a platform value for the next step, if the animator has its entry.
+    pub fn set_platform(&mut self, platform: Platform, value: f32) {
+        if let (Some(c), Some(i)) = (&self.model.controller, &mut self.animator) {
+            i.set_platform(c, platform, value);
+        }
     }
 
     /// The running animator, to set parameters between frames.

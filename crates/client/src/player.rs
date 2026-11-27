@@ -1,12 +1,13 @@
 //! The local player in desktop mode: input moves one island on the ground plane and places the camera at its
-//! viewpoint (design doc §18, ADR 0106).
+//! viewpoint (design doc §18, ADR 0106), and provides its platform values (ADR 0107).
 
 use std::f32::consts::TAU;
 
 use bevy_ecs::prelude::*;
-use civbb_core::math::{add, scale, sub};
+use civbb_core::math::{add, dot, length, scale, sub};
 use civbb_core::schedule::Dt;
 use civbb_format::math::{Quat, Vec3};
+use civbb_format::state::Platform;
 
 use crate::extract::Camera;
 use crate::frame::Shows;
@@ -40,6 +41,60 @@ pub struct Input {
     pub jump: bool,
     /// Turn since the last frame in radians: yaw (positive turns left) and pitch (positive looks up).
     pub look: [f32; 2],
+    /// Switch between standing and crouching once.
+    pub crouch: bool,
+    /// Switch between standing and lying prone once.
+    pub prone: bool,
+    /// Left and right hand gestures, 0 (neutral) to 7 (thumbs up), as the legacy `GestureLeft` and `GestureRight`.
+    pub gestures: [u8; 2],
+    /// Away from keyboard: the window lost focus.
+    pub afk: bool,
+}
+
+/// How upright the player is.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Posture {
+    /// On their feet.
+    #[default]
+    Standing,
+    /// Crouching: half speed.
+    Crouching,
+    /// Lying prone: quarter speed.
+    Prone,
+}
+
+impl Posture {
+    /// The `Upright` value: 1 standing, within the usual crouching and prone bands of locomotion layers otherwise.
+    pub fn upright(self) -> f32 {
+        match self {
+            Posture::Standing => 1.0,
+            Posture::Crouching => 0.55,
+            Posture::Prone => 0.25,
+        }
+    }
+
+    /// The factor on movement speeds.
+    fn speed(self) -> f32 {
+        match self {
+            Posture::Standing => 1.0,
+            Posture::Crouching => 0.5,
+            Posture::Prone => 0.25,
+        }
+    }
+
+    /// `self` after a crouch toggle, then a prone toggle, as asked.
+    fn toggled(self, crouch: bool, prone: bool) -> Self {
+        let p = match (crouch, self) {
+            (false, p) => p,
+            (true, Posture::Crouching) => Posture::Standing,
+            (true, _) => Posture::Crouching,
+        };
+        match (prone, p) {
+            (false, p) => p,
+            (true, Posture::Prone) => Posture::Standing,
+            (true, _) => Posture::Prone,
+        }
+    }
 }
 
 /// Where the camera is.
@@ -78,8 +133,14 @@ pub struct Player {
     pub pitch: f32,
     /// Upward speed in m/s.
     pub vertical: f32,
+    /// Velocity over the last step in m/s, in the world.
+    pub velocity: Vec3,
+    /// Turn rate over the last step in radians per second, positive to the left.
+    pub turn: f32,
     /// Standing on the ground.
     pub grounded: bool,
+    /// Standing, crouching or prone.
+    pub posture: Posture,
     /// The camera mode.
     pub view: View,
 }
@@ -92,7 +153,10 @@ impl Default for Player {
             yaw: 0.0,
             pitch: 0.0,
             vertical: 0.0,
+            velocity: [0.0; 3],
+            turn: 0.0,
             grounded: true,
+            posture: Posture::Standing,
             view: View::Orbit,
         }
     }
@@ -113,16 +177,17 @@ impl Player {
 
     /// Moves and turns by `input` over `dt` seconds on the ground plane y = 0.
     pub fn step(&mut self, input: &Input, dt: f32) {
+        let start = self.pos;
         self.yaw = (self.yaw + input.look[0]).rem_euclid(TAU);
+        self.turn = if dt > 0.0 { input.look[0] / dt } else { 0.0 };
         self.pitch = (self.pitch + input.look[1]).clamp(-PITCH_LIMIT, PITCH_LIMIT);
+        self.posture = self.posture.toggled(input.crouch, input.prone);
         let (f, r) = (input.forward.clamp(-1.0, 1.0), input.right.clamp(-1.0, 1.0));
         // Diagonal input is not faster than straight input.
-        let n = (f * f + r * r).sqrt().max(1.0);
+        let n = (f * f + r * r).sqrt().max(1.0) / self.posture.speed();
         let along = f / n * if input.run { RUN } else { WALK };
         let side = r / n * STRAFE;
-        let forward = self.forward();
-        // Avatars face +Z, so their right is forward x up.
-        let right = [-forward[2], 0.0, forward[0]];
+        let (forward, right) = (self.forward(), self.right());
         self.pos = add(self.pos, scale(add(scale(forward, along), scale(right, side)), dt));
         if self.grounded && input.jump {
             self.vertical = JUMP;
@@ -137,6 +202,44 @@ impl Player {
                 self.grounded = true;
             }
         }
+        self.velocity = if dt > 0.0 {
+            scale(sub(self.pos, start), 1.0 / dt)
+        } else {
+            [0.0; 3]
+        };
+    }
+
+    /// The avatar's right on the ground: avatars face +Z, so it is forward x up.
+    pub fn right(&self) -> Vec3 {
+        let f = self.forward();
+        [-f[2], 0.0, f[0]]
+    }
+
+    /// The platform values the player provides (ADR 0107), given what `input` holds: velocity in avatar space
+    /// (x right, z forward), turn rate (positive to the right), ground contact, posture, gestures, AFK and desktop
+    /// tracking.
+    pub fn platform_values(&self, input: &Input) -> [(Platform, f32); 14] {
+        use Platform::*;
+        let flag = |b: bool| f32::from(u8::from(b));
+        let v = self.velocity;
+        let [left, right] = input.gestures;
+        [
+            (VelocityX, dot(v, self.right())),
+            (VelocityY, v[1]),
+            (VelocityZ, dot(v, self.forward())),
+            (VelocityMagnitude, length(v)),
+            (AngularY, -self.turn),
+            (Grounded, flag(self.grounded)),
+            (Upright, self.posture.upright()),
+            (Afk, flag(input.afk)),
+            (TrackingType, 3.0),
+            (VrMode, 0.0),
+            (GestureLeft, f32::from(left)),
+            (GestureRight, f32::from(right)),
+            // A key press closes the fist all the way.
+            (GestureLeftWeight, flag(left == 1)),
+            (GestureRightWeight, flag(right == 1)),
+        ]
     }
 
     /// The camera's eye and the point it looks at, for an avatar whose viewpoint is `eye` in the world and
@@ -163,10 +266,13 @@ pub(crate) fn player_system(
     mut islands: Query<(&mut Island, &Shows)>,
 ) {
     player.step(&input, dt.0);
-    (input.jump, input.look) = (false, [0.0; 2]);
+    (input.jump, input.look, input.crouch, input.prone) = (false, [0.0; 2], false, false);
     let Some((mut island, shows)) = player.island.and_then(|e| islands.get_mut(e).ok()) else {
         return;
     };
+    for (p, v) in player.platform_values(&input) {
+        island.set_platform(p, v);
+    }
     island.origin.pos = player.pos;
     island.origin.rot = player.rotation();
     island.hide_head = player.view == View::First;
@@ -270,6 +376,78 @@ mod tests {
         // v² / 2g, give or take the integration.
         assert!((top - JUMP * JUMP / (2.0 * GRAVITY)).abs() < 0.03, "{top}");
         assert!(p.grounded && p.pos[1] == 0.0 && p.vertical == 0.0);
+    }
+
+    #[test]
+    fn crouching_and_prone_toggle_and_slow_down() {
+        let mut p = Player::default();
+        let toggle = |crouch, prone| Input {
+            crouch,
+            prone,
+            ..Default::default()
+        };
+        p.step(&toggle(true, false), 0.0);
+        assert_eq!(p.posture, Posture::Crouching);
+        p.step(&toggle(false, true), 0.0);
+        assert_eq!(p.posture, Posture::Prone);
+        p.step(&toggle(false, true), 0.0);
+        assert_eq!(p.posture, Posture::Standing);
+        p.step(&toggle(true, false), 0.0);
+        p.step(
+            &Input {
+                forward: 1.0,
+                ..Default::default()
+            },
+            1.0,
+        );
+        assert!(close(p.pos, [0.0, 0.0, WALK / 2.0]), "{:?}", p.pos);
+    }
+
+    #[test]
+    fn platform_values_are_in_avatar_space() {
+        use Platform::*;
+        let mut p = Player {
+            yaw: std::f32::consts::FRAC_PI_2,
+            ..Default::default()
+        };
+        let input = Input {
+            right: 1.0,
+            look: [-0.1, 0.0],
+            gestures: [1, 4],
+            afk: true,
+            ..Default::default()
+        };
+        p.step(&input, 0.5);
+        let values = p.platform_values(&input);
+        let value = |q| values.iter().find(|(p, _)| *p == q).expect("provided").1;
+        // Strafing right at strafe speed while turning right at 0.2 rad/s.
+        assert!((value(VelocityX) - STRAFE).abs() < 1e-3, "{values:?}");
+        assert!(value(VelocityZ).abs() < 1e-3 && value(VelocityY) == 0.0);
+        assert!((value(VelocityMagnitude) - STRAFE).abs() < 1e-3);
+        assert!((value(AngularY) - 0.2).abs() < 1e-5);
+        assert_eq!(
+            [Grounded, Upright, Afk, TrackingType, VrMode].map(value),
+            [1.0, 1.0, 1.0, 3.0, 0.0]
+        );
+        assert_eq!(
+            [GestureLeft, GestureRight, GestureLeftWeight, GestureRightWeight].map(value),
+            [1.0, 4.0, 1.0, 0.0]
+        );
+        // In the air: falling, not grounded.
+        p.step(
+            &Input {
+                jump: true,
+                ..Default::default()
+            },
+            DT,
+        );
+        // Past the top of the jump (0.31 s), before landing (0.61 s).
+        for _ in 0..25 {
+            p.step(&Input::default(), DT);
+        }
+        let values = p.platform_values(&Input::default());
+        let value = |q| values.iter().find(|(p, _)| *p == q).expect("provided").1;
+        assert!(value(VelocityY) < 0.0 && value(Grounded) == 0.0, "{values:?}");
     }
 
     #[test]

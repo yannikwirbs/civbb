@@ -740,12 +740,36 @@ impl ApplicationHandler for Viewer {
                         self.capture(view != View::Orbit);
                     }
                     KeyCode::Escape => self.capture(false),
-                    _ => {}
+                    KeyCode::KeyC => self.runtime.world.resource_mut::<Input>().crouch = true,
+                    KeyCode::KeyZ => self.runtime.world.resource_mut::<Input>().prone = true,
+                    _ => {
+                        // Left or right Shift with F1 to F8: that hand's gesture 0 to 7.
+                        let f = [
+                            KeyCode::F1,
+                            KeyCode::F2,
+                            KeyCode::F3,
+                            KeyCode::F4,
+                            KeyCode::F5,
+                            KeyCode::F6,
+                            KeyCode::F7,
+                            KeyCode::F8,
+                        ];
+                        let hands = [KeyCode::ShiftLeft, KeyCode::ShiftRight].map(|k| self.held.contains(&k));
+                        if let Some(g) = f.iter().position(|&k| k == code) {
+                            let gestures = &mut self.runtime.world.resource_mut::<Input>().gestures;
+                            for (hand, _) in hands.iter().enumerate().filter(|(_, held)| **held) {
+                                gestures[hand] = g as u8;
+                            }
+                        }
+                    }
                 }
             }
-            WindowEvent::Focused(false) => {
-                self.held.clear();
-                self.capture(false);
+            WindowEvent::Focused(focused) => {
+                self.runtime.world.resource_mut::<Input>().afk = !focused;
+                if !focused {
+                    self.held.clear();
+                    self.capture(false);
+                }
             }
             WindowEvent::CursorMoved { position, .. } => {
                 if let (true, Some((x, y))) = (self.dragging, self.cursor) {
