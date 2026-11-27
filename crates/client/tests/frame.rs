@@ -1,10 +1,13 @@
 //! Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 //! later, every system reports per island, results do not depend on the number of workers or on running as the frame
-//! schedule (ADR 0103), and animated materials (ADR 0025) and constraint fields (ADR 0040) belong to their island.
+//! schedule (ADR 0103), the extract step copies what the renderer reads, and animated materials (ADR 0025) and
+//! constraint fields (ADR 0040) belong to their island.
 
 use std::sync::Arc;
 
+use civbb_client::extract::{Camera, Snapshot};
 use civbb_client::frame::{self, Runtime};
+use civbb_client::view::skin_matrices;
 use civbb_client::{Island, Model};
 use civbb_core::math::Pose;
 use civbb_core::{System, jobs};
@@ -295,4 +298,45 @@ fn a_toggle_can_switch_a_constraint_per_island() {
     // Island 0 switched the constraint off: the target keeps its rest place; island 1 still moves it.
     assert_eq!(islands[0].locals()[target].translation, rest);
     assert_ne!(islands[1].locals()[target].translation, rest);
+}
+
+#[test]
+fn the_extract_step_copies_every_island_in_spawn_order() {
+    let avatar = Arc::new(civbb_corpus::generate(&civbb_corpus::bloated()));
+    let mut runtime = Runtime::default();
+    runtime.extract_to_snapshot(Arc::clone(&avatar));
+    for id in [2, 0, 1] {
+        runtime.spawn(island(&avatar, id, id == 0));
+    }
+    let camera = Camera {
+        eye: [0.0, 1.0, 3.0],
+        target: [0.0, 1.0, 0.0],
+        fov_y: 0.9,
+        clear: [0.0, 0.0, 0.0, 1.0],
+    };
+    runtime.world.insert_resource(camera);
+    for _ in 0..3 {
+        runtime.step(DT);
+    }
+    let snapshot = runtime.world.resource::<Snapshot>();
+    assert_eq!(snapshot.camera, camera);
+    let islands = runtime.islands();
+    assert_eq!(snapshot.islands.len(), islands.len());
+    let mut weights = Vec::new();
+    let mut materials = Vec::new();
+    for (s, island) in snapshot.islands.iter().zip(islands) {
+        assert_eq!(s.origin, island.origin.pos);
+        island.shape_weights(&mut weights);
+        assert_eq!(s.weights, weights);
+        island.materials(&mut materials);
+        assert_eq!(s.materials, materials);
+        for (m, mesh) in avatar.meshes.iter().enumerate() {
+            let expected = island.active()[mesh.node as usize].then(|| {
+                let mut out = Vec::new();
+                skin_matrices(mesh, island.world(), &mut out);
+                out
+            });
+            assert_eq!(s.joints[m], expected);
+        }
+    }
 }

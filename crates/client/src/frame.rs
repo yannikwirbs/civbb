@@ -8,8 +8,10 @@ use bevy_ecs::prelude::*;
 use civbb_core::schedule::{self, Dt, Step};
 use civbb_core::{Counters, System, jobs};
 use civbb_dynamics::contact::{self, Participant};
+use civbb_format::Document;
 
 use crate::affinity;
+use crate::extract::{Avatar, Camera, Snapshot, extract_system};
 use crate::island::Island;
 
 /// The client's worker pool, made on first use: [`jobs::default_workers`] workers, pool threads kept to performance
@@ -118,6 +120,15 @@ impl Runtime {
             schedule,
             order: Vec::new(),
         }
+    }
+
+    /// Adds the `Extract` step: each frame ends by copying every island, all showing `avatar`, and the [`Camera`]
+    /// resource into the [`Snapshot`] resource.
+    pub fn extract_to_snapshot(&mut self, avatar: Arc<Document>) {
+        self.world.insert_resource(Avatar(avatar));
+        self.world.init_resource::<Camera>();
+        self.world.init_resource::<Snapshot>();
+        self.schedule.add_systems(extract_system.in_set(Step::Extract));
     }
 
     /// Adds `island` as an entity, after every island already spawned.

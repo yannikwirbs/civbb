@@ -47,11 +47,13 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/affinity.rs`: Pins the calling thread to a performance core, so one-worker timings on hybrid CPUs do not depend on where the
 - `src/bench.rs`: Headless CPU benchmark: N avatar islands stepped for a number of frames at each worker count (design doc §21).
 - `src/cull.rs`: Frustum culling of mesh instances before skinning (design doc §6, ADR 0077): conservative world bounds from
+- `src/extract.rs`: The render snapshot: what the renderer reads of a frame, copied out of the islands by the `Extract` step so a
 - `src/frame.rs`: One simulation frame's avatar work: every island as its own parallel job, then the cross-avatar contact pass
 - `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
 - `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020),
 - `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`), a desktop
 - `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
+- `src/render_thread.rs`: The render thread: owns the renderer and the avatar's GPU resources, draws each snapshot it is handed while the
 - `src/view.rs`: Desktop viewer: N copies of an avatar in a grid with animator and dynamics running, drawn in a window with an
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
 - `tests/cull.rs`: Frustum culling of mesh instances (ADR 0077): the bounds hold every skinned vertex in every parity state, and

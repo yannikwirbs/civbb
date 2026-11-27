@@ -1,13 +1,14 @@
 //! Desktop viewer: N copies of an avatar in a grid with animator and dynamics running, drawn in a window with an
 //! orbit camera, CPU and GPU frame times in the title (design doc §21 Phase 0 deliverable 4, ADRs 0024 and 0025).
 
+use std::collections::VecDeque;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::time::Instant;
 
 use civbb_core::math::{Pose, mat4_mul};
 use civbb_format::Document;
-use civbb_format::material::{ColorSpace, ImageFormat, Material};
+use civbb_format::material::{ColorSpace, ImageFormat};
 use civbb_format::math::{Mat4, Vec3};
 use civbb_format::mesh::Mesh;
 use civbb_render::material::{MATERIAL_WORDS, pack};
@@ -24,8 +25,10 @@ use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::WindowId;
 
 use crate::cull::{Frustum, MeshBounds};
+use crate::extract::{Camera, Snapshot};
 use crate::frame::Runtime;
 use crate::island::{Island, Model};
+use crate::render_thread::{Drawn, RenderThread};
 
 /// Largest texture side the viewer decodes; larger textures are left out.
 const MAX_TEXTURE_SIDE: u32 = 8192;
@@ -50,10 +53,15 @@ pub struct Config {
 pub struct Summary {
     /// Frames presented.
     pub frames: u32,
-    /// Mean CPU time per frame, simulation and draw preparation, in milliseconds.
+    /// Mean CPU time per frame in milliseconds: the busier of the simulation and render threads, which overlap
+    /// (ADR 0103).
     pub cpu_ms: f32,
-    /// Mean CPU time of the avatar systems alone.
+    /// Mean CPU time of the simulation thread: the frame schedule and the hand-over.
+    pub main_ms: f32,
+    /// Mean CPU time of the frame schedule alone: the avatar systems and the extract step.
     pub systems_ms: f32,
+    /// Mean CPU time of the render thread: culling, draw preparation, recording and submitting.
+    pub render_ms: f32,
     /// Mean GPU time per frame, if the queue has timestamps.
     pub gpu_ms: Option<f32>,
     /// Validation errors reported (debug builds).
@@ -219,7 +227,9 @@ pub fn run(cfg: Config) -> Result<Summary, String> {
     let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
     let mut viewer = Viewer::new(cfg);
     event_loop.run_app(&mut viewer).map_err(|e| e.to_string())?;
-    viewer.shutdown();
+    if let Err(e) = viewer.shutdown() {
+        viewer.error.get_or_insert(e.to_string());
+    }
     match viewer.error.take() {
         Some(e) => Err(e),
         None => Ok(viewer.summary()),
@@ -235,19 +245,16 @@ pub fn run_headless(cfg: Config, width: u32, height: u32) -> civbb_render::Resul
     let result = Renderer::headless(cfg!(debug_assertions), width, height)
         .and_then(|r| viewer.start(r))
         .and_then(|()| {
-            while viewer.timing.frames < frames {
-                if !viewer.frame()? {
-                    break;
-                }
+            // An offscreen target never skips a frame; stop if it does rather than loop.
+            while viewer.timing.frames < frames && viewer.timing.skipped == 0 {
+                viewer.frame()?;
             }
             Ok(())
         });
-    let device = viewer
-        .renderer
-        .as_ref()
-        .map_or_else(String::new, |r| r.context().device_name());
-    viewer.shutdown();
-    result.map(|()| (viewer.summary(), device))
+    let ended = viewer.shutdown();
+    result
+        .and(ended)
+        .map(|()| (viewer.summary(), std::mem::take(&mut viewer.device)))
 }
 
 /// An orbit camera: yaw and pitch around a target at a distance.
@@ -470,41 +477,43 @@ impl Gpu {
 /// Per-frame scratch reused across frames.
 #[derive(Default)]
 pub(crate) struct Scratch {
-    /// Per island and mesh: skinning matrices and blendshape weights; `None` for a hidden mesh.
-    joints: Vec<Vec<Option<Vec<Mat4>>>>,
-    weights: Vec<Vec<f32>>,
-    all_weights: Vec<Vec<Vec<f32>>>,
     draws: Vec<Draw>,
     batches: Batches,
-    /// Per island, its animated materials and the records last written for them.
-    materials: Vec<Vec<Material>>,
+    /// Per island, the records last written for its animated materials.
     packed: Vec<Vec<[u32; MATERIAL_WORDS]>>,
     updates: Vec<(u32, [u32; MATERIAL_WORDS])>,
-    /// The material of each submesh of the mesh being drawn when its slots are swapped.
-    slots: Vec<u32>,
 }
 
 /// Running totals for the title and the summary.
 #[derive(Default)]
 struct Timing {
     frames: u32,
+    /// Sums over the frames: CPU per frame (the busier thread), simulation thread, schedule, render thread.
     cpu: f32,
+    main: f32,
     systems: f32,
+    render: f32,
     gpu: f32,
     gpu_frames: u32,
     /// Draws and skinned meshes in the last frame.
     draws: usize,
     skinned: usize,
-    /// Since the title was last updated: start, frames, CPU, systems.
-    window: Option<(Instant, u32, f32, f32)>,
+    /// Frames the render thread skipped.
+    skipped: u32,
+    /// Simulation thread and schedule times of the frames handed to the render thread and not yet drawn.
+    pending: VecDeque<(f32, f32)>,
+    /// Since the title was last updated: start, frames, simulation thread, schedule, render thread.
+    window: Option<(Instant, u32, f32, f32, f32)>,
 }
 
 struct Viewer {
-    // Dropped in this order: GPU resources (destroyed in `shutdown`), the renderer, then the window.
-    gpu: Option<Gpu>,
-    renderer: Option<Renderer>,
+    // Dropped in this order: the render thread (joined, destroying the renderer), then the window.
+    render: Option<RenderThread>,
     window: Option<winit::window::Window>,
-    avatar: Document,
+    /// The snapshot not in the world or on the render thread, if any: the next frame's extract target.
+    free: Option<Snapshot>,
+    device: String,
+    avatar: Arc<Document>,
     textures: Vec<Option<TextureImage>>,
     model: Arc<Model>,
     runtime: Runtime,
@@ -516,7 +525,6 @@ struct Viewer {
     dragging: bool,
     cursor: Option<(f64, f64)>,
     last: Option<Instant>,
-    scratch: Scratch,
     timing: Timing,
     validation_errors: u32,
     error: Option<String>,
@@ -530,7 +538,9 @@ impl Viewer {
         let spacing = (width * 1.5).max(0.8);
         let origins = grid(cfg.copies, spacing);
         let model = Arc::new(Model::new(&cfg.avatar));
+        let avatar = Arc::new(cfg.avatar);
         let mut runtime = Runtime::default();
+        runtime.extract_to_snapshot(avatar.clone());
         for (i, &pos) in origins.iter().enumerate() {
             let origin = Pose { pos, ..Pose::IDENTITY };
             runtime.spawn(Island::new(model.clone(), i as u64, i == 0, origin));
@@ -544,10 +554,11 @@ impl Viewer {
             distance: (height * 1.6).max(cols * spacing * 1.2),
         };
         Viewer {
-            gpu: None,
-            renderer: None,
+            render: None,
             window: None,
-            avatar: cfg.avatar,
+            free: None,
+            device: String::new(),
+            avatar,
             textures: cfg.textures,
             model,
             runtime,
@@ -558,7 +569,6 @@ impl Viewer {
             dragging: false,
             cursor: None,
             last: None,
-            scratch: Scratch::default(),
             timing: Timing::default(),
             validation_errors: 0,
             error: None,
@@ -576,7 +586,9 @@ impl Viewer {
         Summary {
             frames: t.frames,
             cpu_ms: t.cpu / n,
+            main_ms: t.main / n,
             systems_ms: t.systems / n,
+            render_ms: t.render / n,
             gpu_ms: (t.gpu_frames > 0).then(|| t.gpu / t.gpu_frames as f32),
             validation_errors: self.validation_errors,
             draws: t.draws,
@@ -584,87 +596,100 @@ impl Viewer {
         }
     }
 
-    /// Uploads the avatar to `renderer`'s device and keeps both.
+    /// Uploads the avatar to `renderer`'s device and hands both to a new render thread.
     fn start(&mut self, renderer: Renderer) -> civbb_render::Result<()> {
-        let gpu = Gpu::new(&renderer, &self.avatar, &self.model, &self.textures, self.copies);
-        self.renderer = Some(renderer);
-        self.gpu = Some(gpu?);
+        self.device = renderer.context().device_name();
+        let gpu = Gpu::new(&renderer, &self.avatar, &self.model, &self.textures, self.copies)?;
         self.textures = Vec::new();
+        self.render = Some(RenderThread::spawn(renderer, gpu));
+        self.free = Some(Snapshot::default());
         Ok(())
     }
 
-    /// Waits for the GPU and destroys what the renderer does not own.
-    fn shutdown(&mut self) {
-        if let Some(r) = &self.renderer {
-            self.validation_errors = r.context().validation_errors();
-            if let Some(gpu) = self.gpu.take() {
-                // SAFETY: after the wait nothing is in flight.
-                unsafe {
-                    let _ = r.context().device().device_wait_idle();
-                    gpu.destroy(r);
-                }
-            }
-        }
-        self.renderer = None;
+    /// Ends the render thread after the frames handed to it; fails if one of them failed.
+    fn shutdown(&mut self) -> civbb_render::Result<()> {
+        let Some(render) = self.render.take() else {
+            return Ok(());
+        };
+        self.validation_errors = render.end()?;
+        Ok(())
     }
 
-    /// Steps the avatars, skins and draws them; returns whether a frame was presented.
-    fn frame(&mut self) -> civbb_render::Result<bool> {
+    /// Steps the avatars and extracts frame N while the render thread draws frame N-1, then hands N over.
+    fn frame(&mut self) -> civbb_render::Result<()> {
+        if self.render.is_none() {
+            return Ok(());
+        }
         let start = Instant::now();
         let dt = self
             .last
             .map_or(0.0, |l| start.duration_since(l).as_secs_f32())
             .min(0.1);
         self.last = Some(start);
+        self.runtime.world.insert_resource(Camera {
+            eye: self.camera.eye(),
+            target: self.camera.target,
+            fov_y: FOV_Y,
+            clear: BACKGROUND,
+        });
         self.runtime.step(dt);
         let systems = start.elapsed().as_secs_f32() * 1000.0;
+        // Frame N-1's snapshot comes back once drawn; waiting for it is not this thread's work.
+        let mut waited = 0.0;
+        let mut snapshot = match self.free.take() {
+            Some(s) => s,
+            None => {
+                let wait = Instant::now();
+                let (s, drawn) = self.render.as_mut().expect("checked above").drawn();
+                waited = wait.elapsed().as_secs_f32() * 1000.0;
+                self.drawn(&drawn?);
+                s
+            }
+        };
+        std::mem::swap(&mut snapshot, &mut *self.runtime.world.resource_mut::<Snapshot>());
+        self.render.as_mut().expect("checked above").draw(snapshot);
+        let main = start.elapsed().as_secs_f32() * 1000.0 - waited;
+        self.timing.pending.push_back((main, systems));
+        Ok(())
+    }
 
-        let (Some(renderer), Some(gpu)) = (&mut self.renderer, &self.gpu) else {
-            return Ok(false);
-        };
-        let eye = self.camera.eye();
-        let target = self.camera.target;
-        let Some((draws, skinned)) = draw(
-            renderer,
-            gpu,
-            &self.avatar,
-            &self.runtime.islands(),
-            &mut self.scratch,
-            eye,
-            target,
-            FOV_Y,
-            BACKGROUND,
-        )?
-        else {
-            return Ok(false);
-        };
-        // Waiting for vsync and the GPU is not CPU work.
-        let cpu = start.elapsed().as_secs_f32() * 1000.0 - renderer.blocked_ms();
+    /// Counts a frame the render thread finished.
+    fn drawn(&mut self, drawn: &Drawn) {
+        let (main, systems) = self.timing.pending.pop_front().unwrap_or_default();
         let t = &mut self.timing;
+        let Some((draws, skinned)) = drawn.counts else {
+            t.skipped += 1;
+            return;
+        };
         (t.draws, t.skinned) = (draws, skinned);
         if self.warmup > 0 {
             self.warmup -= 1;
-            return Ok(true);
+            return;
         }
+        let render = drawn.cpu_ms;
         t.frames += 1;
-        t.cpu += cpu;
+        t.cpu += main.max(render);
+        t.main += main;
         t.systems += systems;
-        if let Some(gpu_ms) = renderer.gpu_ms() {
+        t.render += render;
+        if let Some(gpu_ms) = drawn.gpu_ms {
             t.gpu += gpu_ms;
             t.gpu_frames += 1;
         }
-        let w = t.window.get_or_insert((start, 0, 0.0, 0.0));
-        (w.1, w.2, w.3) = (w.1 + 1, w.2 + cpu, w.3 + systems);
+        let now = Instant::now();
+        let w = t.window.get_or_insert((now, 0, 0.0, 0.0, 0.0));
+        (w.1, w.2, w.3, w.4) = (w.1 + 1, w.2 + main, w.3 + systems, w.4 + render);
         if w.0.elapsed().as_secs_f32() >= 0.5 {
             let n = w.1 as f32;
             let fps = n / w.0.elapsed().as_secs_f32();
-            let gpu = renderer.gpu_ms().map_or("n/a".into(), |g| format!("{g:.2} ms"));
+            let gpu = drawn.gpu_ms.map_or("n/a".into(), |g| format!("{g:.2} ms"));
             let title = format!(
-                "civbb-client view: {} x {}, CPU {:.2} ms (avatar systems {:.2} ms), GPU {gpu}, {fps:.0} fps, {} draws, {} skinned meshes, {} triangles per copy",
+                "civbb-client view: {} x {}, simulation {:.2} ms (schedule {:.2} ms), render thread {:.2} ms, GPU {gpu}, {fps:.0} fps, {} draws, {} skinned meshes, {} triangles per copy",
                 self.copies,
                 self.avatar.name,
                 w.2 / n,
                 w.3 / n,
+                w.4 / n,
                 draws,
                 skinned,
                 self.avatar.meshes.iter().map(|m| m.indices.len() / 3).sum::<usize>()
@@ -674,7 +699,6 @@ impl Viewer {
             }
             t.window = None;
         }
-        Ok(true)
     }
 }
 
@@ -684,81 +708,62 @@ const FOV_Y: f32 = 0.9;
 /// The viewer's background, linear.
 pub(crate) const BACKGROUND: [f32; 4] = [0.08, 0.09, 0.11, 1.0];
 
-/// Skins and draws `islands`, each with its own instances in `gpu`, seen from `eye` looking at `target` on
-/// `clear` with a vertical field of view of `fov_y` radians; returns the draws and skinned meshes, or `None` if the frame was skipped.
-#[allow(clippy::too_many_arguments)]
+/// Skins and draws the islands of `snapshot`, each with its own instances in `gpu`, from the snapshot's camera;
+/// returns the draws and skinned meshes, or `None` if the frame was skipped.
 pub(crate) fn draw(
     renderer: &mut Renderer,
     gpu: &Gpu,
-    avatar: &Document,
-    islands: &[&Island],
+    snapshot: &Snapshot,
     s: &mut Scratch,
-    eye: Vec3,
-    target: Vec3,
-    fov_y: f32,
-    clear: [f32; 4],
 ) -> civbb_render::Result<Option<(usize, usize)>> {
-    s.joints.resize_with(islands.len(), Vec::new);
-    s.all_weights.resize_with(islands.len(), Vec::new);
-    s.materials.resize_with(islands.len(), Vec::new);
-    s.packed.resize_with(islands.len(), Vec::new);
+    let Camera {
+        eye,
+        target,
+        fov_y,
+        clear,
+    } = snapshot.camera;
+    s.packed.resize_with(snapshot.islands.len(), Vec::new);
     s.draws.clear();
     s.updates.clear();
     let extent = renderer.extent().unwrap_or_default();
     let aspect = extent.width.max(1) as f32 / extent.height.max(1) as f32;
     let view = View::look_at(eye, target, fov_y, aspect, 0.05);
     let frustum = Frustum::new(&view.view_proj);
-    for (i, island) in islands.iter().enumerate() {
-        island.shape_weights(&mut s.weights);
-        std::mem::swap(&mut s.all_weights[i], &mut s.weights);
+    let mut jobs = Vec::new();
+    for (i, island) in snapshot.islands.iter().enumerate() {
         // An island's records are rewritten only when they change; the first frame writes them all.
-        island.materials(&mut s.materials[i]);
-        s.packed[i].resize(s.materials[i].len(), [0; MATERIAL_WORDS]);
-        for ((m, last), id) in s.materials[i].iter().zip(&mut s.packed[i]).zip(&gpu.own[i]) {
+        s.packed[i].resize(island.materials.len(), [0; MATERIAL_WORDS]);
+        for ((m, last), id) in island.materials.iter().zip(&mut s.packed[i]).zip(&gpu.own[i]) {
             let record = pack(m, &gpu.bindless);
             if record != *last {
                 *last = record;
                 s.updates.push((id.index, record));
             }
         }
-        let world = island.world();
-        let joints = &mut s.joints[i];
-        joints.resize(avatar.meshes.len(), None);
-        let o = island.origin.pos;
+        let o = island.origin;
         let distance = ((o[0] - eye[0]).powi(2) + (o[1] - eye[1]).powi(2) + (o[2] - eye[2]).powi(2)).sqrt();
-        for (m, mesh) in avatar.meshes.iter().enumerate() {
-            if !island.active()[mesh.node as usize] {
-                joints[m] = None;
-                continue;
-            }
-            let out = joints[m].get_or_insert_with(Vec::new);
-            skin_matrices(mesh, world, out);
+        for (m, joints) in island.joints.iter().enumerate() {
+            let Some(joints) = joints else { continue };
             // A mesh wholly outside the view is neither skinned nor drawn (ADR 0077).
-            let seen = gpu.bounds[m].world_box(out, &s.all_weights[i][m]);
+            let seen = gpu.bounds[m].world_box(joints, &island.weights[m]);
             if !seen.is_some_and(|(lo, hi)| frustum.sees(lo, hi)) {
-                joints[m] = None;
                 continue;
             }
             let materials = gpu.maps[i][m].as_deref().unwrap_or(&gpu.materials);
-            island.submesh_materials(avatar, m as u32, &mut s.slots);
-            gpu.meshes[m].draws(&gpu.instances[i][m], materials, &s.slots, distance, &mut s.draws);
+            gpu.meshes[m].draws(
+                &gpu.instances[i][m],
+                materials,
+                &island.slots[m],
+                distance,
+                &mut s.draws,
+            );
+            jobs.push(Job {
+                mesh: &gpu.instances[i][m],
+                joints,
+                weights: &island.weights[m],
+            });
         }
     }
-    let jobs: Vec<Job> = s
-        .joints
-        .iter()
-        .zip(&s.all_weights)
-        .zip(&gpu.instances)
-        .flat_map(|((joints, weights), instances)| {
-            joints.iter().zip(weights).zip(instances).filter_map(|((j, w), mesh)| {
-                Some(Job {
-                    mesh,
-                    joints: j.as_ref()?,
-                    weights: w,
-                })
-            })
-        })
-        .collect();
     batch(&mut s.draws, &mut s.batches);
     let (draws, skinned) = (s.draws.len(), jobs.len());
     let (batches, updates) = (&s.batches, &s.updates);
@@ -813,7 +818,7 @@ impl ApplicationHandler for Viewer {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
-                if let Some(r) = &mut self.renderer {
+                if let Some(r) = &mut self.render {
                     r.resize(size.width, size.height);
                 }
             }

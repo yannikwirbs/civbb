@@ -4,10 +4,12 @@
 pub mod affinity;
 pub mod bench;
 pub mod cull;
+pub mod extract;
 pub mod frame;
 pub mod island;
 #[cfg(feature = "parity")]
 pub mod parity;
+mod render_thread;
 pub mod view;
 
 pub use island::{Island, Model};

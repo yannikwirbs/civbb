@@ -15,6 +15,7 @@ use civbb_render::Renderer;
 use civbb_render::forward::{AMBIENT, LIGHT_COLOR, LIGHT_TOWARDS};
 use serde::{Deserialize, Serialize};
 
+use crate::extract::{Camera, Snapshot};
 use crate::frame;
 use crate::island::{Island, Model};
 use crate::view::{self, BACKGROUND, Gpu, Scratch, TextureImage};
@@ -337,6 +338,7 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
         }
     }
     let mut scratch = [Scratch::default(), Scratch::default()];
+    let mut snapshots = [Snapshot::default(), Snapshot::default()];
     let mut scored = Vec::new();
     let mut failed = None;
     if let Some(dir) = images
@@ -356,6 +358,10 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
         if failed.is_some() {
             return;
         }
+        // Synchronous: each state is extracted and drawn on this thread (ADR 0103).
+        for (k, side) in sides.iter().enumerate() {
+            snapshots[k].extract(side.avatar, std::iter::once(&islands[k]), Camera::default());
+        }
         let mut shots = Vec::with_capacity(rig.views.len());
         let mut views = Vec::with_capacity(rig.views.len());
         for v in &rig.views {
@@ -369,19 +375,15 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
                     }
                 }
             }
-            for (k, side) in sides.iter().enumerate() {
-                let drawn = view::draw(
-                    &mut renderer,
-                    &gpus[k],
-                    side.avatar,
-                    &[&islands[k]],
-                    &mut scratch[k],
-                    v.eye,
-                    v.target,
-                    FOV_Y,
-                    BACKGROUND,
-                )
-                .and_then(|_| renderer.read_last());
+            for k in 0..sides.len() {
+                snapshots[k].camera = Camera {
+                    eye: v.eye,
+                    target: v.target,
+                    fov_y: FOV_Y,
+                    clear: BACKGROUND,
+                };
+                let drawn = view::draw(&mut renderer, &gpus[k], &snapshots[k], &mut scratch[k])
+                    .and_then(|_| renderer.read_last());
                 match drawn {
                     Ok(texels) => pair.push(texels),
                     Err(e) => {
