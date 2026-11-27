@@ -28,6 +28,8 @@ civbb-render = { path = "crates/render" }
 civbb-corpus = { path = "tools/corpus" }
 # The client's ECS (design doc §4, ADR 0103); no reflection or async executor until a crate needs them.
 bevy_ecs = { version = "0.20.1", default-features = false, features = ["std"] }
+# The worker pool (ADR 0103); `multi_threaded` gives it threads.
+bevy_tasks = { version = "0.20.1", default-features = false, features = ["multi_threaded"] }
 
 # Workspace crates at opt-level 1 in dev builds: the stage tests step and skin avatars on the CPU (full test run 82 s
 # at opt-level 0, 19 s at 1), and incremental builds get faster too. Debug assertions and overflow checks stay on.

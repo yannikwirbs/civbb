@@ -2,19 +2,45 @@
 //! (design doc §5 steps 5 and 6, ADR 0020), as plain functions and as systems on the frame schedule (ADR 0103).
 
 use std::borrow::BorrowMut;
+use std::sync::{Arc, OnceLock};
 
 use bevy_ecs::prelude::*;
 use civbb_core::schedule::{self, Dt, Step};
 use civbb_core::{Counters, System, jobs};
 use civbb_dynamics::contact::{self, Participant};
 
+use crate::affinity;
 use crate::island::Island;
 
-/// Steps every island `dt` seconds, one job each on the current worker pool, then runs one contact pass over all of
-/// them; its receiver values reach the animators on the next frame. `permits(receiver, sender)` is the receiving
-/// owner's setting for whose contacts may affect their avatar. Returns the frame's per-system counters (CPU time).
+/// The client's worker pool, made on first use: [`jobs::default_workers`] workers, pool threads kept to performance
+/// cores and no more of them than those cores have logical CPUs (ADR 0103).
+pub fn workers() -> Arc<jobs::Pool> {
+    static WORKERS: OnceLock<Arc<jobs::Pool>> = OnceLock::new();
+    let pool = WORKERS.get_or_init(|| {
+        // The waiting thread is a worker too, but not kept to those cores.
+        let n = jobs::default_workers().min(affinity::performance_cpus().map_or(usize::MAX, |n| n + 1));
+        Arc::new(jobs::pool(n, || {
+            affinity::keep_to_performance_cores();
+        }))
+    });
+    Arc::clone(pool)
+}
+
+/// Steps every island `dt` seconds, one job each on [`workers`], then runs one contact pass over all of them; its
+/// receiver values reach the animators on the next frame. `permits(receiver, sender)` is the receiving owner's
+/// setting for whose contacts may affect their avatar. Returns the frame's per-system counters (CPU time).
 pub fn step<I: BorrowMut<Island> + Send>(islands: &mut [I], permits: impl Fn(u64, u64) -> bool, dt: f32) -> Counters {
-    let mut counters = jobs::islands(islands, |island, c| island.borrow_mut().step(dt, c));
+    step_on(&workers(), islands, permits, dt)
+}
+
+/// [`step`] on `pool`.
+pub fn step_on<I: BorrowMut<Island> + Send>(
+    pool: &jobs::Pool,
+    islands: &mut [I],
+    permits: impl Fn(u64, u64) -> bool,
+    dt: f32,
+) -> Counters {
+    let mut counters = jobs::islands(pool, islands, |island, c| island.borrow_mut().step(dt, c));
     contacts(islands, permits, dt, &mut counters);
     counters
 }
@@ -42,10 +68,14 @@ impl Default for Permits {
     }
 }
 
+/// The pool the island system runs its jobs on.
+#[derive(Resource)]
+pub struct Workers(pub Arc<jobs::Pool>);
+
 /// The island step of [`Step::Avatars`]: one job per island; replaces the frame's [`Counters`].
-fn islands_system(mut q: Query<&mut Island>, dt: Res<Dt>, mut counters: ResMut<Counters>) {
+fn islands_system(mut q: Query<&mut Island>, dt: Res<Dt>, workers: Res<Workers>, mut counters: ResMut<Counters>) {
     let mut all: Vec<&mut Island> = q.iter_mut().map(Mut::into_inner).collect();
-    *counters = jobs::islands(&mut all, |island, c| island.step(dt.0, c));
+    *counters = jobs::islands(&workers.0, &mut all, |island, c| island.step(dt.0, c));
 }
 
 /// The contact pass of [`Step::CrossAvatar`], in spawn order.
@@ -64,7 +94,15 @@ pub struct Runtime {
 }
 
 impl Default for Runtime {
+    /// A runtime on [`workers`].
     fn default() -> Self {
+        Self::with_workers(workers())
+    }
+}
+
+impl Runtime {
+    /// A runtime whose island jobs run on `pool`.
+    pub fn with_workers(pool: Arc<jobs::Pool>) -> Self {
         let mut schedule = schedule::frame();
         schedule.add_systems((
             islands_system.in_set(Step::Avatars),
@@ -74,15 +112,14 @@ impl Default for Runtime {
         world.init_resource::<Dt>();
         world.init_resource::<Counters>();
         world.init_resource::<Permits>();
+        world.insert_resource(Workers(pool));
         Self {
             world,
             schedule,
             order: Vec::new(),
         }
     }
-}
 
-impl Runtime {
     /// Adds `island` as an entity, after every island already spawned.
     pub fn spawn(&mut self, island: Island) -> Entity {
         let e = self.world.spawn(island).id();
@@ -90,7 +127,7 @@ impl Runtime {
         e
     }
 
-    /// Runs one frame of `dt` seconds on the current worker pool; returns its per-system counters (CPU time).
+    /// Runs one frame of `dt` seconds; returns its per-system counters (CPU time).
     pub fn step(&mut self, dt: f32) -> Counters {
         self.world.insert_resource(Dt(dt));
         self.schedule.run(&mut self.world);

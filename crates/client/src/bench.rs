@@ -98,24 +98,29 @@ pub fn doubling(max: usize) -> Vec<usize> {
     v
 }
 
-/// Runs the benchmark with `avatar` on every island; `None` if a worker pool cannot be built.
+/// Runs the benchmark with `avatar` on every island; `None` if a measuring thread cannot be started.
 pub fn run(cfg: &Config, avatar: &Document) -> Option<Report> {
     let model = Arc::new(Model::new(avatar));
     let mut runs: Vec<Run> = Vec::with_capacity(cfg.threads.len());
     for &threads in &cfg.threads {
-        let pool = jobs::pool(threads).ok()?;
-        let (mut frame_ms, counters, pinned) = pool.install(|| {
-            // With one worker this closure runs on it, and so does every job it spawns.
-            let pinned = (cfg.pin && threads == 1)
-                .then(affinity::pin_to_performance_core)
-                .flatten();
-            let (frame_ms, counters) = measure(&model, cfg);
-            let pinned = pinned.map(|p| Pinned {
-                ran_on: affinity::current_cpu().unwrap_or(p.ran_on),
-                ..p
-            });
-            (frame_ms, counters, pinned)
-        });
+        let pool = Arc::new(jobs::pool(threads, || {}));
+        // A fresh thread drives the frames: it is one of the workers (with one worker, the only one), and pinning it
+        // leaves the caller's affinity alone.
+        let (mut frame_ms, counters, pinned) = std::thread::scope(|s| {
+            s.spawn(|| {
+                let pinned = (cfg.pin && threads == 1)
+                    .then(affinity::pin_to_performance_core)
+                    .flatten();
+                let (frame_ms, counters) = measure(&model, pool, cfg);
+                let pinned = pinned.map(|p| Pinned {
+                    ran_on: affinity::current_cpu().unwrap_or(p.ran_on),
+                    ..p
+                });
+                (frame_ms, counters, pinned)
+            })
+            .join()
+            .ok()
+        })?;
         frame_ms.sort_by(f64::total_cmp);
         let n = f64::from(cfg.frames.max(1));
         let mean = frame_ms.iter().sum::<f64>() / n;
@@ -153,9 +158,9 @@ pub fn run(cfg: &Config, avatar: &Document) -> Option<Report> {
 }
 
 /// Fresh islands on a square grid 1 m apart, so neighbours share contact cells; avatar 0 is the local one.
-fn scene(model: &Arc<Model>, avatars: u32) -> Runtime {
+fn scene(model: &Arc<Model>, pool: Arc<jobs::Pool>, avatars: u32) -> Runtime {
     let side = f64::from(avatars).sqrt().ceil().max(1.0) as u32;
-    let mut runtime = Runtime::default();
+    let mut runtime = Runtime::with_workers(pool);
     for id in 0..avatars {
         let origin = Pose {
             pos: [(id % side) as f32, 0.0, (id / side) as f32],
@@ -166,11 +171,11 @@ fn scene(model: &Arc<Model>, avatars: u32) -> Runtime {
     runtime
 }
 
-/// Warm-up then measured frames on a fresh scene; returns each measured frame's wall time in milliseconds and the
+/// Warm-up then measured frames on a fresh scene with its island jobs on `pool`; returns each measured frame's wall time in milliseconds and the
 /// summed counters. Each avatar sways sideways so its chains keep moving, and flips one parameter every
 /// [`FLIP_EVERY`] frames.
-fn measure(model: &Arc<Model>, cfg: &Config) -> (Vec<f64>, Counters) {
-    let mut runtime = scene(model, cfg.avatars);
+fn measure(model: &Arc<Model>, pool: Arc<jobs::Pool>, cfg: &Config) -> (Vec<f64>, Counters) {
+    let mut runtime = scene(model, pool, cfg.avatars);
     let homes: Vec<Pose> = runtime.islands().iter().map(|i| i.origin).collect();
     let params = model.controller().map_or(0, |c| c.state.entries.len());
     let mut frame_ms = Vec::with_capacity(cfg.frames as usize);

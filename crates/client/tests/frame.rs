@@ -112,11 +112,10 @@ fn results_do_not_depend_on_the_worker_count() {
                 Island::new(Arc::clone(&model), id, id == 0, origin)
             })
             .collect();
-        jobs::pool(threads).unwrap().install(|| {
-            for _ in 0..30 {
-                frame::step(&mut islands, |_, _| true, DT);
-            }
-        });
+        let pool = jobs::pool(threads, || {});
+        for _ in 0..30 {
+            frame::step_on(&pool, &mut islands, |_, _| true, DT);
+        }
         islands
             .iter()
             .map(|i| (i.world().to_vec(), i.contact_values().to_vec()))

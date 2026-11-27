@@ -10,6 +10,18 @@ pub fn pin_to_performance_core() -> Option<Pinned> {
     imp::pin()
 }
 
+/// Keeps the calling thread on the fastest core class (all of its logical CPUs in processor group 0), for worker
+/// threads on hybrid CPUs (design doc §5, ADR 0103). `false` where not supported or the OS refuses; the thread then
+/// runs anywhere.
+pub fn keep_to_performance_cores() -> bool {
+    imp::keep()
+}
+
+/// The number of logical CPUs in the fastest core class (processor group 0); `None` where not supported.
+pub fn performance_cpus() -> Option<usize> {
+    imp::performance_cpus()
+}
+
 /// The logical CPU the calling thread is running on; `None` where not supported.
 pub fn current_cpu() -> Option<u32> {
     imp::current()
@@ -78,6 +90,26 @@ mod imp {
         })
     }
 
+    pub fn performance_cpus() -> Option<usize> {
+        let cpus = cpus()?;
+        let fastest = cpus.iter().map(|&(_, class)| class).max()?;
+        Some(cpus.iter().filter(|&&(_, class)| class == fastest).count())
+    }
+
+    pub fn keep() -> bool {
+        let Some(cpus) = cpus() else { return false };
+        let Some(fastest) = cpus.iter().map(|&(_, class)| class).max() else {
+            return false;
+        };
+        let mask = cpus
+            .iter()
+            .filter(|&&(cpu, class)| class == fastest && cpu < usize::BITS)
+            .fold(0usize, |m, &(cpu, _)| m | 1 << cpu);
+        // SAFETY: GetCurrentThread returns a pseudo-handle valid for the calling thread; the mask names only CPUs
+        // that exist in the thread's group, and at least one (the fastest class is someone's).
+        mask != 0 && unsafe { SetThreadAffinityMask(GetCurrentThread(), mask) } != 0
+    }
+
     pub fn current() -> Option<u32> {
         // SAFETY: no arguments, no preconditions.
         Some(unsafe { GetCurrentProcessorNumber() })
@@ -90,6 +122,14 @@ mod imp {
 
     pub fn pin() -> Option<Pinned> {
         None
+    }
+
+    pub fn performance_cpus() -> Option<usize> {
+        None
+    }
+
+    pub fn keep() -> bool {
+        false
     }
 
     pub fn current() -> Option<u32> {

@@ -329,16 +329,22 @@ What exists, by area. Read the section for the area you touch; update it when th
   records through `Forward::add`'s upload pass. As recorded (ADR 0067): defaults from the renderer's material 0 (0
   when it lacks the field), components no curve animates are 0 (baked by the importer, ADR 0099), animated colours
   converted from gamma even when `[HDR]` (an `[HDR]` default still round-trips, #93).
-- `civbb-core`: shared math, `jobs::islands` (one rayon job per avatar), per-system `Counters` (a resource),
+- `civbb-core`: shared math, `jobs` on bevy_tasks (#132, ADR 0103: `islands(pool, ..)` one task per island, the
+  waiting thread works too, so `pool(n, on_spawn)` has n - 1 threads; `default_workers()` cores minus 2; rayon is
+  gone), per-system `Counters` (a resource),
   `schedule::frame()` (ADR 0103: the `Frame` schedule, `Step` sets in design doc §5's order, chained; `Dt`).
   `civbb-client`: `Model`/`Island` (a component; animator, constraints, IK stub, dynamics, world poses),
   `frame::step` (plain: islands then the contact pass feeding next frame's parameters, ADR 0020; parity and the
   collapse tests use it) and `frame::Runtime` (bevy_ecs world, one entity per island in spawn order, the island and
-  contact systems in `Avatars`/`CrossAvatar`, `Permits` resource; the bench and viewer use it, #131). bevy_ecs has
+  contact systems in `Avatars`/`CrossAvatar`, `Permits` and `Workers` resources; the bench and viewer use it, #131).
+  `frame::workers()` is the shared pool (pool threads kept to the fastest core class, `affinity::keep_to_performance_cores`);
+  `Runtime::with_workers` and `frame::step_on` take another. The executor is single-threaded (one system per set so
+  far); bevy's `ComputeTaskPool` is a global `OnceLock` and unused. bevy_ecs has
   default features off: the derive macros need it as a direct dependency of each crate that derives.
   `civbb-client bench [--package <pkg> --key <key>]` prints JSON (#23, #57).
-- Benchmark on the reference PC (release): 100 bloated avatars 3.23 ms/frame on 1 thread, 0.43 ms on 16 (7.5x);
-  1000 avatars 32.6 ms to 3.7 ms (8.9x), measured before the corpus got constraints. Corpus constraints (#57): lean
+- Benchmark on the reference PC (release, bloated, #132): 100 avatars 7.03 ms/frame on 1 worker, 0.756 ms on 16
+  (9.3x); 1000 avatars 71.6 ms to 7.06 ms (10.1x). The bench makes one pool per worker count and drives frames from
+  a fresh thread (`measure` pins it, 1 worker, ADR 0080). Corpus constraints (#57): lean
   2 twist helpers, bloated 67 (twists and tail bones). The constraint pass places only the nodes constraints read
   and keeps its scratch per island (#66): lean 0.97 to 0.49 µs, bloated 12.7 to 9.45 µs per avatar on one worker.
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
