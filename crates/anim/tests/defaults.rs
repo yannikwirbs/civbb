@@ -7,17 +7,71 @@ use civbb_anim::muscle::find;
 use civbb_anim::{Controller, Instance};
 use civbb_core::math::{Pose, world_poses};
 use civbb_format::animator::{Clip, HumanoidProperty, Target};
-use civbb_format::hierarchy::HumanBone;
+use civbb_format::hierarchy::{BoneNode, HumanBone, Node};
+use civbb_format::math::Transform;
 use civbb_format::state::Platform;
 use civbb_format::{Caps, Document, validate};
 
 const DT: f32 = 1.0 / 60.0;
 
-/// The lean corpus avatar with muscle frames and an FX layer only.
+/// The lean corpus avatar with index and middle fingers, muscle frames and an FX layer only.
 fn humanoid() -> Document {
+    use HumanBone as H;
     let mut doc = civbb_corpus::generate(&civbb_corpus::lean());
+    let fingers = [
+        (
+            H::LeftHand,
+            1.0,
+            [H::LeftIndexProximal, H::LeftIndexIntermediate, H::LeftIndexDistal],
+            0.02,
+        ),
+        (
+            H::LeftHand,
+            1.0,
+            [H::LeftMiddleProximal, H::LeftMiddleIntermediate, H::LeftMiddleDistal],
+            -0.02,
+        ),
+        (
+            H::RightHand,
+            -1.0,
+            [H::RightIndexProximal, H::RightIndexIntermediate, H::RightIndexDistal],
+            0.02,
+        ),
+        (
+            H::RightHand,
+            -1.0,
+            [H::RightMiddleProximal, H::RightMiddleIntermediate, H::RightMiddleDistal],
+            -0.02,
+        ),
+    ];
+    let mut bones = Vec::new();
+    for (hand, side, phalanges, z) in fingers {
+        let h = doc.avatar().unwrap().humanoid.as_ref().unwrap();
+        let mut parent = h.node(hand).unwrap();
+        for (k, bone) in phalanges.into_iter().map(Some).chain([None]).enumerate() {
+            let offset = if k == 0 {
+                [side * 0.08, 0.0, z]
+            } else {
+                [side * 0.03, 0.0, 0.0]
+            };
+            doc.hierarchy.nodes.push(Node {
+                name: format!("{bone:?}{parent}"),
+                parent: Some(parent),
+                rest: Transform {
+                    translation: offset,
+                    ..Transform::default()
+                },
+                active: true,
+            });
+            parent = (doc.hierarchy.nodes.len() - 1) as u32;
+            if let Some(bone) = bone {
+                bones.push(BoneNode { bone, node: parent });
+            }
+        }
+    }
     let hierarchy = doc.hierarchy.clone();
     let h = doc.avatar_mut().unwrap().humanoid.as_mut().unwrap();
+    h.bones.extend(bones);
     h.muscle_frames = derive(&hierarchy, h);
     doc
 }
@@ -156,9 +210,10 @@ fn layers_are_added_only_to_empty_groups() {
     assert!(apply(&mut doc));
     let a = doc.animator.as_ref().unwrap();
     let names: Vec<_> = a.layers.iter().map(|l| l.name.as_str()).collect();
-    assert_eq!(names.len(), fx + 2);
-    assert_eq!(names[0], "civbb/locomotion");
+    assert_eq!(names.len(), fx + 4);
+    assert_eq!(names[..3], ["civbb/locomotion", "civbb/hand_left", "civbb/hand_right"]);
     assert_eq!(a.groups[a.layers[0].group as usize].name, "Base");
+    assert_eq!(a.groups[a.layers[1].group as usize].name, "Gesture");
     let action = names.iter().position(|n| *n == "civbb/action").unwrap();
     assert_eq!(a.groups[a.layers[action].group as usize].name, "Action");
     validate(&doc, &Caps::default(), |_| true).unwrap();
@@ -278,4 +333,37 @@ fn afk_and_sitting_play_on_the_action_layer() {
         knee[2] > hips[2] + 0.3 && (knee[1] - hips[1]).abs() < 0.15,
         "knee {knee:?} hips {hips:?}"
     );
+}
+
+#[test]
+fn gestures_pose_each_hand_and_the_fist_follows_its_weight() {
+    let mut r = Run::new();
+    let slot = |r: &Run, name: &str| {
+        let m = find(name).unwrap();
+        let targets = &r.c.bound.bindings.targets;
+        let slot = targets
+            .iter()
+            .position(|t| *t == civbb_anim::Target::Muscle(m))
+            .unwrap();
+        r.i.pose()[slot]
+    };
+    let (left, right) = ("LeftHand.Index.2 Stretched", "RightHand.Index.2 Stretched");
+    r.step(10);
+    let idle = slot(&r, left);
+    assert!(idle > 0.0 && slot(&r, right) == idle, "relaxed hands");
+    r.set(Platform::GestureLeft, 1.0);
+    r.set(Platform::GestureLeftWeight, 0.5);
+    r.step(30);
+    assert!(
+        (slot(&r, left) - (idle - 1.0) / 2.0).abs() < 1e-4,
+        "half a fist: {}",
+        slot(&r, left)
+    );
+    assert_eq!(slot(&r, right), idle, "the other hand stays");
+    r.set(Platform::GestureLeftWeight, 1.0);
+    r.set(Platform::GestureRight, 3.0);
+    r.step(30);
+    assert_eq!(slot(&r, left), -1.0);
+    assert_eq!(slot(&r, right), 1.0, "pointing");
+    assert_eq!(slot(&r, "RightHand.Middle.2 Stretched"), -1.0);
 }

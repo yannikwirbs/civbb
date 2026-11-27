@@ -17,7 +17,7 @@ Internal deps: civbb-core, civbb-format
 - `src/controller.rs`: A compiled animator controller and one running instance of it: parameters, layers, the evaluated pose.
 - `src/curve.rs`: Evaluates a curve of Hermite keys with Unity `AnimationCurve` semantics (ADR 0007).
 - `src/defaults/poses.rs`: Generated built-in clips (ADR 0108): key poses and a procedural gait in muscle space, each key's body height
-- `src/defaults.rs`: Built-in locomotion (ADR 0108): substitutes for the SDK's empty proxy clips and default Base and Action layers,
+- `src/defaults.rs`: Built-in locomotion (ADR 0108): substitutes for the SDK's empty proxy clips and default Base, Gesture and Action
 - `src/frames.rs`: Unity's muscle frames derived from a humanoid's rest pose (#53, ADR 0064), for sources that carry none (glTF,
 - `src/lib.rs`: Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles and constraints (design
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
@@ -338,6 +338,7 @@ Internal deps: none
 - `docs/adr/0106-desktop-player.md`: 0106: The desktop player: input resource, kinematic root, first- and third-person camera
 - `docs/adr/0107-desktop-platform-values.md`: 0107: Platform values from the desktop player
 - `docs/adr/0108-built-in-locomotion.md`: 0108: Built-in locomotion: generated muscle poses merged into avatars at load
+- `docs/adr/0109-default-gesture-layer.md`: 0109: A default Gesture layer per hand
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

@@ -1,5 +1,5 @@
-//! Built-in locomotion (ADR 0108): substitutes for the SDK's empty proxy clips and default Base and Action layers,
-//! generated in muscle space and merged into a loaded avatar before it compiles.
+//! Built-in locomotion (ADR 0108): substitutes for the SDK's empty proxy clips and default Base, Gesture and Action
+//! layers, generated in muscle space and merged into a loaded avatar before it compiles.
 
 mod poses;
 
@@ -7,8 +7,9 @@ pub use poses::{Hand, Kind, Poser, Style};
 
 use civbb_format::Document;
 use civbb_format::animator::{
-    Action, Animator, BlendTree, BlendTreeKind, ChildMotion, ClipIndex, Condition, ConditionMode, InterruptionSource,
-    Layer, LayerBlending, LayerGroup, Motion, State, StateMachine, Transition, TransitionDest, Unwritten,
+    Action, Animator, BlendTree, BlendTreeKind, BodyPart, ChildMotion, ClipIndex, Condition, ConditionMode,
+    InterruptionSource, Layer, LayerBlending, LayerGroup, Mask, Motion, State, StateMachine, Transition,
+    TransitionDest, Unwritten,
 };
 use civbb_format::state::{Entry, EntryIndex, Platform};
 
@@ -72,8 +73,8 @@ pub fn proxy(name: &str) -> Option<Kind> {
 }
 
 /// Merges the built-in defaults into a validated humanoid avatar with muscle frames: fills empty proxy clips it
-/// covers, adds a Base layer when the Base group has none and an Action layer when the Action group has none, with
-/// the platform entries they read. Returns whether it changed anything; other avatars stay as they are.
+/// covers, adds a Base layer, a Gesture layer per hand and an Action layer to each of those groups that has none,
+/// with the platform entries they read. Returns whether it changed anything; other avatars stay as they are.
 pub fn apply(doc: &mut Document) -> bool {
     let Some(poser) = Poser::new(doc) else {
         return false;
@@ -96,12 +97,17 @@ pub fn apply(doc: &mut Document) -> bool {
         m.insert(0, layer);
         changed = true;
     }
+    if !m.has_layers("Gesture") {
+        let layers = [m.gesture(true), m.gesture(false)];
+        let at = m.after(&["Base", "Additive"]);
+        for (k, layer) in layers.into_iter().enumerate() {
+            m.insert(at + k, layer);
+        }
+        changed = true;
+    }
     if !m.has_layers("Action") {
         let layer = m.action();
-        let lower = ["Base", "Additive", "Gesture"];
-        let at = (m.animator.layers.iter())
-            .rposition(|l| lower.contains(&m.animator.groups[l.group as usize].name.as_str()))
-            .map_or(0, |i| i + 1);
+        let at = m.after(&["Base", "Additive", "Gesture"]);
         m.insert(at, layer);
         changed = true;
     }
@@ -139,6 +145,14 @@ impl Merge<'_> {
             });
             groups.len() - 1
         }) as u32
+    }
+
+    /// The index after the last layer in one of `groups`, 0 without one.
+    fn after(&self, groups: &[&str]) -> usize {
+        let a = &self.animator;
+        (a.layers.iter())
+            .rposition(|l| groups.contains(&a.groups[l.group as usize].name.as_str()))
+            .map_or(0, |i| i + 1)
     }
 
     /// Inserts `layer` at `at`, moving layer weight actions that point at or past it.
@@ -273,6 +287,71 @@ impl Merge<'_> {
             state("Falling", falling, vec![to(stand, vec![landed])]),
         ];
         layer("civbb/locomotion", group, states)
+    }
+
+    /// One hand's gestures (`GestureLeft` or `GestureRight` 0 to 7) on its fingers; the fist closes with the
+    /// gesture's weight.
+    fn gesture(&mut self, left: bool) -> Layer {
+        let group = self.group("Gesture", 1.0);
+        let (gesture, weight, part, side) = if left {
+            let e = (
+                self.entry(Platform::GestureLeft),
+                self.entry(Platform::GestureLeftWeight),
+            );
+            (e.0, e.1, BodyPart::LeftFingers, "left")
+        } else {
+            let e = (
+                self.entry(Platform::GestureRight),
+                self.entry(Platform::GestureRightWeight),
+            );
+            (e.0, e.1, BodyPart::RightFingers, "right")
+        };
+        use Hand::*;
+        let mut states = Vec::new();
+        let mut any = Vec::new();
+        for (n, hand) in [Idle, Fist, Open, Point, Peace, Rock, Gun, ThumbsUp]
+            .into_iter()
+            .enumerate()
+        {
+            let name = format!("{hand:?}");
+            let mut motion = self.clip(&format!("civbb/hands/{name}").to_lowercase(), Kind::Hands(hand));
+            if hand == Fist {
+                let idle = states.first().map(|s: &State| s.motion.clone().expect("a clip"));
+                let children = vec![
+                    ChildMotion {
+                        threshold: 0.0,
+                        ..child(idle.expect("idle comes first"), [0.0; 2], false)
+                    },
+                    ChildMotion {
+                        threshold: 1.0,
+                        ..child(motion, [0.0; 2], false)
+                    },
+                ];
+                motion = Motion::BlendTree(Box::new(BlendTree {
+                    kind: BlendTreeKind::Simple1D { param: weight },
+                    children,
+                    normalize: false,
+                }));
+            }
+            states.push(state(&name, motion, Vec::new()));
+            let mut t = to(
+                n as u32,
+                vec![Condition {
+                    param: gesture,
+                    mode: ConditionMode::Equals,
+                    threshold: n as f32,
+                }],
+            );
+            t.duration = 0.1;
+            any.push(t);
+        }
+        let mut layer = layer(&format!("civbb/hand_{side}"), group, states);
+        layer.mask = Some(Mask {
+            body_parts: vec![part],
+            transforms: None,
+        });
+        layer.state_machine.any_state_transitions = any;
+        layer
     }
 
     /// AFK and sitting, raising the Action group while they play.
