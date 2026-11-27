@@ -320,6 +320,7 @@ Internal deps: none
 - `docs/adr/0100-toon-features-presence.md`: 0100: When a toon feature is present, and what an absent one means
 - `docs/adr/0101-civbb-extension-layout.md`: 0101: CIVBB_* extensions: document parts at the root, glTF indices, node flags and toon materials local
 - `docs/adr/0102-dialect-1-as-a-json-rewrite.md`: 0102: Native JSON shapes, and Unity dialect 1 read through a JSON rewrite instead of copied types
+- `docs/adr/0103-client-runtime-on-bevy-ecs.md`: 0103: The client runtime on bevy_ecs: island entities, one task pool, a frame schedule and a render thread
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data
