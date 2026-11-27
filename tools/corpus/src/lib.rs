@@ -1,6 +1,9 @@
 //! Deterministic synthetic avatars: a lean control and a deliberately bloated worst case (design doc §21).
 
 pub mod gltf;
+pub mod world;
+
+pub use world::world;
 
 use civbb_format::animator::*;
 use civbb_format::constraint::{Constraint, ConstraintKind, ConstraintSource};

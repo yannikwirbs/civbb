@@ -21,6 +21,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::{CursorGrabMode, WindowId};
 
+use crate::controller::WorldMesh;
 use crate::extract::{Camera, Snapshot};
 use crate::frame::Runtime;
 use crate::gpu::Gpu;
@@ -43,6 +44,8 @@ pub struct Config {
     pub frames: Option<u32>,
     /// Frames presented before timing starts: the first one creates the swapchain (~170 ms on the reference PC).
     pub warmup: u32,
+    /// A world shown at the origin; the player walks on its rigid meshes (ADR 0110). `None`: a flat ground at y 0.
+    pub world: Option<Handle>,
 }
 
 /// What a run measured, past the warm-up.
@@ -416,6 +419,10 @@ struct Viewer {
 impl Viewer {
     fn new(cfg: Config) -> Self {
         let mut runtime = Runtime::default();
+        if let Some(world) = &cfg.world {
+            (runtime.world).insert_resource(WorldMesh::from_document(&world.avatar, Pose::IDENTITY));
+            runtime.spawn_package(world, u64::MAX, false, Pose::IDENTITY);
+        }
         runtime.add_player();
         runtime.extract_to_snapshot();
         Viewer {

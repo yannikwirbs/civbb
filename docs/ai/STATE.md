@@ -375,11 +375,19 @@ What exists, by area. Read the section for the area you touch; update it when th
   default features off: the derive macros need it as a direct dependency of each crate that derives.
   `civbb-client bench [--package <pkg> --key <key>]` prints JSON (#23, #57).
 - Desktop player (#141, #142; ADRs 0106, 0107): `player.rs`, `Runtime::add_player` (`Input`, `Player`, `Camera`
-  resources; a system in `PosesIn` moves the player's island on the ground plane, the viewer's first copy). WASD,
-  Shift runs (walk 2, run 4, strafe 2 m/s), Space jumps (3 m/s, gravity 9.81, flat ground at y 0), mouse look, V
+  resources; a system in `PosesIn` moves the player's island through the `WorldMesh` resource, the viewer's first
+  copy). WASD, Shift runs (walk 2, run 4, strafe 2 m/s), Space jumps (3 m/s, gravity 9.81), mouse look, V
   cycles orbit/first/third person (own head hidden in first person), C/Z toggle crouch/prone (`Upright` 0.55/0.25,
   half/quarter speed), Shift+F1..F8 gestures, AFK while unfocused; it sets the island's platform values each frame
-  (`Island::set_platform`). No world collision yet (#144).
+  (`Island::set_platform`).
+- Character controller (#144, ADR 0110; Jolt deferred to Phase 2 world content): `controller.rs`, `WorldMesh`
+  (static world triangles, brute force; `plane()` is `add_player`'s default, `from_document` takes rigid meshes)
+  and `Body::step` (vertical capsule r 0.25, h 1.6; overlap resolution in substeps of r/2; walkable ≤ 45° pushes
+  straight up; an edge or corner contact below the feet's sphere and within the 0.3 m step of the frame's starting
+  feet height is a step edge, lifted onto; taller risers up to 0.3 m by up-across-down; snap down a step when walking
+  off, else fall; `Grounded` = walkable within 1 cm). Test world `civbb_corpus::world()` (CC0 rigid meshes, avatar
+  role until a world role exists): `civbb-client view --world` spawns it at the origin as an island; the player
+  starts at the origin facing +Z towards it, so the orbit camera (at +Z) has it behind.
 - Built-in locomotion (#143, #152; ADRs 0108, 0109): `civbb_anim::defaults::apply(&mut Document)` merges generated
   muscle-space clips into a humanoid with muscle frames: fills empty `proxy_*` clips by name (`defaults::proxy`;
   emotes stay empty, #151) and adds `civbb/locomotion` (Base: standing/crouching/prone 2D freeform trees on

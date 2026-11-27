@@ -12,6 +12,7 @@ use civbb_core::{Counters, System, jobs, profile};
 use civbb_dynamics::contact::{self, Participant};
 
 use crate::affinity;
+use crate::controller::WorldMesh;
 use crate::extract::{Camera, Snapshot, extract_system};
 use crate::island::Island;
 use crate::package::Handle;
@@ -185,12 +186,16 @@ impl Runtime {
         self.schedule.add_systems(extract_system.in_set(Step::Extract));
     }
 
-    /// Adds the desktop player (ADR 0106): the [`Input`] and [`Player`] resources and, in `PosesIn`, the system that
-    /// moves the player's island and places the [`Camera`] by them.
+    /// Adds the desktop player (ADR 0106): the [`Input`] and [`Player`] resources, a [`WorldMesh`] (a flat ground
+    /// unless one is there already, ADR 0110) and, in `PosesIn`, the system that moves the player's island through it
+    /// and places the [`Camera`].
     pub fn add_player(&mut self) {
         self.world.init_resource::<Camera>();
         self.world.init_resource::<Input>();
         self.world.init_resource::<Player>();
+        if !self.world.contains_resource::<WorldMesh>() {
+            self.world.insert_resource(WorldMesh::plane());
+        }
         self.schedule.add_systems(player_system.in_set(Step::PosesIn));
     }
 

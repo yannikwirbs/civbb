@@ -16,7 +16,7 @@ const USAGE: &str = "usage:
   civbb-client bench [--avatars N] [--threads T[,T...]] [--frames F] [--warmup W]
                      [--avatar lean|bloated | --package <package.civpkg> --key <key-file>]
   civbb-client view [<package.civpkg>... --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F]
-                    [--warmup W] [--lod L]
+                    [--warmup W] [--lod L] [--world]
   civbb-client measure <package.civpkg> --key <key-file> [--avatars N] [--frames F] [--warmup W]
   civbb-client parity <reference.civpkg | unity-dir> <test.civpkg> --key <key-file> [--images <dir>]
   civbb-client rig <package.civpkg> --key <key-file>
@@ -30,7 +30,8 @@ makes one from glTF or VRM), or of a corpus avatar (default bloated), with anima
 load in the background and appear as they are ready. Drag to
 orbit, scroll to zoom; CPU and GPU frame times are in the title. With --frames it exits after W + F frames
 (default W 60; the first creates the swapchain) and prints a summary of the last F. --lod draws every mesh at level L of its LOD chain (0 is full, default; past a mesh's last level, its
-last).
+last). --world shows the generated test world (ground, stairs, ramps, a platform, a wall) and the player walks
+through it (ADR 0110).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
 300) and through the viewer's frames on an offscreen 1280x720 target (N copies, same frames) and prints the times
@@ -145,6 +146,7 @@ fn parse(args: &[String]) -> Option<(Config, Option<(String, String)>)> {
 fn run_view(args: &[String]) -> ExitCode {
     let (mut packages, mut key, mut corpus, mut copies, mut frames, mut lod) = (Vec::new(), None, None, 1, None, 0);
     let mut warmup = 60;
+    let mut world = false;
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let parsed = match arg.as_str() {
@@ -154,6 +156,10 @@ fn run_view(args: &[String]) -> ExitCode {
             "--frames" => it.next().and_then(|v| v.parse().ok()).map(|n| frames = Some(n)),
             "--lod" => it.next().and_then(|v| v.parse().ok()).map(|n| lod = n),
             "--warmup" => it.next().and_then(|v| v.parse().ok()).map(|n| warmup = n),
+            "--world" => {
+                world = true;
+                Some(())
+            }
             s if !s.starts_with('-') => {
                 packages.push(s.to_owned());
                 Some(())
@@ -206,6 +212,7 @@ fn run_view(args: &[String]) -> ExitCode {
         copies,
         frames,
         warmup,
+        world: world.then(|| Package::new(civbb_corpus::world(), Vec::new())),
     };
     match view::run(cfg) {
         Ok(s) => {
@@ -411,6 +418,7 @@ fn measure(package: &Path, key: &Path, avatars: u32, frames: u32, warmup: u32) -
         copies: avatars,
         frames: Some(frames),
         warmup,
+        world: None,
     };
     let gpu = match view::run_headless(view, width, height) {
         Ok((s, device)) => match s.gpu_ms {

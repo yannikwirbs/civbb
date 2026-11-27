@@ -95,7 +95,7 @@ fn two_pinned_runs_agree_within_ten_percent() {
 }
 
 #[test]
-fn headless_frames_draw_two_packages_without_validation_errors() {
+fn headless_frames_draw_two_packages_in_the_test_world_without_validation_errors() {
     let load = |spec: civbb_corpus::Spec| {
         package::spawn(move || Ok(package::Package::new(civbb_corpus::generate(&spec), vec![])))
     };
@@ -104,6 +104,7 @@ fn headless_frames_draw_two_packages_without_validation_errors() {
         copies: 2,
         frames: Some(4),
         warmup: 2,
+        world: Some(package::Package::new(civbb_corpus::world(), vec![])),
     };
     match view::run_headless(cfg, 320, 180) {
         Ok((s, device)) => {

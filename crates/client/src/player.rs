@@ -1,4 +1,4 @@
-//! The local player in desktop mode: input moves one island on the ground plane and places the camera at its
+//! The local player in desktop mode: input moves one island through the world (ADR 0110) and places the camera at its
 //! viewpoint (design doc §18, ADR 0106), and provides its platform values (ADR 0107).
 
 use std::f32::consts::TAU;
@@ -9,6 +9,7 @@ use civbb_core::schedule::Dt;
 use civbb_format::math::{Quat, Vec3};
 use civbb_format::state::Platform;
 
+use crate::controller::{Body, WorldMesh};
 use crate::extract::Camera;
 use crate::frame::Shows;
 use crate::island::Island;
@@ -19,10 +20,7 @@ pub const WALK: f32 = 2.0;
 pub const RUN: f32 = 4.0;
 /// Sideways speed in m/s, running or not.
 pub const STRAFE: f32 = 2.0;
-/// Upward speed a jump starts with, in m/s.
-pub const JUMP: f32 = 3.0;
-/// Downward acceleration in m/s².
-pub const GRAVITY: f32 = 9.81;
+pub use crate::controller::{GRAVITY, JUMP};
 /// The view's pitch stays within ±89°.
 const PITCH_LIMIT: f32 = 89.0 * std::f32::consts::PI / 180.0;
 /// The third-person camera's distance behind the viewpoint, in viewpoint heights.
@@ -175,8 +173,8 @@ impl Player {
         [0.0, s, 0.0, c]
     }
 
-    /// Moves and turns by `input` over `dt` seconds on the ground plane y = 0.
-    pub fn step(&mut self, input: &Input, dt: f32) {
+    /// Moves and turns by `input` over `dt` seconds through `world` (ADR 0110).
+    pub fn step(&mut self, input: &Input, dt: f32, world: &WorldMesh) {
         let start = self.pos;
         self.yaw = (self.yaw + input.look[0]).rem_euclid(TAU);
         self.turn = if dt > 0.0 { input.look[0] / dt } else { 0.0 };
@@ -188,20 +186,13 @@ impl Player {
         let along = f / n * if input.run { RUN } else { WALK };
         let side = r / n * STRAFE;
         let (forward, right) = (self.forward(), self.right());
-        self.pos = add(self.pos, scale(add(scale(forward, along), scale(right, side)), dt));
-        if self.grounded && input.jump {
-            self.vertical = JUMP;
-            self.grounded = false;
-        }
-        if !self.grounded {
-            self.vertical -= GRAVITY * dt;
-            self.pos[1] += self.vertical * dt;
-            if self.pos[1] <= 0.0 {
-                self.pos[1] = 0.0;
-                self.vertical = 0.0;
-                self.grounded = true;
-            }
-        }
+        let mut body = Body {
+            pos: self.pos,
+            vertical: self.vertical,
+            grounded: self.grounded,
+        };
+        body.step(world, add(scale(forward, along), scale(right, side)), input.jump, dt);
+        (self.pos, self.vertical, self.grounded) = (body.pos, body.vertical, body.grounded);
         self.velocity = if dt > 0.0 {
             scale(sub(self.pos, start), 1.0 / dt)
         } else {
@@ -263,9 +254,10 @@ pub(crate) fn player_system(
     mut input: ResMut<Input>,
     mut player: ResMut<Player>,
     mut camera: ResMut<Camera>,
+    world: Res<WorldMesh>,
     mut islands: Query<(&mut Island, &Shows)>,
 ) {
-    player.step(&input, dt.0);
+    player.step(&input, dt.0, &world);
     (input.jump, input.look, input.crouch, input.prone) = (false, [0.0; 2], false, false);
     let Some((mut island, shows)) = player.island.and_then(|e| islands.get_mut(e).ok()) else {
         return;
@@ -289,6 +281,10 @@ mod tests {
 
     const DT: f32 = 1.0 / 60.0;
 
+    fn step(p: &mut Player, input: &Input, dt: f32) {
+        p.step(input, dt, &WorldMesh::plane());
+    }
+
     fn close(a: Vec3, b: Vec3) -> bool {
         a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-4)
     }
@@ -301,17 +297,18 @@ mod tests {
             ..Default::default()
         };
         for _ in 0..60 {
-            p.step(&walk, DT);
+            step(&mut p, &walk, DT);
         }
         assert!(close(p.pos, [0.0, 0.0, WALK]), "{:?}", p.pos);
         let run = Input { run: true, ..walk };
         for _ in 0..60 {
-            p.step(&run, DT);
+            step(&mut p, &run, DT);
         }
         assert!(close(p.pos, [0.0, 0.0, WALK + RUN]), "{:?}", p.pos);
         // Right of an avatar facing +Z is -X.
         let mut p = Player::default();
-        p.step(
+        step(
+            &mut p,
             &Input {
                 right: 1.0,
                 ..Default::default()
@@ -321,7 +318,8 @@ mod tests {
         assert!(close(p.pos, [-STRAFE, 0.0, 0.0]), "{:?}", p.pos);
         // Diagonal: no faster than straight.
         let mut p = Player::default();
-        p.step(
+        step(
+            &mut p,
             &Input {
                 forward: 1.0,
                 right: 1.0,
@@ -335,14 +333,16 @@ mod tests {
     #[test]
     fn turning_left_then_walking_heads_to_plus_x() {
         let mut p = Player::default();
-        p.step(
+        step(
+            &mut p,
             &Input {
                 look: [std::f32::consts::FRAC_PI_2, 0.0],
                 ..Default::default()
             },
             0.0,
         );
-        p.step(
+        step(
+            &mut p,
             &Input {
                 forward: 1.0,
                 ..Default::default()
@@ -360,7 +360,8 @@ mod tests {
     #[test]
     fn a_jump_rises_and_lands() {
         let mut p = Player::default();
-        p.step(
+        step(
+            &mut p,
             &Input {
                 jump: true,
                 ..Default::default()
@@ -370,12 +371,12 @@ mod tests {
         assert!(!p.grounded && p.pos[1] > 0.0);
         let mut top = 0.0_f32;
         for _ in 0..120 {
-            p.step(&Input::default(), DT);
+            step(&mut p, &Input::default(), DT);
             top = top.max(p.pos[1]);
         }
         // v² / 2g, give or take the integration.
         assert!((top - JUMP * JUMP / (2.0 * GRAVITY)).abs() < 0.03, "{top}");
-        assert!(p.grounded && p.pos[1] == 0.0 && p.vertical == 0.0);
+        assert!(p.grounded && p.pos[1].abs() < 1e-5 && p.vertical == 0.0, "{p:?}");
     }
 
     #[test]
@@ -386,14 +387,15 @@ mod tests {
             prone,
             ..Default::default()
         };
-        p.step(&toggle(true, false), 0.0);
+        step(&mut p, &toggle(true, false), 0.0);
         assert_eq!(p.posture, Posture::Crouching);
-        p.step(&toggle(false, true), 0.0);
+        step(&mut p, &toggle(false, true), 0.0);
         assert_eq!(p.posture, Posture::Prone);
-        p.step(&toggle(false, true), 0.0);
+        step(&mut p, &toggle(false, true), 0.0);
         assert_eq!(p.posture, Posture::Standing);
-        p.step(&toggle(true, false), 0.0);
-        p.step(
+        step(&mut p, &toggle(true, false), 0.0);
+        step(
+            &mut p,
             &Input {
                 forward: 1.0,
                 ..Default::default()
@@ -417,7 +419,7 @@ mod tests {
             afk: true,
             ..Default::default()
         };
-        p.step(&input, 0.5);
+        step(&mut p, &input, 0.5);
         let values = p.platform_values(&input);
         let value = |q| values.iter().find(|(p, _)| *p == q).expect("provided").1;
         // Strafing right at strafe speed while turning right at 0.2 rad/s.
@@ -434,7 +436,8 @@ mod tests {
             [1.0, 4.0, 1.0, 0.0]
         );
         // In the air: falling, not grounded.
-        p.step(
+        step(
+            &mut p,
             &Input {
                 jump: true,
                 ..Default::default()
@@ -443,7 +446,7 @@ mod tests {
         );
         // Past the top of the jump (0.31 s), before landing (0.61 s).
         for _ in 0..25 {
-            p.step(&Input::default(), DT);
+            step(&mut p, &Input::default(), DT);
         }
         let values = p.platform_values(&Input::default());
         let value = |q| values.iter().find(|(p, _)| *p == q).expect("provided").1;
@@ -457,7 +460,7 @@ mod tests {
             look: [0.0, 10.0],
             ..Default::default()
         };
-        p.step(&up, DT);
+        step(&mut p, &up, DT);
         assert_eq!(p.pitch, PITCH_LIMIT);
     }
 

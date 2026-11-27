@@ -49,6 +49,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 
 - `src/affinity.rs`: Pins the calling thread to a performance core, so one-worker timings on hybrid CPUs do not depend on where the
 - `src/bench.rs`: Headless CPU benchmark: N avatar islands stepped for a number of frames at each worker count (design doc §21).
+- `src/controller.rs`: The character controller (ADR 0110): a vertical capsule moved against static world triangles with gravity,
 - `src/cull.rs`: Frustum culling of mesh instances before skinning (design doc §6, ADR 0077): conservative world bounds from
 - `src/extract.rs`: The render snapshot: what the renderer reads of a frame, copied out of the islands by the `Extract` step so a
 - `src/frame.rs`: One simulation frame's avatar work: every island as its own parallel job, then the cross-avatar contact pass
@@ -58,11 +59,12 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`), a desktop
 - `src/package.rs`: Packages as shared handles: a verified avatar, its compiled model and decoded textures, loaded on the I/O pool
 - `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
-- `src/player.rs`: The local player in desktop mode: input moves one island on the ground plane and places the camera at its
+- `src/player.rs`: The local player in desktop mode: input moves one island through the world (ADR 0110) and places the camera at its
 - `src/render_thread.rs`: The render thread: owns the renderer and the GPU resources of what is shown, draws each snapshot it is handed
 - `src/view.rs`: Desktop viewer: N copies of each of several packages in a grid with animator and dynamics running, drawn in a
 - `tests/alloc.rs`: Island steps and whole frames allocate nothing on the heap after warm-up (design doc §5 "Scheduling rules", #135,
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
+- `tests/controller.rs`: The character controller over the test world (ADR 0110, #144): stairs and the 30° ramp climb to the platform on
 - `tests/cull.rs`: Frustum culling of mesh instances (ADR 0077): the bounds hold every skinned vertex in every parity state, and
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 - `tests/measure.rs`: `civbb-client measure` (ADR 0032): debug builds refuse, release builds print CPU times and, with a device, GPU
@@ -211,12 +213,13 @@ Internal deps: civbb-core, civbb-format
 
 ## `tools/corpus` (civbb-corpus)
 
-Deterministic generator of synthetic test avatars (lean control and deliberately bloated), CC0.
+Deterministic generator of synthetic test avatars (lean control and deliberately bloated) and a test world, CC0.
 
 Internal deps: civbb-format
 
 - `src/gltf.rs`: Exports an avatar's node, mesh, skin and morph subset as GLB, the importer's test input.
 - `src/lib.rs`: Deterministic synthetic avatars: a lean control and a deliberately bloated worst case (design doc §21).
+- `src/world.rs`: The test world (ADR 0110): ground, stairs and two ramps up to a platform, and a wall, as rigid meshes, CC0.
 
 ## `tools/xtask` (xtask)
 
@@ -339,6 +342,7 @@ Internal deps: none
 - `docs/adr/0107-desktop-platform-values.md`: 0107: Platform values from the desktop player
 - `docs/adr/0108-built-in-locomotion.md`: 0108: Built-in locomotion: generated muscle poses merged into avatars at load
 - `docs/adr/0109-default-gesture-layer.md`: 0109: A default Gesture layer per hand
+- `docs/adr/0110-character-controller.md`: 0110: An own capsule character controller over static triangles until worlds need rigid bodies
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

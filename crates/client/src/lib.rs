@@ -3,6 +3,7 @@
 
 pub mod affinity;
 pub mod bench;
+pub mod controller;
 pub mod cull;
 pub mod extract;
 pub mod frame;

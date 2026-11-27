@@ -1,6 +1,6 @@
 [package]
 name = "civbb-corpus"
-description = "Deterministic generator of synthetic test avatars (lean control and deliberately bloated), CC0."
+description = "Deterministic generator of synthetic test avatars (lean control and deliberately bloated) and a test world, CC0."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
