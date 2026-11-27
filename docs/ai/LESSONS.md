@@ -56,3 +56,6 @@ Add a line to the matching file whenever something costs more than one attempt.
   the issue) instead of retrying.
 - bevy_tasks: `TaskPool::scope` runs tasks on the calling thread too (n workers = n - 1 pool threads), and
   `ComputeTaskPool` & co. are process-wide `OnceLock`s that cannot be resized: build own `TaskPool`s to vary counts.
+- `while let Some(x) = mutex.lock().unwrap().next() { body }` holds the guard for the whole body (temporaries in a
+  `while let` scrutinee live to the end of the iteration): parallel workers ran serially (#140). Take through a
+  closure or a `let` first.

@@ -72,7 +72,7 @@ Engine core: math, texture mips, the job runner for per-avatar islands and per-s
 Internal deps: civbb-format
 
 - `src/counters.rs`: Per-system timing counters: lightweight, always-on time and run counts for each system of a frame (design doc §5).
-- `src/jobs.rs`: The job runner: one task per avatar island, run in parallel across islands on a bevy_tasks pool (ADRs 0020, 0103).
+- `src/jobs.rs`: The job runner: avatar islands stepped in parallel on a fork-join pool that wakes every worker at once (ADRs 0020, 0105).
 - `src/lib.rs`: Engine core: math, the frame schedule, the job runner for per-avatar islands and per-system timing counters
 - `src/math.rs`: Vector and quaternion helpers on the format's array types, and world placements of a node hierarchy.
 - `src/mips.rs`: Texture mip chains made on the CPU, the one definition the compiler encodes and the renderer uploads (ADR 0035).
@@ -329,6 +329,7 @@ Internal deps: none
 - `docs/adr/0102-dialect-1-as-a-json-rewrite.md`: 0102: Native JSON shapes, and Unity dialect 1 read through a JSON rewrite instead of copied types
 - `docs/adr/0103-client-runtime-on-bevy-ecs.md`: 0103: The client runtime on bevy_ecs: island entities, one task pool, a frame schedule and a render thread
 - `docs/adr/0104-package-handles-and-runtime-spawning.md`: 0104: Packages as shared handles, islands spawned and despawned at runtime, GPU instances keyed by island
+- `docs/adr/0105-fork-join-worker-pool.md`: 0105: Island jobs on an own fork-join pool that wakes every worker at once and spins briefly
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

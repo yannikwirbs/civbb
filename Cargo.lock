@@ -652,7 +652,6 @@ name = "civbb-core"
 version = "0.0.0"
 dependencies = [
  "bevy_ecs",
- "bevy_tasks",
  "civbb-format",
  "tracy-client",
 ]

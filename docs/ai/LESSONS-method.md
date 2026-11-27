@@ -58,3 +58,8 @@ run that takes minutes.
   (other test threads allocate too). To locate them, let the allocator print `Backtrace::force_capture()` filtered to
   `civbb` frames for one step, behind a thread-local reentrancy guard (the backtrace allocates); `sort | uniq -c`
   over the output names the hot spots in one run. Remove the tracing before committing.
+- Parallel step slower than CPU / workers (#140): record each worker's start offset and items taken per step, sorted
+  and averaged over 600 steps. It shows at once whether threads start late or the work is unbalanced. To tell
+  executor wake chains from OS wake latency, rerun with an idle-priority busy loop on every core
+  (`cmd //c "start /low /b spin.exe 16 40"`, a scratch program that exits by itself): if prompt starts jump, the OS
+  is the cause. Vsync-paced viewer and back-to-back bench differ exactly here; measure both.

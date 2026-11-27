@@ -25,3 +25,4 @@ them in whole or in part. Read an ADR together with the ones that supersede part
 - 0101: the node-level placement of 0086 point 4 (components stay root lists).
 - 0102: point 2 of 0085 (fork on divergence) for shape-only changes: dialect 1 is rewritten as JSON.
 - 0103 supersedes 0003 and the `jobs` part of 0020 point 1 (bevy_tasks pools instead of rayon, with a fallback).
+- 0105: point 3 of 0103 for island and extract jobs (an own fork-join pool, no ComputeTaskPool or rayon fallback).

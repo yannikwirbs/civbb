@@ -350,9 +350,11 @@ What exists, by area. Read the section for the area you touch; update it when th
   records through `Forward::add`'s upload pass. As recorded (ADR 0067): defaults from the renderer's material 0 (0
   when it lacks the field), components no curve animates are 0 (baked by the importer, ADR 0099), animated colours
   converted from gamma even when `[HDR]` (an `[HDR]` default still round-trips, #93).
-- `civbb-core`: shared math, `jobs` on bevy_tasks (#132, ADR 0103: `islands(pool, ..)` one task per island, the
-  waiting thread works too, so `pool(n, on_spawn)` has n - 1 threads; `default_workers()` cores minus 2; rayon is
-  gone), per-system `Counters` (a resource; avatar systems, contacts and, in the runtime, extract per island),
+- `civbb-core`: shared math, `jobs` (ADR 0105, #140: an own fork-join `Pool`; `broadcast(job)` wakes every pool
+  thread with one `notify_all`, runs the job on the caller too and waits only for threads that took it in time; pool
+  threads spin 200 µs for the next job before sleeping; `islands(pool, ..)` broadcasts one closure that takes islands
+  from a shared iterator; `pool(n, on_spawn)` has n - 1 threads; `default_workers()` cores minus 2; no bevy_tasks or
+  rayon in core), per-system `Counters` (a resource; avatar systems, contacts and, in the runtime, extract per island),
   `profile` (#136: `zone(name)` guards, `start()` in the client's `main`, `frame_mark()` after each `Runtime::step`;
   Tracy only with the off-by-default `profile` feature, `cargo build -p civbb-client --release --features profile`;
   zones per `Counters::time` system, per island job (`island`), the `avatars` system, the render thread's `render`,
@@ -384,8 +386,12 @@ What exists, by area. Read the section for the area you touch; update it when th
   sorted (cell, sender) list instead of a `HashMap`; receivers placed in the second loop; `touching` lists reused),
   frame.rs keeps the participant and `&mut Island` buffers (`frame::recycle`, the standard in-place collect
   reusing a `Vec`'s allocation for borrows; a thread-local scratch for plain `step`, `Local`s in the systems), and
-  `jobs::islands` on a pool without threads is a plain loop. Still allocating: bevy_tasks' scope with threads (~2 per
-  task) and the extract step's per-frame `Vec`s. Contact pass 100 bloated: 0.042 to 0.024 ms/frame.
+  `jobs::islands` allocates nothing with threads either (#140; `tests/alloc.rs` counts only the calling thread). Still
+  allocating: the extract step's per-frame `Vec`s. Contact pass 100 bloated: 0.042 to 0.024 ms/frame. Viewer (vsync, 100 bloated, 13 workers, #140): simulation
+  1.52 to 1.00 ms/frame, island step wall 1.35 to ~0.85 ms, extract 0.126 to ~0.087 ms; render thread 0.69 to
+  0.74-0.84 ms (the spin competes). Without the spin only ~5 of 13 threads start a step promptly: Windows wakes
+  threads on idle cores late (the owner's plan parks cores down to 4 %, `powercfg /qh scheme_current sub_processor
+  CPMINCORES`).
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
   human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056), the start time does not reach one and a transition fired at its exit time starts with the overshoot elapsed; the first update advances like any other; a Write Defaults on state without a motion writes nothing (ADR 0065, recorded); instances start entries at `Entry::default` (`Controller::start`; the expression default for lowered Unity content,

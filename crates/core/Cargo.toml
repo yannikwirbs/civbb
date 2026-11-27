@@ -9,7 +9,6 @@ publish.workspace = true
 [dependencies]
 civbb-format.workspace = true
 bevy_ecs.workspace = true
-bevy_tasks.workspace = true
 # Tracy zones per system, island job and render pass (ADR 0103), only with `profile`.
 tracy-client = { version = "0.19", optional = true }
 
