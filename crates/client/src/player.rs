@@ -268,6 +268,7 @@ pub(crate) fn player_system(
     island.origin.pos = player.pos;
     island.origin.rot = player.rotation();
     island.hide_head = player.view == View::First;
+    island.targets.look = player.pitch;
     let viewpoint = shows.0.avatar.avatar().map_or([0.0; 3], |a| a.viewpoint);
     let eye = island.origin.point(viewpoint);
     if let Some((eye, target)) = player.camera(eye, viewpoint[1] * island.origin.scale) {

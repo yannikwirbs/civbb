@@ -360,7 +360,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   zones per `Counters::time` system, per island job (`island`), the `avatars` system, the render thread's `render`,
   the renderer's `wait` and `present`, and each render graph pass by name; the gate never builds the feature),
   `schedule::frame()` (ADR 0103: the `Frame` schedule, `Step` sets in design doc §5's order, chained; `Dt`).
-  `civbb-client`: `Model`/`Island` (a component; animator, constraints, IK stub, dynamics, world poses),
+  `civbb-client`: `Model`/`Island` (a component; animator, constraints, IK, dynamics, world poses),
   `frame::step` (plain: islands then the contact pass feeding next frame's parameters, ADR 0020; parity and the
   collapse tests use it) and `frame::Runtime` (bevy_ecs world, one entity per island, the island and
   contact systems in `Avatars`/`CrossAvatar`, `Permits` and `Workers` resources; the bench and viewer use it, #131).
@@ -399,6 +399,16 @@ What exists, by area. Read the section for the area you touch; update it when th
   leg front-back 0.6 standing (more negative is forward), stretch 1 straight, finger stretch +1 open. Only the
   viewer's package load applies it (`main.rs`); parity, `measure` and bench show packages as built. All 13 corpus
   exports validate merged; KohzieBoi, Megumi, Ostgaroa and Taro run on the generated layers.
+- Full-body IK, 3-point (#145, ADR 0111): `civbb_anim::ik::Solver` (per `Model`, `None` unless hips, spine, head,
+  arms and legs are mapped) runs in `Island::step` between constraints and dynamics on `Island::targets`
+  (`ik::Targets`: head and hand `Goal`s in avatar space, `look` = view pitch; the default changes nothing, so parity
+  is untouched). Head goal: hips follow its height, the spine bends towards it (2 passes), hips take the rest, legs
+  keep their animated feet. Limbs: two-bone, bend towards the animated middle joint, else a rest pole (elbows down
+  and back, knees forward); unreachable stretches straight. Pose sources `Animation` (tracking control) skip a part.
+  The desktop player sets `look` (chest 0.2, neck 0.3, head the rest). Bones are placed by walking parents up to an
+  anchor (no pose cache). Bench (`reach` in `bench.rs` sets all three goals and the pitch on every island):
+  IK 4.5 µs per avatar on 1 worker (lean and bloated alike), bloated 100 avatars 6.96 to 7.74 ms/frame on 1 worker,
+  unchanged at 13 workers (0.81 ms).
 - Benchmark on the reference PC (release, bloated, #132): 100 avatars 7.03 ms/frame on 1 worker, 0.756 ms on 16
   (9.3x); 1000 avatars 71.6 ms to 7.06 ms (10.1x). The bench makes one pool per worker count and drives frames from
   a fresh thread (`measure` pins it, 1 worker, ADR 0080). Corpus constraints (#57): lean

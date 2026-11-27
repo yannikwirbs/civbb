@@ -4,10 +4,12 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use civbb_core::math::Pose;
+use civbb_anim::ik::{Goal, Targets};
+use civbb_core::math::{Pose, world_poses};
 use civbb_core::{Counters, System, jobs};
 use civbb_format::Document;
 use civbb_format::cost::Pinned;
+use civbb_format::hierarchy::HumanBone;
 use serde::Serialize;
 
 use crate::affinity;
@@ -101,6 +103,7 @@ pub fn doubling(max: usize) -> Vec<usize> {
 /// Runs the benchmark with `avatar` on every island; `None` if a measuring thread cannot be started.
 pub fn run(cfg: &Config, avatar: &Document) -> Option<Report> {
     let model = Arc::new(Model::new(avatar));
+    let rest = rest_targets(avatar);
     let mut runs: Vec<Run> = Vec::with_capacity(cfg.threads.len());
     for &threads in &cfg.threads {
         let pool = Arc::new(jobs::pool(threads, || {}));
@@ -111,7 +114,7 @@ pub fn run(cfg: &Config, avatar: &Document) -> Option<Report> {
                 let pinned = (cfg.pin && threads == 1)
                     .then(affinity::pin_to_performance_core)
                     .flatten();
-                let (frame_ms, counters) = measure(&model, pool, cfg);
+                let (frame_ms, counters) = measure(&model, &rest, pool, cfg);
                 let pinned = pinned.map(|p| Pinned {
                     ran_on: affinity::current_cpu().unwrap_or(p.ran_on),
                     ..p
@@ -171,10 +174,48 @@ fn scene(model: &Arc<Model>, pool: Arc<jobs::Pool>, avatars: u32) -> Runtime {
     runtime
 }
 
+/// The head and hands' rest placements in avatar space; `None` without a humanoid that maps them.
+fn rest_targets(avatar: &Document) -> Option<[Goal; 3]> {
+    let humanoid = avatar.avatar()?.humanoid.as_ref()?;
+    let nodes = &avatar.hierarchy.nodes;
+    let parents: Vec<_> = nodes.iter().map(|n| n.parent).collect();
+    let rest: Vec<_> = nodes.iter().map(|n| n.rest).collect();
+    let world = world_poses(&parents, Pose::IDENTITY, &rest);
+    let goal = |bone| {
+        let p = world[humanoid.node(bone)? as usize];
+        Some(Goal { pos: p.pos, rot: p.rot })
+    };
+    Some([
+        goal(HumanBone::Head)?,
+        goal(HumanBone::LeftHand)?,
+        goal(HumanBone::RightHand)?,
+    ])
+}
+
+/// 3-point targets `t` seconds into a sway, from [`rest_targets`]: the head bobs down to 10 cm, the hands reach
+/// forward in front of the chest, and the view pitch swings, so every part of the solver runs each frame.
+fn reach(rest: &[Goal; 3], t: f32) -> Targets {
+    let s = (t * 2.0).sin();
+    let [head, left, right] = *rest;
+    let hand = |g: Goal| Goal {
+        pos: [g.pos[0] * 0.4, g.pos[1] - 0.25 + 0.05 * s, 0.3 + 0.05 * s],
+        ..g
+    };
+    Targets {
+        head: Some(Goal {
+            pos: [head.pos[0], head.pos[1] - 0.05 - 0.05 * s, head.pos[2] + 0.05 * s],
+            ..head
+        }),
+        left_hand: Some(hand(left)),
+        right_hand: Some(hand(right)),
+        look: 0.3 * s,
+    }
+}
+
 /// Warm-up then measured frames on a fresh scene with its island jobs on `pool`; returns each measured frame's wall time in milliseconds and the
-/// summed counters. Each avatar sways sideways so its chains keep moving, and flips one parameter every
-/// [`FLIP_EVERY`] frames.
-fn measure(model: &Arc<Model>, pool: Arc<jobs::Pool>, cfg: &Config) -> (Vec<f64>, Counters) {
+/// summed counters. Each avatar sways sideways so its chains keep moving, reaches for IK targets ([`reach`]) and flips
+/// one parameter every [`FLIP_EVERY`] frames.
+fn measure(model: &Arc<Model>, rest: &Option<[Goal; 3]>, pool: Arc<jobs::Pool>, cfg: &Config) -> (Vec<f64>, Counters) {
     let mut runtime = scene(model, pool, cfg.avatars);
     let homes: Vec<Pose> = runtime.islands().iter().map(|i| i.origin).collect();
     let params = model.controller().map_or(0, |c| c.state.entries.len());
@@ -185,6 +226,9 @@ fn measure(model: &Arc<Model>, pool: Arc<jobs::Pool>, cfg: &Config) -> (Vec<f64>
         for (k, home) in homes.iter().enumerate() {
             let mut island = runtime.island_mut(k);
             island.origin.pos[0] = home.pos[0] + 0.1 * (t * 3.0 + k as f32).sin();
+            if let Some(rest) = rest {
+                island.targets = reach(rest, t + k as f32);
+            }
             if params > 0 && f % FLIP_EVERY == 0 {
                 let p = (f / FLIP_EVERY) as usize % params;
                 if let Some(a) = island.animator_mut() {

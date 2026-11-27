@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use civbb_anim::action::coerce;
+use civbb_anim::action::{PoseSources, coerce};
+use civbb_anim::ik::{Solver, Targets};
 use civbb_anim::material;
 use civbb_anim::{Constraints, Controller, Instance, Slot, Target};
 use civbb_core::math::{Pose, world_poses_into};
@@ -10,6 +11,7 @@ use civbb_core::{Counters, System};
 use civbb_dynamics::contact::Participant;
 use civbb_dynamics::{ContactRig, ContactState, State};
 use civbb_format::Document;
+use civbb_format::animator::PoseSource;
 use civbb_format::hierarchy::{HumanBone, NodeIndex};
 use civbb_format::material::{Material, MaterialField};
 use civbb_format::math::Transform;
@@ -21,6 +23,8 @@ use civbb_format::state::{EntryIndex, EntryKind, Platform};
 pub struct Model {
     controller: Option<Controller>,
     constraints: Constraints,
+    /// Full-body IK; `None` for avatars that are not full humanoids.
+    ik: Option<Solver>,
     chains: civbb_dynamics::Rig,
     contacts: ContactRig,
     parents: Vec<Option<NodeIndex>>,
@@ -131,6 +135,7 @@ impl Model {
         Self {
             controller,
             constraints: Constraints::new(avatar),
+            ik: Solver::new(avatar),
             chains: civbb_dynamics::Rig::new(avatar),
             contacts,
             parents: nodes.iter().map(|n| n.parent).collect(),
@@ -173,6 +178,8 @@ pub struct Island {
     pub origin: Pose,
     /// Drawn for its own first-person view: the head and everything below it shrink to the head (ADR 0106).
     pub hide_head: bool,
+    /// IK targets in avatar space for the next step (ADR 0111); the default leaves the animated pose.
+    pub targets: Targets,
     model: Arc<Model>,
     animator: Option<Instance>,
     chains: State,
@@ -195,6 +202,7 @@ impl Island {
             local,
             origin,
             hide_head: false,
+            targets: Targets::default(),
             animator: model.controller.as_ref().map(|c| Instance::new(c, local)),
             chains: State::new(&model.chains),
             contacts: ContactState::new(&model.contacts),
@@ -321,13 +329,14 @@ impl Island {
             active,
             world,
             constraint_scratch,
+            targets,
             ..
         } = self;
         let m = &**model;
         counters.time(System::Animator, || {
             locals.copy_from_slice(&m.rest);
             own_active.copy_from_slice(&m.active);
-            if let (Some(c), Some(a)) = (&m.controller, animator) {
+            if let (Some(c), Some(a)) = (&m.controller, animator.as_mut()) {
                 for (r, &v) in m.receivers.iter().zip(contacts.values()) {
                     if let &Some((p, kind)) = r {
                         a.params[p as usize] = coerce(kind, v);
@@ -356,7 +365,12 @@ impl Island {
         counters.time(System::Constraints, || {
             m.constraints.evaluate(locals, constraint_scratch)
         });
-        counters.time(System::Ik, || ik(locals));
+        let sources: PoseSources = animator.as_ref().map_or([PoseSource::Tracking; 10], |a| a.pose_sources);
+        counters.time(System::Ik, || {
+            if let Some(ik) = &m.ik {
+                ik.solve(locals, targets, &sources);
+            }
+        });
         counters.time(System::Dynamics, || chains.step(&m.chains, *origin, locals, dt));
         counters.time(System::World, || {
             world_poses_into(&m.parents, *origin, locals, world);
@@ -378,6 +392,3 @@ impl Island {
         }
     }
 }
-
-/// Full-body IK: a stub until the solver exists (design doc §7, Phase 1); it keeps its place and timer in the order.
-fn ik(_locals: &mut [Transform]) {}

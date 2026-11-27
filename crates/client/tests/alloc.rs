@@ -5,6 +5,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::sync::Arc;
 
+use civbb_anim::ik::{Goal, Targets};
 use civbb_client::frame::{self, Runtime};
 use civbb_client::{Island, Model};
 use civbb_core::math::Pose;
@@ -49,6 +50,17 @@ fn island_steps_do_not_allocate_after_warm_up() {
     for (name, spec) in [("lean", civbb_corpus::lean()), ("bloated", civbb_corpus::bloated())] {
         let avatar = civbb_corpus::generate(&spec);
         let mut island = Island::new(Arc::new(Model::new(&avatar)), 0, true, Pose::IDENTITY);
+        // IK with every target set (ADR 0111): hands in front of the chest, the head lowered, the view pitched.
+        let goal = |pos| Goal {
+            pos,
+            rot: [0.0, 0.0, 0.0, 1.0],
+        };
+        island.targets = Targets {
+            head: Some(goal([0.0, 1.3, 0.1])),
+            left_hand: Some(goal([0.2, 1.1, 0.3])),
+            right_hand: Some(goal([-0.2, 1.1, 0.3])),
+            look: 0.4,
+        };
         let mut counters = Default::default();
         let controller = island.model().controller().cloned();
         let entries = controller.as_ref().map_or(0, |c| c.state.entries.len());

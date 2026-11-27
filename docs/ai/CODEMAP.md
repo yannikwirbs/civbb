@@ -19,6 +19,7 @@ Internal deps: civbb-core, civbb-format
 - `src/defaults/poses.rs`: Generated built-in clips (ADR 0108): key poses and a procedural gait in muscle space, each key's body height
 - `src/defaults.rs`: Built-in locomotion (ADR 0108): substitutes for the SDK's empty proxy clips and default Base, Gesture and Action
 - `src/frames.rs`: Unity's muscle frames derived from a humanoid's rest pose (#53, ADR 0064), for sources that carry none (glTF,
+- `src/ik.rs`: Full-body IK (design doc §7, ADR 0111): head and hand targets in avatar space reached by an iterative spine and
 - `src/lib.rs`: Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles and constraints (design
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
 - `src/material.rs`: Animated material fields (ADRs 0025, 0099): a [`MaterialField`] of a material read and written in the units the
@@ -33,6 +34,7 @@ Internal deps: civbb-core, civbb-format
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
 - `tests/defaults.rs`: Built-in locomotion (ADR 0108) on the generated humanoid: proxy names, the merged layers, and the poses they
 - `tests/golden.rs`: Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
+- `tests/ik.rs`: Full-body IK (ADR 0111) on the lean corpus humanoid: reachable targets are met within 1 mm with bone lengths
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
 - `tests/material.rs`: Material curves (ADRs 0025, 0099): native fields read and written as stored, the sRGB transfer, per-renderer slots
 - `tests/mirror.rs`: Humanoid mirroring (ADR 0060): the muscle map against Unity's recording (`tools/unity-truth/Assets/Editor/Mirror.cs`
@@ -343,6 +345,7 @@ Internal deps: none
 - `docs/adr/0108-built-in-locomotion.md`: 0108: Built-in locomotion: generated muscle poses merged into avatars at load
 - `docs/adr/0109-default-gesture-layer.md`: 0109: A default Gesture layer per hand
 - `docs/adr/0110-character-controller.md`: 0110: An own capsule character controller over static triangles until worlds need rigid bodies
+- `docs/adr/0111-full-body-ik-3-point.md`: 0111: Full-body IK: avatar-space bone targets, hips follow the head, limbs keep their animated bend
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

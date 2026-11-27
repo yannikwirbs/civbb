@@ -6,7 +6,7 @@ use civbb_client::extract::{Camera, Snapshot};
 use civbb_client::frame::Runtime;
 use civbb_client::package::Package;
 use civbb_client::player::{Input, Player, Posture, RUN, View, WALK};
-use civbb_core::math::Pose;
+use civbb_core::math::{Pose, conj, rotate};
 use civbb_format::hierarchy::HumanBone;
 use civbb_format::state::{Entry, Platform};
 
@@ -134,5 +134,30 @@ fn first_person_shrinks_the_players_head_to_a_point() {
             // Other islands never hide their head.
             assert!(head_matrix(&runtime, 1, j)[..12].iter().any(|&x| x != 0.0));
         }
+    }
+}
+
+#[test]
+fn looking_up_and_down_turns_the_players_head_only() {
+    let package = Package::new(civbb_corpus::generate(&civbb_corpus::lean()), Vec::new());
+    let head = (package.avatar.avatar().and_then(|a| a.humanoid.as_ref()))
+        .and_then(|h| h.node(HumanBone::Head))
+        .expect("a head") as usize;
+    let mut runtime = Runtime::default();
+    runtime.add_player();
+    let e = runtime.spawn_package(&package, 0, true, Pose::IDENTITY);
+    runtime.spawn_package(&package, 1, false, Pose::IDENTITY);
+    runtime.world.resource_mut::<Player>().island = Some(e);
+    runtime.step(DT);
+    let level = |runtime: &Runtime, k: usize| runtime.islands()[k].world()[head].rot;
+    let start = [level(&runtime, 0), level(&runtime, 1)];
+    for pitch in [0.5_f32, -0.5] {
+        let turned = pitch - runtime.world.resource::<Player>().pitch;
+        runtime.world.resource_mut::<Input>().look = [0.0, turned];
+        runtime.step(DT);
+        // The head's forward, measured against its level placement, tilts by the pitch.
+        let forward = rotate(level(&runtime, 0), rotate(conj(start[0]), [0.0, 0.0, 1.0]));
+        assert!((forward[1] - pitch.sin()).abs() < 1e-3, "{pitch}: {forward:?}");
+        assert_eq!(level(&runtime, 1), start[1], "other islands keep their head");
     }
 }

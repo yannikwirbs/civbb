@@ -10,6 +10,7 @@ pub mod controller;
 pub mod curve;
 pub mod defaults;
 pub mod frames;
+pub mod ik;
 pub mod machine;
 pub mod material;
 mod mix;
