@@ -436,6 +436,7 @@ impl<'a> Graph<'a> {
         // SAFETY: per this function's contract; barriers and rendering infos only reference the graph's resources.
         unsafe {
             for ((pass, before), buffers) in self.passes.into_iter().zip(&plan.before).zip(&plan.buffers) {
+                let _zone = civbb_core::profile::zone(pass.name);
                 barriers(device, cmd, &self.images, &self.buffers, before, buffers);
                 let attachment = |(image, load): (ImageId, Load)| {
                     let (load_op, clear) = match load {

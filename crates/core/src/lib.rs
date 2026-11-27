@@ -5,6 +5,7 @@ pub mod counters;
 pub mod jobs;
 pub mod math;
 pub mod mips;
+pub mod profile;
 pub mod schedule;
 
 pub use counters::{Counters, System};

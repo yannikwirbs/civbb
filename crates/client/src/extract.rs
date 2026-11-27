@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
+use civbb_core::{Counters, System};
 use civbb_format::material::Material;
 use civbb_format::math::{Mat4, Vec3};
 
@@ -103,11 +104,14 @@ pub(crate) fn extract_system(
     q: Query<(Entity, &Spawned, &Shows, &Island)>,
     camera: Res<Camera>,
     mut snapshot: ResMut<Snapshot>,
+    mut counters: ResMut<Counters>,
 ) {
-    let mut all: Vec<_> = q.iter().collect();
-    all.sort_unstable_by_key(|(_, spawned, ..)| **spawned);
-    let islands = all
-        .into_iter()
-        .map(|(e, _, shows, island)| (e.to_bits(), &shows.0, island));
-    snapshot.extract(islands, *camera);
+    counters.time(System::Extract, || {
+        let mut all: Vec<_> = q.iter().collect();
+        all.sort_unstable_by_key(|(_, spawned, ..)| **spawned);
+        let islands = all
+            .into_iter()
+            .map(|(e, _, shows, island)| (e.to_bits(), &shows.0, island));
+        snapshot.extract(islands, *camera);
+    });
 }

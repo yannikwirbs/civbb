@@ -76,6 +76,7 @@ Internal deps: civbb-format
 - `src/lib.rs`: Engine core: math, the frame schedule, the job runner for per-avatar islands and per-system timing counters
 - `src/math.rs`: Vector and quaternion helpers on the format's array types, and world placements of a node hierarchy.
 - `src/mips.rs`: Texture mip chains made on the CPU, the one definition the compiler encodes and the renderer uploads (ADR 0035).
+- `src/profile.rs`: Tracy zones behind the off-by-default `profile` feature (ADR 0103): without it zones are empty values and no Tracy
 - `src/schedule.rs`: The frame schedule: one simulation frame's system sets in design doc §5's order, run chained (ADR 0103).
 - `tests/mips.rs`: CPU mip chains (ADR 0035): 2x2 boxes for even sides, linear-light averages for sRGB colour, linear alpha,
 

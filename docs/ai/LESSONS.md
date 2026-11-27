@@ -51,5 +51,8 @@ Add a line to the matching file whenever something costs more than one attempt.
 - `fuzz/` is its own workspace and the gate never builds it: a format API change that passes `cargo xtask ci` can still break the fuzz CI job. Run `cargo check --manifest-path fuzz/Cargo.toml --bins` after renaming or moving format types.
 - Git Bash's `/tmp` is not a path Windows Python can open (`FileNotFoundError`): put scratch files under
   `target/scratch/`. Git Bash has no `pgrep`; wait on a background job's own output (its log lines) instead.
+- Running a downloaded third-party executable (Tracy's `tracy-capture.exe` from its GitHub release, #136) is
+  denied by the auto-mode permission classifier. Hand checks that need such tools to the owner (`needs-user`, steps in
+  the issue) instead of retrying.
 - bevy_tasks: `TaskPool::scope` runs tasks on the calling thread too (n workers = n - 1 pool threads), and
   `ComputeTaskPool` & co. are process-wide `OnceLock`s that cannot be resized: build own `TaskPool`s to vary counts.

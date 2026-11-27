@@ -30,6 +30,8 @@ windows-sys = { version = "0.61", features = ["Win32_System_SystemInformation", 
 default = ["parity"]
 # FLIP scoring (ADR 0033). Off in the fuzz build: flip-rs is also a cdylib, which cargo-fuzz cannot link on MSVC.
 parity = ["dep:flip-rs"]
+# Tracy zones in every engine crate (ADR 0103, #136); the binary starts the client.
+profile = ["civbb-core/profile"]
 
 [lints]
 workspace = true

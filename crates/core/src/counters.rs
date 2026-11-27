@@ -2,7 +2,7 @@
 
 use std::time::Instant;
 
-/// The systems of a simulation frame that report their time, in pipeline order (design doc §5 steps 5 and 6).
+/// The systems of a simulation frame that report their time, in pipeline order (design doc §5 steps 5 to 9).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum System {
     /// Animator state machines, blend trees and the pose they write.
@@ -17,17 +17,20 @@ pub enum System {
     World,
     /// The cross-avatar contact pass.
     Contacts,
+    /// Render data copied out for the renderer.
+    Extract,
 }
 
 impl System {
     /// Every system, in pipeline order.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Animator,
         Self::Constraints,
         Self::Ik,
         Self::Dynamics,
         Self::World,
         Self::Contacts,
+        Self::Extract,
     ];
 
     /// Lower-case name for reports.
@@ -39,6 +42,7 @@ impl System {
             Self::Dynamics => "dynamics",
             Self::World => "world",
             Self::Contacts => "contacts",
+            Self::Extract => "extract",
         }
     }
 }
@@ -54,8 +58,9 @@ pub struct Counters {
 }
 
 impl Counters {
-    /// Runs `f` and adds its time to `system`.
+    /// Runs `f` and adds its time to `system`; with the `profile` feature also as a Tracy zone.
     pub fn time<R>(&mut self, system: System, f: impl FnOnce() -> R) -> R {
+        let _zone = crate::profile::zone(system.name());
         let start = Instant::now();
         let r = f();
         self.nanos[system as usize] += start.elapsed().as_nanos() as u64;
@@ -98,7 +103,7 @@ mod tests {
         let mut b = Counters::default();
         b.time(System::Ik, || ());
         b.merge(&a);
-        assert_eq!(b.runs, [0, 0, 1, 2, 0, 0]);
+        assert_eq!(b.runs, [0, 0, 1, 2, 0, 0, 0]);
         assert_eq!(b.total_nanos(), a.total_nanos() + b.nanos[System::Ik as usize]);
     }
 }

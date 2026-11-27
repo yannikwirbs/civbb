@@ -115,11 +115,13 @@ fn run(mut renderer: Renderer, mut gpu: Gpu, inbox: &Receiver<Message>, outbox: 
             Message::Resize(width, height) => renderer.resize(width, height),
             Message::Frame(snapshot) => {
                 let start = Instant::now();
+                let zone = civbb_core::profile::zone("render");
                 let drawn = draw(&mut renderer, &mut gpu, &snapshot, &mut scratch).map(|counts| Drawn {
                     counts,
                     cpu_ms: start.elapsed().as_secs_f32() * 1000.0 - renderer.blocked_ms(),
                     gpu_ms: renderer.gpu_ms(),
                 });
+                drop(zone);
                 let failed = drawn.is_err();
                 if outbox.send((snapshot, drawn)).is_err() || failed {
                     break;

@@ -212,6 +212,7 @@ impl Renderer {
         // buffer and semaphore are no longer in use before they are reused.
         unsafe {
             let wait = std::time::Instant::now();
+            let blocked = civbb_core::profile::zone("wait");
             device.wait_for_fences(&[frame.done], true, u64::MAX)?;
             let (queries, period, written) = &mut self.timestamps;
             let first = 2 * self.current as u32;
@@ -256,6 +257,7 @@ impl Renderer {
                 None => unreachable!("recreated above"),
             };
             self.blocked_ms = wait.elapsed().as_secs_f32() * 1000.0;
+            drop(blocked);
             device.reset_command_pool(frame.pool, vk::CommandPoolResetFlags::empty())?;
             device.begin_command_buffer(
                 frame.cmd,
@@ -304,6 +306,7 @@ impl Renderer {
                 .wait_semaphores(&wait)
                 .swapchains(&swapchains)
                 .image_indices(&indices);
+            let _zone = civbb_core::profile::zone("present");
             match sc.loader.queue_present(self.ctx.queue(), &present) {
                 Ok(suboptimal) => self.stale |= suboptimal,
                 Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.stale = true,

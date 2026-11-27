@@ -350,7 +350,11 @@ What exists, by area. Read the section for the area you touch; update it when th
   converted from gamma even when `[HDR]` (an `[HDR]` default still round-trips, #93).
 - `civbb-core`: shared math, `jobs` on bevy_tasks (#132, ADR 0103: `islands(pool, ..)` one task per island, the
   waiting thread works too, so `pool(n, on_spawn)` has n - 1 threads; `default_workers()` cores minus 2; rayon is
-  gone), per-system `Counters` (a resource),
+  gone), per-system `Counters` (a resource; avatar systems, contacts and, in the runtime, extract),
+  `profile` (#136: `zone(name)` guards, `start()` in the client's `main`, `frame_mark()` after each `Runtime::step`;
+  Tracy only with the off-by-default `profile` feature, `cargo build -p civbb-client --release --features profile`;
+  zones per `Counters::time` system, per island job (`island`), the `avatars` system, the render thread's `render`,
+  the renderer's `wait` and `present`, and each render graph pass by name; the gate never builds the feature),
   `schedule::frame()` (ADR 0103: the `Frame` schedule, `Step` sets in design doc §5's order, chained; `Dt`).
   `civbb-client`: `Model`/`Island` (a component; animator, constraints, IK stub, dynamics, world poses),
   `frame::step` (plain: islands then the contact pass feeding next frame's parameters, ADR 0020; parity and the

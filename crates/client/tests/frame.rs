@@ -93,11 +93,16 @@ fn chain_outputs_reach_their_entries() {
 
 #[test]
 fn every_system_reports_per_island_and_the_contact_pass_once() {
+    // The plain step has no extract step; the runtime's is counted in the extract test below.
     let avatar = civbb_corpus::generate(&civbb_corpus::lean());
     let mut islands: Vec<Island> = (0..5).map(|id| island(&avatar, id, id == 0)).collect();
     let c = frame::step(&mut islands, |_, _| true, DT);
     for s in System::ALL {
-        let expected = if s == System::Contacts { 1 } else { 5 };
+        let expected = match s {
+            System::Contacts => 1,
+            System::Extract => 0,
+            _ => 5,
+        };
         assert_eq!(c.runs[s as usize], expected, "{}", s.name());
     }
 }
@@ -322,7 +327,8 @@ fn the_extract_step_copies_every_island_in_spawn_order() {
     };
     runtime.world.insert_resource(camera);
     for _ in 0..3 {
-        runtime.step(DT);
+        let c = runtime.step(DT);
+        assert_eq!(c.runs[System::Extract as usize], 1);
     }
     let snapshot = runtime.world.resource::<Snapshot>();
     assert_eq!(snapshot.camera, camera);

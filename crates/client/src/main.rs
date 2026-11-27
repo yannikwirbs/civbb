@@ -47,6 +47,8 @@ rig prints the hand-off for Unity reference renders of a package's avatar as JSO
 parameters and states (ADR 0048).";
 
 fn main() -> ExitCode {
+    // With the `profile` feature: Tracy zones from here on (#136).
+    civbb_core::profile::start();
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("view") => return run_view(&args[1..]),

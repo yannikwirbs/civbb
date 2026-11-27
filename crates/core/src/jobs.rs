@@ -13,6 +13,7 @@ pub fn islands<T: Send>(pool: &TaskPool, islands: &mut [T], step: impl Fn(&mut T
     pool.scope(|s| {
         for island in islands.iter_mut() {
             s.spawn(async move {
+                let _zone = crate::profile::zone("island");
                 let mut c = Counters::default();
                 step(island, &mut c);
                 c

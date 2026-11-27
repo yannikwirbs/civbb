@@ -43,7 +43,15 @@ fn bench_reports_every_worker_count_as_json() {
         let names: Vec<&str> = systems.keys().map(String::as_str).collect();
         assert_eq!(
             names,
-            ["animator", "constraints", "contacts", "dynamics", "ik", "world"]
+            [
+                "animator",
+                "constraints",
+                "contacts",
+                "dynamics",
+                "extract",
+                "ik",
+                "world"
+            ]
         );
     }
     assert_eq!(runs[0]["speedup"].as_f64(), Some(1.0));

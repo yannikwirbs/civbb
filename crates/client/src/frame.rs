@@ -7,7 +7,7 @@ use std::sync::{Arc, OnceLock};
 use bevy_ecs::prelude::*;
 use civbb_core::math::Pose;
 use civbb_core::schedule::{self, Dt, Step};
-use civbb_core::{Counters, System, jobs};
+use civbb_core::{Counters, System, jobs, profile};
 use civbb_dynamics::contact::{self, Participant};
 
 use crate::affinity;
@@ -77,6 +77,7 @@ pub struct Workers(pub Arc<jobs::Pool>);
 
 /// The island step of [`Step::Avatars`]: one job per island; replaces the frame's [`Counters`].
 fn islands_system(mut q: Query<&mut Island>, dt: Res<Dt>, workers: Res<Workers>, mut counters: ResMut<Counters>) {
+    let _zone = profile::zone("avatars");
     let mut all: Vec<&mut Island> = q.iter_mut().map(Mut::into_inner).collect();
     *counters = jobs::islands(&workers.0, &mut all, |island, c| island.step(dt.0, c));
 }
@@ -172,6 +173,7 @@ impl Runtime {
     pub fn step(&mut self, dt: f32) -> Counters {
         self.world.insert_resource(Dt(dt));
         self.schedule.run(&mut self.world);
+        profile::frame_mark();
         *self.world.resource::<Counters>()
     }
 
