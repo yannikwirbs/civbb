@@ -330,8 +330,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   panic is re-raised on main. Headless `measure` runs pipelined too: its "viewer CPU per frame" is now the busier
   thread per frame and "systems" includes extract. Parity draws synchronously (extract, then `draw`, same thread).
   Release, reference PC, 100 bloated, vsync: serial before 2.13 ms CPU (systems 1.19 ms); pipelined 1.57 to 1.89 ms
-  (simulation 1.57 to 1.82 ms with extract ~0.4 ms of it, render thread 0.69 to 0.80 ms), GPU ~0.7 ms. Extract runs
-  on one thread (not yet per island on the pool).
+  (simulation 1.57 to 1.82 ms with extract ~0.4 ms of it, render thread 0.69 to 0.80 ms), GPU ~0.7 ms. Since #137
+  the runtime's extract is one job per island on the `Workers` pool (`Snapshot::extract_on`; the plain `extract`
+  parity uses stays serial, both through `IslandSnapshot::fill`; `System::Extract` counts once per island): extract
+  wall 0.35 to 0.12 ms (0.40 ms summed CPU; the gap to ~0.03 ms is #140), simulation 1.69 to 1.52 ms.
 - GPU resources by island (#134, ADR 0104, `civbb_client::gpu`): each `IslandSnapshot` carries its key (entity bits)
   and package handle; `Gpu::sync` (start of `draw`) uploads a package on first sight (meshes, textures, shared
   materials, bounds), gives a new key a freed instance of its package or a new one (skinned meshes, own material
@@ -350,7 +352,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   converted from gamma even when `[HDR]` (an `[HDR]` default still round-trips, #93).
 - `civbb-core`: shared math, `jobs` on bevy_tasks (#132, ADR 0103: `islands(pool, ..)` one task per island, the
   waiting thread works too, so `pool(n, on_spawn)` has n - 1 threads; `default_workers()` cores minus 2; rayon is
-  gone), per-system `Counters` (a resource; avatar systems, contacts and, in the runtime, extract),
+  gone), per-system `Counters` (a resource; avatar systems, contacts and, in the runtime, extract per island),
   `profile` (#136: `zone(name)` guards, `start()` in the client's `main`, `frame_mark()` after each `Runtime::step`;
   Tracy only with the off-by-default `profile` feature, `cargo build -p civbb-client --release --features profile`;
   zones per `Counters::time` system, per island job (`island`), the `avatars` system, the render thread's `render`,

@@ -328,7 +328,8 @@ fn the_extract_step_copies_every_island_in_spawn_order() {
     runtime.world.insert_resource(camera);
     for _ in 0..3 {
         let c = runtime.step(DT);
-        assert_eq!(c.runs[System::Extract as usize], 1);
+        // One extract job per island (#137).
+        assert_eq!(c.runs[System::Extract as usize], 3);
     }
     let snapshot = runtime.world.resource::<Snapshot>();
     assert_eq!(snapshot.camera, camera);
