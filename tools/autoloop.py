@@ -1,7 +1,9 @@
-"""Back-to-back headless `/continue` sessions until the 5-hour usage window passes a threshold.
+"""Back-to-back headless `/continue` sessions while the 5-hour usage window has room for another.
 
+Between sessions it predicts the next session's usage as the average of past sessions' usage
+(percentage points of the window) and stops if that prediction would cross the limit or 100%.
 Usage is checked only between sessions, so a running session always finishes first.
-Usage: python tools/autoloop.py [threshold percent, default 80]
+Usage: python tools/autoloop.py [limit percent, default 90]
 """
 
 import json
@@ -43,29 +45,44 @@ def run(args, label, cwd):
         elif t == "rate_limit_event":
             w = e["rate_limit_info"].get("unifiedWindows", {}).get("five_hour")
             if w:
-                used = int(w["utilization"] * 100)
+                used = w["utilization"] * 100
         elif t == "result" and label:
             mins = e.get("duration_ms", 0) // 60000
             print(f"\n--- [session {label}] ended: {e.get('subtype')}, {e.get('num_turns')} turns, {mins} min ---")
     return proc.wait(), used
 
 
+def usage():
+    """Current 5h usage % via a tiny Haiku call, or None if unknown."""
+    return run(["reply ok", "--model", "haiku"], None, tempfile.gettempdir())[1]
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    limit = int(sys.argv[1]) if len(sys.argv) > 1 else 80
+    limit = float(sys.argv[1]) if len(sys.argv) > 1 else 90
+    before = usage()
+    costs = []  # usage (percentage points) of each past session
     n = 0
     while True:
-        n += 1
-        print(f"\n==================== SESSION {n}  ({datetime.now():%Y-%m-%d %H:%M:%S}) ====================", flush=True)
-        code, used = run(["/continue", "--permission-mode", "auto"], n, REPO)
-        if code != 0:
-            sys.exit(f"autoloop: session {n} exited with code {code}, stopping.")
-        if used is None:  # no usage event in the stream: ask with a tiny Haiku call
-            _, used = run(["reply ok", "--model", "haiku"], None, tempfile.gettempdir())
-        print(f"autoloop: 5-hour window at {used if used is not None else 'unknown'}% (limit {limit}%)")
-        if used is None or used >= limit:
+        avg = sum(costs) / len(costs) if costs else 0
+        if before is None:
+            print("autoloop: 5-hour usage unknown, stopping.")
+            return
+        predicted = before + avg
+        print(f"autoloop: window at {before:.1f}%, avg session {avg:.1f}%, next predicted {predicted:.1f}% (limit {limit:g}%)")
+        if predicted > limit or predicted > 100:
             print(f"autoloop: stopping after {n} session(s).")
             return
+        n += 1
+        print(f"\n==================== SESSION {n}  ({datetime.now():%Y-%m-%d %H:%M:%S}) ====================", flush=True)
+        code, after = run(["/continue", "--permission-mode", "auto"], n, REPO)
+        if code != 0:
+            sys.exit(f"autoloop: session {n} exited with code {code}, stopping.")
+        if after is None:
+            after = usage()
+        if after is not None and after >= before:  # a drop means the window reset mid-session: no clean sample
+            costs.append(after - before)
+        before = after
 
 
 if __name__ == "__main__":
