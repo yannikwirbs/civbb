@@ -51,3 +51,6 @@ run that takes minutes.
   recordings, goldens and the corpus writer all parse or write that JSON. Before such a change, grep for
   `serde_json::from_` of format types across every crate's tests, and capture a serde-independent pin (`{:?}` of the
   imports) to compare after, so goldens can be re-blessed with evidence.
+- A claim in STATUS or a comment that "order matters" (or any invariant) is a hypothesis: a mutation check showed
+  the contact pass is order-free (max over senders), which removed code #134 was about to add. Mutate before
+  building on such a claim.

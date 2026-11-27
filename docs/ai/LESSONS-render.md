@@ -84,3 +84,6 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   1, rendered as on UV0); the renderer does the same (`scene.rs`).
 - A batch that runs `target/release` binaries for many minutes (`tools/parity.sh` over 13 exports) must not overlap
   a release rebuild; debug `cargo test`/`xtask ci` can run meanwhile.
+- `powershell -File script.ps1 -Args a,b` hands a `[string[]]` parameter one string `"a,b"` (no array parsing with
+  `-File`): the viewer got bad arguments and exited before its window opened. Take one `[string]` of space-separated
+  arguments for `Start-Process -ArgumentList`.
