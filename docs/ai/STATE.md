@@ -317,9 +317,19 @@ What exists, by area. Read the section for the area you touch; update it when th
 - Viewer (ADR 0024): `civbb-client view [<pkg> --key <key> | --avatar lean|bloated] [--copies N] [--frames F]
   [--warmup W] [--lod L]`; the title shows triangles per copy; `--frames` summarises the F frames after a 60-frame
   warm-up (ADR 0032).
-  glTF/VRM go through `civbb build` first (client may not depend on pipeline). Release, reference PC: 100 bloated
-  avatars 1.72 ms CPU per frame (systems 0.53 ms), 0.56 ms GPU; 4 Yumeka 1.5 ms CPU, 0.21 ms GPU. AliciaSolid
-  renders textured and toon-shaded. Debug builds are ~30x slower on the CPU (validation).
+  glTF/VRM go through `civbb build` first (client may not depend on pipeline). AliciaSolid renders textured and
+  toon-shaded. Debug builds are ~30x slower on the CPU (validation).
+- Pipelined frames (#133, ADR 0103 point 5): the schedule's `Extract` step (`civbb_client::extract`,
+  `Runtime::extract_to_snapshot`) copies each island's origin, skinning matrices (`None` for inactive meshes), shape
+  weights, animated materials and submesh slots plus the `Camera` resource into the `Snapshot` resource. The viewer
+  swaps it with a free one and hands it to `render_thread::RenderThread` (owns `Renderer` + `Gpu`; culling, material
+  packing, draw lists and recording happen there via `view::draw`); two snapshots circulate, so simulation is one
+  frame ahead at most. Window and event loop stay on main; resizes go through the thread's channel; a render-thread
+  panic is re-raised on main. Headless `measure` runs pipelined too: its "viewer CPU per frame" is now the busier
+  thread per frame and "systems" includes extract. Parity draws synchronously (extract, then `draw`, same thread).
+  Release, reference PC, 100 bloated, vsync: serial before 2.13 ms CPU (systems 1.19 ms); pipelined 1.57 to 1.89 ms
+  (simulation 1.57 to 1.82 ms with extract ~0.4 ms of it, render thread 0.69 to 0.80 ms), GPU ~0.7 ms. Extract runs
+  on one thread (not yet per island on the pool).
 
 ## Runtime (`core`, `anim`, `dynamics`, `client`)
 
