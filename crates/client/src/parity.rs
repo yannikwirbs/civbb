@@ -17,8 +17,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::extract::{Camera, Snapshot};
 use crate::frame;
+use crate::gpu::{self, Gpu, Scratch};
 use crate::island::{Island, Model};
-use crate::view::{self, BACKGROUND, Gpu, Scratch, TextureImage};
+use crate::package::{Handle, Package};
+use crate::view::{BACKGROUND, TextureImage};
 
 /// Rig image size in pixels: square, as T-posed avatars are about as wide as tall.
 pub const WIDTH: u32 = 640;
@@ -52,7 +54,7 @@ pub const DT: f32 = 1.0 / 60.0;
 pub struct Side<'a> {
     /// The avatar.
     pub avatar: &'a Document,
-    /// Its textures, from [`view::decode_textures`].
+    /// Its textures, from [`crate::view::decode_textures`].
     pub textures: &'a [Option<TextureImage>],
 }
 
@@ -327,9 +329,12 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
         Reference::Unity { handoff, .. } => (handoff.rig.clone(), "unity", vec![&test], UNITY_THRESHOLDS),
     };
     let mut renderer = Renderer::headless(cfg!(debug_assertions), WIDTH, HEIGHT)?;
+    let packages: Vec<Handle> = (sides.iter())
+        .map(|s| Package::new(s.avatar.clone(), s.textures.to_vec()))
+        .collect();
     let mut gpus = Vec::with_capacity(2);
-    for side in &sides {
-        match Gpu::new(&renderer, side.avatar, &Model::new(side.avatar), side.textures, 1) {
+    for _ in &sides {
+        match Gpu::new(&renderer) {
             Ok(gpu) => gpus.push(gpu),
             Err(e) => {
                 destroy(&renderer, gpus);
@@ -359,8 +364,8 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
             return;
         }
         // Synchronous: each state is extracted and drawn on this thread (ADR 0103).
-        for (k, side) in sides.iter().enumerate() {
-            snapshots[k].extract(side.avatar, std::iter::once(&islands[k]), Camera::default());
+        for (k, package) in packages.iter().enumerate() {
+            snapshots[k].extract(std::iter::once((0, package, &islands[k])), Camera::default());
         }
         let mut shots = Vec::with_capacity(rig.views.len());
         let mut views = Vec::with_capacity(rig.views.len());
@@ -382,7 +387,7 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
                     fov_y: FOV_Y,
                     clear: BACKGROUND,
                 };
-                let drawn = view::draw(&mut renderer, &gpus[k], &snapshots[k], &mut scratch[k])
+                let drawn = gpu::draw(&mut renderer, &mut gpus[k], &snapshots[k], &mut scratch[k])
                     .and_then(|_| renderer.read_last());
                 match drawn {
                     Ok(texels) => pair.push(texels),

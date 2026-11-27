@@ -49,12 +49,14 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/cull.rs`: Frustum culling of mesh instances before skinning (design doc §6, ADR 0077): conservative world bounds from
 - `src/extract.rs`: The render snapshot: what the renderer reads of a frame, copied out of the islands by the `Extract` step so a
 - `src/frame.rs`: One simulation frame's avatar work: every island as its own parallel job, then the cross-avatar contact pass
+- `src/gpu.rs`: The render thread's GPU resources, kept in step with each snapshot: one upload per package shown and one skinned
 - `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
 - `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020),
 - `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`), a desktop
+- `src/package.rs`: Packages as shared handles: a verified avatar, its compiled model and decoded textures, loaded on the I/O pool
 - `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
-- `src/render_thread.rs`: The render thread: owns the renderer and the avatar's GPU resources, draws each snapshot it is handed while the
-- `src/view.rs`: Desktop viewer: N copies of an avatar in a grid with animator and dynamics running, drawn in a window with an
+- `src/render_thread.rs`: The render thread: owns the renderer and the GPU resources of what is shown, draws each snapshot it is handed
+- `src/view.rs`: Desktop viewer: N copies of each of several packages in a grid with animator and dynamics running, drawn in a
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
 - `tests/cull.rs`: Frustum culling of mesh instances (ADR 0077): the bounds hold every skinned vertex in every parity state, and
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
@@ -324,6 +326,7 @@ Internal deps: none
 - `docs/adr/0101-civbb-extension-layout.md`: 0101: CIVBB_* extensions: document parts at the root, glTF indices, node flags and toon materials local
 - `docs/adr/0102-dialect-1-as-a-json-rewrite.md`: 0102: Native JSON shapes, and Unity dialect 1 read through a JSON rewrite instead of copied types
 - `docs/adr/0103-client-runtime-on-bevy-ecs.md`: 0103: The client runtime on bevy_ecs: island entities, one task pool, a frame schedule and a render thread
+- `docs/adr/0104-package-handles-and-runtime-spawning.md`: 0104: Packages as shared handles, islands spawned and despawned at runtime, GPU instances keyed by island
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

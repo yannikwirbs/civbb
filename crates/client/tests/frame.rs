@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use civbb_client::extract::{Camera, Snapshot};
 use civbb_client::frame::{self, Runtime};
+use civbb_client::package::Package;
 use civbb_client::view::skin_matrices;
 use civbb_client::{Island, Model};
 use civbb_core::math::Pose;
@@ -302,11 +303,16 @@ fn a_toggle_can_switch_a_constraint_per_island() {
 
 #[test]
 fn the_extract_step_copies_every_island_in_spawn_order() {
-    let avatar = Arc::new(civbb_corpus::generate(&civbb_corpus::bloated()));
+    let package = Package::new(civbb_corpus::generate(&civbb_corpus::bloated()), Vec::new());
+    let avatar = &package.avatar;
     let mut runtime = Runtime::default();
-    runtime.extract_to_snapshot(Arc::clone(&avatar));
+    runtime.extract_to_snapshot();
     for id in [2, 0, 1] {
-        runtime.spawn(island(&avatar, id, id == 0));
+        let origin = Pose {
+            pos: [id as f32 * 2.0, 0.0, 0.0],
+            ..Pose::IDENTITY
+        };
+        runtime.spawn_package(&package, id, id == 0, origin);
     }
     let camera = Camera {
         eye: [0.0, 1.0, 3.0],
@@ -324,7 +330,10 @@ fn the_extract_step_copies_every_island_in_spawn_order() {
     assert_eq!(snapshot.islands.len(), islands.len());
     let mut weights = Vec::new();
     let mut materials = Vec::new();
+    let keys: std::collections::HashSet<u64> = snapshot.islands.iter().map(|s| s.key).collect();
+    assert_eq!(keys.len(), 3);
     for (s, island) in snapshot.islands.iter().zip(islands) {
+        assert!(Arc::ptr_eq(&s.package, &package));
         assert_eq!(s.origin, island.origin.pos);
         island.shape_weights(&mut weights);
         assert_eq!(s.weights, weights);
@@ -338,5 +347,64 @@ fn the_extract_step_copies_every_island_in_spawn_order() {
             });
             assert_eq!(s.joints[m], expected);
         }
+    }
+}
+
+/// Islands spawned and despawned between frames leave the others' results as they would be without them (ADR 0104):
+/// far-away extras come and go, and despawning reorders the ECS table, but the snapshot keeps spawn order.
+#[test]
+fn spawning_and_despawning_between_frames_leaves_the_other_islands_unchanged() {
+    let package = Package::new(civbb_corpus::generate(&civbb_corpus::bloated()), Vec::new());
+    let at = |x: f32| Pose {
+        pos: [x, 0.0, 0.0],
+        ..Pose::IDENTITY
+    };
+    // Four avatars close enough to touch, as in the reference.
+    let spawn = |r: &mut Runtime, id: u64| r.spawn_package(&package, id, id == 0, at(id as f32 * 0.3));
+    let results = |r: &Runtime| {
+        let all = r.islands();
+        let kept = all.iter().filter(|i| i.id < 4);
+        kept.map(|i| (i.id, i.world().to_vec(), i.contact_values().to_vec()))
+            .collect::<Vec<_>>()
+    };
+
+    let mut reference = Runtime::default();
+    reference.extract_to_snapshot();
+    for id in 0..4 {
+        spawn(&mut reference, id);
+    }
+    for _ in 0..30 {
+        reference.step(DT);
+    }
+
+    let mut runtime = Runtime::default();
+    runtime.extract_to_snapshot();
+    let far = runtime.spawn_package(&package, 100, false, at(100.0));
+    spawn(&mut runtime, 0);
+    spawn(&mut runtime, 1);
+    let farther = runtime.spawn_package(&package, 101, false, at(-100.0));
+    spawn(&mut runtime, 2);
+    spawn(&mut runtime, 3);
+    for f in 0..30 {
+        if f == 10 {
+            assert!(runtime.despawn(far));
+        }
+        if f == 20 {
+            runtime.spawn_package(&package, 102, false, at(200.0));
+            assert!(runtime.despawn(farther));
+            assert!(!runtime.despawn(farther));
+        }
+        runtime.step(DT);
+    }
+
+    assert_eq!(runtime.len(), 5);
+    assert_eq!(results(&runtime), results(&reference));
+    let (ours, theirs) = (
+        runtime.world.resource::<Snapshot>(),
+        reference.world.resource::<Snapshot>(),
+    );
+    assert_eq!(ours.islands.len(), 5);
+    for (a, b) in ours.islands.iter().zip(&theirs.islands) {
+        assert_eq!((a.origin, &a.joints, &a.weights), (b.origin, &b.joints, &b.weights));
     }
 }

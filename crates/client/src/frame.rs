@@ -5,14 +5,15 @@ use std::borrow::BorrowMut;
 use std::sync::{Arc, OnceLock};
 
 use bevy_ecs::prelude::*;
+use civbb_core::math::Pose;
 use civbb_core::schedule::{self, Dt, Step};
 use civbb_core::{Counters, System, jobs};
 use civbb_dynamics::contact::{self, Participant};
-use civbb_format::Document;
 
 use crate::affinity;
-use crate::extract::{Avatar, Camera, Snapshot, extract_system};
+use crate::extract::{Camera, Snapshot, extract_system};
 use crate::island::Island;
+use crate::package::Handle;
 
 /// The client's worker pool, made on first use: [`jobs::default_workers`] workers, pool threads kept to performance
 /// cores and no more of them than those cores have logical CPUs (ADR 0103).
@@ -80,19 +81,31 @@ fn islands_system(mut q: Query<&mut Island>, dt: Res<Dt>, workers: Res<Workers>,
     *counters = jobs::islands(&workers.0, &mut all, |island, c| island.step(dt.0, c));
 }
 
-/// The contact pass of [`Step::CrossAvatar`], in spawn order.
+/// The contact pass of [`Step::CrossAvatar`], in query order: a receiver's value is the largest over its senders,
+/// so the order islands come in does not change results (ADR 0104).
 fn contacts_system(mut q: Query<&mut Island>, dt: Res<Dt>, permits: Res<Permits>, mut counters: ResMut<Counters>) {
     let mut all: Vec<&mut Island> = q.iter_mut().map(Mut::into_inner).collect();
     contacts(&mut all, &permits.0, dt.0, &mut counters);
 }
 
-/// Avatar islands as entities in an ECS world and the frame schedule that steps them (ADR 0103). Islands keep the
-/// order they were spawned in.
+/// When an island was spawned: the extract step copies islands in this order (ADR 0104).
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Spawned(pub u64);
+
+/// The package an island shows; the extract step copies only islands that have one.
+#[derive(Component)]
+pub struct Shows(pub Handle);
+
+/// Avatar islands as entities in an ECS world and the frame schedule that steps them (ADR 0103). Islands are spawned
+/// and despawned between frames and keep the order they were spawned in (ADR 0104).
 pub struct Runtime {
     /// The ECS world: one entity per island, and the frame's resources.
     pub world: World,
     schedule: Schedule,
+    /// Live islands in spawn order.
     order: Vec<Entity>,
+    /// Islands spawned so far, the next [`Spawned`].
+    spawned: u64,
 }
 
 impl Default for Runtime {
@@ -119,13 +132,13 @@ impl Runtime {
             world,
             schedule,
             order: Vec::new(),
+            spawned: 0,
         }
     }
 
-    /// Adds the `Extract` step: each frame ends by copying every island, all showing `avatar`, and the [`Camera`]
+    /// Adds the `Extract` step: each frame ends by copying every island showing a package and the [`Camera`]
     /// resource into the [`Snapshot`] resource.
-    pub fn extract_to_snapshot(&mut self, avatar: Arc<Document>) {
-        self.world.insert_resource(Avatar(avatar));
+    pub fn extract_to_snapshot(&mut self) {
         self.world.init_resource::<Camera>();
         self.world.init_resource::<Snapshot>();
         self.schedule.add_systems(extract_system.in_set(Step::Extract));
@@ -133,9 +146,26 @@ impl Runtime {
 
     /// Adds `island` as an entity, after every island already spawned.
     pub fn spawn(&mut self, island: Island) -> Entity {
-        let e = self.world.spawn(island).id();
+        let e = self.world.spawn((Spawned(self.spawned), island)).id();
+        self.spawned += 1;
         self.order.push(e);
         e
+    }
+
+    /// Spawns an island showing `package`, after every island already spawned.
+    pub fn spawn_package(&mut self, package: &Handle, id: u64, local: bool, origin: Pose) -> Entity {
+        let e = self.spawn(Island::new(Arc::clone(&package.model), id, local, origin));
+        self.world.entity_mut(e).insert(Shows(Arc::clone(package)));
+        e
+    }
+
+    /// Removes the island `e`; the others keep their order. Returns whether it was there.
+    pub fn despawn(&mut self, e: Entity) -> bool {
+        let Some(k) = self.order.iter().position(|&o| o == e) else {
+            return false;
+        };
+        self.order.remove(k);
+        self.world.despawn(e)
     }
 
     /// Runs one frame of `dt` seconds; returns its per-system counters (CPU time).
@@ -149,15 +179,15 @@ impl Runtime {
     pub fn islands(&self) -> Vec<&Island> {
         self.order
             .iter()
-            .map(|&e| self.world.get::<Island>(e).expect("spawned islands are never removed"))
+            .map(|&e| self.world.get::<Island>(e).expect("islands in the order are live"))
             .collect()
     }
 
-    /// The `k`th island spawned.
+    /// The `k`th live island in spawn order.
     pub fn island_mut(&mut self, k: usize) -> Mut<'_, Island> {
         self.world
             .get_mut::<Island>(self.order[k])
-            .expect("spawned islands are never removed")
+            .expect("islands in the order are live")
     }
 
     /// The number of islands.

@@ -1,5 +1,6 @@
-//! The render thread: owns the renderer and the avatar's GPU resources, draws each snapshot it is handed while the
-//! schedule simulates the next frame, and hands the snapshot back to be reused (design doc §5 step 10, ADR 0103).
+//! The render thread: owns the renderer and the GPU resources of what is shown, draws each snapshot it is handed
+//! while the schedule simulates the next frame, and hands the snapshot back to be reused (design doc §5 step 10, ADR
+//! 0103).
 
 use std::sync::mpsc::{Receiver, Sender, SyncSender, channel, sync_channel};
 use std::thread::JoinHandle;
@@ -8,7 +9,7 @@ use std::time::Instant;
 use civbb_render::Renderer;
 
 use crate::extract::Snapshot;
-use crate::view::{Gpu, Scratch, draw};
+use crate::gpu::{Gpu, Scratch, draw};
 
 enum Message {
     Frame(Snapshot),
@@ -107,14 +108,14 @@ impl Drop for RenderThread {
 }
 
 /// The thread's loop; returns the validation errors reported.
-fn run(mut renderer: Renderer, gpu: Gpu, inbox: &Receiver<Message>, outbox: &Sender<Handed>) -> u32 {
+fn run(mut renderer: Renderer, mut gpu: Gpu, inbox: &Receiver<Message>, outbox: &Sender<Handed>) -> u32 {
     let mut scratch = Scratch::default();
     while let Ok(m) = inbox.recv() {
         match m {
             Message::Resize(width, height) => renderer.resize(width, height),
             Message::Frame(snapshot) => {
                 let start = Instant::now();
-                let drawn = draw(&mut renderer, &gpu, &snapshot, &mut scratch).map(|counts| Drawn {
+                let drawn = draw(&mut renderer, &mut gpu, &snapshot, &mut scratch).map(|counts| Drawn {
                     counts,
                     cpu_ms: start.elapsed().as_secs_f32() * 1000.0 - renderer.blocked_ms(),
                     gpu_ms: renderer.gpu_ms(),

@@ -632,6 +632,7 @@ version = "0.0.0"
 dependencies = [
  "basisu",
  "bevy_ecs",
+ "bevy_tasks",
  "civbb-anim",
  "civbb-core",
  "civbb-corpus",

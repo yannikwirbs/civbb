@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use civbb_client::package;
 use civbb_client::view;
 use civbb_format::cost::Measured;
 use civbb_format::package::{ContentKind, Header, Platform};
@@ -94,10 +95,12 @@ fn two_pinned_runs_agree_within_ten_percent() {
 }
 
 #[test]
-fn headless_frames_draw_without_validation_errors() {
+fn headless_frames_draw_two_packages_without_validation_errors() {
+    let load = |spec: civbb_corpus::Spec| {
+        package::spawn(move || Ok(package::Package::new(civbb_corpus::generate(&spec), vec![])))
+    };
     let cfg = view::Config {
-        avatar: civbb_corpus::generate(&civbb_corpus::bloated()),
-        textures: Vec::new(),
+        packages: vec![load(civbb_corpus::lean()), load(civbb_corpus::bloated())],
         copies: 2,
         frames: Some(4),
         warmup: 2,

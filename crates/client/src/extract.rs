@@ -4,11 +4,12 @@
 use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
-use civbb_format::Document;
 use civbb_format::material::Material;
 use civbb_format::math::{Mat4, Vec3};
 
+use crate::frame::{Shows, Spawned};
 use crate::island::Island;
+use crate::package::Handle;
 use crate::view::skin_matrices;
 
 /// Where the frame is seen from.
@@ -24,13 +25,12 @@ pub struct Camera {
     pub clear: [f32; 4],
 }
 
-/// The avatar every island shows, for the extract system (one avatar per runtime until packages are shared, #134).
-#[derive(Resource)]
-pub struct Avatar(pub Arc<Document>);
-
 /// One island as the renderer reads it.
-#[derive(Default)]
 pub struct IslandSnapshot {
+    /// The island's key, stable while it lives: the render thread keys its GPU instance by it (ADR 0104).
+    pub key: u64,
+    /// The package it shows.
+    pub package: Handle,
     /// Where the avatar's root parent is in the world.
     pub origin: Vec3,
     /// Per mesh, its skinning matrices; `None` for a mesh whose node is inactive.
@@ -53,16 +53,32 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Copies `islands`, each showing `avatar`, and `camera` into the snapshot.
+    /// Copies `islands`, each with its key and the package it shows, and `camera` into the snapshot.
     pub fn extract<'a>(
         &mut self,
-        avatar: &Document,
-        islands: impl ExactSizeIterator<Item = &'a Island>,
+        islands: impl ExactSizeIterator<Item = (u64, &'a Handle, &'a Island)>,
         camera: Camera,
     ) {
         self.camera = camera;
-        self.islands.resize_with(islands.len(), IslandSnapshot::default);
-        for (island, s) in islands.zip(&mut self.islands) {
+        self.islands.truncate(islands.len());
+        for (k, (key, package, island)) in islands.enumerate() {
+            if k == self.islands.len() {
+                self.islands.push(IslandSnapshot {
+                    key,
+                    package: Arc::clone(package),
+                    origin: [0.0; 3],
+                    joints: Vec::new(),
+                    weights: Vec::new(),
+                    materials: Vec::new(),
+                    slots: Vec::new(),
+                });
+            }
+            let s = &mut self.islands[k];
+            s.key = key;
+            if !Arc::ptr_eq(&s.package, package) {
+                s.package = Arc::clone(package);
+            }
+            let avatar = &package.avatar;
             s.origin = island.origin.pos;
             island.shape_weights(&mut s.weights);
             island.materials(&mut s.materials);
@@ -81,12 +97,17 @@ impl Snapshot {
     }
 }
 
-/// The extract system of [`civbb_core::schedule::Step::Extract`]: every island into the [`Snapshot`] resource.
+/// The extract system of [`civbb_core::schedule::Step::Extract`]: every island showing a package into the
+/// [`Snapshot`] resource, in spawn order.
 pub(crate) fn extract_system(
-    q: Query<&Island>,
-    avatar: Res<Avatar>,
+    q: Query<(Entity, &Spawned, &Shows, &Island)>,
     camera: Res<Camera>,
     mut snapshot: ResMut<Snapshot>,
 ) {
-    snapshot.extract(&avatar.0, q.iter(), *camera);
+    let mut all: Vec<_> = q.iter().collect();
+    all.sort_unstable_by_key(|(_, spawned, ..)| **spawned);
+    let islands = all
+        .into_iter()
+        .map(|(e, _, shows, island)| (e.to_bits(), &shows.0, island));
+    snapshot.extract(islands, *camera);
 }

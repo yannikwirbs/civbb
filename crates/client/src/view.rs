@@ -1,22 +1,18 @@
-//! Desktop viewer: N copies of an avatar in a grid with animator and dynamics running, drawn in a window with an
-//! orbit camera, CPU and GPU frame times in the title (design doc §21 Phase 0 deliverable 4, ADRs 0024 and 0025).
+//! Desktop viewer: N copies of each of several packages in a grid with animator and dynamics running, drawn in a
+//! window with an orbit camera, CPU and GPU frame times in the title (design doc §21 Phase 0 deliverable 4, ADRs 0024,
+//! 0025 and 0104).
 
 use std::collections::VecDeque;
 use std::io::Cursor;
-use std::sync::Arc;
 use std::time::Instant;
 
+use bevy_tasks::Task;
 use civbb_core::math::{Pose, mat4_mul};
 use civbb_format::Document;
-use civbb_format::material::{ColorSpace, ImageFormat};
+use civbb_format::material::ImageFormat;
 use civbb_format::math::{Mat4, Vec3};
 use civbb_format::mesh::Mesh;
-use civbb_render::material::{MATERIAL_WORDS, pack};
-use civbb_render::skin::{Job, SkinnedMesh, Skinning};
-use civbb_render::{
-    Access, Batches, Capacity, Draw, Forward, FrameStatus, MaterialId, MeshData, Pass, Renderer, Scene, View, Window,
-    batch,
-};
+use civbb_render::{Renderer, Window};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
@@ -24,10 +20,10 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::WindowId;
 
-use crate::cull::{Frustum, MeshBounds};
 use crate::extract::{Camera, Snapshot};
 use crate::frame::Runtime;
-use crate::island::{Island, Model};
+use crate::gpu::Gpu;
+use crate::package::Handle;
 use crate::render_thread::{Drawn, RenderThread};
 
 /// Largest texture side the viewer decodes; larger textures are left out.
@@ -35,11 +31,10 @@ const MAX_TEXTURE_SIDE: u32 = 8192;
 
 /// What to show and for how long.
 pub struct Config {
-    /// The avatar, validated.
-    pub avatar: Document,
-    /// Its texture images, decoded by [`decode_textures`].
-    pub textures: Vec<Option<TextureImage>>,
-    /// Copies in the grid.
+    /// The packages, loading ([`crate::package::spawn`]): each one's copies spawn on the frame its load is done; a
+    /// failed load ends the viewer with its error.
+    pub packages: Vec<Task<Result<Handle, String>>>,
+    /// Copies of each package in the grid.
     pub copies: u32,
     /// Exit after this many presented frames past the warm-up (for automated runs); `None` runs until the window
     /// closes.
@@ -73,6 +68,7 @@ pub struct Summary {
 }
 
 /// A decoded texture image.
+#[derive(Clone)]
 pub struct TextureImage {
     /// Width in texels.
     pub width: u32,
@@ -83,6 +79,7 @@ pub struct TextureImage {
 }
 
 /// Texels as the renderer uploads them.
+#[derive(Clone)]
 pub enum Texels {
     /// RGBA8; mips are made on upload.
     Rgba8(Vec<u8>),
@@ -246,7 +243,7 @@ pub fn run_headless(cfg: Config, width: u32, height: u32) -> civbb_render::Resul
         .and_then(|r| viewer.start(r))
         .and_then(|()| {
             // An offscreen target never skips a frame; stop if it does rather than loop.
-            while viewer.timing.frames < frames && viewer.timing.skipped == 0 {
+            while viewer.timing.frames < frames && viewer.timing.skipped == 0 && viewer.error.is_none() {
                 viewer.frame()?;
             }
             Ok(())
@@ -359,131 +356,6 @@ pub(crate) fn bounds(avatar: &Document) -> (Vec3, Vec3) {
     if lo[0] > hi[0] { ([0.0; 3], [0.0; 3]) } else { (lo, hi) }
 }
 
-/// Everything on the GPU: the scene, one skinned instance per island and mesh, and the pipelines.
-pub(crate) struct Gpu {
-    scene: Scene,
-    meshes: Vec<MeshData>,
-    /// Per mesh, its bind-space spheres for culling (ADR 0077).
-    bounds: Vec<MeshBounds>,
-    instances: Vec<Vec<SkinnedMesh>>,
-    /// The avatar's materials, shared by every island.
-    materials: Vec<MaterialId>,
-    /// Bindless index of each avatar texture.
-    bindless: Vec<u32>,
-    /// Per island, its own records for animated renderers, in [`Island::materials`] order (ADR 0025).
-    own: Vec<Vec<MaterialId>>,
-    /// Per island and mesh, the material map of an animated renderer: the shared one with its own records.
-    maps: Vec<Vec<Option<Vec<MaterialId>>>>,
-    skinning: Skinning,
-    forward: Forward,
-}
-
-impl Gpu {
-    pub(crate) fn new(
-        renderer: &Renderer,
-        avatar: &Document,
-        model: &Model,
-        textures: &[Option<TextureImage>],
-        copies: u32,
-    ) -> civbb_render::Result<Self> {
-        let ctx = renderer.context();
-        let per_island: usize = model.animated_materials().map(|(_, m)| m.len()).sum();
-        let materials = avatar.materials.len() + per_island * copies as usize;
-        let capacity = Capacity::for_meshes(&avatar.meshes, copies, materials as u32);
-        let mut scene = Scene::new(ctx, capacity)?;
-        let mut bindless = Vec::with_capacity(textures.len());
-        for (t, decoded) in avatar.textures.iter().zip(textures) {
-            bindless.push(match decoded {
-                Some(image) => {
-                    let srgb = t.color_space == ColorSpace::Srgb;
-                    match &image.texels {
-                        Texels::Rgba8(rgba) => scene.add_texture(ctx, image.width, image.height, rgba, srgb)?,
-                        Texels::Bc7(levels) => scene.add_bc7_texture(ctx, image.width, image.height, levels, srgb)?,
-                    }
-                }
-                None => civbb_render::material::NONE,
-            });
-        }
-        let materials = avatar
-            .materials
-            .iter()
-            .map(|m| scene.add_material(ctx, m, &bindless))
-            .collect::<civbb_render::Result<Vec<_>>>()?;
-        let mut own = Vec::with_capacity(copies as usize);
-        let mut maps = Vec::with_capacity(copies as usize);
-        for _ in 0..copies {
-            let mut records = Vec::with_capacity(per_island);
-            let mut island_maps = vec![None; avatar.meshes.len()];
-            for (mesh, indices) in model.animated_materials() {
-                let mut map = materials.clone();
-                for &m in indices {
-                    let id = scene.add_material(ctx, &avatar.materials[m as usize], &bindless)?;
-                    map[m as usize] = id;
-                    records.push(id);
-                }
-                island_maps[mesh as usize] = Some(map);
-            }
-            own.push(records);
-            maps.push(island_maps);
-        }
-        let meshes = avatar
-            .meshes
-            .iter()
-            .map(|m| scene.add_mesh(ctx, m))
-            .collect::<civbb_render::Result<Vec<_>>>()?;
-        let mut instances = Vec::with_capacity(copies as usize);
-        for _ in 0..copies {
-            instances.push(
-                meshes
-                    .iter()
-                    .map(|m| SkinnedMesh::new(ctx, &mut scene, m))
-                    .collect::<civbb_render::Result<Vec<_>>>()?,
-            );
-        }
-        let submeshes: usize = meshes.iter().map(|m| m.submeshes().len()).sum();
-        // Each submesh may add an outline draw (ADR 0034).
-        let max_draws = (2 * submeshes * copies as usize).max(1) as u32;
-        Ok(Gpu {
-            skinning: Skinning::new(ctx)?,
-            forward: Forward::new(ctx, &scene, renderer.color_format()?, max_draws)?,
-            scene,
-            meshes,
-            bounds: avatar.meshes.iter().map(MeshBounds::new).collect(),
-            instances,
-            materials,
-            bindless,
-            own,
-            maps,
-        })
-    }
-
-    /// # Safety
-    ///
-    /// The GPU is idle.
-    pub(crate) unsafe fn destroy(self, renderer: &Renderer) {
-        let ctx = renderer.context();
-        // SAFETY: per the contract.
-        unsafe {
-            self.forward.destroy(ctx);
-            self.skinning.destroy(ctx.device());
-            for i in self.instances.into_iter().flatten() {
-                i.destroy(ctx);
-            }
-            self.scene.destroy(ctx);
-        }
-    }
-}
-
-/// Per-frame scratch reused across frames.
-#[derive(Default)]
-pub(crate) struct Scratch {
-    draws: Vec<Draw>,
-    batches: Batches,
-    /// Per island, the records last written for its animated materials.
-    packed: Vec<Vec<[u32; MATERIAL_WORDS]>>,
-    updates: Vec<(u32, [u32; MATERIAL_WORDS])>,
-}
-
 /// Running totals for the title and the summary.
 #[derive(Default)]
 struct Timing {
@@ -513,9 +385,14 @@ struct Viewer {
     /// The snapshot not in the world or on the render thread, if any: the next frame's extract target.
     free: Option<Snapshot>,
     device: String,
-    avatar: Arc<Document>,
-    textures: Vec<Option<TextureImage>>,
-    model: Arc<Model>,
+    /// Package loads not done yet.
+    loads: Vec<Task<Result<Handle, String>>>,
+    /// Packages shown, in the order their loads finished.
+    shown: Vec<Handle>,
+    /// Grid slots: copies times packages asked for.
+    slots: u32,
+    /// The grid's spacing, made for the first package shown.
+    spacing: f32,
     runtime: Runtime,
     copies: u32,
     limit: Option<u32>,
@@ -532,40 +409,27 @@ struct Viewer {
 
 impl Viewer {
     fn new(cfg: Config) -> Self {
-        let (lo, hi) = bounds(&cfg.avatar);
-        let width = (hi[0] - lo[0]).max(hi[2] - lo[2]);
-        let height = (hi[1] - lo[1]).max(0.5);
-        let spacing = (width * 1.5).max(0.8);
-        let origins = grid(cfg.copies, spacing);
-        let model = Arc::new(Model::new(&cfg.avatar));
-        let avatar = Arc::new(cfg.avatar);
         let mut runtime = Runtime::default();
-        runtime.extract_to_snapshot(avatar.clone());
-        for (i, &pos) in origins.iter().enumerate() {
-            let origin = Pose { pos, ..Pose::IDENTITY };
-            runtime.spawn(Island::new(model.clone(), i as u64, i == 0, origin));
-        }
-        let cols = (cfg.copies as f32).sqrt().ceil();
-        let rows = (cfg.copies as f32 / cols).ceil();
-        let camera = Orbit {
-            target: [0.0, lo[1] + height * 0.55, -(rows - 1.0) * spacing / 2.0],
-            yaw: 0.0,
-            pitch: 0.15,
-            distance: (height * 1.6).max(cols * spacing * 1.2),
-        };
+        runtime.extract_to_snapshot();
         Viewer {
             render: None,
             window: None,
             free: None,
             device: String::new(),
-            avatar,
-            textures: cfg.textures,
-            model,
+            slots: cfg.copies * cfg.packages.len() as u32,
+            loads: cfg.packages,
+            shown: Vec::new(),
+            spacing: 1.0,
             runtime,
             copies: cfg.copies,
             limit: cfg.frames,
             warmup: cfg.warmup,
-            camera,
+            camera: Orbit {
+                target: [0.0, 1.0, 0.0],
+                yaw: 0.0,
+                pitch: 0.15,
+                distance: 3.0,
+            },
             dragging: false,
             cursor: None,
             last: None,
@@ -573,6 +437,48 @@ impl Viewer {
             validation_errors: 0,
             error: None,
         }
+    }
+
+    /// Shows every package whose load is done; a failed load is kept as the viewer's error.
+    fn arrive(&mut self) {
+        let mut k = 0;
+        while k < self.loads.len() {
+            if !self.loads[k].is_finished() {
+                k += 1;
+                continue;
+            }
+            match bevy_tasks::block_on(self.loads.swap_remove(k)) {
+                Ok(p) => self.show(p),
+                Err(e) => {
+                    self.error.get_or_insert(e);
+                }
+            }
+        }
+    }
+
+    /// Spawns `copies` islands of `p` in the next grid slots; the first package shown frames the camera.
+    fn show(&mut self, p: Handle) {
+        if self.shown.is_empty() {
+            let (lo, hi) = bounds(&p.avatar);
+            let width = (hi[0] - lo[0]).max(hi[2] - lo[2]);
+            let height = (hi[1] - lo[1]).max(0.5);
+            self.spacing = (width * 1.5).max(0.8);
+            let cols = (self.slots as f32).sqrt().ceil();
+            let rows = (self.slots as f32 / cols).ceil();
+            self.camera = Orbit {
+                target: [0.0, lo[1] + height * 0.55, -(rows - 1.0) * self.spacing / 2.0],
+                yaw: 0.0,
+                pitch: 0.15,
+                distance: (height * 1.6).max(cols * self.spacing * 1.2),
+            };
+        }
+        let origins = grid(self.slots, self.spacing);
+        let first = self.shown.len() * self.copies as usize;
+        for (i, &pos) in origins.iter().enumerate().skip(first).take(self.copies as usize) {
+            let origin = Pose { pos, ..Pose::IDENTITY };
+            self.runtime.spawn_package(&p, i as u64, i == 0, origin);
+        }
+        self.shown.push(p);
     }
 
     fn fail(&mut self, event_loop: &ActiveEventLoop, e: impl ToString) {
@@ -596,11 +502,10 @@ impl Viewer {
         }
     }
 
-    /// Uploads the avatar to `renderer`'s device and hands both to a new render thread.
+    /// Hands `renderer` to a new render thread.
     fn start(&mut self, renderer: Renderer) -> civbb_render::Result<()> {
         self.device = renderer.context().device_name();
-        let gpu = Gpu::new(&renderer, &self.avatar, &self.model, &self.textures, self.copies)?;
-        self.textures = Vec::new();
+        let gpu = Gpu::new(&renderer)?;
         self.render = Some(RenderThread::spawn(renderer, gpu));
         self.free = Some(Snapshot::default());
         Ok(())
@@ -620,6 +525,7 @@ impl Viewer {
         if self.render.is_none() {
             return Ok(());
         }
+        self.arrive();
         let start = Instant::now();
         let dt = self
             .last
@@ -662,6 +568,9 @@ impl Viewer {
             return;
         };
         (t.draws, t.skinned) = (draws, skinned);
+        if !self.loads.is_empty() {
+            return;
+        }
         if self.warmup > 0 {
             self.warmup -= 1;
             return;
@@ -686,13 +595,19 @@ impl Viewer {
             let title = format!(
                 "civbb-client view: {} x {}, simulation {:.2} ms (schedule {:.2} ms), render thread {:.2} ms, GPU {gpu}, {fps:.0} fps, {} draws, {} skinned meshes, {} triangles per copy",
                 self.copies,
-                self.avatar.name,
+                self.shown
+                    .iter()
+                    .map(|p| p.avatar.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
                 w.2 / n,
                 w.3 / n,
                 w.4 / n,
                 draws,
                 skinned,
-                self.avatar.meshes.iter().map(|m| m.indices.len() / 3).sum::<usize>()
+                (self.shown.iter().flat_map(|p| &p.avatar.meshes))
+                    .map(|m| m.indices.len() / 3)
+                    .sum::<usize>()
             );
             if let Some(window) = &self.window {
                 window.set_title(&title);
@@ -707,79 +622,6 @@ const FOV_Y: f32 = 0.9;
 
 /// The viewer's background, linear.
 pub(crate) const BACKGROUND: [f32; 4] = [0.08, 0.09, 0.11, 1.0];
-
-/// Skins and draws the islands of `snapshot`, each with its own instances in `gpu`, from the snapshot's camera;
-/// returns the draws and skinned meshes, or `None` if the frame was skipped.
-pub(crate) fn draw(
-    renderer: &mut Renderer,
-    gpu: &Gpu,
-    snapshot: &Snapshot,
-    s: &mut Scratch,
-) -> civbb_render::Result<Option<(usize, usize)>> {
-    let Camera {
-        eye,
-        target,
-        fov_y,
-        clear,
-    } = snapshot.camera;
-    s.packed.resize_with(snapshot.islands.len(), Vec::new);
-    s.draws.clear();
-    s.updates.clear();
-    let extent = renderer.extent().unwrap_or_default();
-    let aspect = extent.width.max(1) as f32 / extent.height.max(1) as f32;
-    let view = View::look_at(eye, target, fov_y, aspect, 0.05);
-    let frustum = Frustum::new(&view.view_proj);
-    let mut jobs = Vec::new();
-    for (i, island) in snapshot.islands.iter().enumerate() {
-        // An island's records are rewritten only when they change; the first frame writes them all.
-        s.packed[i].resize(island.materials.len(), [0; MATERIAL_WORDS]);
-        for ((m, last), id) in island.materials.iter().zip(&mut s.packed[i]).zip(&gpu.own[i]) {
-            let record = pack(m, &gpu.bindless);
-            if record != *last {
-                *last = record;
-                s.updates.push((id.index, record));
-            }
-        }
-        let o = island.origin;
-        let distance = ((o[0] - eye[0]).powi(2) + (o[1] - eye[1]).powi(2) + (o[2] - eye[2]).powi(2)).sqrt();
-        for (m, joints) in island.joints.iter().enumerate() {
-            let Some(joints) = joints else { continue };
-            // A mesh wholly outside the view is neither skinned nor drawn (ADR 0077).
-            let seen = gpu.bounds[m].world_box(joints, &island.weights[m]);
-            if !seen.is_some_and(|(lo, hi)| frustum.sees(lo, hi)) {
-                continue;
-            }
-            let materials = gpu.maps[i][m].as_deref().unwrap_or(&gpu.materials);
-            gpu.meshes[m].draws(
-                &gpu.instances[i][m],
-                materials,
-                &island.slots[m],
-                distance,
-                &mut s.draws,
-            );
-            jobs.push(Job {
-                mesh: &gpu.instances[i][m],
-                joints,
-                weights: &island.weights[m],
-            });
-        }
-    }
-    batch(&mut s.draws, &mut s.batches);
-    let (draws, skinned) = (s.draws.len(), jobs.len());
-    let (batches, updates) = (&s.batches, &s.updates);
-    let status = renderer.frame(|graph, target| {
-        let skinned = graph.import_buffer(gpu.scene.skinned().handle, &[Access::VertexRead]);
-        graph.add(
-            Pass::new("skin")
-                .buffer(skinned, Access::ComputeWrite)
-                // SAFETY: the graph records this outside a rendering scope on the renderer's device.
-                .record(|d, cmd| unsafe { gpu.skinning.record(d, cmd, &jobs) }),
-        );
-        gpu.forward
-            .add(graph, &gpu.scene, target, skinned, &view, batches, updates, clear);
-    })?;
-    Ok((status == FrameStatus::Presented).then_some((draws, skinned)))
-}
 
 impl ApplicationHandler for Viewer {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -840,6 +682,9 @@ impl ApplicationHandler for Viewer {
             WindowEvent::RedrawRequested => {
                 if let Err(e) = self.frame() {
                     return self.fail(event_loop, e);
+                }
+                if self.error.is_some() {
+                    return event_loop.exit();
                 }
                 if self.limit.is_some_and(|l| self.timing.frames >= l) {
                     event_loop.exit();

@@ -314,22 +314,31 @@ What exists, by area. Read the section for the area you touch; update it when th
 - Culling (ADR 0077, #99): `civbb_client::cull` bounds each mesh instance by per-joint bind-space spheres moved by
   the frame's skinning matrices (padded for blendshapes) and drops instances outside the view frustum before
   skinning and drawing. The GPU culling pass with hierarchical Z is Phase 2 (#59).
-- Viewer (ADR 0024): `civbb-client view [<pkg> --key <key> | --avatar lean|bloated] [--copies N] [--frames F]
-  [--warmup W] [--lod L]`; the title shows triangles per copy; `--frames` summarises the F frames after a 60-frame
-  warm-up (ADR 0032).
+- Viewer (ADR 0024): `civbb-client view [<pkg>... --key <key> | --avatar lean|bloated] [--copies N] [--frames F]
+  [--warmup W] [--lod L]`; N copies of each package; packages load on the I/O pool while frames run and spawn when
+  done (#134, ADR 0104), the first one frames the camera and the grid; a failed load ends the viewer with its error.
+  The title shows triangles per copy (all packages); `--frames` summarises the F frames after a 60-frame warm-up that
+  starts once every load is done (ADR 0032).
   glTF/VRM go through `civbb build` first (client may not depend on pipeline). AliciaSolid renders textured and
   toon-shaded. Debug builds are ~30x slower on the CPU (validation).
 - Pipelined frames (#133, ADR 0103 point 5): the schedule's `Extract` step (`civbb_client::extract`,
   `Runtime::extract_to_snapshot`) copies each island's origin, skinning matrices (`None` for inactive meshes), shape
   weights, animated materials and submesh slots plus the `Camera` resource into the `Snapshot` resource. The viewer
   swaps it with a free one and hands it to `render_thread::RenderThread` (owns `Renderer` + `Gpu`; culling, material
-  packing, draw lists and recording happen there via `view::draw`); two snapshots circulate, so simulation is one
+  packing, draw lists and recording happen there via `gpu::draw`); two snapshots circulate, so simulation is one
   frame ahead at most. Window and event loop stay on main; resizes go through the thread's channel; a render-thread
   panic is re-raised on main. Headless `measure` runs pipelined too: its "viewer CPU per frame" is now the busier
   thread per frame and "systems" includes extract. Parity draws synchronously (extract, then `draw`, same thread).
   Release, reference PC, 100 bloated, vsync: serial before 2.13 ms CPU (systems 1.19 ms); pipelined 1.57 to 1.89 ms
   (simulation 1.57 to 1.82 ms with extract ~0.4 ms of it, render thread 0.69 to 0.80 ms), GPU ~0.7 ms. Extract runs
   on one thread (not yet per island on the pool).
+- GPU resources by island (#134, ADR 0104, `civbb_client::gpu`): each `IslandSnapshot` carries its key (entity bits)
+  and package handle; `Gpu::sync` (start of `draw`) uploads a package on first sight (meshes, textures, shared
+  materials, bounds), gives a new key a freed instance of its package or a new one (skinned meshes, own material
+  records), and returns instances of keys missing from the snapshot to their package's free list. When the scene
+  cannot hold what is new it waits idle, destroys everything and rebuilds with max(2x old, need); the first snapshot
+  sizes it exactly (parity allocates as before). Package GPU data is never freed short of a rebuild; no range
+  allocator or VRAM budget yet.
 
 ## Runtime (`core`, `anim`, `dynamics`, `client`)
 
@@ -345,8 +354,13 @@ What exists, by area. Read the section for the area you touch; update it when th
   `schedule::frame()` (ADR 0103: the `Frame` schedule, `Step` sets in design doc §5's order, chained; `Dt`).
   `civbb-client`: `Model`/`Island` (a component; animator, constraints, IK stub, dynamics, world poses),
   `frame::step` (plain: islands then the contact pass feeding next frame's parameters, ADR 0020; parity and the
-  collapse tests use it) and `frame::Runtime` (bevy_ecs world, one entity per island in spawn order, the island and
+  collapse tests use it) and `frame::Runtime` (bevy_ecs world, one entity per island, the island and
   contact systems in `Avatars`/`CrossAvatar`, `Permits` and `Workers` resources; the bench and viewer use it, #131).
+  Packages (#134, ADR 0104): `package::Package` (validated `Document`, `Arc<Model>`, decoded textures kept in RAM,
+  process-unique `id`) behind `Handle = Arc<Package>`; `package::spawn(load)` runs a load on bevy's `IoTaskPool`
+  (cores / 4 threads, not pinned), `package::read` verifies and decodes a file. `Runtime::spawn_package(&handle, id,
+  local, origin)` adds `Spawned(seq)` + `Shows(handle)` + the island; `Runtime::despawn(e)`. Despawn reorders the
+  ECS table: extract sorts by `Spawned`; the contact pass needs no order (receiver value = max over senders).
   `frame::workers()` is the shared pool (pool threads kept to the fastest core class, `affinity::keep_to_performance_cores`);
   `Runtime::with_workers` and `frame::step_on` take another. The executor is single-threaded (one system per set so
   far); bevy's `ComputeTaskPool` is a global `OnceLock` and unused. bevy_ecs has

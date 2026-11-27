@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 basisu = "0.1.0"
 bevy_ecs.workspace = true
+bevy_tasks.workspace = true
 civbb-anim.workspace = true
 civbb-core.workspace = true
 civbb-corpus.workspace = true

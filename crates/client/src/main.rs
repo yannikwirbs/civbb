@@ -5,9 +5,9 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use civbb_client::bench::{self, Config};
+use civbb_client::package::{self, Package, read as load_package};
 use civbb_client::{parity, view};
 use civbb_format::cost::{CpuTimes, GpuTimes, Measured};
-use civbb_format::{Caps, Package, ReadLimits, SigningKey, validate};
 
 /// The offscreen target `measure` draws to: the viewer window's default size.
 const MEASURE_SIZE: (u32, u32) = (1280, 720);
@@ -15,8 +15,8 @@ const MEASURE_SIZE: (u32, u32) = (1280, 720);
 const USAGE: &str = "usage:
   civbb-client bench [--avatars N] [--threads T[,T...]] [--frames F] [--warmup W]
                      [--avatar lean|bloated | --package <package.civpkg> --key <key-file>]
-  civbb-client view [<package.civpkg> --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F] [--warmup W]
-                    [--lod L]
+  civbb-client view [<package.civpkg>... --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F]
+                    [--warmup W] [--lod L]
   civbb-client measure <package.civpkg> --key <key-file> [--avatars N] [--frames F] [--warmup W]
   civbb-client parity <reference.civpkg | unity-dir> <test.civpkg> --key <key-file> [--images <dir>]
   civbb-client rig <package.civpkg> --key <key-file>
@@ -25,8 +25,9 @@ bench steps N avatars (default 100, bloated, or a verified runtime package) for 
 2, 4 ... up to the logical core count) and prints a JSON report to stdout. Build with --release for meaningful
 numbers.
 
-view shows N copies (default 1) of a runtime package, verified against the key that signed it (`civbb build`
-makes one from glTF or VRM), or of a corpus avatar (default bloated), with animator and dynamics running. Drag to
+view shows N copies (default 1) of each runtime package, verified against the key that signed them (`civbb build`
+makes one from glTF or VRM), or of a corpus avatar (default bloated), with animator and dynamics running. Packages
+load in the background and appear as they are ready. Drag to
 orbit, scroll to zoom; CPU and GPU frame times are in the title. With --frames it exits after W + F frames
 (default W 60; the first creates the swapchain) and prints a summary of the last F. --lod draws every mesh at level L of its LOD chain (0 is full, default; past a mesh's last level, its
 last).
@@ -140,7 +141,7 @@ fn parse(args: &[String]) -> Option<(Config, Option<(String, String)>)> {
 }
 
 fn run_view(args: &[String]) -> ExitCode {
-    let (mut package, mut key, mut corpus, mut copies, mut frames, mut lod) = (None, None, None, 1, None, 0);
+    let (mut packages, mut key, mut corpus, mut copies, mut frames, mut lod) = (Vec::new(), None, None, 1, None, 0);
     let mut warmup = 60;
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -151,8 +152,8 @@ fn run_view(args: &[String]) -> ExitCode {
             "--frames" => it.next().and_then(|v| v.parse().ok()).map(|n| frames = Some(n)),
             "--lod" => it.next().and_then(|v| v.parse().ok()).map(|n| lod = n),
             "--warmup" => it.next().and_then(|v| v.parse().ok()).map(|n| warmup = n),
-            s if !s.starts_with('-') && package.is_none() => {
-                package = Some(s.to_owned());
+            s if !s.starts_with('-') => {
+                packages.push(s.to_owned());
                 Some(())
             }
             _ => None,
@@ -162,33 +163,42 @@ fn run_view(args: &[String]) -> ExitCode {
             return ExitCode::from(2);
         }
     }
-    let loaded = match (package, key, corpus) {
-        (Some(p), Some(k), None) => load_package(Path::new(&p), Path::new(&k)),
-        (None, None, corpus) => match corpus.as_deref().unwrap_or("bloated") {
-            "lean" => Ok((civbb_corpus::generate(&civbb_corpus::lean()), Vec::new())),
-            "bloated" => Ok((civbb_corpus::generate(&civbb_corpus::bloated()), Vec::new())),
-            other => Err(format!("unknown avatar {other:?}")),
-        },
+    // Each package loads on the I/O pool while the window opens and frames run (ADR 0104).
+    let loads = match (packages.is_empty(), key, corpus) {
+        (false, Some(key), None) => (packages.into_iter())
+            .map(|p| {
+                let key = key.clone();
+                package::spawn(move || {
+                    let (mut avatar, textures) = load_package(Path::new(&p), Path::new(&key))?;
+                    if lod > 0 {
+                        avatar.meshes = avatar.meshes.iter().map(|m| m.level(lod)).collect();
+                        let triangles: usize = avatar.meshes.iter().map(|m| m.indices.len() / 3).sum();
+                        println!("{}: LOD {lod}, {triangles} triangles", avatar.name);
+                    }
+                    Ok(Package::new(avatar, textures))
+                })
+            })
+            .collect(),
+        (true, None, corpus) => {
+            let avatar = match corpus.as_deref().unwrap_or("bloated") {
+                "lean" => civbb_corpus::lean(),
+                "bloated" => civbb_corpus::bloated(),
+                other => {
+                    eprintln!("civbb-client: unknown avatar {other:?}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            vec![package::spawn(move || {
+                Ok(Package::new(civbb_corpus::generate(&avatar), Vec::new()))
+            })]
+        }
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
         }
     };
-    let (mut avatar, textures) = match loaded {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("civbb-client: {e}");
-            return ExitCode::FAILURE;
-        }
-    };
-    if lod > 0 {
-        avatar.meshes = avatar.meshes.iter().map(|m| m.level(lod)).collect();
-        let triangles: usize = avatar.meshes.iter().map(|m| m.indices.len() / 3).sum();
-        println!("LOD {lod}: {triangles} triangles");
-    }
     let cfg = view::Config {
-        avatar,
-        textures,
+        packages: loads,
         copies,
         frames,
         warmup,
@@ -391,9 +401,9 @@ fn measure(package: &Path, key: &Path, avatars: u32, frames: u32, warmup: u32) -
         pinned: run.pinned.clone(),
     };
     let (width, height) = MEASURE_SIZE;
+    let handle = Package::new(avatar, textures);
     let view = view::Config {
-        avatar,
-        textures,
+        packages: vec![package::spawn(move || Ok(handle))],
         copies: avatars,
         frames: Some(frames),
         warmup,
@@ -429,24 +439,4 @@ fn measure(package: &Path, key: &Path, avatars: u32, frames: u32, warmup: u32) -
         cpu,
         gpu,
     })
-}
-
-/// Reads, verifies and validates a package, and decodes its textures.
-#[allow(clippy::type_complexity)]
-fn load_package(path: &Path, key: &Path) -> Result<(civbb_format::Document, Vec<Option<view::TextureImage>>), String> {
-    let seed: [u8; 32] = std::fs::read(key)
-        .map_err(|e| format!("{}: {e}", key.display()))?
-        .try_into()
-        .map_err(|_| format!("{}: a key file holds exactly 32 bytes", key.display()))?;
-    let limits = ReadLimits::default();
-    let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let key = SigningKey::from_bytes(&seed).verifying_key();
-    let pkg = Package::decode_verified(&bytes, &key, &limits).map_err(|e| e.to_string())?;
-    let avatar = pkg.document(&limits).map_err(|e| e.to_string())?;
-    validate(&avatar, &Caps::default(), |id| pkg.blob(id).is_some()).map_err(|errors| {
-        let list: Vec<String> = errors.iter().map(ToString::to_string).collect();
-        format!("invalid avatar: {}", list.join("; "))
-    })?;
-    let textures = view::decode_textures(&avatar, |id| pkg.blob(id));
-    Ok((avatar, textures))
 }

@@ -6,7 +6,9 @@ pub mod bench;
 pub mod cull;
 pub mod extract;
 pub mod frame;
+mod gpu;
 pub mod island;
+pub mod package;
 #[cfg(feature = "parity")]
 pub mod parity;
 mod render_thread;
