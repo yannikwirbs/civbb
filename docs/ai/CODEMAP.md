@@ -26,6 +26,7 @@ Internal deps: civbb-core, civbb-format
 - `src/mix.rs`: Layer pose mixing: weighted sources, Write Defaults fill, override and additive layers, masks (ADR 0008-0010).
 - `src/motion.rs`: What a state plays: its motion's clips with weights and sample times, its length and whether it loops.
 - `src/muscle.rs`: Humanoid muscles: Unity's muscle table, and muscle values to human bones' local rotations (ADR 0014).
+- `src/tracking.rs`: Tracker input and calibration (design doc §7 and §17, ADR 0113): device poses by role in tracking space, and the
 - `tests/action.rs`: Platform values (ADR 0096) and state actions (ADR 0011): names and types, entry operations, owner-only actions,
 - `tests/bind.rs`: Compile-time binding and clip sampling: slot sharing, defaults, unbound reports, rotation grouping, Euler order,
 - `tests/blend.rs`: Blend tree weights, hand-derived (ADR 0009): 1D, 2D simple directional, freeform cartesian and polar gradient
@@ -63,6 +64,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
 - `src/player.rs`: The local player in desktop mode: input moves one island through the world (ADR 0110) and places the camera at its
 - `src/render_thread.rs`: The render thread: owns the renderer and the GPU resources of what is shown, draws each snapshot it is handed
+- `src/tracking.rs`: Tracker input for the player (ADR 0113): the [`Trackers`] resource that sources fill, the system that calibrates
 - `src/view.rs`: Desktop viewer: N copies of each of several packages in a grid with animator and dynamics running, drawn in a
 - `tests/alloc.rs`: Island steps and whole frames allocate nothing on the heap after warm-up (design doc §5 "Scheduling rules", #135,
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
@@ -72,6 +74,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `tests/measure.rs`: `civbb-client measure` (ADR 0032): debug builds refuse, release builds print CPU times and, with a device, GPU
 - `tests/parity.rs`: FLIP parity scoring without a device (ADR 0033): FLIP of an image against itself is 0, a known perturbation
 - `tests/player.rs`: The desktop player on the frame schedule (ADRs 0106, 0107): input moves and turns only the player's island and sets
+- `tests/tracking.rs`: Tracker input on the frame schedule (ADR 0113): the scripted source calibrates the player's avatar on its first
 - `tests/view.rs`: Viewer helpers without a window (ADR 0024): placement matrices agree with `Pose::point`, the grid is centred,
 
 ## `crates/core` (civbb-core)
@@ -347,6 +350,7 @@ Internal deps: none
 - `docs/adr/0110-character-controller.md`: 0110: An own capsule character controller over static triangles until worlds need rigid bodies
 - `docs/adr/0111-full-body-ik-3-point.md`: 0111: Full-body IK: avatar-space bone targets, hips follow the head, limbs keep their animated bend
 - `docs/adr/0112-ik-6-and-10-point.md`: 0112: 6- and 10-point IK goals, and FABRIK for the spine
+- `docs/adr/0113-tracker-input-and-calibration.md`: 0113: Tracker input as a resource, and calibration by eye height and per-device offsets
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

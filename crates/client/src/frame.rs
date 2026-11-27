@@ -17,6 +17,7 @@ use crate::extract::{Camera, Snapshot, extract_system};
 use crate::island::Island;
 use crate::package::Handle;
 use crate::player::{Input, Player, player_system};
+use crate::tracking::{Scripted, Trackers, scripted_system, trackers_system};
 
 /// The client's worker pool, made on first use: [`jobs::default_workers`] workers, pool threads kept to performance
 /// cores and no more of them than those cores have logical CPUs (ADR 0103).
@@ -197,6 +198,25 @@ impl Runtime {
             self.world.insert_resource(WorldMesh::plane());
         }
         self.schedule.add_systems(player_system.in_set(Step::PosesIn));
+    }
+
+    /// Adds tracker input for the player (ADR 0113, after [`Self::add_player`]): the [`Trackers`] resource and, after
+    /// the player system, the system that calibrates and sets the player island's IK targets from it; with
+    /// `scripted`, that source writes the devices first.
+    pub fn add_trackers(&mut self, scripted: Option<Scripted>) {
+        self.world.init_resource::<Trackers>();
+        match scripted {
+            Some(s) => {
+                self.world.insert_resource(s);
+                let systems = (scripted_system, trackers_system).chain();
+                self.schedule
+                    .add_systems(systems.after(player_system).in_set(Step::PosesIn));
+            }
+            None => {
+                self.schedule
+                    .add_systems(trackers_system.after(player_system).in_set(Step::PosesIn));
+            }
+        }
     }
 
     /// Adds `island` as an entity, after every island already spawned.

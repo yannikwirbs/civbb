@@ -1,10 +1,12 @@
 //! Full-body IK (ADRs 0111, 0112) on the lean corpus humanoid: reachable targets are met within 1 mm with bone
 //! lengths kept, unreachable ones stretch the limb straight, the view pitch turns the head, tracking control skips
-//! parts, and 6- and 10-point goals taken from a scripted pose sequence put every tracked bone back where it was.
+//! parts, and 6- and 10-point goals taken from a scripted pose sequence put every tracked bone back where it was, also
+//! through tracker devices and a calibration (ADR 0113).
 
 use civbb_anim::action::{PoseSources, part_index};
 use civbb_anim::ik::{Goal, Solver, Targets};
-use civbb_core::math::{Pose, dot, euler_to_quat, length, mul, rotate, sub, world_poses};
+use civbb_anim::tracking::{Calibration, Devices, ROLES, Role};
+use civbb_core::math::{Pose, add, conj, dot, euler_to_quat, length, mul, rotate, scale, sub, world_poses};
 use civbb_format::Document;
 use civbb_format::animator::{PosePart, PoseSource};
 use civbb_format::hierarchy::{HumanBone, NodeIndex};
@@ -332,4 +334,81 @@ fn ten_point_targets_place_the_chest_elbows_and_knees_too() {
     met.extend([H::Hips, H::Head, H::LeftHand, H::RightHand, H::LeftFoot, H::RightFoot].map(|b| (b, true)));
     met.extend([H::LeftLowerArm, H::RightLowerArm, H::LeftLowerLeg, H::RightLowerLeg].map(|b| (b, false)));
     follows_the_script(ten_point, &met);
+}
+
+/// The user wearing the devices is this many times the avatar's size.
+const USER: f32 = 1.2;
+
+fn bone(role: Role) -> HumanBone {
+    use HumanBone as H;
+    match role {
+        Role::Head => H::Head,
+        Role::LeftHand => H::LeftHand,
+        Role::RightHand => H::RightHand,
+        Role::Hips => H::Hips,
+        Role::Chest => H::Chest,
+        Role::LeftFoot => H::LeftFoot,
+        Role::RightFoot => H::RightFoot,
+        Role::LeftElbow => H::LeftLowerArm,
+        Role::RightElbow => H::RightLowerArm,
+        Role::LeftKnee => H::LeftLowerLeg,
+        Role::RightKnee => H::RightLowerLeg,
+    }
+}
+
+/// Devices worn on the bones of `world` (a pose of the avatar) by a user [`USER`] times its size: each device turned
+/// and set off its bone by a mount of its own, the head device at the eyes.
+fn devices(a: &Avatar, world: &[Pose]) -> Devices {
+    let rest = a.world(&a.rest);
+    let head = rest[a.node(HumanBone::Head)];
+    let eyes = a.doc.avatar().expect("an avatar").viewpoint;
+    let eyes = rotate(conj(head.rot), sub(eyes, head.pos));
+    Role::ALL.map(|role| {
+        let k = role as usize as f32;
+        let b = world[a.node(bone(role))];
+        let rot = mul(b.rot, euler_to_quat([10.0 * k, 30.0, -20.0]));
+        let pos = match role {
+            Role::Head => add(b.pos, rotate(b.rot, eyes)),
+            _ => sub(b.pos, rotate(rot, [0.01 * k, 0.05, -0.04])),
+        };
+        Some(Goal {
+            pos: scale(pos, USER),
+            rot,
+        })
+    })
+}
+
+#[test]
+fn calibrated_devices_put_the_tracked_bones_where_a_scripted_pose_has_them() {
+    use HumanBone as H;
+    let a = avatar();
+    let rest = a.world(&a.rest);
+    let calibration = Calibration::new(&a.doc, &devices(&a, &rest)).expect("a head device");
+    assert!((calibration.ratio - 1.0 / USER).abs() < 1e-6, "{}", calibration.ratio);
+    let mut met = vec![(H::Chest, true)];
+    met.extend([H::Hips, H::Head, H::LeftHand, H::RightHand, H::LeftFoot, H::RightFoot].map(|b| (b, true)));
+    met.extend([H::LeftLowerArm, H::RightLowerArm, H::LeftLowerLeg, H::RightLowerLeg].map(|b| (b, false)));
+    follows_the_script(|a, world| calibration.targets(&devices(a, world)), &met);
+}
+
+#[test]
+fn calibration_needs_a_head_device_and_targets_only_calibrated_tracked_roles() {
+    let a = avatar();
+    let rest = a.world(&a.rest);
+    let mut worn = devices(&a, &rest);
+    worn[Role::Head as usize] = None;
+    assert!(Calibration::new(&a.doc, &worn).is_none());
+    // 3-point at calibration: later hip and foot devices set nothing.
+    let mut three = [None; ROLES];
+    for role in [Role::Head, Role::LeftHand, Role::RightHand] {
+        three[role as usize] = devices(&a, &rest)[role as usize];
+    }
+    let calibration = Calibration::new(&a.doc, &three).expect("a head device");
+    let mut worn = devices(&a, &rest);
+    worn[Role::LeftHand as usize] = None;
+    let targets = calibration.targets(&worn);
+    assert!(targets.head.is_some() && targets.hands[1].is_some());
+    assert_eq!(targets.hands[0], None, "the left hand lost tracking");
+    assert_eq!((targets.hips, targets.chest, targets.feet), (None, None, [None; 2]));
+    assert_eq!((targets.elbows, targets.knees), ([None; 2], [None; 2]));
 }

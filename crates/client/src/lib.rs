@@ -14,6 +14,7 @@ pub mod package;
 pub mod parity;
 pub mod player;
 mod render_thread;
+pub mod tracking;
 pub mod view;
 
 pub use island::{Island, Model};

@@ -16,6 +16,7 @@ pub mod material;
 mod mix;
 pub mod motion;
 pub mod muscle;
+pub mod tracking;
 
 pub use bind::{Bindings, Bound, Slot, Target, Unbound, bind};
 pub use clip::BoundClip;

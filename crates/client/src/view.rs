@@ -28,6 +28,7 @@ use crate::gpu::Gpu;
 use crate::package::Handle;
 use crate::player::{Input, Player, View};
 use crate::render_thread::{Drawn, RenderThread};
+use crate::tracking::Scripted;
 
 /// Largest texture side the viewer decodes; larger textures are left out.
 const MAX_TEXTURE_SIDE: u32 = 8192;
@@ -46,6 +47,8 @@ pub struct Config {
     pub warmup: u32,
     /// A world shown at the origin; the player walks on its rigid meshes (ADR 0110). `None`: a flat ground at y 0.
     pub world: Option<Handle>,
+    /// Scripted trackers drive the player's avatar (ADR 0113).
+    pub trackers: Option<Scripted>,
 }
 
 /// What a run measured, past the warm-up.
@@ -424,6 +427,9 @@ impl Viewer {
             runtime.spawn_package(world, u64::MAX, false, Pose::IDENTITY);
         }
         runtime.add_player();
+        if let Some(scripted) = cfg.trackers.clone() {
+            runtime.add_trackers(Some(scripted));
+        }
         runtime.extract_to_snapshot();
         Viewer {
             render: None,
