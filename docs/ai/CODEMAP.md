@@ -64,6 +64,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
 - `src/player.rs`: The local player in desktop mode: input moves one island through the world (ADR 0110) and places the camera at its
 - `src/render_thread.rs`: The render thread: owns the renderer and the GPU resources of what is shown, draws each snapshot it is handed
+- `src/station.rs`: Stations (design doc §7, ADR 0114): seats in the world that the player uses, sits in and leaves.
 - `src/tracking.rs`: Tracker input for the player (ADR 0113): the [`Trackers`] resource that sources fill, the system that calibrates
 - `src/view.rs`: Desktop viewer: N copies of each of several packages in a grid with animator and dynamics running, drawn in a
 - `tests/alloc.rs`: Island steps and whole frames allocate nothing on the heap after warm-up (design doc §5 "Scheduling rules", #135,
@@ -73,7 +74,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 - `tests/measure.rs`: `civbb-client measure` (ADR 0032): debug builds refuse, release builds print CPU times and, with a device, GPU
 - `tests/parity.rs`: FLIP parity scoring without a device (ADR 0033): FLIP of an image against itself is 0, a known perturbation
-- `tests/player.rs`: The desktop player on the frame schedule (ADRs 0106, 0107): input moves and turns only the player's island and sets
+- `tests/player.rs`: The desktop player on the frame schedule (ADRs 0106, 0107, 0114): input moves and turns only the player's island and sets
 - `tests/tracking.rs`: Tracker input on the frame schedule (ADR 0113): the scripted source calibrates the player's avatar on its first
 - `tests/view.rs`: Viewer helpers without a window (ADR 0024): placement matrices agree with `Pose::point`, the grid is centred,
 
@@ -351,6 +352,7 @@ Internal deps: none
 - `docs/adr/0111-full-body-ik-3-point.md`: 0111: Full-body IK: avatar-space bone targets, hips follow the head, limbs keep their animated bend
 - `docs/adr/0112-ik-6-and-10-point.md`: 0112: 6- and 10-point IK goals, and FABRIK for the spine
 - `docs/adr/0113-tracker-input-and-calibration.md`: 0113: Tracker input as a resource, and calibration by eye height and per-device offsets
+- `docs/adr/0114-avatar-scaling-and-stations.md`: 0114: Avatar scaling by eye height, and stations as client components
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

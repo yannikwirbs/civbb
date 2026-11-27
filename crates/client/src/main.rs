@@ -6,6 +6,7 @@ use std::process::ExitCode;
 
 use civbb_client::bench::{self, Config};
 use civbb_client::package::{self, Package, read as load_package};
+use civbb_client::station::Station;
 use civbb_client::tracking::Scripted;
 use civbb_client::{parity, view};
 use civbb_format::cost::{CpuTimes, GpuTimes, Measured};
@@ -32,7 +33,7 @@ load in the background and appear as they are ready. Drag to
 orbit, scroll to zoom; CPU and GPU frame times are in the title. With --frames it exits after W + F frames
 (default W 60; the first creates the swapchain) and prints a summary of the last F. --lod draws every mesh at level L of its LOD chain (0 is full, default; past a mesh's last level, its
 last). --world shows the generated test world (ground, stairs, ramps, a platform, a wall) and the player walks
-through it (ADR 0110). --trackers drives the player's avatar with scripted 3-, 6- or 10-point trackers, calibrated on
+through it (ADR 0110); E sits on its bench and gets up again, = and - scale the avatar (ADR 0114). --trackers drives the player's avatar with scripted 3-, 6- or 10-point trackers, calibrated on
 the first frame (ADR 0113).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
@@ -219,6 +220,7 @@ fn run_view(args: &[String]) -> ExitCode {
         frames,
         warmup,
         world: world.then(|| Package::new(civbb_corpus::world(), Vec::new())),
+        stations: if world { vec![test_station()] } else { Vec::new() },
         trackers,
     };
     match view::run(cfg) {
@@ -239,6 +241,17 @@ fn run_view(args: &[String]) -> ExitCode {
             eprintln!("civbb-client: {e}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// The test world's bench (ADR 0114).
+fn test_station() -> Station {
+    use civbb_corpus::world::{EXIT, SEAT};
+    Station {
+        seat: SEAT,
+        yaw: 0.0,
+        exit: EXIT,
+        seated: true,
     }
 }
 
@@ -426,6 +439,7 @@ fn measure(package: &Path, key: &Path, avatars: u32, frames: u32, warmup: u32) -
         frames: Some(frames),
         warmup,
         world: None,
+        stations: Vec::new(),
         trackers: None,
     };
     let gpu = match view::run_headless(view, width, height) {

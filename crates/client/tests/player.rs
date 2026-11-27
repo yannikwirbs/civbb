@@ -1,4 +1,4 @@
-//! The desktop player on the frame schedule (ADRs 0106, 0107): input moves and turns only the player's island and sets
+//! The desktop player on the frame schedule (ADRs 0106, 0107, 0114): input moves and turns only the player's island and sets
 //! its platform values, the camera
 //! sits at its viewpoint in first person with its own head shrunk away, and the extract step sees the moved island.
 
@@ -6,6 +6,7 @@ use civbb_client::extract::{Camera, Snapshot};
 use civbb_client::frame::Runtime;
 use civbb_client::package::Package;
 use civbb_client::player::{Input, Player, Posture, RUN, View, WALK};
+use civbb_client::station::Station;
 use civbb_core::math::{Pose, conj, rotate};
 use civbb_format::hierarchy::HumanBone;
 use civbb_format::state::{Entry, Platform};
@@ -160,4 +161,79 @@ fn looking_up_and_down_turns_the_players_head_only() {
         assert!((forward[1] - pitch.sin()).abs() < 1e-3, "{pitch}: {forward:?}");
         assert_eq!(level(&runtime, 1), start[1], "other islands keep their head");
     }
+}
+
+#[test]
+fn a_scaled_player_sees_from_its_scaled_viewpoint_and_its_bones_scale() {
+    let package = Package::new(civbb_corpus::generate(&civbb_corpus::lean()), Vec::new());
+    let viewpoint = package.avatar.avatar().expect("an avatar").viewpoint;
+    let mut runtime = Runtime::default();
+    runtime.add_player();
+    let e = runtime.spawn_package(&package, 0, true, Pose::IDENTITY);
+    runtime.spawn_package(&package, 1, false, Pose::IDENTITY);
+    {
+        let mut player = runtime.world.resource_mut::<Player>();
+        (player.island, player.view) = (Some(e), View::First);
+    }
+    runtime.step(DT);
+    let unscaled = runtime.islands()[0].world().to_vec();
+    runtime.world.resource_mut::<Input>().resize = Some(2.0);
+    runtime.step(DT);
+    let player = *runtime.world.resource::<Player>();
+    assert_eq!((player.eye_height, player.scale), (Some(2.0 * viewpoint[1]), 2.0));
+    let islands = runtime.islands();
+    assert_eq!(islands[0].origin.scale, 2.0);
+    assert_eq!(islands[1].origin.scale, 1.0, "others keep their scale");
+    // Every bone, IK and dynamics included, sits twice as far from the origin.
+    for (a, b) in islands[0].world().iter().zip(&unscaled) {
+        assert!(close(a.pos, b.pos.map(|x| 2.0 * x)), "{:?} {:?}", a.pos, b.pos);
+    }
+    let camera = *runtime.world.resource::<Camera>();
+    assert!(close(camera.eye, viewpoint.map(|x| 2.0 * x)), "{camera:?}");
+}
+
+#[test]
+fn using_a_station_seats_the_player_and_jumping_leaves() {
+    let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());
+    let declared = [Platform::InStation, Platform::Seated];
+    let first = avatar.state.entries.len();
+    for p in declared {
+        avatar.state.entries.push(Entry::new(p.name(), p.kind(), 0.0));
+    }
+    let package = Package::new(avatar, Vec::new());
+    let mut runtime = Runtime::default();
+    runtime.add_player();
+    let station = Station {
+        seat: [0.0, 0.0, 1.0],
+        yaw: 1.0,
+        exit: [0.0, 0.0, 2.0],
+        seated: true,
+    };
+    let far = Station {
+        seat: [0.0, 0.0, 9.0],
+        ..station
+    };
+    runtime.world.spawn_batch([station, far]);
+    let e = runtime.spawn_package(&package, 0, true, Pose::IDENTITY);
+    runtime.world.resource_mut::<Player>().island = Some(e);
+    let params =
+        |runtime: &mut Runtime| runtime.island_mut(0).animator_mut().expect("an animator").params[first..].to_vec();
+    runtime.world.resource_mut::<Input>().interact = true;
+    runtime.step(DT);
+    assert_eq!(runtime.islands()[0].origin.pos, station.seat);
+    assert_eq!(params(&mut runtime), [1.0, 1.0]);
+    // Walking does nothing; jumping gets off at the exit.
+    runtime.world.resource_mut::<Input>().forward = 1.0;
+    runtime.step(DT);
+    assert_eq!(runtime.islands()[0].origin.pos, station.seat);
+    runtime.world.resource_mut::<Input>().forward = 0.0;
+    runtime.world.resource_mut::<Input>().jump = true;
+    runtime.step(DT);
+    assert_eq!(runtime.islands()[0].origin.pos, station.exit);
+    assert_eq!(params(&mut runtime), [0.0, 0.0]);
+    // Out of reach: using does nothing.
+    runtime.world.resource_mut::<Player>().pos = [0.0, 0.0, 5.0];
+    runtime.world.resource_mut::<Input>().interact = true;
+    runtime.step(DT);
+    assert_eq!(runtime.world.resource::<Player>().station, None);
 }

@@ -14,6 +14,7 @@ pub mod package;
 pub mod parity;
 pub mod player;
 mod render_thread;
+pub mod station;
 pub mod tracking;
 pub mod view;
 

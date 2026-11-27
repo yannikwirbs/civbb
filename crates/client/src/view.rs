@@ -28,10 +28,13 @@ use crate::gpu::Gpu;
 use crate::package::Handle;
 use crate::player::{Input, Player, View};
 use crate::render_thread::{Drawn, RenderThread};
+use crate::station::Station;
 use crate::tracking::Scripted;
 
 /// Largest texture side the viewer decodes; larger textures are left out.
 const MAX_TEXTURE_SIDE: u32 = 8192;
+/// The factor one press of `=` or `-` multiplies or divides the eye height by (ADR 0114).
+const RESIZE: f32 = 1.1;
 
 /// What to show and for how long.
 pub struct Config {
@@ -47,6 +50,8 @@ pub struct Config {
     pub warmup: u32,
     /// A world shown at the origin; the player walks on its rigid meshes (ADR 0110). `None`: a flat ground at y 0.
     pub world: Option<Handle>,
+    /// The world's stations (ADR 0114).
+    pub stations: Vec<Station>,
     /// Scripted trackers drive the player's avatar (ADR 0113).
     pub trackers: Option<Scripted>,
 }
@@ -427,6 +432,7 @@ impl Viewer {
             runtime.spawn_package(world, u64::MAX, false, Pose::IDENTITY);
         }
         runtime.add_player();
+        runtime.world.spawn_batch(cfg.stations.clone());
         if let Some(scripted) = cfg.trackers.clone() {
             runtime.add_trackers(Some(scripted));
         }
@@ -755,6 +761,9 @@ impl ApplicationHandler for Viewer {
                     KeyCode::Escape => self.capture(false),
                     KeyCode::KeyC => self.runtime.world.resource_mut::<Input>().crouch = true,
                     KeyCode::KeyZ => self.runtime.world.resource_mut::<Input>().prone = true,
+                    KeyCode::KeyE => self.runtime.world.resource_mut::<Input>().interact = true,
+                    KeyCode::Equal => self.runtime.world.resource_mut::<Input>().resize = Some(RESIZE),
+                    KeyCode::Minus => self.runtime.world.resource_mut::<Input>().resize = Some(1.0 / RESIZE),
                     _ => {
                         // Left or right Shift with F1 to F8: that hand's gesture 0 to 7.
                         let f = [

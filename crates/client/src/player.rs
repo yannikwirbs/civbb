@@ -13,6 +13,7 @@ use crate::controller::{Body, WorldMesh};
 use crate::extract::Camera;
 use crate::frame::Shows;
 use crate::island::Island;
+use crate::station::{self, REACH, Station};
 
 /// Walking speed forward and back in m/s, the legacy world default (ADR 0106).
 pub const WALK: f32 = 2.0;
@@ -25,6 +26,10 @@ pub use crate::controller::{GRAVITY, JUMP};
 const PITCH_LIMIT: f32 = 89.0 * std::f32::consts::PI / 180.0;
 /// The third-person camera's distance behind the viewpoint, in viewpoint heights.
 const THIRD_PERSON: f32 = 1.5;
+/// The lowest eye height in metres the player can choose (ADR 0114).
+pub const EYE_MIN: f32 = 0.2;
+/// The highest eye height in metres the player can choose.
+pub const EYE_MAX: f32 = 5.0;
 
 /// What the player asks for, written before each frame; the frame consumes `jump` and `look`.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq)]
@@ -47,6 +52,10 @@ pub struct Input {
     pub gestures: [u8; 2],
     /// Away from keyboard: the window lost focus.
     pub afk: bool,
+    /// Multiply the eye height by this once (ADR 0114).
+    pub resize: Option<f32>,
+    /// Use the nearest station, or leave the one sat in, once.
+    pub interact: bool,
 }
 
 /// How upright the player is.
@@ -141,6 +150,12 @@ pub struct Player {
     pub posture: Posture,
     /// The camera mode.
     pub view: View,
+    /// The chosen eye height in metres; `None` is the avatar's own (ADR 0114).
+    pub eye_height: Option<f32>,
+    /// The avatar's scale: the eye height over the avatar's own.
+    pub scale: f32,
+    /// The station sat in.
+    pub station: Option<Station>,
 }
 
 impl Default for Player {
@@ -156,6 +171,9 @@ impl Default for Player {
             grounded: true,
             posture: Posture::Standing,
             view: View::Orbit,
+            eye_height: None,
+            scale: 1.0,
+            station: None,
         }
     }
 }
@@ -173,16 +191,43 @@ impl Player {
         [0.0, s, 0.0, c]
     }
 
-    /// Moves and turns by `input` over `dt` seconds through `world` (ADR 0110).
+    /// Applies `factor` to the eye height, kept within [`EYE_MIN`] and [`EYE_MAX`], and sets the scale for an avatar
+    /// whose own eye height is `own` metres; without one (`own` not positive) the scale is 1.
+    pub fn rescale(&mut self, factor: Option<f32>, own: f32) {
+        if own <= 0.0 {
+            self.scale = 1.0;
+            return;
+        }
+        if let Some(f) = factor {
+            self.eye_height = Some((self.eye_height.unwrap_or(own) * f).clamp(EYE_MIN, EYE_MAX));
+        }
+        self.scale = self.eye_height.map_or(1.0, |e| e / own);
+    }
+
+    /// Sits in `station`: at its seat, facing its way, still.
+    pub fn sit(&mut self, station: Station) {
+        (self.pos, self.yaw, self.station) = (station.seat, station.yaw, Some(station));
+        (self.vertical, self.velocity, self.turn, self.grounded) = (0.0, [0.0; 3], 0.0, true);
+    }
+
+    /// Moves and turns by `input` over `dt` seconds through `world` (ADR 0110), at the player's scale (ADR 0114). In a
+    /// station only the view pitches; jumping or using leaves it.
     pub fn step(&mut self, input: &Input, dt: f32, world: &WorldMesh) {
         let start = self.pos;
+        self.pitch = (self.pitch + input.look[1]).clamp(-PITCH_LIMIT, PITCH_LIMIT);
+        if let Some(station) = self.station {
+            if input.jump || input.interact {
+                (self.pos, self.station) = (station.exit, None);
+            }
+            (self.velocity, self.turn) = ([0.0; 3], 0.0);
+            return;
+        }
         self.yaw = (self.yaw + input.look[0]).rem_euclid(TAU);
         self.turn = if dt > 0.0 { input.look[0] / dt } else { 0.0 };
-        self.pitch = (self.pitch + input.look[1]).clamp(-PITCH_LIMIT, PITCH_LIMIT);
         self.posture = self.posture.toggled(input.crouch, input.prone);
         let (f, r) = (input.forward.clamp(-1.0, 1.0), input.right.clamp(-1.0, 1.0));
         // Diagonal input is not faster than straight input.
-        let n = (f * f + r * r).sqrt().max(1.0) / self.posture.speed();
+        let n = (f * f + r * r).sqrt().max(1.0) / (self.posture.speed() * self.scale);
         let along = f / n * if input.run { RUN } else { WALK };
         let side = r / n * STRAFE;
         let (forward, right) = (self.forward(), self.right());
@@ -190,6 +235,7 @@ impl Player {
             pos: self.pos,
             vertical: self.vertical,
             grounded: self.grounded,
+            scale: self.scale,
         };
         body.step(world, add(scale(forward, along), scale(right, side)), input.jump, dt);
         (self.pos, self.vertical, self.grounded) = (body.pos, body.vertical, body.grounded);
@@ -206,13 +252,14 @@ impl Player {
         [-f[2], 0.0, f[0]]
     }
 
-    /// The platform values the player provides (ADR 0107), given what `input` holds: velocity in avatar space
-    /// (x right, z forward), turn rate (positive to the right), ground contact, posture, gestures, AFK and desktop
-    /// tracking.
-    pub fn platform_values(&self, input: &Input) -> [(Platform, f32); 14] {
+    /// The platform values the player provides (ADR 0107), given what `input` holds and the avatar's own eye height
+    /// `own`: velocity in avatar space (x right, z forward, avatar metres), turn rate (positive to the right), ground
+    /// contact, posture, gestures, AFK, desktop tracking, stations and scale (ADR 0114).
+    pub fn platform_values(&self, input: &Input, own: f32) -> [(Platform, f32); 20] {
         use Platform::*;
         let flag = |b: bool| f32::from(u8::from(b));
-        let v = self.velocity;
+        let v = scale(self.velocity, 1.0 / self.scale);
+        let eye = own * self.scale;
         let [left, right] = input.gestures;
         [
             (VelocityX, dot(v, self.right())),
@@ -230,6 +277,15 @@ impl Player {
             // A key press closes the fist all the way.
             (GestureLeftWeight, flag(left == 1)),
             (GestureRightWeight, flag(right == 1)),
+            (InStation, flag(self.station.is_some())),
+            (Seated, flag(self.station.is_some_and(|s| s.seated))),
+            (ScaleFactor, self.scale),
+            (ScaleFactorInverse, 1.0 / self.scale),
+            (EyeHeight, eye),
+            (
+                EyeHeightPercent,
+                ((eye - EYE_MIN) / (EYE_MAX - EYE_MIN)).clamp(0.0, 1.0),
+            ),
         ]
     }
 
@@ -247,29 +303,42 @@ impl Player {
     }
 }
 
-/// The player system of [`civbb_core::schedule::Step::PosesIn`]: steps the [`Player`] by the [`Input`], places its
-/// island and, outside orbit mode, the [`Camera`].
+/// The player system of [`civbb_core::schedule::Step::PosesIn`]: scales the [`Player`], seats it in the nearest
+/// [`Station`] when asked, steps it by the [`Input`], places its island and, outside orbit mode, the [`Camera`].
 pub(crate) fn player_system(
     dt: Res<Dt>,
     mut input: ResMut<Input>,
     mut player: ResMut<Player>,
     mut camera: ResMut<Camera>,
     world: Res<WorldMesh>,
+    stations: Query<&Station>,
     mut islands: Query<(&mut Island, &Shows)>,
 ) {
+    let viewpoint = (player.island.and_then(|e| islands.get(e).ok()))
+        .and_then(|(_, shows)| shows.0.avatar.avatar().map(|a| a.viewpoint))
+        .unwrap_or([0.0; 3]);
+    player.rescale(input.resize, viewpoint[1]);
+    if input.interact
+        && player.station.is_none()
+        && let Some(s) = station::nearest(stations, player.pos, REACH * player.scale)
+    {
+        player.sit(s);
+        input.interact = false;
+    }
     player.step(&input, dt.0, &world);
     (input.jump, input.look, input.crouch, input.prone) = (false, [0.0; 2], false, false);
-    let Some((mut island, shows)) = player.island.and_then(|e| islands.get_mut(e).ok()) else {
+    (input.resize, input.interact) = (None, false);
+    let Some((mut island, _)) = player.island.and_then(|e| islands.get_mut(e).ok()) else {
         return;
     };
-    for (p, v) in player.platform_values(&input) {
+    for (p, v) in player.platform_values(&input, viewpoint[1]) {
         island.set_platform(p, v);
     }
     island.origin.pos = player.pos;
     island.origin.rot = player.rotation();
+    island.origin.scale = player.scale;
     island.hide_head = player.view == View::First;
     island.targets.look = player.pitch;
-    let viewpoint = shows.0.avatar.avatar().map_or([0.0; 3], |a| a.viewpoint);
     let eye = island.origin.point(viewpoint);
     if let Some((eye, target)) = player.camera(eye, viewpoint[1] * island.origin.scale) {
         (camera.eye, camera.target) = (eye, target);
@@ -421,7 +490,7 @@ mod tests {
             ..Default::default()
         };
         step(&mut p, &input, 0.5);
-        let values = p.platform_values(&input);
+        let values = p.platform_values(&input, 1.5);
         let value = |q| values.iter().find(|(p, _)| *p == q).expect("provided").1;
         // Strafing right at strafe speed while turning right at 0.2 rad/s.
         assert!((value(VelocityX) - STRAFE).abs() < 1e-3, "{values:?}");
@@ -449,7 +518,7 @@ mod tests {
         for _ in 0..25 {
             step(&mut p, &Input::default(), DT);
         }
-        let values = p.platform_values(&Input::default());
+        let values = p.platform_values(&Input::default(), 1.5);
         let value = |q| values.iter().find(|(p, _)| *p == q).expect("provided").1;
         assert!(value(VelocityY) < 0.0 && value(Grounded) == 0.0, "{values:?}");
     }
@@ -477,5 +546,101 @@ mod tests {
         assert_eq!(at, eye);
         assert!(close(from, [0.0, 1.5, 0.1 - THIRD_PERSON * 1.5]));
         assert_eq!(p.view.next(), View::Orbit);
+    }
+
+    #[test]
+    fn eye_height_scales_speeds_and_the_jump_within_limits() {
+        use Platform::*;
+        let mut p = Player::default();
+        // An avatar with its eyes at 1.5 m, doubled.
+        p.rescale(Some(2.0), 1.5);
+        assert_eq!((p.eye_height, p.scale), (Some(3.0), 2.0));
+        let walk = Input {
+            forward: 1.0,
+            ..Default::default()
+        };
+        step(&mut p, &walk, 1.0);
+        assert!(close(p.pos, [0.0, 0.0, 2.0 * WALK]), "{:?}", p.pos);
+        // Platform velocities stay in avatar metres, so the gait matches the speed.
+        let values = p.platform_values(&walk, 1.5);
+        let value = |q| values.iter().find(|(p, _)| *p == q).expect("provided").1;
+        assert!((value(VelocityZ) - WALK).abs() < 1e-4, "{values:?}");
+        assert_eq!([ScaleFactor, ScaleFactorInverse, EyeHeight].map(value), [2.0, 0.5, 3.0]);
+        assert!((value(EyeHeightPercent) - (3.0 - EYE_MIN) / (EYE_MAX - EYE_MIN)).abs() < 1e-6);
+        // The jump reaches twice its height.
+        let mut top = 0.0_f32;
+        step(
+            &mut p,
+            &Input {
+                jump: true,
+                ..Default::default()
+            },
+            DT,
+        );
+        for _ in 0..120 {
+            step(&mut p, &Input::default(), DT);
+            top = top.max(p.pos[1]);
+        }
+        assert!((top - 2.0 * JUMP * JUMP / (2.0 * GRAVITY)).abs() < 0.05, "{top}");
+        // Chosen heights stay within the limits; another avatar keeps the eye height and takes its own scale.
+        p.rescale(Some(100.0), 1.5);
+        assert_eq!(p.eye_height, Some(EYE_MAX));
+        p.rescale(Some(1e-3), 1.5);
+        assert_eq!(p.eye_height, Some(EYE_MIN));
+        p.rescale(None, 0.8);
+        assert_eq!(p.scale, EYE_MIN / 0.8);
+        // No avatar, no scale.
+        p.rescale(Some(2.0), 0.0);
+        assert_eq!(p.scale, 1.0);
+    }
+
+    #[test]
+    fn a_station_holds_the_player_until_a_jump_or_use() {
+        use Platform::*;
+        let station = Station {
+            seat: [1.0, 0.0, 2.0],
+            yaw: 1.0,
+            exit: [1.0, 0.0, 3.0],
+            seated: true,
+        };
+        let mut p = Player::default();
+        p.sit(station);
+        let walk = Input {
+            forward: 1.0,
+            look: [0.5, 0.2],
+            crouch: true,
+            ..Default::default()
+        };
+        step(&mut p, &walk, 1.0);
+        assert_eq!((p.pos, p.yaw, p.posture), (station.seat, 1.0, Posture::Standing));
+        assert_eq!((p.velocity, p.pitch), ([0.0; 3], 0.2));
+        let values = p.platform_values(&walk, 1.5);
+        let value = |q| values.iter().find(|(p, _)| *p == q).expect("provided").1;
+        assert_eq!(
+            [InStation, Seated, VelocityZ, Grounded].map(value),
+            [1.0, 1.0, 0.0, 1.0]
+        );
+        for leave in [
+            Input {
+                jump: true,
+                ..Default::default()
+            },
+            Input {
+                interact: true,
+                ..Default::default()
+            },
+        ] {
+            p.sit(station);
+            step(&mut p, &leave, DT);
+            assert_eq!((p.pos, p.station), (station.exit, None));
+        }
+        // A station without sitting.
+        p.sit(Station {
+            seated: false,
+            ..station
+        });
+        let values = p.platform_values(&Input::default(), 1.5);
+        let value = |q| values.iter().find(|(p, _)| *p == q).expect("provided").1;
+        assert_eq!([InStation, Seated].map(value), [1.0, 0.0]);
     }
 }

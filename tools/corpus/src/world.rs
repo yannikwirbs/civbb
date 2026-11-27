@@ -2,7 +2,7 @@
 //!
 //! Metres, +Y up; a player at the origin facing +Z looks at the stairs (x -4 to -2), the walkable 30° ramp (x 0 to
 //! 2) and the too steep 60° ramp (x 2 to 4), which all end at the platform's front edge (z 6, 1 m high, to z 10).
-//! The wall stands at x 6 to 6.2, z 0 to 8, 2 m high.
+//! The wall stands at x 6 to 6.2, z 0 to 8, 2 m high. Behind the player a bench faces it, with one station (ADR 0114).
 
 use civbb_format::hierarchy::{Hierarchy, Node};
 use civbb_format::material::{AlphaMode, Material, MaterialModel, Pbr};
@@ -20,6 +20,12 @@ pub const STEP: f32 = 0.2;
 pub const TREAD: f32 = 0.3;
 /// Where the stairs, the ramps and the platform meet.
 pub const FRONT: f32 = 6.0;
+/// Height of the bench's top.
+pub const BENCH: f32 = 0.45;
+/// The bench's station: where a seated avatar's origin goes, facing +Z, its hips over the bench.
+pub const SEAT: Vec3 = [0.0, 0.0, -3.25];
+/// Where a player leaving the bench stands.
+pub const EXIT: Vec3 = [0.0, 0.0, -2.4];
 
 /// Flat-shaded triangles of one material.
 #[derive(Default)]
@@ -124,6 +130,8 @@ pub fn world() -> Document {
     steep.ramp(2.0, 4.0, FRONT - run(60.0), FRONT, PLATFORM);
     let mut wall = Part::default();
     wall.cuboid([6.0, 0.0, 0.0], [6.2, 2.0, 8.0]);
+    let mut bench = Part::default();
+    bench.cuboid([-1.0, 0.0, -3.5], [1.0, BENCH, -3.05]);
     Document {
         name: "Test world".into(),
         hierarchy: Hierarchy {
@@ -140,6 +148,7 @@ pub fn world() -> Document {
             ramps.mesh("Ramp", 2),
             steep.mesh("Steep ramp", 3),
             wall.mesh("Wall", 4),
+            bench.mesh("Bench", 5),
         ],
         materials: vec![
             pbr("Ground", [0.35, 0.37, 0.35]),
@@ -147,6 +156,7 @@ pub fn world() -> Document {
             pbr("Ramp", [0.3, 0.45, 0.7]),
             pbr("Steep", [0.7, 0.3, 0.25]),
             pbr("Wall", [0.35, 0.6, 0.35]),
+            pbr("Bench", [0.5, 0.33, 0.2]),
         ],
         // Until Phase 2 adds a world role (ADR 0110).
         role: Role::Avatar(Avatar::default()),

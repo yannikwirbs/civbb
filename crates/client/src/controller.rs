@@ -63,9 +63,11 @@ impl WorldMesh {
     }
 
     /// Moves a capsule standing at `pos` by `delta` and pushes it out of the triangles; returns where it ends and what
-    /// it touched. Edges up to a step above `floor`, the feet's height before the move, are stood on.
-    fn slide(&self, mut pos: Vec3, delta: Vec3, floor: f32) -> (Vec3, Touch) {
-        let n = (length(delta) / (RADIUS * 0.5)).ceil().clamp(1.0, MAX_SUBSTEPS);
+    /// it touched. Edges up to a step above `floor`, the feet's height before the move, are stood on. The capsule and
+    /// the step are `size` times their constants.
+    fn slide(&self, mut pos: Vec3, delta: Vec3, floor: f32, size: f32) -> (Vec3, Touch) {
+        let (radius, height, step_height) = (RADIUS * size, HEIGHT * size, STEP * size);
+        let n = (length(delta) / (radius * 0.5)).ceil().clamp(1.0, MAX_SUBSTEPS);
         let step = scale(delta, 1.0 / n);
         let mut touch = Touch::default();
         for _ in 0..n as usize {
@@ -74,13 +76,13 @@ impl WorldMesh {
                 let mut pushed = false;
                 for t in &self.triangles {
                     let (a, b) = (
-                        [pos[0], pos[1] + RADIUS, pos[2]],
-                        [pos[0], pos[1] + HEIGHT - RADIUS, pos[2]],
+                        [pos[0], pos[1] + radius, pos[2]],
+                        [pos[0], pos[1] + height - radius, pos[2]],
                     );
                     let (on_axis, on_t) = closest_segment_triangle(a, b, t);
                     let away = sub(on_axis, on_t);
                     let d = length(away);
-                    if d >= RADIUS + SKIN {
+                    if d >= radius + SKIN {
                         continue;
                     }
                     let normal = if d > 1e-6 {
@@ -95,18 +97,18 @@ impl WorldMesh {
                             n
                         }
                     };
-                    let depth = RADIUS - d;
+                    let depth = radius - d;
                     // Touching an edge or corner, not a face: a low one below the feet's sphere is a step's edge,
                     // stood on like ground whatever the faces meeting there are.
                     let edge = dot(face_normal(t), normal).abs() < 0.999;
-                    let step = edge && normal[1] > 0.05 && on_t[1] <= floor + STEP;
+                    let step = edge && normal[1] > 0.05 && on_t[1] <= floor + step_height;
                     if normal[1] >= WALKABLE || step {
                         touch.ground = true;
                         if depth > 0.0 {
                             // Straight up until the sphere rests on the edge or the face.
                             pos[1] += if edge {
                                 let h = (on_axis[0] - on_t[0]).hypot(on_axis[2] - on_t[2]);
-                                on_t[1] + (RADIUS * RADIUS - h * h).max(0.0).sqrt() - on_axis[1]
+                                on_t[1] + (radius * radius - h * h).max(0.0).sqrt() - on_axis[1]
                             } else {
                                 depth / normal[1]
                             };
@@ -139,7 +141,7 @@ struct Touch {
     ceiling: bool,
 }
 
-/// A character: where it stands, its vertical speed and whether it is on the ground.
+/// A character: where it stands, its vertical speed, whether it is on the ground and its size.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Body {
     /// The feet: the capsule's bottom.
@@ -148,6 +150,9 @@ pub struct Body {
     pub vertical: f32,
     /// Standing on walkable ground.
     pub grounded: bool,
+    /// The capsule and the step are this many times [`RADIUS`], [`HEIGHT`] and [`STEP`]; the jump reaches this many
+    /// times its height (ADR 0114).
+    pub scale: f32,
 }
 
 impl Body {
@@ -156,31 +161,31 @@ impl Body {
     pub fn step(&mut self, world: &WorldMesh, walk: Vec3, jump: bool, dt: f32) {
         let was_grounded = self.grounded;
         if self.grounded && jump {
-            self.vertical = JUMP;
+            self.vertical = JUMP * self.scale.sqrt();
         } else if self.grounded {
             self.vertical = 0.0;
         }
         self.vertical -= GRAVITY * dt;
         let across = [walk[0] * dt, 0.0, walk[2] * dt];
-        let (mut pos, touch) = world.slide(self.pos, across, self.pos[1]);
+        let (mut pos, touch) = world.slide(self.pos, across, self.pos[1], self.scale);
         if was_grounded && touch.blocked {
             // Step up: lifted, across, set down; kept if it gets further and lands on walkable ground.
-            let (up, _) = world.slide(self.pos, [0.0, STEP, 0.0], self.pos[1]);
-            let (over, _) = world.slide(up, across, self.pos[1]);
-            let (down, landed) = world.slide(over, [0.0, self.pos[1] - up[1] - SKIN, 0.0], self.pos[1]);
+            let (up, _) = world.slide(self.pos, [0.0, STEP * self.scale, 0.0], self.pos[1], self.scale);
+            let (over, _) = world.slide(up, across, self.pos[1], self.scale);
+            let (down, landed) = world.slide(over, [0.0, self.pos[1] - up[1] - SKIN, 0.0], self.pos[1], self.scale);
             let further = |p: Vec3| (p[0] - self.pos[0]).hypot(p[2] - self.pos[2]);
             if landed.ground && further(down) > further(pos) + 1e-4 {
                 pos = down;
             }
         }
-        let (mut pos, touch) = world.slide(pos, [0.0, self.vertical * dt, 0.0], self.pos[1]);
+        let (mut pos, touch) = world.slide(pos, [0.0, self.vertical * dt, 0.0], self.pos[1], self.scale);
         if touch.ceiling && self.vertical > 0.0 {
             self.vertical = 0.0;
         }
         self.grounded = touch.ground && self.vertical <= 0.0;
         if was_grounded && !jump && !self.grounded {
             // Down stairs and ramps: snapped to ground up to a step below, else falling.
-            let (down, landed) = world.slide(pos, [0.0, -STEP, 0.0], self.pos[1]);
+            let (down, landed) = world.slide(pos, [0.0, -STEP * self.scale, 0.0], self.pos[1], self.scale);
             if landed.ground {
                 (pos, self.grounded) = (down, true);
             }
@@ -329,6 +334,7 @@ mod tests {
                 pos: [0.0; 3],
                 vertical: 0.0,
                 grounded: true,
+                scale: 1.0,
             };
             for _ in 0..60 {
                 body.step(&world, [0.0, 0.0, 2.0], false, 1.0 / 60.0);
@@ -347,6 +353,7 @@ mod tests {
             pos: [0.0; 3],
             vertical: 0.0,
             grounded: true,
+            scale: 1.0,
         };
         body.step(&world, [0.0; 3], false, 1.0 / 60.0);
         assert!(body.grounded && body.pos[1].abs() < 1e-5, "{body:?}");

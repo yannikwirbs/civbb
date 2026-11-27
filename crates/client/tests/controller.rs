@@ -17,6 +17,7 @@ fn body(pos: Vec3) -> Body {
         pos,
         vertical: 0.0,
         grounded: true,
+        scale: 1.0,
     }
 }
 
