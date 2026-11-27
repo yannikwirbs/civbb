@@ -16,6 +16,8 @@ Internal deps: civbb-core, civbb-format
 - `src/constraint.rs`: Constraints: ordered by dependency once when compiled, then evaluated in one pass over the local pose (ADR 0018).
 - `src/controller.rs`: A compiled animator controller and one running instance of it: parameters, layers, the evaluated pose.
 - `src/curve.rs`: Evaluates a curve of Hermite keys with Unity `AnimationCurve` semantics (ADR 0007).
+- `src/defaults/poses.rs`: Generated built-in clips (ADR 0108): key poses and a procedural gait in muscle space, each key's body height
+- `src/defaults.rs`: Built-in locomotion (ADR 0108): substitutes for the SDK's empty proxy clips and default Base and Action layers,
 - `src/frames.rs`: Unity's muscle frames derived from a humanoid's rest pose (#53, ADR 0064), for sources that carry none (glTF,
 - `src/lib.rs`: Animation runtime: curve binding, clip sampling, Mecanim state machines, blend trees, muscles and constraints (design
 - `src/machine.rs`: Mecanim layer state machines: entry, any-state and exit transitions, exit time, interruption, triggers (ADR 0008).
@@ -29,6 +31,7 @@ Internal deps: civbb-core, civbb-format
 - `tests/body_pose.rs`: Unity's humanoid body pose (#52) against `HumanPoseHandler` recordings on the generated test skeleton, plain and
 - `tests/constraint.rs`: Constraints (ADR 0018): every case recorded from Unity's constraints (`tests/unity/constraints.json`), and
 - `tests/curve.rs`: Unity `AnimationCurve` key semantics, hand-derived from the Hermite basis (ADR 0007): clamp, tangent scaling,
+- `tests/defaults.rs`: Built-in locomotion (ADR 0108) on the generated humanoid: proxy names, the merged layers, and the poses they
 - `tests/golden.rs`: Golden-file conformance: runs every `tests/golden/*.json` case frame by frame and compares the pose.
 - `tests/machine.rs`: Mecanim state machine conformance, hand-derived from the Unity manual (ADR 0008): entry, exit time, durations,
 - `tests/material.rs`: Material curves (ADRs 0025, 0099): native fields read and written as stored, the sRGB transfer, per-renderer slots
@@ -334,6 +337,7 @@ Internal deps: none
 - `docs/adr/0105-fork-join-worker-pool.md`: 0105: Island jobs on an own fork-join pool that wakes every worker at once and spins briefly
 - `docs/adr/0106-desktop-player.md`: 0106: The desktop player: input resource, kinematic root, first- and third-person camera
 - `docs/adr/0107-desktop-platform-values.md`: 0107: Platform values from the desktop player
+- `docs/adr/0108-built-in-locomotion.md`: 0108: Built-in locomotion: generated muscle poses merged into avatars at load
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

@@ -172,6 +172,8 @@ fn run_view(args: &[String]) -> ExitCode {
                 let key = key.clone();
                 package::spawn(move || {
                     let (mut avatar, textures) = load_package(Path::new(&p), Path::new(&key))?;
+                    // Built-in locomotion and proxy substitutes (ADR 0108); parity and `measure` show packages as built.
+                    civbb_anim::defaults::apply(&mut avatar);
                     if lod > 0 {
                         avatar.meshes = avatar.meshes.iter().map(|m| m.level(lod)).collect();
                         let triangles: usize = avatar.meshes.iter().map(|m| m.indices.len() / 3).sum();

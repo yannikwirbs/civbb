@@ -80,6 +80,11 @@ impl BodyRig {
         })
     }
 
+    /// Metres per body position unit.
+    pub fn human_scale(&self) -> f32 {
+        self.human_scale
+    }
+
     /// Writes the hips' local transform that puts the pose in `locals` (muscles applied) at `body`: the rotation
     /// that turns the pose's orientation into the body rotation, then the position that puts its centre of mass
     /// at the body position times the human scale.

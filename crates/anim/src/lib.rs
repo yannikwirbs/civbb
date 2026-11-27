@@ -8,6 +8,7 @@ pub mod clip;
 pub mod constraint;
 pub mod controller;
 pub mod curve;
+pub mod defaults;
 pub mod frames;
 pub mod machine;
 pub mod material;
