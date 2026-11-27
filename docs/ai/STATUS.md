@@ -3,18 +3,20 @@
 Read at the start of every session; update at the end. Keep it short: the queue lives in GitHub issues, what
 exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in `docs/adr/README.md`.
 
-**Milestone:** M1.2 ECS client runtime (https://github.com/yannikwirbs/civbb/milestones).
+**Milestone:** M1.3 Desktop mode, locomotion and IK (https://github.com/yannikwirbs/civbb/milestones).
 
 ## Next
 
-Start M1.3 Desktop mode, locomotion and IK: it has only #70 (native locomotion extras). First file its issues from
-the design doc sections it covers (`grep -n '^#' docs/design-doc.md`; desktop mode, locomotion, IK), lowest first,
-then take the lowest. M1.2 is done except #136's owner check (Tracy screenshot); close M1.2 once the owner posts it.
-Job timings changed with ADR 0105 (own fork-join pool, 200 µs spin): compare viewer numbers against STATE.md's, not
-older sessions'.
+#144 (test world and character controller). Its ADR decides Jolt (C bindings, MSVC and Linux builds) against an own
+capsule sweep over static meshes; the player (`crates/client/src/player.rs`) now falls to a flat ground at y 0 and
+sets `Grounded` from that, so the controller replaces that step. Then the queue in order (#145 IK, #146, #147, #148,
+#149, #153, #70). M1.2 stays open only for #136's owner check (Tracy screenshot); close M1.2 once posted.
 
 ## Now
 
+- **M1.3 started**: #141 desktop player (ADR 0106), #142 its platform values (ADR 0107), #143 built-in locomotion
+  (ADR 0108: generated muscle-space clips grounded per avatar, proxy substitutes, default Base and Action layers
+  merged at load by the viewer only), #152 default Gesture layer (ADR 0109). Emotes are #151 (M1.8).
 - **Phase 0's gate is passed** (ADR 0084; table of all 13 Unity exports there, every red state after rest
   itemised with a Phase 1 issue). Phase 1 is split into milestones M1.1 to M1.9: M1.1 Native content model (#100)
   first, then ECS client runtime, desktop mode/locomotion/IK, OpenXR, protocol/instance server/nodes, voice,
@@ -51,15 +53,12 @@ older sessions'.
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-27 (16): #135 closed: the dynamics solver keeps its per-frame buffers in `State`; island steps allocate
-  nothing after warm-up (`tests/alloc.rs`). Bloated 100, 1 worker: 7.21 to 6.96 ms/frame. Parity s135
-  byte-identical. `issue.sh queue` fixed for dotted milestones. #139 filed. Next: #136.
-- 2026-11-27 (17): #136 code done (`civbb_core::profile`, tracy-client 0.19 behind `profile`; zones per system,
-  island job, render pass; `System::Extract` counter), the Tracy check left to the owner (needs-user: running the
-  downloaded tracy-capture was denied). #137 closed (extract on the pool: 0.35 to 0.12 ms, simulation 1.69 to 1.52
-  ms), #139 closed (frames allocation-free on one worker; contact pass 0.042 to 0.024 ms). Parity s139 byte-identical.
-  #140 filed. Next: #140.
 - 2026-11-27 (18): #140 closed (ADR 0105): an own fork-join `jobs::Pool` replaces bevy_tasks for island and extract
-  jobs (broadcast wake, late wakers skipped, islands from a shared iterator, 200 µs spin; allocation-free). Cause:
-  async-executor's one-at-a-time wake chain plus Windows waking idle cores late. Viewer 100 bloated: simulation 1.52
-  to 1.00 ms/frame; bench unchanged at 1 worker, 0.75 to 0.69 ms at 16. Parity s140 byte-identical. Next: M1.3.
+  jobs (broadcast wake, 200 µs spin). Viewer 100 bloated: simulation 1.52 to 1.00 ms/frame. Parity s140
+  byte-identical. Next: M1.3.
+- 2026-11-27 (19): M1.3 issues filed; #141 (desktop player, ADR 0106) and #142 (platform values, ADR 0107) closed.
+  Ended without the end-of-session steps; session 20 pushed its commits after a green gate.
+- 2026-11-27 (20): #143 closed (ADR 0108: `civbb_anim::defaults`, generated locomotion, proxy substitutes, default
+  Base and Action layers, grounded per avatar; viewer only, parity untouched) and #152 (ADR 0109: default Gesture
+  layer per hand). All 13 corpus exports validate merged; KohzieBoi captured idle, walking, running, crouched,
+  prone. Filed #151, #153. Next: #144.

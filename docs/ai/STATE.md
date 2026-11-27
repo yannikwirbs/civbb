@@ -374,6 +374,23 @@ What exists, by area. Read the section for the area you touch; update it when th
   far); bevy's `ComputeTaskPool` is a global `OnceLock` and unused. bevy_ecs has
   default features off: the derive macros need it as a direct dependency of each crate that derives.
   `civbb-client bench [--package <pkg> --key <key>]` prints JSON (#23, #57).
+- Desktop player (#141, #142; ADRs 0106, 0107): `player.rs`, `Runtime::add_player` (`Input`, `Player`, `Camera`
+  resources; a system in `PosesIn` moves the player's island on the ground plane, the viewer's first copy). WASD,
+  Shift runs (walk 2, run 4, strafe 2 m/s), Space jumps (3 m/s, gravity 9.81, flat ground at y 0), mouse look, V
+  cycles orbit/first/third person (own head hidden in first person), C/Z toggle crouch/prone (`Upright` 0.55/0.25,
+  half/quarter speed), Shift+F1..F8 gestures, AFK while unfocused; it sets the island's platform values each frame
+  (`Island::set_platform`). No world collision yet (#144).
+- Built-in locomotion (#143, #152; ADRs 0108, 0109): `civbb_anim::defaults::apply(&mut Document)` merges generated
+  muscle-space clips into a humanoid with muscle frames: fills empty `proxy_*` clips by name (`defaults::proxy`;
+  emotes stay empty, #151) and adds `civbb/locomotion` (Base: standing/crouching/prone 2D freeform trees on
+  `VelocityX`/`VelocityZ`, falling on `Grounded`, postures at `Upright` 0.7/0.4), `civbb/hand_left`/`_right`
+  (Gesture: any-state per gesture value, fist blended by its weight, masked per hand) and `civbb/action` (AFK,
+  sitting; raises the Action group) to empty groups, plus the platform entries they read. `defaults::Poser`
+  grounds each key: the pose's lowest human bone at the rest pose's lowest. Muscle signs on our rig: front-back
+  of spine, chest, neck, head and arms positive backwards, nods positive up, upper leg in-out positive out, upper
+  leg front-back 0.6 standing (more negative is forward), stretch 1 straight, finger stretch +1 open. Only the
+  viewer's package load applies it (`main.rs`); parity, `measure` and bench show packages as built. All 13 corpus
+  exports validate merged; KohzieBoi, Megumi, Ostgaroa and Taro run on the generated layers.
 - Benchmark on the reference PC (release, bloated, #132): 100 avatars 7.03 ms/frame on 1 worker, 0.756 ms on 16
   (9.3x); 1000 avatars 71.6 ms to 7.06 ms (10.1x). The bench makes one pool per worker count and drives frames from
   a fresh thread (`measure` pins it, 1 worker, ADR 0080). Corpus constraints (#57): lean

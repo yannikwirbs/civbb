@@ -89,3 +89,7 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   offset is `1 - v_scale - v_offset`. Zeroing (baking) a V scale must add the old scale to the stored offset, or the
   `material_first_default` golden reads 1.2 for 0.2. And a slot's default is a Write Defaults value: a value Unity
   holds where no clip writes cannot become a constant curve; bake it into the material (ADR 0099).
+- Muscle signs are not what the names suggest: on our rig (Unity's frames) arm and spine front-back are positive
+  backwards, so a generated walk first swung the arms with the legs (#143). Before writing poses, probe each muscle:
+  `Rig::rotations` on the lean corpus skeleton with `frames::derive`, `world_poses`, print a child bone's position
+  (a bone's own position does not move with its rotation). Corpus clips give the absolute scale (standing legs 0.6).
