@@ -1,10 +1,11 @@
-//! Island steps allocate nothing on the heap after warm-up (design doc §5 "Scheduling rules", #135): a counting
-//! global allocator, so this file holds this one test (the allocator is process-wide).
+//! Island steps and whole frames allocate nothing on the heap after warm-up (design doc §5 "Scheduling rules", #135,
+//! #139): a counting global allocator, process-wide, so it has a file of its own; counts are per thread.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::sync::Arc;
 
+use civbb_client::frame::{self, Runtime};
 use civbb_client::{Island, Model};
 use civbb_core::math::Pose;
 
@@ -69,6 +70,56 @@ fn island_steps_do_not_allocate_after_warm_up() {
             allocations() - before,
             0,
             "{name}: heap allocations in 200 island steps"
+        );
+    }
+}
+
+#[test]
+fn frames_do_not_allocate_after_warm_up() {
+    for (name, spec) in [("lean", civbb_corpus::lean()), ("bloated", civbb_corpus::bloated())] {
+        let model = Arc::new(Model::new(&civbb_corpus::generate(&spec)));
+        // Close enough that contacts of neighbours touch.
+        let mut islands: Vec<Island> = (0..4)
+            .map(|id| {
+                let origin = Pose {
+                    pos: [id as f32 * 0.3, 0.0, 0.0],
+                    ..Pose::IDENTITY
+                };
+                Island::new(Arc::clone(&model), id, id == 0, origin)
+            })
+            .collect();
+        // One worker: the calling thread runs every job, so the thread-local count sees them all.
+        let pool = Arc::new(civbb_core::jobs::pool(1, || {}));
+        let mut runtime = Runtime::with_workers(Arc::clone(&pool));
+        for island in &islands {
+            runtime.spawn(Island::new(Arc::clone(&model), island.id, island.local, island.origin));
+        }
+        let sway = |frame: usize, k: usize, island: &mut Island| {
+            island.origin.pos[0] = k as f32 * 0.3 + (frame as f32 * 0.05).sin() * 0.2;
+        };
+        for _ in 0..10 {
+            frame::step_on(&pool, &mut islands, |_, _| true, 1.0 / 90.0);
+            runtime.step(1.0 / 90.0);
+        }
+        let before = allocations();
+        for f in 0..200 {
+            for (k, island) in islands.iter_mut().enumerate() {
+                sway(f, k, island);
+            }
+            frame::step_on(&pool, &mut islands, |_, _| true, 1.0 / 90.0);
+        }
+        assert_eq!(allocations() - before, 0, "{name}: heap allocations in 200 frames");
+        let before = allocations();
+        for f in 0..200 {
+            for k in 0..runtime.len() {
+                sway(f, k, &mut runtime.island_mut(k));
+            }
+            runtime.step(1.0 / 90.0);
+        }
+        assert_eq!(
+            allocations() - before,
+            0,
+            "{name}: heap allocations in 200 runtime frames"
         );
     }
 }

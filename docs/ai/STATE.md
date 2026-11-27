@@ -379,7 +379,13 @@ What exists, by area. Read the section for the area you touch; update it when th
   and keeps its scratch per island (#66): lean 0.97 to 0.49 µs, bloated 12.7 to 9.45 µs per avatar on one worker.
   `Island::step` allocates nothing after warm-up (#135, `tests/alloc.rs`, a counting global allocator): the
   dynamics solver keeps its world poses, collider placements and grab path in `State`'s scratch. Bloated 100
-  avatars, 1 worker: 7.21 to 6.96 ms/frame. The contact pass and frame glue still allocate per frame (#139).
+  avatars, 1 worker: 7.21 to 6.96 ms/frame. Whole frames too since #139 (`frame::step_on` and `Runtime::step`
+  without extract, one worker): `contact::step_with` keeps its buffers in a `contact::Scratch` (broadphase grid a
+  sorted (cell, sender) list instead of a `HashMap`; receivers placed in the second loop; `touching` lists reused),
+  frame.rs keeps the participant and `&mut Island` buffers (`frame::recycle`, the standard in-place collect
+  reusing a `Vec`'s allocation for borrows; a thread-local scratch for plain `step`, `Local`s in the systems), and
+  `jobs::islands` on a pool without threads is a plain loop. Still allocating: bevy_tasks' scope with threads (~2 per
+  task) and the extract step's per-frame `Vec`s. Contact pass 100 bloated: 0.042 to 0.024 ms/frame.
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
   human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056), the start time does not reach one and a transition fired at its exit time starts with the overshoot elapsed; the first update advances like any other; a Write Defaults on state without a motion writes nothing (ADR 0065, recorded); instances start entries at `Entry::default` (`Controller::start`; the expression default for lowered Unity content,
@@ -393,7 +399,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   integration, immobile, limits with their rotation composed `qz qy qx` as the SDK does (#108), segment colliders;
   not the hand and finger colliders that `allowCollision` chains meet, #92) with grab/pose (ADR 0015's, unverified; outputs written to their entries before the next frame's animator update,
   as receivers are), and contacts with the
-  cross-avatar grid broadphase (`contact::step`, ADR 0017): sphere, capsule and box shapes, face proximity, the
+  cross-avatar grid broadphase (`contact::step`/`step_with`, ADR 0017): sphere, capsule and box shapes, face proximity, the
   component's node apart from the root transform, Proximity from a sender's second frame (ADR 0047). Format v13
   (`rebake` ADR 0046, contact shapes ADR 0047, PhysBone `version` ADR 0049, `Toon::light` ADR 0050).
 

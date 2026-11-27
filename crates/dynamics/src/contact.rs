@@ -1,8 +1,6 @@
 //! Contact senders and receivers: compiled volumes, a grid broadphase across avatars and receiver values (ADR 0017,
 //! 0047).
 
-use std::collections::HashMap;
-
 use civbb_format::Document;
 use civbb_format::dynamics::{ContactShape, ContactVolume, ReceiverKind};
 use civbb_format::hierarchy::NodeIndex;
@@ -242,73 +240,89 @@ fn place(v: &Volume, p: &Participant, last: Vec3, dt: f32) -> Option<(Placed, Ve
     Some((Placed { body, velocity }, centre))
 }
 
+/// Buffers a contact pass reuses from one frame to the next, so passes after the first allocate nothing (#139).
+#[derive(Default)]
+pub struct Scratch {
+    /// This frame's senders: avatar slot, sender index, placement.
+    senders: Vec<(usize, u32, Placed)>,
+    /// The broadphase grid: (cell, sender) pairs, sorted.
+    cells: Vec<([i32; 3], u32)>,
+    /// Senders sharing a cell with the receiver at hand.
+    candidates: Vec<u32>,
+    /// Senders touching the receiver at hand.
+    now: Vec<SenderId>,
+}
+
 /// Runs one frame's contact pass over every avatar on this client: places all contacts, finds sender and receiver
 /// pairs through the grid and updates each receiver's value. `permits(receiver_avatar, sender_avatar)` is the
 /// receiving owner's setting for whose contacts may affect their avatar; it is not asked about an avatar's own
 /// senders. `dt` is the frame time in seconds.
 pub fn step(avatars: &mut [Participant], permits: impl Fn(u64, u64) -> bool, dt: f32) {
-    // Senders: (avatar slot, sender index, placement), and the grid over them.
-    let mut senders: Vec<(usize, u32, Placed)> = Vec::new();
-    let mut receivers: Vec<Vec<Option<Placed>>> = Vec::with_capacity(avatars.len());
+    step_with(&mut Scratch::default(), avatars, permits, dt);
+}
+
+/// [`step`] with buffers kept in `scratch`.
+pub fn step_with(scratch: &mut Scratch, avatars: &mut [Participant], permits: impl Fn(u64, u64) -> bool, dt: f32) {
+    let Scratch {
+        senders,
+        cells,
+        candidates,
+        now,
+    } = scratch;
+    senders.clear();
     for (slot, p) in avatars.iter_mut().enumerate() {
-        let mut placed = Vec::with_capacity(p.rig.receivers.len());
         for (i, s) in p.rig.senders.iter().enumerate() {
             if let Some((s, centre)) = place(s, p, p.state.senders[i], dt) {
                 senders.push((slot, i as u32, s));
                 p.state.senders[i] = centre;
             }
         }
-        for (i, r) in p.rig.receivers.iter().enumerate() {
-            let r = place(&r.volume, p, p.state.receivers[i], dt);
-            if let Some((_, centre)) = r {
-                p.state.receivers[i] = centre;
-            }
-            placed.push(r.map(|(r, _)| r));
-        }
-        receivers.push(placed);
     }
-    let mut grid: HashMap<[i32; 3], Vec<u32>> = HashMap::new();
+    cells.clear();
     for (k, (_, _, s)) in senders.iter().enumerate() {
-        for cell in s.cells() {
-            grid.entry(cell).or_default().push(k as u32);
-        }
+        cells.extend(s.cells().map(|cell| (cell, k as u32)));
     }
+    cells.sort_unstable();
 
-    let ids: Vec<u64> = avatars.iter().map(|p| p.id).collect();
-    let rigs: Vec<&ContactRig> = avatars.iter().map(|p| p.rig).collect();
-    let mut candidates: Vec<u32> = Vec::new();
-    for (slot, p) in avatars.iter_mut().enumerate() {
-        for (i, r) in p.rig.receivers.iter().enumerate() {
-            let Some(rp) = receivers[slot][i] else {
-                p.state.touching[i].clear();
-                p.state.values[i] = 0.0;
+    for slot in 0..avatars.len() {
+        let rig = avatars[slot].rig;
+        for (i, r) in rig.receivers.iter().enumerate() {
+            let placed = place(&r.volume, &avatars[slot], avatars[slot].state.receivers[i], dt);
+            let state = &mut *avatars[slot].state;
+            let Some((rp, centre)) = placed else {
+                state.touching[i].clear();
+                state.values[i] = 0.0;
                 continue;
             };
+            state.receivers[i] = centre;
             candidates.clear();
             for cell in rp.cells() {
-                candidates.extend(grid.get(&cell).into_iter().flatten());
+                let first = cells.partition_point(|&(c, _)| c < cell);
+                candidates.extend(cells[first..].iter().take_while(|&&(c, _)| c == cell).map(|&(_, k)| k));
             }
             candidates.sort_unstable();
             candidates.dedup();
 
-            let mut now: Vec<SenderId> = Vec::new();
+            now.clear();
             let mut value: f32 = 0.0;
-            for &k in &candidates {
+            let (id, touching) = (avatars[slot].id, &avatars[slot].state.touching[i]);
+            for &k in candidates.iter() {
                 let (s_slot, s_index, sp) = senders[k as usize];
+                let sender = &avatars[s_slot];
                 let allowed = if s_slot == slot {
                     r.allow_self
                 } else {
-                    r.allow_others && permits(ids[slot], ids[s_slot])
+                    r.allow_others && permits(id, sender.id)
                 };
-                if !allowed || !shares_tag(&r.volume.tags, &rigs[s_slot].senders[s_index as usize].tags) {
+                if !allowed || !shares_tag(&r.volume.tags, &sender.rig.senders[s_index as usize].tags) {
                     continue;
                 }
                 if gap(&rp.body, &sp.body) > 0.0 {
                     continue;
                 }
-                let id = (ids[s_slot], s_index);
-                now.push(id);
-                let entered = !p.state.touching[i].contains(&id);
+                let sid = (sender.id, s_index);
+                now.push(sid);
+                let entered = !touching.contains(&sid);
                 value = value.max(match r.kind {
                     ReceiverKind::Constant => 1.0,
                     ReceiverKind::OnEnter => {
@@ -320,10 +334,12 @@ pub fn step(avatars: &mut [Participant], permits: impl Fn(u64, u64) -> bool, dt:
                     ReceiverKind::Proximity => proximity(&rp.body, &sp.body, r.face),
                 });
             }
-            p.state.touching[i] = now;
-            p.state.values[i] = value;
+            let state = &mut *avatars[slot].state;
+            state.touching[i].clear();
+            state.touching[i].extend_from_slice(now);
+            state.values[i] = value;
         }
-        p.state.started = true;
+        avatars[slot].state.started = true;
     }
 }
 

@@ -7,8 +7,17 @@ use crate::counters::Counters;
 pub use bevy_tasks::TaskPool as Pool;
 
 /// Runs `step` once on every island as its own task on `pool`; the calling thread runs tasks too until all are done.
-/// Returns the counters every task reported, summed.
+/// Returns the counters every task reported, summed. A pool without threads runs them in a plain loop, which
+/// allocates nothing (#139).
 pub fn islands<T: Send>(pool: &TaskPool, islands: &mut [T], step: impl Fn(&mut T, &mut Counters) + Sync) -> Counters {
+    if pool.thread_num() == 0 {
+        let mut c = Counters::default();
+        for island in islands {
+            let _zone = crate::profile::zone("island");
+            step(island, &mut c);
+        }
+        return c;
+    }
     let step = &step;
     pool.scope(|s| {
         for island in islands.iter_mut() {

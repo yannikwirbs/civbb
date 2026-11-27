@@ -2,6 +2,7 @@
 //! (design doc §5 steps 5 and 6, ADR 0020), as plain functions and as systems on the frame schedule (ADR 0103).
 
 use std::borrow::BorrowMut;
+use std::cell::RefCell;
 use std::sync::{Arc, OnceLock};
 
 use bevy_ecs::prelude::*;
@@ -43,22 +44,43 @@ pub fn step_on<I: BorrowMut<Island> + Send>(
     permits: impl Fn(u64, u64) -> bool,
     dt: f32,
 ) -> Counters {
+    thread_local! {
+        static SCRATCH: RefCell<ContactScratch> = RefCell::default();
+    }
     let mut counters = jobs::islands(pool, islands, |island, c| island.borrow_mut().step(dt, c));
-    contacts(islands, permits, dt, &mut counters);
+    SCRATCH.with_borrow_mut(|scratch| contacts(scratch, islands, permits, dt, &mut counters));
     counters
+}
+
+/// What the contact pass reuses from frame to frame (#139).
+#[derive(Default)]
+struct ContactScratch {
+    /// Empty between passes; only its allocation is kept.
+    participants: Vec<Participant<'static>>,
+    pass: contact::Scratch,
 }
 
 /// The contact pass over `islands` after they stepped, timed as [`System::Contacts`].
 fn contacts<I: BorrowMut<Island>>(
+    scratch: &mut ContactScratch,
     islands: &mut [I],
     permits: impl Fn(u64, u64) -> bool,
     dt: f32,
     counters: &mut Counters,
 ) {
     counters.time(System::Contacts, || {
-        let mut all: Vec<Participant> = islands.iter_mut().map(|i| i.borrow_mut().participant()).collect();
-        contact::step(&mut all, permits, dt);
+        let mut all = recycle(std::mem::take(&mut scratch.participants));
+        all.extend(islands.iter_mut().map(|i| i.borrow_mut().participant()));
+        contact::step_with(&mut scratch.pass, &mut all, permits, dt);
+        scratch.participants = recycle(all);
     });
+}
+
+/// `v` emptied, its allocation reused for elements of another type of the same layout (the standard library's
+/// in-place collect): buffers of borrows kept across frames without allocating (#139).
+pub(crate) fn recycle<T, U>(mut v: Vec<T>) -> Vec<U> {
+    v.clear();
+    v.into_iter().map(|_| unreachable!("the vector is empty")).collect()
 }
 
 /// Whose contacts may affect whose avatar: `(receiving owner, sending owner) -> allowed`. Everyone by default.
@@ -76,17 +98,34 @@ impl Default for Permits {
 pub struct Workers(pub Arc<jobs::Pool>);
 
 /// The island step of [`Step::Avatars`]: one job per island; replaces the frame's [`Counters`].
-fn islands_system(mut q: Query<&mut Island>, dt: Res<Dt>, workers: Res<Workers>, mut counters: ResMut<Counters>) {
+fn islands_system(
+    mut q: Query<&mut Island>,
+    dt: Res<Dt>,
+    workers: Res<Workers>,
+    mut counters: ResMut<Counters>,
+    mut buffer: Local<Vec<&'static mut Island>>,
+) {
     let _zone = profile::zone("avatars");
-    let mut all: Vec<&mut Island> = q.iter_mut().map(Mut::into_inner).collect();
+    let mut all: Vec<&mut Island> = recycle(std::mem::take(&mut *buffer));
+    all.extend(q.iter_mut().map(Mut::into_inner));
     *counters = jobs::islands(&workers.0, &mut all, |island, c| island.step(dt.0, c));
+    *buffer = recycle(all);
 }
 
 /// The contact pass of [`Step::CrossAvatar`], in query order: a receiver's value is the largest over its senders,
 /// so the order islands come in does not change results (ADR 0104).
-fn contacts_system(mut q: Query<&mut Island>, dt: Res<Dt>, permits: Res<Permits>, mut counters: ResMut<Counters>) {
-    let mut all: Vec<&mut Island> = q.iter_mut().map(Mut::into_inner).collect();
-    contacts(&mut all, &permits.0, dt.0, &mut counters);
+fn contacts_system(
+    mut q: Query<&mut Island>,
+    dt: Res<Dt>,
+    permits: Res<Permits>,
+    mut counters: ResMut<Counters>,
+    mut buffer: Local<Vec<&'static mut Island>>,
+    mut scratch: Local<ContactScratch>,
+) {
+    let mut all: Vec<&mut Island> = recycle(std::mem::take(&mut *buffer));
+    all.extend(q.iter_mut().map(Mut::into_inner));
+    contacts(&mut scratch, &mut all, &permits.0, dt.0, &mut counters);
+    *buffer = recycle(all);
 }
 
 /// When an island was spawned: the extract step copies islands in this order (ADR 0104).
