@@ -16,3 +16,4 @@
 !/tools/unity-truth/ProjectSettings/ProjectVersion.txt
 .claude/settings.local.json
 .claude/*.lock
+__pycache__/

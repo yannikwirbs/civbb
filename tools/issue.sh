@@ -14,7 +14,7 @@ show)
     + ([.comments[] | "\n\n--- \(.author.login) \(.createdAt[:10])\n\(.body)"] | join(""))'
   ;;
 queue)
-  m=${2:-$(sed -n 's/.*\*\*Milestone:\*\* \([^.(]*\).*/\1/p' "$(dirname "$0")/../docs/ai/STATUS.md" | head -1)}
+  m=${2:-$(sed -n 's/.*\*\*Milestone:\*\* \([^(]*[^ (]\) *(.*/\1/p' "$(dirname "$0")/../docs/ai/STATUS.md" | head -1)}
   [ -n "$m" ] || { echo "issue: no milestone given and none in STATUS.md (**Milestone:** line)" >&2; exit 2; }
   gh issue list --repo $repo --milestone "${m% }" --state open --limit 100 --json number,title,labels --jq '
     sort_by(.number)[] | "#\(.number) \(.title)\(if (.labels | length) > 0 then " [" + ([.labels[].name] | join(", ")) + "]" else "" end)"'
