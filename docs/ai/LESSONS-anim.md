@@ -93,3 +93,7 @@ Read before working on `civbb-anim`, `civbb-dynamics`, constraints, muscles or t
   backwards, so a generated walk first swung the arms with the legs (#143). Before writing poses, probe each muscle:
   `Rig::rotations` on the lean corpus skeleton with `frames::derive`, `world_poses`, print a child bone's position
   (a bone's own position does not move with its rotation). Corpus clips give the absolute scale (standing legs 0.6).
+- Test IK with goals taken from a scripted pose of the same skeleton (always reachable, and every bone has a known
+  answer). It showed that distributed CCD stalls on goals nearly in line with a straight chain (7 mm short after 16
+  passes) and that FABRIK from a straight rest chain needs ~40 passes near full extension; 3-point tests missed both
+  because the hips absorbed the remainder.
