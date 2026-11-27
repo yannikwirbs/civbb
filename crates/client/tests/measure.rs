@@ -107,6 +107,7 @@ fn headless_frames_draw_two_packages_in_the_test_world_without_validation_errors
         world: Some(package::Package::new(civbb_corpus::world(), vec![])),
         stations: Vec::new(),
         trackers: None,
+        turning: Default::default(),
     };
     match view::run_headless(cfg, 320, 180) {
         Ok((s, device)) => {

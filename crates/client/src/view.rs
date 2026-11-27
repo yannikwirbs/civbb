@@ -24,6 +24,7 @@ use winit::window::{CursorGrabMode, WindowId};
 use crate::controller::WorldMesh;
 use crate::extract::{Camera, Snapshot};
 use crate::frame::Runtime;
+use crate::gamepad::{Pad, Turning};
 use crate::gpu::Gpu;
 use crate::package::Handle;
 use crate::player::{Input, Player, View};
@@ -54,6 +55,8 @@ pub struct Config {
     pub stations: Vec<Station>,
     /// Scripted trackers drive the player's avatar (ADR 0113).
     pub trackers: Option<Scripted>,
+    /// How a gamepad's right stick turns the player (ADR 0115).
+    pub turning: Turning,
 }
 
 /// What a run measured, past the warm-up.
@@ -416,6 +419,10 @@ struct Viewer {
     cursor: Option<(f64, f64)>,
     /// Keys held down, for the player's input (ADR 0106).
     held: HashSet<KeyCode>,
+    /// Gamepad events, if the platform has them (ADR 0115).
+    pads: Option<gilrs::Gilrs>,
+    /// The gamepads' sticks and settings.
+    pad: Pad,
     /// The cursor is confined and hidden, and mouse motion turns the player.
     captured: bool,
     last: Option<Instant>,
@@ -459,6 +466,8 @@ impl Viewer {
             dragging: false,
             cursor: None,
             held: HashSet::new(),
+            pads: gilrs::Gilrs::new().ok(),
+            pad: Pad::new(cfg.turning),
             captured: false,
             last: None,
             timing: Timing::default(),
@@ -532,6 +541,14 @@ impl Viewer {
         window.set_cursor_visible(!on);
     }
 
+    /// Cycles the camera mode (V or a pad's Select), capturing the cursor outside orbit mode.
+    fn cycle_view(&mut self) {
+        let mut player = self.runtime.world.resource_mut::<Player>();
+        player.view = player.view.next();
+        let view = player.view;
+        self.capture(view != View::Orbit);
+    }
+
     fn fail(&mut self, event_loop: &ActiveEventLoop, e: impl ToString) {
         self.error = Some(e.to_string());
         event_loop.exit();
@@ -597,6 +614,19 @@ impl Viewer {
         let run = self.held.contains(&KeyCode::ShiftLeft) || self.held.contains(&KeyCode::ShiftRight);
         let mut input = self.runtime.world.resource_mut::<Input>();
         (input.forward, input.right, input.run) = (forward, right, run);
+        let mut cycle = false;
+        while let Some(gilrs::Event { event, .. }) = self.pads.as_mut().and_then(|p| p.next_event()) {
+            match event {
+                gilrs::EventType::ButtonPressed(b, _) => cycle |= self.pad.button(b, &mut input),
+                gilrs::EventType::AxisChanged(a, v, _) => self.pad.axis(a, v),
+                gilrs::EventType::Disconnected => self.pad.reset(),
+                _ => {}
+            }
+        }
+        self.pad.apply(&mut input, dt);
+        if cycle {
+            self.cycle_view();
+        }
         self.runtime.step(dt);
         let systems = start.elapsed().as_secs_f32() * 1000.0;
         // Frame N-1's snapshot comes back once drawn; waiting for it is not this thread's work.
@@ -752,12 +782,7 @@ impl ApplicationHandler for Viewer {
                 self.held.insert(code);
                 match code {
                     KeyCode::Space => self.runtime.world.resource_mut::<Input>().jump = true,
-                    KeyCode::KeyV => {
-                        let mut player = self.runtime.world.resource_mut::<Player>();
-                        player.view = player.view.next();
-                        let view = player.view;
-                        self.capture(view != View::Orbit);
-                    }
+                    KeyCode::KeyV => self.cycle_view(),
                     KeyCode::Escape => self.capture(false),
                     KeyCode::KeyC => self.runtime.world.resource_mut::<Input>().crouch = true,
                     KeyCode::KeyZ => self.runtime.world.resource_mut::<Input>().prone = true,
@@ -790,6 +815,7 @@ impl ApplicationHandler for Viewer {
                 self.runtime.world.resource_mut::<Input>().afk = !focused;
                 if !focused {
                     self.held.clear();
+                    self.pad.reset();
                     self.capture(false);
                 }
             }

@@ -7,6 +7,7 @@ pub mod controller;
 pub mod cull;
 pub mod extract;
 pub mod frame;
+pub mod gamepad;
 mod gpu;
 pub mod island;
 pub mod package;

@@ -56,6 +56,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/cull.rs`: Frustum culling of mesh instances before skinning (design doc §6, ADR 0077): conservative world bounds from
 - `src/extract.rs`: The render snapshot: what the renderer reads of a frame, copied out of the islands by the `Extract` step so a
 - `src/frame.rs`: One simulation frame's avatar work: every island as its own parallel job, then the cross-avatar contact pass
+- `src/gamepad.rs`: Gamepad input for the desktop player (design doc §18, ADR 0115): gilrs buttons and sticks onto the player's
 - `src/gpu.rs`: The render thread's GPU resources, kept in step with each snapshot: one upload per package shown and one skinned
 - `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
 - `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020),
@@ -353,6 +354,7 @@ Internal deps: none
 - `docs/adr/0112-ik-6-and-10-point.md`: 0112: 6- and 10-point IK goals, and FABRIK for the spine
 - `docs/adr/0113-tracker-input-and-calibration.md`: 0113: Tracker input as a resource, and calibration by eye height and per-device offsets
 - `docs/adr/0114-avatar-scaling-and-stations.md`: 0114: Avatar scaling by eye height, and stations as client components
+- `docs/adr/0115-gamepad-input-and-turning.md`: 0115: Gamepad input through gilrs, merged into the player's input, with snap or smooth turning
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

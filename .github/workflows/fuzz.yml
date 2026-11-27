@@ -32,6 +32,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: fuzz
+      # gilrs (gamepads, ADR 0115) links libudev on Linux.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev
       - run: cargo run --release --manifest-path fuzz/Cargo.toml --bin seeds
       - name: fuzz
         run: |
