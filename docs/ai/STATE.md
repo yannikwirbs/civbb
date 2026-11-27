@@ -380,6 +380,15 @@ What exists, by area. Read the section for the area you touch; update it when th
   cycles orbit/first/third person (own head hidden in first person), C/Z toggle crouch/prone (`Upright` 0.55/0.25,
   half/quarter speed), Shift+F1..F8 gestures, AFK while unfocused; it sets the island's platform values each frame
   (`Island::set_platform`).
+- Scaling and stations (#147, ADR 0114): `Player::eye_height` (`None` = the avatar's viewpoint height; chosen within
+  0.2 to 5 m, `=`/`-` multiply by 1.1) gives `Player::scale` = eye over own, written to `Island::origin.scale`
+  (viewpoint, cameras, bones, IK goals in avatar space follow); speeds and `Body::scale` (capsule, step) scale by
+  it, the jump speed by its square root; platform velocities are in avatar metres. `ScaleFactor`(`Inverse`),
+  `EyeHeight`, `EyeHeightPercent`, `InStation`, `Seated` set each frame. `station.rs`: `Station` component (seat,
+  yaw, exit, `seated`), `nearest`; E (`Input::interact`) sits within 1.5 m (scaled), jump or E leaves to the exit;
+  seated the body neither moves nor turns, the view pitches. Test world bench (`civbb_corpus::world::{SEAT, EXIT}`,
+  0.45 m, behind the player) is spawned by `view --world` via `Config::stations`. World stations, station animation
+  overrides and world eye-height limits: #156 (Phase 2).
 - Character controller (#144, ADR 0110; Jolt deferred to Phase 2 world content): `controller.rs`, `WorldMesh`
   (static world triangles, brute force; `plane()` is `add_player`'s default, `from_document` takes rigid meshes)
   and `Body::step` (vertical capsule r 0.25, h 1.6; overlap resolution in substeps of r/2; walkable ≤ 45° pushes

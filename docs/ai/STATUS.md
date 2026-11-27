@@ -7,10 +7,11 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#147 (avatar scaling, eye height, stations; desktop scope). Scaling must carry into IK: `Calibration::ratio`
-(ADR 0113) is eye height over the head device's, so a scaled avatar's viewpoint changes it; tracker goals are in
-avatar space (before `Island::origin.scale`). Then the queue in order (#148, #149, #153, #154, #70). M1.2 stays open
-only for #136's owner check (Tracy screenshot); close M1.2 once posted.
+#148 (gamepad input, snap or smooth turning). Feed the pad into the existing `player::Input` resource (the viewer
+writes it from winit events in `view.rs`; `Input::look` is yaw/pitch in radians per frame, `resize` and `interact`
+are one-shot like `jump`). A seated player ignores yaw (`Player::step`, ADR 0114). Then the queue in order (#149,
+#153, #154, #70). #154 should scale its posture heights from `Body::scale`. M1.2 stays open only for #136's owner
+check (Tracy screenshot); close M1.2 once posted.
 
 ## Now
 
@@ -21,7 +22,8 @@ only for #136's owner check (Tracy screenshot); close M1.2 once posted.
   `civbb-client view --world`).
   #145 full-body IK, 3-point (ADR 0111: `civbb_anim::ik`, goals in avatar space on `Island::targets`, desktop
   view pitch shared over chest, neck and head); #146 (ADR 0112: 6- and 10-point goals, FABRIK spine; ADR 0113:
-  tracker devices by role, calibration, `Trackers` resource, `view --trackers 3|6|10`).
+  tracker devices by role, calibration, `Trackers` resource, `view --trackers 3|6|10`). #147 (ADR 0114: eye height
+  scales the avatar, speeds and capsule; `Station` component, the test world's bench; world stations are #156).
 - **Phase 0's gate is passed** (ADR 0084; table of all 13 Unity exports there, every red state after rest
   itemised with a Phase 1 issue). Phase 1 is split into milestones M1.1 to M1.9: M1.1 Native content model (#100)
   first, then ECS client runtime, desktop mode/locomotion/IK, OpenXR, protocol/instance server/nodes, voice,
@@ -58,10 +60,11 @@ only for #136's owner check (Tracy screenshot); close M1.2 once posted.
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-27 (21): #144 closed (ADR 0110: `controller.rs` capsule controller over static triangles, step edges stood
-  on, step-up, snap down; `civbb_corpus::world()` shown by `view --world`). Filed #154. Next: #145.
 - 2026-11-27 (22): #145 closed (ADR 0111: `civbb_anim::ik::Solver`, 3-point goals and the view pitch; bench sets
   goals on every island, IK 4.5 µs per avatar). #146 half done (ADR 0112: 6- and 10-point goals, FABRIK spine,
   scripted-pose tests). Next: the rest of #146.
 - 2026-11-27 (23): #146 closed (ADR 0113: `civbb_anim::tracking` devices and calibration, round trip through the
   10-point solver within 1 mm; client `Trackers` resource and system, `view --trackers`). Filed #155. Next: #147.
+- 2026-11-27 (24): #147 closed (ADR 0114: eye height sets the avatar's scale, speeds, capsule and jump follow;
+  scale and station platform values; `Station` component, E sits or leaves, a bench in the test world). Filed #156.
+  Next: #148.
