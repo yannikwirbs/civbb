@@ -1,0 +1,299 @@
+//! The local player in desktop mode: input moves one island on the ground plane and places the camera at its
+//! viewpoint (design doc §18, ADR 0106).
+
+use std::f32::consts::TAU;
+
+use bevy_ecs::prelude::*;
+use civbb_core::math::{add, scale, sub};
+use civbb_core::schedule::Dt;
+use civbb_format::math::{Quat, Vec3};
+
+use crate::extract::Camera;
+use crate::frame::Shows;
+use crate::island::Island;
+
+/// Walking speed forward and back in m/s, the legacy world default (ADR 0106).
+pub const WALK: f32 = 2.0;
+/// Running speed forward and back in m/s.
+pub const RUN: f32 = 4.0;
+/// Sideways speed in m/s, running or not.
+pub const STRAFE: f32 = 2.0;
+/// Upward speed a jump starts with, in m/s.
+pub const JUMP: f32 = 3.0;
+/// Downward acceleration in m/s².
+pub const GRAVITY: f32 = 9.81;
+/// The view's pitch stays within ±89°.
+const PITCH_LIMIT: f32 = 89.0 * std::f32::consts::PI / 180.0;
+/// The third-person camera's distance behind the viewpoint, in viewpoint heights.
+const THIRD_PERSON: f32 = 1.5;
+
+/// What the player asks for, written before each frame; the frame consumes `jump` and `look`.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq)]
+pub struct Input {
+    /// Forward (+1) to back (-1).
+    pub forward: f32,
+    /// Right (+1) to left (-1).
+    pub right: f32,
+    /// Run instead of walk.
+    pub run: bool,
+    /// Jump once.
+    pub jump: bool,
+    /// Turn since the last frame in radians: yaw (positive turns left) and pitch (positive looks up).
+    pub look: [f32; 2],
+}
+
+/// Where the camera is.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum View {
+    /// The viewer's own camera; the player does not place it.
+    #[default]
+    Orbit,
+    /// At the avatar's viewpoint.
+    First,
+    /// Behind the viewpoint, looking at it.
+    Third,
+}
+
+impl View {
+    /// The next mode in the cycle orbit, first person, third person.
+    pub fn next(self) -> Self {
+        match self {
+            View::Orbit => View::First,
+            View::First => View::Third,
+            View::Third => View::Orbit,
+        }
+    }
+}
+
+/// The local player: which island it moves and where.
+#[derive(Resource, Clone, Copy, Debug, PartialEq)]
+pub struct Player {
+    /// The island moved; `None` moves nothing.
+    pub island: Option<Entity>,
+    /// Where the avatar stands (its origin).
+    pub pos: Vec3,
+    /// Facing in radians about +Y; 0 faces +Z.
+    pub yaw: f32,
+    /// The view's elevation in radians.
+    pub pitch: f32,
+    /// Upward speed in m/s.
+    pub vertical: f32,
+    /// Standing on the ground.
+    pub grounded: bool,
+    /// The camera mode.
+    pub view: View,
+}
+
+impl Default for Player {
+    fn default() -> Self {
+        Self {
+            island: None,
+            pos: [0.0; 3],
+            yaw: 0.0,
+            pitch: 0.0,
+            vertical: 0.0,
+            grounded: true,
+            view: View::Orbit,
+        }
+    }
+}
+
+impl Player {
+    /// Facing as a unit vector on the ground.
+    pub fn forward(&self) -> Vec3 {
+        let (s, c) = self.yaw.sin_cos();
+        [s, 0.0, c]
+    }
+
+    /// Facing as a rotation about +Y.
+    pub fn rotation(&self) -> Quat {
+        let (s, c) = (self.yaw / 2.0).sin_cos();
+        [0.0, s, 0.0, c]
+    }
+
+    /// Moves and turns by `input` over `dt` seconds on the ground plane y = 0.
+    pub fn step(&mut self, input: &Input, dt: f32) {
+        self.yaw = (self.yaw + input.look[0]).rem_euclid(TAU);
+        self.pitch = (self.pitch + input.look[1]).clamp(-PITCH_LIMIT, PITCH_LIMIT);
+        let (f, r) = (input.forward.clamp(-1.0, 1.0), input.right.clamp(-1.0, 1.0));
+        // Diagonal input is not faster than straight input.
+        let n = (f * f + r * r).sqrt().max(1.0);
+        let along = f / n * if input.run { RUN } else { WALK };
+        let side = r / n * STRAFE;
+        let forward = self.forward();
+        // Avatars face +Z, so their right is forward x up.
+        let right = [-forward[2], 0.0, forward[0]];
+        self.pos = add(self.pos, scale(add(scale(forward, along), scale(right, side)), dt));
+        if self.grounded && input.jump {
+            self.vertical = JUMP;
+            self.grounded = false;
+        }
+        if !self.grounded {
+            self.vertical -= GRAVITY * dt;
+            self.pos[1] += self.vertical * dt;
+            if self.pos[1] <= 0.0 {
+                self.pos[1] = 0.0;
+                self.vertical = 0.0;
+                self.grounded = true;
+            }
+        }
+    }
+
+    /// The camera's eye and the point it looks at, for an avatar whose viewpoint is `eye` in the world and
+    /// `height` metres above its origin; `None` in orbit mode.
+    pub fn camera(&self, eye: Vec3, height: f32) -> Option<(Vec3, Vec3)> {
+        let (sp, cp) = self.pitch.sin_cos();
+        let forward = self.forward();
+        let look = [forward[0] * cp, sp, forward[2] * cp];
+        match self.view {
+            View::Orbit => None,
+            View::First => Some((eye, add(eye, look))),
+            View::Third => Some((sub(eye, scale(look, THIRD_PERSON * height.max(0.5))), eye)),
+        }
+    }
+}
+
+/// The player system of [`civbb_core::schedule::Step::PosesIn`]: steps the [`Player`] by the [`Input`], places its
+/// island and, outside orbit mode, the [`Camera`].
+pub(crate) fn player_system(
+    dt: Res<Dt>,
+    mut input: ResMut<Input>,
+    mut player: ResMut<Player>,
+    mut camera: ResMut<Camera>,
+    mut islands: Query<(&mut Island, &Shows)>,
+) {
+    player.step(&input, dt.0);
+    (input.jump, input.look) = (false, [0.0; 2]);
+    let Some((mut island, shows)) = player.island.and_then(|e| islands.get_mut(e).ok()) else {
+        return;
+    };
+    island.origin.pos = player.pos;
+    island.origin.rot = player.rotation();
+    island.hide_head = player.view == View::First;
+    let viewpoint = shows.0.avatar.avatar().map_or([0.0; 3], |a| a.viewpoint);
+    let eye = island.origin.point(viewpoint);
+    if let Some((eye, target)) = player.camera(eye, viewpoint[1] * island.origin.scale) {
+        (camera.eye, camera.target) = (eye, target);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DT: f32 = 1.0 / 60.0;
+
+    fn close(a: Vec3, b: Vec3) -> bool {
+        a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-4)
+    }
+
+    #[test]
+    fn walks_runs_and_strafes_at_the_set_speeds() {
+        let mut p = Player::default();
+        let walk = Input {
+            forward: 1.0,
+            ..Default::default()
+        };
+        for _ in 0..60 {
+            p.step(&walk, DT);
+        }
+        assert!(close(p.pos, [0.0, 0.0, WALK]), "{:?}", p.pos);
+        let run = Input { run: true, ..walk };
+        for _ in 0..60 {
+            p.step(&run, DT);
+        }
+        assert!(close(p.pos, [0.0, 0.0, WALK + RUN]), "{:?}", p.pos);
+        // Right of an avatar facing +Z is -X.
+        let mut p = Player::default();
+        p.step(
+            &Input {
+                right: 1.0,
+                ..Default::default()
+            },
+            1.0,
+        );
+        assert!(close(p.pos, [-STRAFE, 0.0, 0.0]), "{:?}", p.pos);
+        // Diagonal: no faster than straight.
+        let mut p = Player::default();
+        p.step(
+            &Input {
+                forward: 1.0,
+                right: 1.0,
+                ..Default::default()
+            },
+            1.0,
+        );
+        assert!((p.pos[0].hypot(p.pos[2]) - WALK).abs() < 1e-4, "{:?}", p.pos);
+    }
+
+    #[test]
+    fn turning_left_then_walking_heads_to_plus_x() {
+        let mut p = Player::default();
+        p.step(
+            &Input {
+                look: [std::f32::consts::FRAC_PI_2, 0.0],
+                ..Default::default()
+            },
+            0.0,
+        );
+        p.step(
+            &Input {
+                forward: 1.0,
+                ..Default::default()
+            },
+            1.0,
+        );
+        assert!(close(p.pos, [WALK, 0.0, 0.0]), "{:?}", p.pos);
+        // The rotation turns +Z to the facing.
+        assert!(close(
+            civbb_core::math::rotate(p.rotation(), [0.0, 0.0, 1.0]),
+            p.forward()
+        ));
+    }
+
+    #[test]
+    fn a_jump_rises_and_lands() {
+        let mut p = Player::default();
+        p.step(
+            &Input {
+                jump: true,
+                ..Default::default()
+            },
+            DT,
+        );
+        assert!(!p.grounded && p.pos[1] > 0.0);
+        let mut top = 0.0_f32;
+        for _ in 0..120 {
+            p.step(&Input::default(), DT);
+            top = top.max(p.pos[1]);
+        }
+        // v² / 2g, give or take the integration.
+        assert!((top - JUMP * JUMP / (2.0 * GRAVITY)).abs() < 0.03, "{top}");
+        assert!(p.grounded && p.pos[1] == 0.0 && p.vertical == 0.0);
+    }
+
+    #[test]
+    fn pitch_stays_short_of_straight_up_and_down() {
+        let mut p = Player::default();
+        let up = Input {
+            look: [0.0, 10.0],
+            ..Default::default()
+        };
+        p.step(&up, DT);
+        assert_eq!(p.pitch, PITCH_LIMIT);
+    }
+
+    #[test]
+    fn cameras_by_view() {
+        let mut p = Player::default();
+        let eye = [0.0, 1.5, 0.1];
+        assert_eq!(p.camera(eye, 1.5), None);
+        p.view = View::First;
+        assert_eq!(p.camera(eye, 1.5), Some((eye, [0.0, 1.5, 1.1])));
+        p.view = View::Third;
+        let (from, at) = p.camera(eye, 1.5).expect("third person places the camera");
+        assert_eq!(at, eye);
+        assert!(close(from, [0.0, 1.5, 0.1 - THIRD_PERSON * 1.5]));
+        assert_eq!(p.view.next(), View::Orbit);
+    }
+}

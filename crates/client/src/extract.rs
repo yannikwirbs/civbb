@@ -7,6 +7,7 @@ use bevy_ecs::prelude::*;
 use civbb_core::{Counters, System, jobs};
 use civbb_format::material::Material;
 use civbb_format::math::{Mat4, Vec3};
+use civbb_format::mesh::Mesh;
 
 use crate::frame::{Shows, Spawned, Workers};
 use crate::island::Island;
@@ -117,13 +118,34 @@ impl IslandSnapshot {
         self.joints.resize(avatar.meshes.len(), None);
         self.slots.resize_with(avatar.meshes.len(), Vec::new);
         let (world, active) = (island.world(), island.active());
+        let hidden = island.hidden();
         for (m, mesh) in avatar.meshes.iter().enumerate() {
             if active[mesh.node as usize] {
-                skin_matrices(mesh, world, self.joints[m].get_or_insert_with(Vec::new));
+                let joints = self.joints[m].get_or_insert_with(Vec::new);
+                skin_matrices(mesh, world, joints);
+                if let Some((under, head)) = hidden {
+                    shrink(mesh, under, head.pos, joints);
+                }
             } else {
                 self.joints[m] = None;
             }
             island.submesh_materials(avatar, m as u32, &mut self.slots[m]);
+        }
+    }
+}
+
+/// Replaces the skinning matrices of `mesh` that the nodes marked in `under` place with one that puts every vertex at
+/// `at`: the head hidden from its own first-person view (ADR 0106).
+fn shrink(mesh: &Mesh, under: &[bool], at: Vec3, joints: &mut [Mat4]) {
+    let mut collapsed = [0.0; 16];
+    (collapsed[12], collapsed[13], collapsed[14], collapsed[15]) = (at[0], at[1], at[2], 1.0);
+    let nodes = match &mesh.skin {
+        Some(skin) if !skin.joints.is_empty() => &skin.joints[..],
+        _ => std::slice::from_ref(&mesh.node),
+    };
+    for (m, &n) in joints.iter_mut().zip(nodes) {
+        if under[n as usize] {
+            *m = collapsed;
         }
     }
 }

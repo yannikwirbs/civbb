@@ -15,6 +15,7 @@ use crate::affinity;
 use crate::extract::{Camera, Snapshot, extract_system};
 use crate::island::Island;
 use crate::package::Handle;
+use crate::player::{Input, Player, player_system};
 
 /// The client's worker pool, made on first use: [`jobs::default_workers`] workers, pool threads kept to performance
 /// cores and no more of them than those cores have logical CPUs (ADR 0103).
@@ -182,6 +183,15 @@ impl Runtime {
         self.world.init_resource::<Camera>();
         self.world.init_resource::<Snapshot>();
         self.schedule.add_systems(extract_system.in_set(Step::Extract));
+    }
+
+    /// Adds the desktop player (ADR 0106): the [`Input`] and [`Player`] resources and, in `PosesIn`, the system that
+    /// moves the player's island and places the [`Camera`] by them.
+    pub fn add_player(&mut self) {
+        self.world.init_resource::<Camera>();
+        self.world.init_resource::<Input>();
+        self.world.init_resource::<Player>();
+        self.schedule.add_systems(player_system.in_set(Step::PosesIn));
     }
 
     /// Adds `island` as an entity, after every island already spawned.

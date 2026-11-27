@@ -11,6 +11,7 @@ pub mod island;
 pub mod package;
 #[cfg(feature = "parity")]
 pub mod parity;
+pub mod player;
 mod render_thread;
 pub mod view;
 

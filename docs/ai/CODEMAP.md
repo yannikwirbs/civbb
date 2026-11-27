@@ -55,6 +55,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`), a desktop
 - `src/package.rs`: Packages as shared handles: a verified avatar, its compiled model and decoded textures, loaded on the I/O pool
 - `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
+- `src/player.rs`: The local player in desktop mode: input moves one island on the ground plane and places the camera at its
 - `src/render_thread.rs`: The render thread: owns the renderer and the GPU resources of what is shown, draws each snapshot it is handed
 - `src/view.rs`: Desktop viewer: N copies of each of several packages in a grid with animator and dynamics running, drawn in a
 - `tests/alloc.rs`: Island steps and whole frames allocate nothing on the heap after warm-up (design doc §5 "Scheduling rules", #135,
@@ -63,6 +64,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 - `tests/measure.rs`: `civbb-client measure` (ADR 0032): debug builds refuse, release builds print CPU times and, with a device, GPU
 - `tests/parity.rs`: FLIP parity scoring without a device (ADR 0033): FLIP of an image against itself is 0, a known perturbation
+- `tests/player.rs`: The desktop player on the frame schedule (ADR 0106): input moves and turns only the player's island, the camera
 - `tests/view.rs`: Viewer helpers without a window (ADR 0024): placement matrices agree with `Pose::point`, the grid is centred,
 
 ## `crates/core` (civbb-core)
@@ -330,6 +332,7 @@ Internal deps: none
 - `docs/adr/0103-client-runtime-on-bevy-ecs.md`: 0103: The client runtime on bevy_ecs: island entities, one task pool, a frame schedule and a render thread
 - `docs/adr/0104-package-handles-and-runtime-spawning.md`: 0104: Packages as shared handles, islands spawned and despawned at runtime, GPU instances keyed by island
 - `docs/adr/0105-fork-join-worker-pool.md`: 0105: Island jobs on an own fork-join pool that wakes every worker at once and spins briefly
+- `docs/adr/0106-desktop-player.md`: 0106: The desktop player: input resource, kinematic root, first- and third-person camera
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

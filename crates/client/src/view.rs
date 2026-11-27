@@ -2,7 +2,7 @@
 //! window with an orbit camera, CPU and GPU frame times in the title (design doc §21 Phase 0 deliverable 4, ADRs 0024,
 //! 0025 and 0104).
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::io::Cursor;
 use std::time::Instant;
 
@@ -15,15 +15,17 @@ use civbb_format::mesh::Mesh;
 use civbb_render::{Renderer, Window};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use winit::window::WindowId;
+use winit::window::{CursorGrabMode, WindowId};
 
 use crate::extract::{Camera, Snapshot};
 use crate::frame::Runtime;
 use crate::gpu::Gpu;
 use crate::package::Handle;
+use crate::player::{Input, Player, View};
 use crate::render_thread::{Drawn, RenderThread};
 
 /// Largest texture side the viewer decodes; larger textures are left out.
@@ -401,6 +403,10 @@ struct Viewer {
     camera: Orbit,
     dragging: bool,
     cursor: Option<(f64, f64)>,
+    /// Keys held down, for the player's input (ADR 0106).
+    held: HashSet<KeyCode>,
+    /// The cursor is confined and hidden, and mouse motion turns the player.
+    captured: bool,
     last: Option<Instant>,
     timing: Timing,
     validation_errors: u32,
@@ -410,6 +416,7 @@ struct Viewer {
 impl Viewer {
     fn new(cfg: Config) -> Self {
         let mut runtime = Runtime::default();
+        runtime.add_player();
         runtime.extract_to_snapshot();
         Viewer {
             render: None,
@@ -432,6 +439,8 @@ impl Viewer {
             },
             dragging: false,
             cursor: None,
+            held: HashSet::new(),
+            captured: false,
             last: None,
             timing: Timing::default(),
             validation_errors: 0,
@@ -456,7 +465,8 @@ impl Viewer {
         }
     }
 
-    /// Spawns `copies` islands of `p` in the next grid slots; the first package shown frames the camera.
+    /// Spawns `copies` islands of `p` in the next grid slots; the first package shown frames the camera and its
+    /// first copy is the player's.
     fn show(&mut self, p: Handle) {
         if self.shown.is_empty() {
             let (lo, hi) = bounds(&p.avatar);
@@ -476,9 +486,31 @@ impl Viewer {
         let first = self.shown.len() * self.copies as usize;
         for (i, &pos) in origins.iter().enumerate().skip(first).take(self.copies as usize) {
             let origin = Pose { pos, ..Pose::IDENTITY };
-            self.runtime.spawn_package(&p, i as u64, i == 0, origin);
+            let e = self.runtime.spawn_package(&p, i as u64, i == 0, origin);
+            if i == 0 {
+                let mut player = self.runtime.world.resource_mut::<Player>();
+                (player.island, player.pos) = (Some(e), pos);
+            }
         }
         self.shown.push(p);
+    }
+
+    /// Confines and hides the cursor so mouse motion turns the player, or frees it.
+    fn capture(&mut self, on: bool) {
+        self.captured = on;
+        let Some(window) = &self.window else { return };
+        let grab = if on {
+            // Windows confines but cannot lock; other platforms may only lock.
+            window
+                .set_cursor_grab(CursorGrabMode::Confined)
+                .or_else(|_| window.set_cursor_grab(CursorGrabMode::Locked))
+        } else {
+            window.set_cursor_grab(CursorGrabMode::None)
+        };
+        if let Err(e) = grab {
+            eprintln!("civbb-client: cursor grab: {e}");
+        }
+        window.set_cursor_visible(!on);
     }
 
     fn fail(&mut self, event_loop: &ActiveEventLoop, e: impl ToString) {
@@ -538,6 +570,14 @@ impl Viewer {
             fov_y: FOV_Y,
             clear: BACKGROUND,
         });
+        let key = |k| f32::from(u8::from(self.held.contains(&k)));
+        let (forward, right) = (
+            key(KeyCode::KeyW) - key(KeyCode::KeyS),
+            key(KeyCode::KeyD) - key(KeyCode::KeyA),
+        );
+        let run = self.held.contains(&KeyCode::ShiftLeft) || self.held.contains(&KeyCode::ShiftRight);
+        let mut input = self.runtime.world.resource_mut::<Input>();
+        (input.forward, input.right, input.run) = (forward, right, run);
         self.runtime.step(dt);
         let systems = start.elapsed().as_secs_f32() * 1000.0;
         // Frame N-1's snapshot comes back once drawn; waiting for it is not this thread's work.
@@ -668,7 +708,45 @@ impl ApplicationHandler for Viewer {
                 state,
                 button: MouseButton::Left,
                 ..
-            } => self.dragging = state == ElementState::Pressed,
+            } => {
+                let pressed = state == ElementState::Pressed;
+                if self.runtime.world.resource::<Player>().view == View::Orbit {
+                    self.dragging = pressed;
+                } else if pressed {
+                    self.capture(true);
+                }
+            }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(code),
+                        state,
+                        repeat: false,
+                        ..
+                    },
+                ..
+            } => {
+                if state == ElementState::Released {
+                    self.held.remove(&code);
+                    return;
+                }
+                self.held.insert(code);
+                match code {
+                    KeyCode::Space => self.runtime.world.resource_mut::<Input>().jump = true,
+                    KeyCode::KeyV => {
+                        let mut player = self.runtime.world.resource_mut::<Player>();
+                        player.view = player.view.next();
+                        let view = player.view;
+                        self.capture(view != View::Orbit);
+                    }
+                    KeyCode::Escape => self.capture(false),
+                    _ => {}
+                }
+            }
+            WindowEvent::Focused(false) => {
+                self.held.clear();
+                self.capture(false);
+            }
             WindowEvent::CursorMoved { position, .. } => {
                 if let (true, Some((x, y))) = (self.dragging, self.cursor) {
                     self.camera.drag((position.x - x) as f32, (position.y - y) as f32);
@@ -696,4 +774,15 @@ impl ApplicationHandler for Viewer {
             _ => {}
         }
     }
+
+    fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
+        if let (true, DeviceEvent::MouseMotion { delta: (dx, dy) }) = (self.captured, event) {
+            let look = &mut self.runtime.world.resource_mut::<Input>().look;
+            look[0] -= dx as f32 * LOOK_PER_COUNT;
+            look[1] -= dy as f32 * LOOK_PER_COUNT;
+        }
+    }
 }
+
+/// Radians the player turns per raw mouse count.
+const LOOK_PER_COUNT: f32 = 0.0025;

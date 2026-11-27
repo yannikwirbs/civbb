@@ -10,7 +10,7 @@ use civbb_core::{Counters, System};
 use civbb_dynamics::contact::Participant;
 use civbb_dynamics::{ContactRig, ContactState, State};
 use civbb_format::Document;
-use civbb_format::hierarchy::NodeIndex;
+use civbb_format::hierarchy::{HumanBone, NodeIndex};
 use civbb_format::material::{Material, MaterialField};
 use civbb_format::math::Transform;
 use civbb_format::mesh::MeshIndex;
@@ -36,6 +36,8 @@ pub struct Model {
     renderers: Vec<AnimatedRenderer>,
     /// Per mesh, the animator slot of each submesh whose material it swaps; empty for most meshes.
     swaps: Vec<Vec<(u8, Slot)>>,
+    /// The humanoid head and, per node, whether it is the head or below it; `None` without a head.
+    head: Option<(NodeIndex, Vec<bool>)>,
 }
 
 /// A state entry a system writes, with its kind to coerce the value to.
@@ -116,6 +118,16 @@ impl Model {
             }
         }
         let nodes = &avatar.hierarchy.nodes;
+        let head = (avatar.avatar())
+            .and_then(|a| a.humanoid.as_ref()?.node(HumanBone::Head))
+            .map(|h| {
+                // Parents come before their children.
+                let mut under = vec![false; nodes.len()];
+                for (i, n) in nodes.iter().enumerate() {
+                    under[i] = i == h as usize || n.parent.is_some_and(|p| under[p as usize]);
+                }
+                (h, under)
+            });
         Self {
             controller,
             constraints: Constraints::new(avatar),
@@ -133,6 +145,7 @@ impl Model {
             chain_outputs,
             renderers,
             swaps,
+            head,
         }
     }
 
@@ -158,6 +171,8 @@ pub struct Island {
     pub local: bool,
     /// Where the avatar's root parent is in the world.
     pub origin: Pose,
+    /// Drawn for its own first-person view: the head and everything below it shrink to the head (ADR 0106).
+    pub hide_head: bool,
     model: Arc<Model>,
     animator: Option<Instance>,
     chains: State,
@@ -179,6 +194,7 @@ impl Island {
             id,
             local,
             origin,
+            hide_head: false,
             animator: model.controller.as_ref().map(|c| Instance::new(c, local)),
             chains: State::new(&model.chains),
             contacts: ContactState::new(&model.contacts),
@@ -209,6 +225,12 @@ impl Island {
     /// Every node's world placement after the last step.
     pub fn world(&self) -> &[Pose] {
         &self.world
+    }
+
+    /// When the head is hidden ([`Island::hide_head`]), per node whether it shrinks, and the head's world placement.
+    pub fn hidden(&self) -> Option<(&[bool], Pose)> {
+        let (head, under) = self.model.head.as_ref().filter(|_| self.hide_head)?;
+        Some((under, *self.world.get(*head as usize)?))
     }
 
     /// Whether each node is active after the last step, its ancestors included.
