@@ -7,7 +7,7 @@ use civbb_format::math::{Quat, Transform, Vec3};
 use crate::rig::{LimitKind, NO_PARENT, Rig};
 use civbb_core::math::{
     IDENTITY, Pose, add, conj, cross, dot, from_to, length, mul, nlerp, normalize, qnormalize, rotate, scale, sub,
-    unit, world_poses,
+    unit, world_poses_into,
 };
 
 /// The fixed simulation step, seconds. Frame time accumulates; leftover time is simulated for the output only.
@@ -106,12 +106,28 @@ pub struct State {
     posed: Vec<Option<Vec<Vec3>>>,
     /// Per chain: the frame's placement at the last full step.
     frame: Vec<Option<Pose>>,
-    /// The animated world pose at the last full step, as interpolated for it; `None` before the first frame.
-    last: Option<Vec<Pose>>,
-    /// The animated world pose at the last frame (colliders interpolate from it); `None` before the first.
-    previous: Option<Vec<Pose>>,
+    /// The animated world pose at the last full step, as interpolated for it; empty before the first frame.
+    last: Vec<Pose>,
+    /// The animated world pose at the last frame (colliders interpolate from it); empty before the first.
+    previous: Vec<Pose>,
     /// Seconds since the last full step.
     time: f32,
+    /// Buffers each step refills, kept so stepping does not allocate (#135).
+    scratch: Scratch,
+}
+
+/// [`State::step`]'s per-frame buffers.
+#[derive(Clone, Debug, Default)]
+struct Scratch {
+    /// The animated world pose at the frame's time.
+    world: Vec<Pose>,
+    /// The animated pose at a step's time.
+    between: Vec<Pose>,
+    /// The pose colliders are placed from at a step's time.
+    colliders: Vec<Pose>,
+    placed: Vec<(Placed, bool)>,
+    /// A grabbed particle's free ancestors.
+    path: Vec<usize>,
 }
 
 impl State {
@@ -125,9 +141,10 @@ impl State {
             grab: vec![None; chains],
             posed: vec![None; chains],
             frame: vec![None; chains],
-            last: None,
-            previous: None,
+            last: Vec::new(),
+            previous: Vec::new(),
             time: 0.0,
+            scratch: Scratch::default(),
         }
     }
 
@@ -138,16 +155,17 @@ impl State {
         if rig.chains.is_empty() {
             return;
         }
-        let mut world = world_poses(&rig.parents, origin, locals);
-        let start = match self.last.take() {
-            Some(start) => start,
-            None => {
-                for c in 0..rig.chains.len() {
-                    self.start(rig, c, origin, &world);
-                }
-                world.clone()
+        let mut s = std::mem::take(&mut self.scratch);
+        world_poses_into(&rig.parents, origin, locals, &mut s.world);
+        if self.last.is_empty() {
+            for c in 0..rig.chains.len() {
+                self.start(rig, c, origin, &s.world);
             }
-        };
+            self.last.clone_from(&s.world);
+        }
+        if self.previous.is_empty() {
+            self.previous.clone_from(&s.world);
+        }
         let dt = dt.clamp(0.0, MAX_FRAME);
         // Whole steps come off the accumulated time in single precision, as the SDK counts them: at 90 Hz every
         // third frame ends a hair short of a step and takes none. Step `j` runs against the animated pose
@@ -160,59 +178,61 @@ impl State {
             left -= STEP;
             steps += 1;
         }
-        let previous = self.previous.take().unwrap_or_else(|| world.clone());
-        let mut between = world.clone();
-        let mut colliders = world.clone();
+        s.between.clone_from(&s.world);
+        s.colliders.clone_from(&s.world);
         for j in 1..=steps {
             let t = (j as f32 * STEP / total).min(1.0);
-            blend(&mut between, &start, &world, t);
+            blend(&mut s.between, &self.last, &s.world, t);
             if !rig.colliders.is_empty() {
-                blend(&mut colliders, &previous, &world, t);
+                blend(&mut s.colliders, &self.previous, &s.world, t);
             }
-            let placed = place(rig, &colliders);
+            place(rig, &s.colliders, &mut s.placed);
             for c in 0..rig.chains.len() {
-                let frame = frame_of(rig, c, origin, &between);
+                let frame = frame_of(rig, c, origin, &s.between);
                 let last = self.frame[c].replace(frame);
                 let ctx = Ctx {
-                    world: &between,
-                    placed: &placed,
+                    world: &s.between,
+                    placed: &s.placed,
                     frame,
                     last,
                     posed: self.posed[c].as_deref(),
                     grab: self.grab[c],
                     r: 1.0,
                 };
-                advance(rig, c, &ctx, &mut self.p, &mut self.turn);
+                advance(rig, c, &ctx, &mut self.p, &mut self.turn, &mut s.path);
             }
         }
         self.time = left;
         // The output between steps, for the leftover time; not kept (ADR 0074).
         let r = self.time / STEP;
-        let placed = place(rig, &world);
+        place(rig, &s.world, &mut s.placed);
         for c in 0..rig.chains.len() {
             let ch = &rig.chains[c];
             let range = ch.first as usize..(ch.first + ch.count) as usize;
             self.out.copy_range(&self.p, range.clone());
             if r > 1e-4 {
                 let ctx = Ctx {
-                    world: &world,
-                    placed: &placed,
-                    frame: frame_of(rig, c, origin, &world),
+                    world: &s.world,
+                    placed: &s.placed,
+                    frame: frame_of(rig, c, origin, &s.world),
                     last: self.frame[c],
                     posed: self.posed[c].as_deref(),
                     grab: self.grab[c],
                     r,
                 };
-                advance(rig, c, &ctx, &mut self.out, &mut self.turn);
+                advance(rig, c, &ctx, &mut self.out, &mut self.turn, &mut s.path);
             }
             // The next step's falloff reads the bones as shown (recorded, ADR 0074).
             self.p.shown[range.clone()].copy_from_slice(&self.out.shown[range]);
         }
-        self.previous = Some(world.clone());
+        self.previous.clone_from(&s.world);
         for c in 0..rig.chains.len() {
-            self.write(rig, c, origin, &mut world, locals);
+            self.write(rig, c, origin, &mut s.world, locals);
         }
-        self.last = Some(if steps > 0 { between } else { start });
+        if steps > 0 {
+            std::mem::swap(&mut self.last, &mut s.between);
+        }
+        self.scratch = s;
     }
 
     /// Puts chain `c` at the animated pose, at rest.
@@ -247,14 +267,16 @@ impl State {
             let n = n as usize;
             let parent = rig.parents[n].map_or(origin, |p| world[p as usize]);
             let base = parent.then(&locals[n]);
-            let mut aim = range.clone().filter(|&q| rig.parent[q] == k as u32);
-            let aim: Vec<usize> = match (k == first, ch.multi_child) {
-                (true, MultiChild::Ignore) => Vec::new(),
-                (true, MultiChild::First) => aim.next().into_iter().collect(),
-                _ => aim.collect(),
+            let take = match (k == first, ch.multi_child) {
+                (true, MultiChild::Ignore) => 0,
+                (true, MultiChild::First) => 1,
+                _ => usize::MAX,
             };
+            let aim = || range.clone().filter(|&q| rig.parent[q] == k as u32).take(take);
             let mut sum = [0.0; 4];
-            for &q in &aim {
+            let mut aimed = false;
+            for q in aim() {
+                aimed = true;
                 let rest_dir = match rig.node[q] {
                     Some(m) => locals[m as usize].translation,
                     None => rig.endpoint[q],
@@ -268,7 +290,7 @@ impl State {
                 };
                 sum = std::array::from_fn(|i| sum[i] + sign * swing[i]);
             }
-            let rot = if aim.is_empty() {
+            let rot = if !aimed {
                 base.rot
             } else {
                 qnormalize(mul(qnormalize(sum), base.rot))
@@ -276,7 +298,7 @@ impl State {
             world[n] = Pose { rot, ..base };
             locals[n].rotation = mul(conj(parent.rot), rot);
             // Grabbed bones may stretch or squish: scale the child's offset to the simulated length.
-            for &q in &aim {
+            for q in aim() {
                 if let Some(m) = rig.node[q] {
                     let t = &mut locals[m as usize].translation;
                     let rest = length(*t) * base.scale;
@@ -401,41 +423,39 @@ fn anim(rig: &Rig, world: &[Pose], k: usize) -> Vec3 {
     }
 }
 
-/// Every collider placed in the world.
-fn place(rig: &Rig, world: &[Pose]) -> Vec<(Placed, bool)> {
-    rig.colliders
-        .iter()
-        .map(|col| {
-            let w = world[col.node as usize];
-            let center = w.point(col.position);
-            let up = rotate(mul(w.rot, col.rotation), [0.0, 1.0, 0.0]);
-            let shape = match col.shape {
-                Shape::Sphere { radius } => Placed::Capsule {
-                    a: center,
-                    b: center,
-                    radius: radius.max(0.0) * w.scale,
-                },
-                Shape::Capsule { radius, height } => {
-                    let radius = radius.max(0.0) * w.scale;
-                    let half = (height * 0.5 * w.scale - radius).max(0.0);
-                    Placed::Capsule {
-                        a: add(center, scale(up, -half)),
-                        b: add(center, scale(up, half)),
-                        radius,
-                    }
+/// Every collider placed in the world, into `out`.
+fn place(rig: &Rig, world: &[Pose], out: &mut Vec<(Placed, bool)>) {
+    out.clear();
+    out.extend(rig.colliders.iter().map(|col| {
+        let w = world[col.node as usize];
+        let center = w.point(col.position);
+        let up = rotate(mul(w.rot, col.rotation), [0.0, 1.0, 0.0]);
+        let shape = match col.shape {
+            Shape::Sphere { radius } => Placed::Capsule {
+                a: center,
+                b: center,
+                radius: radius.max(0.0) * w.scale,
+            },
+            Shape::Capsule { radius, height } => {
+                let radius = radius.max(0.0) * w.scale;
+                let half = (height * 0.5 * w.scale - radius).max(0.0);
+                Placed::Capsule {
+                    a: add(center, scale(up, -half)),
+                    b: add(center, scale(up, half)),
+                    radius,
                 }
-                Shape::Plane => Placed::Plane {
-                    point: center,
-                    normal: up,
-                },
-            };
-            (shape, col.inside)
-        })
-        .collect()
+            }
+            Shape::Plane => Placed::Plane {
+                point: center,
+                normal: up,
+            },
+        };
+        (shape, col.inside)
+    }));
 }
 
 /// One step of chain `c`, parents first (ADR 0049).
-fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]) {
+fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat], path: &mut Vec<usize>) {
     let ch = &rig.chains[c];
     let first = ch.first as usize;
     let range = first..first + ch.count as usize;
@@ -585,7 +605,7 @@ fn advance(rig: &Rig, c: usize, ctx: &Ctx, ps: &mut Particles, turn: &mut [Quat]
     }
     if let Some((g, target)) = ctx.grab {
         // The path from the first free ancestor down to the grabbed particle points straight at the hand.
-        let mut path = Vec::new();
+        path.clear();
         let mut k = g as usize;
         while !rig.pinned[k] {
             path.push(k);

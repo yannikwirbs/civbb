@@ -371,6 +371,9 @@ What exists, by area. Read the section for the area you touch; update it when th
   a fresh thread (`measure` pins it, 1 worker, ADR 0080). Corpus constraints (#57): lean
   2 twist helpers, bloated 67 (twists and tail bones). The constraint pass places only the nodes constraints read
   and keeps its scratch per island (#66): lean 0.97 to 0.49 µs, bloated 12.7 to 9.45 µs per avatar on one worker.
+  `Island::step` allocates nothing after warm-up (#135, `tests/alloc.rs`, a counting global allocator): the
+  dynamics solver keeps its world poses, collider placements and grab path in `State`'s scratch. Bloated 100
+  avatars, 1 worker: 7.21 to 6.96 ms/frame. The contact pass and frame glue still allocate per frame (#139).
 - `civbb-anim`: curve binding, clip sampling, state machines, blend trees, Write Defaults, built-ins, behaviours,
   humanoid muscles and constraints (ADRs 0007 to 0011, 0014, 0018, 0019). Muscles default to 0 (Unity's default
   human pose) and Write Defaults off never holds them; exit times below 1 recur every cycle (ADR 0056), the start time does not reach one and a transition fired at its exit time starts with the overshoot elapsed; the first update advances like any other; a Write Defaults on state without a motion writes nothing (ADR 0065, recorded); instances start entries at `Entry::default` (`Controller::start`; the expression default for lowered Unity content,

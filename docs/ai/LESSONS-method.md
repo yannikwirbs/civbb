@@ -54,3 +54,7 @@ run that takes minutes.
 - A claim in STATUS or a comment that "order matters" (or any invariant) is a hypothesis: a mutation check showed
   the contact pass is order-free (max over senders), which removed code #134 was about to add. Mutate before
   building on such a claim.
+- Finding heap allocations (#135): a counting `#[global_allocator]` in its own test file, with a thread-local count
+  (other test threads allocate too). To locate them, let the allocator print `Backtrace::force_capture()` filtered to
+  `civbb` frames for one step, behind a thread-local reentrancy guard (the backtrace allocates); `sort | uniq -c`
+  over the output names the hot spots in one run. Remove the tracing before committing.
