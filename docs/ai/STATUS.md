@@ -7,20 +7,22 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#160 (native locomotion page in the radial menu), then #162 (the `civbb-xr` crate). M1.4's queue is #160, #162 to
-#174 (`tools/issue.sh queue`). #160: `civbb_ui::radial` works on a format `Menu` whose controls write avatar
-entries; floor poses and flight live on `Player`, not in the island's parameters, so the client-owned page needs a
-small design (an ADR): e.g. a synthetic page appended to the root with entries the menu system intercepts. Its VR
-half waits for #170. #162: `Context::new` creates instance and device itself; XR_KHR_vulkan_enable2 has the runtime
-create both, so the device create info (features 1.0 to 1.3 incl. `multiview`, which `mesh.spv` now needs) must be
-built in one place both paths share. SteamVR is the active runtime here; whether a headset is attached is unknown
-(ask in #174 before relying on it). The floor poses (ADR 0119) were checked by bone positions only, never looked at
-in a window: worth a capture (`view --world`, X) when the viewer is next run.
+#163 (`view --xr`: stereo frames into the XR swapchain at the display rate). #162 left: `civbb_client::xr::run`
+opens the session on a `Context::create(.., ByRuntime)` device and clears each eye's layer; #163 replaces the clear
+with the forward pass (multiview, `Output { views: 2 }`, the swapchain imported per frame with
+`Graph::import_layers`), view records from `Session::views` (pose and asymmetric fov per eye, stage space), a
+depth swapchain submitted through XR_KHR_composition_layer_depth where offered (ADR 0122 point 4), and decides how
+the render thread (ADR 0103 point 5) and `xrWaitFrame` pace each other. `view.rs` is 921 lines: the XR viewer goes
+in its own module. Teardown order: session before context. No headset here: all checks off-device, the owner's in
+#174 (steps posted there). M1.4's queue: #163 to #174 (`tools/issue.sh queue`).
+The floor poses (ADR 0119) and the locomotion page (ADR 0121) were checked by tests only, never looked at in a
+window: worth a capture (`view --world`, X, Tab) when the viewer is next run.
 
 ## Now
 
 - **M1.4 started** (2026-11-28): issues #162 to #174 filed; #60 MSAA and multiview (ADR 0120), #158 stick
-  navigation of the radial menu.
+  navigation of the radial menu, #160 locomotion page in the menu (ADR 0121), #162 `civbb-xr` crate, session and
+  `view --xr` cleared frames (ADR 0122; OpenXR loader from `CIVBB_OPENXR_LOADER`).
 - **M1.3 code done** (open for #157 only): #141 desktop player (ADR 0106), #142 its platform values (ADR 0107), #143 built-in locomotion
   (ADR 0108: generated muscle-space clips grounded per avatar, proxy substitutes, default Base and Action layers
   merged at load by the viewer only), #152 default Gesture layer (ADR 0109). Emotes are #151 (M1.8).
@@ -60,6 +62,10 @@ in a window: worth a capture (`view --world`, X) when the viewer is next run.
 
 ## Blockers and needs-user
 
+- #174 (needs-user): headset check; a first step for #162's cleared frames is in its comments. No headset on this
+  PC as far as SteamVR sees.
+- An untracked `tracy/` folder of Tracy executables sits in the repo root (the owner's, for #136?): not committed;
+  delete it or add it to `.gitignore`.
 - #157 (needs-user): try a real gamepad in `view --world`, smooth and `--turn snap` (steps in the issue).
 - #136 (needs-user): connect a Tracy 0.14.1 profiler to `civbb-client` built with `--features profile` and post a
   screenshot (steps in the issue).
@@ -71,9 +77,6 @@ in a window: worth a capture (`view --world`, X) when the viewer is next run.
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-28 (26): #149 closed (ADRs 0116, 0117: `civbb-ui` with `draw`, `text` (cosmic-text 0.19, system fonts,
-  one RGBA8 glyph atlas) and `radial`; `civbb_render::overlay`; client `menu` system and `Overlay` resource; Tab or
-  Start opens the menu). Filed #158 (stick navigation, M1.4). Next: #153.
 - 2026-11-28 (27): #153 closed (basisu's XUASTC weight wraps by design; dev overflow checks off for it, all 13
   corpus packages decode in dev). #154 closed (ADR 0118: `Body::height` by posture 1.6/1.0/0.5, getting up only where
   `WorldMesh::fits`). #70 closed (ADR 0119: floor sitting and lying in the default Action layer on `civbb/pose`, X;
@@ -81,3 +84,6 @@ The newest three; `SESSIONS.md` has them all.
 - 2026-11-28 (28): M1.4 started, #162 to #174 filed. #60 closed (ADR 0120: MSAA by resolve, multiview by view mask
   and `SV_ViewID`; viewer `--msaa` default 4, parity 1, s60 byte-identical to s140). #158 closed (`Ring::stick`,
   `ExpressionMenu::stick`, `Pad::menu_button`). Next: #160.
+- 2026-11-28 (29): #160 closed (ADR 0121: client "Locomotion" page appended to the root, synthetic entries past
+  the island's routed to `Player`). #162 closed (ADR 0122: `civbb_render::Create` seam, `civbb-xr` with openxr 0.22
+  loaded at run time, session, swapchain, frame loop; `view --xr` clears each eye; unrun in a headset). Next: #163.

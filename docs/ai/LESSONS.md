@@ -67,5 +67,9 @@ Add a line to the matching file whenever something costs more than one attempt.
 - `if let (true, Some(x)) = (flag, opt.take())` runs `take()` whatever `flag` is: the tuple is built before the
   pattern is matched, so the option is emptied on frames where `flag` is false (a held menu button lost its
   release, #149). Test the flag first, or `opt.filter(|_| flag)` and clear it inside.
+- OpenXR on this PC: SteamVR is the active runtime, no headset. With `CIVBB_OPENXR_LOADER` set to SteamVR's
+  `bin/win64/openxr_loader.dll`, instance creation starts SteamVR and then either reports no headset after ~10 s or
+  blocks ~65 s and fails with ERROR_RUNTIME_FAILURE: give such runs a timeout over 90 s. Without the variable the
+  loader is not found and nothing starts (the gate's case).
 - A bevy system with more than 7 parameters fails clippy's `too_many_arguments` under `-D warnings`: group related
   ones into a tuple parameter (`(world, rules): (Res<WorldMesh>, Res<WorldRules>)`) instead of an `allow`.

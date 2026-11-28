@@ -351,6 +351,18 @@ What exists, by area. Read the section for the area you touch; update it when th
   sizes it exactly (parity allocates as before). Package GPU data is never freed short of a rebuild; no range
   allocator or VRAM budget yet.
 
+- XR (#162, ADR 0122): `civbb_render::Create` (instance from an info, an optional required physical device, device
+  from an info; `Direct` is `Context::new`'s path) and `Context::create(validation, window, creator)`; `Context::entry`;
+  `Error::Create`. `civbb-xr` (engine crate, `openxr` 0.22 `loaded`: `CIVBB_OPENXR_LOADER` path, else the system
+  search): `Xr::new` (instance with XR_KHR_vulkan_enable2, HMD system, `views`, `blend`, `vulkan` min/max as
+  `VK_MAKE_API_VERSION`), `create_vulkan_instance`/`vulkan_physical_device`/`create_vulkan_device` in raw handles;
+  `Session::new(xr, instance, physical, device, queue_family, formats)` (stage else local space, one colour swapchain
+  with 2 array layers, else one per eye; usage colour attachment + transfer dst; size = largest recommended),
+  `poll` (begins on READY, ends on STOPPING, `Status::Exit` on EXITING/LOSS_PENDING), `wait`, `begin`, `views`,
+  `acquire` (`[Target { image, layer }; 2]`), `release`, `end(time, Some(views))`. Client `xr.rs`: `ByRuntime`
+  (implements `Create`; keeps the loader's `vkGetInstanceProcAddr`), `xr::run(frames)` behind `view --xr [--frames
+  F]` clears each eye (left warm, right cool) with a transfer clear, images back in COLOR_ATTACHMENT_OPTIMAL, fence
+  wait per frame. No depth swapchain yet (#163). Never run against a headset (none here; #174 has the steps).
 - Overlay and UI (#149, ADRs 0116, 0117): `civbb_render::overlay::Overlay` draws a screen-space triangle list after
   the forward pass (`overlay.slang`: 48-byte vertices pulled by address, window pixels, colour times an optional
   bindless texture, straight alpha, no depth; at most 65536 vertices a frame in the client, `MAX_OVERLAY`).
