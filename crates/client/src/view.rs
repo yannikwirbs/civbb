@@ -38,6 +38,9 @@ const MAX_TEXTURE_SIDE: u32 = 8192;
 /// The factor one press of `=` or `-` multiplies or divides the eye height by (ADR 0114).
 const RESIZE: f32 = 1.1;
 
+/// The viewer's samples per pixel unless asked otherwise (ADR 0120).
+pub const MSAA: u32 = 4;
+
 /// What to show and for how long.
 pub struct Config {
     /// The packages, loading ([`crate::package::spawn`]): each one's copies spawn on the frame its load is done; a
@@ -58,6 +61,8 @@ pub struct Config {
     pub trackers: Option<Scripted>,
     /// How a gamepad's right stick turns the player (ADR 0115).
     pub turning: Turning,
+    /// Samples per pixel of the forward pass, as far as the device supports them (ADR 0120).
+    pub msaa: u32,
 }
 
 /// What a run measured, past the warm-up.
@@ -424,6 +429,8 @@ struct Viewer {
     pads: Option<gilrs::Gilrs>,
     /// The gamepads' sticks and settings.
     pad: Pad,
+    /// Samples per pixel asked for (ADR 0120).
+    msaa: u32,
     /// The cursor is confined and hidden, and mouse motion turns the player.
     captured: bool,
     last: Option<Instant>,
@@ -473,6 +480,7 @@ impl Viewer {
             held: HashSet::new(),
             pads: gilrs::Gilrs::new().ok(),
             pad: Pad::new(cfg.turning),
+            msaa: cfg.msaa,
             captured: false,
             last: None,
             timing: Timing::default(),
@@ -578,7 +586,7 @@ impl Viewer {
     /// Hands `renderer` to a new render thread.
     fn start(&mut self, renderer: Renderer) -> civbb_render::Result<()> {
         self.device = renderer.context().device_name();
-        let gpu = Gpu::new(&renderer)?;
+        let gpu = Gpu::new(&renderer, self.msaa)?;
         self.render = Some(RenderThread::spawn(renderer, gpu));
         self.free = Some(Snapshot::default());
         Ok(())

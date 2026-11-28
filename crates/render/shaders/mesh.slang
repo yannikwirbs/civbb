@@ -81,7 +81,7 @@ struct Push
     float4* attrs; // uv0 in xy, uv1 in zw
     Material* materials;
     Draw* draws;
-    View* view;
+    View* view; // one record per view of a multiview pass (ADR 0120)
 };
 
 [[vk::push_constant]] Push pc;
@@ -96,12 +96,13 @@ struct Varyings
     float4 tangent : TANGENT;
     float4 uv : TEXCOORD;
     nointerpolation uint material : MATERIAL;
+    nointerpolation uint view : VIEW;
 };
 
-// A skinned vertex of draw `d` at world position `p`.
-Varyings place(Draw d, Skinned s, float4 uv, float3 p)
+// A skinned vertex of draw `d` at world position `p`, seen from view `view`.
+Varyings place(Draw d, Skinned s, float4 uv, float3 p, uint view)
 {
-    View v = *pc.view;
+    View v = pc.view[view];
     Varyings o;
     o.position = v.view_proj[0] * p.x + v.view_proj[1] * p.y + v.view_proj[2] * p.z + v.view_proj[3];
     o.world = p;
@@ -109,21 +110,22 @@ Varyings place(Draw d, Skinned s, float4 uv, float3 p)
     o.tangent = s.tangent;
     o.uv = uv;
     o.material = d.material;
+    o.view = view;
     return o;
 }
 
 [shader("vertex")]
-Varyings vertex(uint index: SV_VulkanVertexID, uint instance: SV_VulkanInstanceID)
+Varyings vertex(uint index: SV_VulkanVertexID, uint instance: SV_VulkanInstanceID, uint view: SV_ViewID)
 {
     Draw d = pc.draws[instance];
     Skinned s = pc.skinned[d.skinned + index];
-    return place(d, s, pc.attrs[d.attrs + index], s.position.xyz);
+    return place(d, s, pc.attrs[d.attrs + index], s.position.xyz, view);
 }
 
 // Toon outlines (ADR 0034): the vertex pushed out along its skinned normal by the outline width in metres, times
 // the width texture's G channel (MToon 1.0) sampled at the top mip.
 [shader("vertex")]
-Varyings outline_vertex(uint index: SV_VulkanVertexID, uint instance: SV_VulkanInstanceID)
+Varyings outline_vertex(uint index: SV_VulkanVertexID, uint instance: SV_VulkanInstanceID, uint view: SV_ViewID)
 {
     Draw d = pc.draws[instance];
     Skinned s = pc.skinned[d.skinned + index];
@@ -139,7 +141,7 @@ Varyings outline_vertex(uint index: SV_VulkanVertexID, uint instance: SV_VulkanI
     float3 n = s.normal.xyz;
     float l = length(n);
     float3 p = s.position.xyz + (l > 0 ? n * (width / l) : 0);
-    return place(d, s, uv, p);
+    return place(d, s, uv, p, view);
 }
 
 // The slot's texel, or white without a texture.
@@ -197,7 +199,7 @@ float3 normal(Material m, Varyings i, bool front)
 float4 pbr(Varyings i, bool front: SV_IsFrontFace) : SV_Target
 {
     Material m = pc.materials[i.material];
-    View v = *pc.view;
+    View v = pc.view[i.view];
     float4 c = base(m, i.uv);
     float3 n = normal(m, i, front);
     float3 l = v.light_dir.xyz;
@@ -246,7 +248,7 @@ float3 matcap(float3 color, float3 light, float2 uv, float4 uvs, Slot tex, float
 float4 toon(Varyings i, bool front: SV_IsFrontFace) : SV_Target
 {
     Material m = pc.materials[i.material];
-    View v = *pc.view;
+    View v = pc.view[i.view];
     float4 lit = base(m, i.uv);
     float3 shade_tex = sample(m.slots[2], i.uv).rgb;
     if (m.slots[2].tex.x == m.slots[0].tex.x)

@@ -31,7 +31,7 @@ pub struct Candidate {
     /// The highest Vulkan version the device supports.
     pub api_version: u32,
     /// Whether it has the features the renderer needs (dynamic rendering, synchronization2, buffer device address,
-    /// descriptor indexing, multi-draw indirect, BC textures; ADRs 0021 to 0023, 0029).
+    /// descriptor indexing, multi-draw indirect, BC textures, multiview; ADRs 0021 to 0023, 0029, 0120).
     pub features: bool,
     /// A queue family with graphics and compute (and present, when there is a surface), if any.
     pub queue_family: Option<u32>,
@@ -127,6 +127,7 @@ impl Context {
             .draw_indirect_first_instance(true)
             .sampler_anisotropy(true)
             .texture_compression_bc(true);
+        let mut features11 = vk::PhysicalDeviceVulkan11Features::default().multiview(true);
         let mut features12 = vk::PhysicalDeviceVulkan12Features::default()
             .buffer_device_address(true)
             .descriptor_indexing(true)
@@ -144,7 +145,8 @@ impl Context {
             .enabled_extension_names(&extensions)
             .enabled_features(&features)
             .push_next(&mut features13)
-            .push_next(&mut features12);
+            .push_next(&mut features12)
+            .push_next(&mut features11);
         // SAFETY: `physical` came from this instance and supports everything requested (`select`).
         let device = unsafe { instance.instance.create_device(physical, &info, None)? };
         // SAFETY: the queue family was created with one queue.
@@ -212,6 +214,18 @@ impl Context {
     /// The window's surface, if the context was created with one.
     pub fn surface(&self) -> Option<(&khr::surface::Instance, vk::SurfaceKHR)> {
         self.instance.surface.as_ref().map(|(l, s)| (l, *s))
+    }
+
+    /// The highest sample count up to `n` that colour and depth framebuffers both support (at least 1; ADR 0120).
+    pub fn samples(&self, n: u32) -> vk::SampleCountFlags {
+        // SAFETY: plain query on a device from this instance.
+        let limits = unsafe { self.instance.instance.get_physical_device_properties(self.physical) }.limits;
+        let supported = limits.framebuffer_color_sample_counts & limits.framebuffer_depth_sample_counts;
+        [64, 32, 16, 8, 4, 2]
+            .into_iter()
+            .map(vk::SampleCountFlags::from_raw)
+            .find(|&s| s.as_raw() <= n && supported.contains(s))
+            .unwrap_or(vk::SampleCountFlags::TYPE_1)
     }
 
     /// How many error messages validation has reported so far (always 0 without validation).
@@ -315,11 +329,13 @@ fn select(
         let mut candidates = Vec::with_capacity(devices.len());
         for &pd in &devices {
             let props = instance.get_physical_device_properties(pd);
+            let mut f11 = vk::PhysicalDeviceVulkan11Features::default();
             let mut f12 = vk::PhysicalDeviceVulkan12Features::default();
             let mut f13 = vk::PhysicalDeviceVulkan13Features::default();
             let mut f2 = vk::PhysicalDeviceFeatures2::default()
                 .push_next(&mut f13)
-                .push_next(&mut f12);
+                .push_next(&mut f12)
+                .push_next(&mut f11);
             if props.api_version >= vk::API_VERSION_1_3 {
                 instance.get_physical_device_features2(pd, &mut f2);
             }
@@ -329,6 +345,7 @@ fn select(
                 f.draw_indirect_first_instance,
                 f.sampler_anisotropy,
                 f.texture_compression_bc,
+                f11.multiview,
                 f12.buffer_device_address,
                 f12.descriptor_indexing,
                 f12.runtime_descriptor_array,

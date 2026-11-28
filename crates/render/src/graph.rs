@@ -136,6 +136,8 @@ pub struct Pass<'a> {
     name: &'static str,
     colors: Vec<(ImageId, Load)>,
     depth: Option<(ImageId, Load)>,
+    resolve: Option<ImageId>,
+    views: u32,
     buffers: Vec<(BufferId, Access)>,
     record: Option<Record<'a>>,
 }
@@ -147,9 +149,25 @@ impl<'a> Pass<'a> {
             name,
             colors: Vec::new(),
             depth: None,
+            resolve: None,
+            views: 1,
             buffers: Vec::new(),
             record: None,
         }
+    }
+
+    /// Resolves the first colour attachment (multisampled) into `image` (single-sampled, same size and layers) at
+    /// the end of the pass, averaging the samples; the multisampled contents are not stored (ADR 0120).
+    pub fn resolve(mut self, image: ImageId) -> Self {
+        self.resolve = Some(image);
+        self
+    }
+
+    /// Draws `views` views at once with multiview, view `i` into layer `i` of every attachment (ADR 0120); the
+    /// pipelines must have the same view mask. 1, the default, is no multiview.
+    pub fn views(mut self, views: u32) -> Self {
+        self.views = views;
+        self
     }
 
     /// Adds a colour attachment.
@@ -228,9 +246,24 @@ pub struct ImageDesc {
     pub extent: vk::Extent2D,
     /// How passes use it.
     pub usage: vk::ImageUsageFlags,
+    /// Samples per pixel.
+    pub samples: vk::SampleCountFlags,
+    /// Array layers (one per view of a multiview pass).
+    pub layers: u32,
 }
 
 impl ImageDesc {
+    /// A single-sampled image of one layer.
+    pub fn new(format: vk::Format, extent: vk::Extent2D, usage: vk::ImageUsageFlags) -> Self {
+        ImageDesc {
+            format,
+            extent,
+            usage,
+            samples: vk::SampleCountFlags::TYPE_1,
+            layers: 1,
+        }
+    }
+
     fn aspect(&self) -> vk::ImageAspectFlags {
         match self.format {
             vk::Format::D16_UNORM | vk::Format::D32_SFLOAT | vk::Format::X8_D24_UNORM_PACK32 => {
@@ -245,6 +278,7 @@ struct Image {
     image: vk::Image,
     view: vk::ImageView,
     extent: vk::Extent2D,
+    layers: u32,
     aspect: vk::ImageAspectFlags,
     initial: Use,
     /// `None` for transients: they stay in their last use, which the pool remembers.
@@ -304,7 +338,8 @@ impl<'a> Graph<'a> {
         Self::default()
     }
 
-    /// Adds an image owned elsewhere, in use `initial` now and left in use `last` after the graph runs.
+    /// Adds a colour image of one layer owned elsewhere, in use `initial` now and left in use `last` after the
+    /// graph runs.
     pub fn import(
         &mut self,
         image: vk::Image,
@@ -313,10 +348,25 @@ impl<'a> Graph<'a> {
         initial: Use,
         last: Use,
     ) -> ImageId {
+        self.import_layers(image, view, extent, 1, initial, last)
+    }
+
+    /// As [`Graph::import`] for a colour image of `layers` layers, `view` an array view of them all (a stereo
+    /// target, ADR 0120).
+    pub fn import_layers(
+        &mut self,
+        image: vk::Image,
+        view: vk::ImageView,
+        extent: vk::Extent2D,
+        layers: u32,
+        initial: Use,
+        last: Use,
+    ) -> ImageId {
         self.images.push(Image {
             image,
             view,
             extent,
+            layers,
             aspect: vk::ImageAspectFlags::COLOR,
             initial,
             last: Some(last),
@@ -332,6 +382,7 @@ impl<'a> Graph<'a> {
             image: vk::Image::null(),
             view: vk::ImageView::null(),
             extent: desc.extent,
+            layers: desc.layers,
             aspect: desc.aspect(),
             initial: Use::Undefined,
             last: None,
@@ -343,6 +394,11 @@ impl<'a> Graph<'a> {
     /// An image's size.
     pub fn extent(&self, image: ImageId) -> vk::Extent2D {
         self.images[image.0].extent
+    }
+
+    /// An image's array layers.
+    pub fn layers(&self, image: ImageId) -> u32 {
+        self.images[image.0].layers
     }
 
     /// Adds a buffer owned elsewhere. `prior` lists how earlier work (a previous frame) touched it, so the first
@@ -385,6 +441,10 @@ impl<'a> Graph<'a> {
         for p in &self.passes {
             let mut out = Vec::new();
             for &(image, _) in &p.colors {
+                step(image, Use::ColorAttachment, &mut out);
+            }
+            // Resolves write at colour attachment output, in the colour attachment layout.
+            if let Some(image) = p.resolve {
                 step(image, Use::ColorAttachment, &mut out);
             }
             if let Some((image, _)) = p.depth {
@@ -462,7 +522,14 @@ impl<'a> Graph<'a> {
                         .store_op(vk::AttachmentStoreOp::STORE)
                         .clear_value(clear_value)
                 };
-                let colors: Vec<_> = pass.colors.iter().copied().map(attachment).collect();
+                let mut colors: Vec<_> = pass.colors.iter().copied().map(attachment).collect();
+                if let (Some(resolve), Some(first)) = (pass.resolve, colors.first_mut()) {
+                    *first = first
+                        .store_op(vk::AttachmentStoreOp::DONT_CARE)
+                        .resolve_mode(vk::ResolveModeFlags::AVERAGE)
+                        .resolve_image_view(self.images[resolve.0].view)
+                        .resolve_image_layout(Use::ColorAttachment.layout());
+                }
                 let depth = pass.depth.map(attachment);
                 let first = pass.colors.first().or(pass.depth.as_ref()).map(|&(image, _)| image);
                 if let Some(first) = first {
@@ -474,6 +541,9 @@ impl<'a> Graph<'a> {
                         .render_area(area)
                         .layer_count(1)
                         .color_attachments(&colors);
+                    if pass.views > 1 {
+                        info = info.view_mask((1 << pass.views) - 1);
+                    }
                     if let Some(depth) = &depth {
                         info = info.depth_attachment(depth);
                     }
@@ -527,6 +597,7 @@ unsafe fn barriers(
                 .image(image.image)
                 .subresource_range(vk::ImageSubresourceRange {
                     aspect_mask: image.aspect,
+                    layer_count: vk::REMAINING_ARRAY_LAYERS,
                     ..COLOR
                 })
         })
@@ -601,8 +672,8 @@ impl Transients {
             .format(desc.format)
             .extent(desc.extent.into())
             .mip_levels(1)
-            .array_layers(1)
-            .samples(vk::SampleCountFlags::TYPE_1)
+            .array_layers(desc.layers)
+            .samples(desc.samples)
             .usage(desc.usage);
         let image = ctx.create_image("transient", &info, desc.aspect())?;
         self.images.push(Pooled {

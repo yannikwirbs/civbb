@@ -247,6 +247,28 @@ pub fn batch(draws: &mut [Draw], out: &mut Batches) {
     }
 }
 
+/// What a [`Forward`] draws into (ADR 0120).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Output {
+    /// The target's format.
+    pub color: vk::Format,
+    /// Samples per pixel; above 1 the pass draws multisampled and resolves into the target.
+    pub samples: vk::SampleCountFlags,
+    /// Views drawn at once by multiview, one per target layer; 1 is no multiview.
+    pub views: u32,
+}
+
+impl Output {
+    /// One view, single-sampled, into `color` images.
+    pub fn single(color: vk::Format) -> Self {
+        Output {
+            color,
+            samples: vk::SampleCountFlags::TYPE_1,
+            views: 1,
+        }
+    }
+}
+
 /// The forward pipelines (one per [`PipelineKey`]) and the per-frame view, draw record and command buffers.
 pub struct Forward {
     layout: vk::PipelineLayout,
@@ -255,11 +277,12 @@ pub struct Forward {
     records: Buffer,
     commands: Buffer,
     max_draws: u32,
+    output: Output,
 }
 
 impl Forward {
-    /// Creates every pipeline for drawing `scene` into `color` images, and room for `max_draws` draws a frame.
-    pub fn new(ctx: &Context, scene: &Scene, color: vk::Format, max_draws: u32) -> Result<Self> {
+    /// Creates every pipeline for drawing `scene` into `output`'s images, and room for `max_draws` draws a frame.
+    pub fn new(ctx: &Context, scene: &Scene, output: Output, max_draws: u32) -> Result<Self> {
         use vk::BufferUsageFlags as U;
         let gpu = MemoryLocation::GpuOnly;
         let n = u64::from(max_draws);
@@ -274,7 +297,12 @@ impl Forward {
         let mut f = Forward {
             layout: vk::PipelineLayout::null(),
             pipelines: Vec::new(),
-            view: ctx.create_buffer("view", VIEW_WORDS as u64 * 4, U::STORAGE_BUFFER | U::TRANSFER_DST, gpu)?,
+            view: ctx.create_buffer(
+                "view",
+                u64::from(output.views) * VIEW_WORDS as u64 * 4,
+                U::STORAGE_BUFFER | U::TRANSFER_DST,
+                gpu,
+            )?,
             records: ctx.create_buffer(
                 "draw records",
                 n * RECORD_WORDS as u64 * 4,
@@ -288,6 +316,7 @@ impl Forward {
                 gpu,
             )?,
             max_draws,
+            output,
         };
         // SAFETY: valid create infos; on failure everything created so far is destroyed.
         let built = unsafe {
@@ -299,7 +328,7 @@ impl Forward {
                     None,
                 )?;
                 let module = d.create_shader_module(&vk::ShaderModuleCreateInfo::default().code(&code), None)?;
-                let pipelines = create_pipelines(d, f.layout, module, color);
+                let pipelines = create_pipelines(d, f.layout, module, output);
                 d.destroy_shader_module(module, None);
                 f.pipelines = pipelines?;
                 Ok(())
@@ -315,15 +344,16 @@ impl Forward {
         }
     }
 
-    /// Adds the frame's two passes to `graph`: one writing the view, draw records, commands and the changed
+    /// Adds the frame's two passes to `graph`: one writing the views, draw records, commands and the changed
     /// `materials` (index from [`Scene::add_material`], record from [`crate::material::pack`]), then the forward pass
-    /// drawing `batches` into `target` (cleared to `clear`) with a transient depth buffer. `skinned` is
-    /// [`Scene::skinned`] in the graph, written by an earlier skinning pass.
+    /// drawing `batches` into `target` (cleared to `clear`) with a transient depth buffer, view `i` into layer `i`;
+    /// multisampled, into a transient colour image resolved into `target`. `skinned` is [`Scene::skinned`] in the
+    /// graph, written by an earlier skinning pass.
     ///
     /// # Panics
     ///
-    /// If `batches` holds more draws than the `max_draws` given to [`Forward::new`], or a material index was not
-    /// added to the scene.
+    /// If `batches` holds more draws than the `max_draws` given to [`Forward::new`], a material index was not
+    /// added to the scene, or `views` and `target`'s layers are not the [`Output`]'s view count.
     #[allow(clippy::too_many_arguments)]
     pub fn add<'a>(
         &'a self,
@@ -331,7 +361,7 @@ impl Forward {
         scene: &'a Scene,
         target: ImageId,
         skinned: BufferId,
-        view: &View,
+        views: &[View],
         batches: &Batches,
         materials: &[(u32, [u32; MATERIAL_WORDS])],
         clear: [f32; 4],
@@ -348,7 +378,16 @@ impl Forward {
                 (u64::from(*index) * record, bytes(words))
             })
             .collect();
-        let view_words = view.words();
+        let Output {
+            color,
+            samples,
+            views: n,
+        } = self.output;
+        assert!(
+            views.len() == n as usize && graph.layers(target) == n,
+            "a view and a target layer per view of the Output"
+        );
+        let view_words: Vec<u32> = views.iter().flat_map(View::words).collect();
         let records = bytes(&batches.records);
         let commands = bytes(&batches.commands);
         let runs = batches.runs.clone();
@@ -376,11 +415,14 @@ impl Forward {
                 }),
         );
         let extent = graph.extent(target);
-        let depth = graph.transient(ImageDesc {
-            format: DEPTH,
-            extent,
-            usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-        });
+        let attachment = |format, usage| ImageDesc {
+            samples,
+            layers: n,
+            ..ImageDesc::new(format, extent, usage)
+        };
+        let depth = graph.transient(attachment(DEPTH, vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT));
+        let msaa = vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT;
+        let multisampled = (samples != vk::SampleCountFlags::TYPE_1).then(|| graph.transient(attachment(color, msaa)));
         let mut push = Vec::with_capacity(PUSH_SIZE as usize);
         for address in [
             scene.skinned().address,
@@ -391,9 +433,12 @@ impl Forward {
         ] {
             push.extend(address.to_le_bytes());
         }
+        let pass = match multisampled {
+            Some(m) => Pass::new("forward").color(m, Load::Clear(clear)).resolve(target),
+            None => Pass::new("forward").color(target, Load::Clear(clear)),
+        };
         graph.add(
-            Pass::new("forward")
-                .color(target, Load::Clear(clear))
+            pass.views(n)
                 .depth(depth, Load::Clear([0.0; 4]))
                 .buffer(skinned, Access::VertexRead)
                 .buffer(view_buf, Access::VertexRead)
@@ -465,7 +510,7 @@ unsafe fn create_pipelines(
     d: &ash::Device,
     layout: vk::PipelineLayout,
     module: vk::ShaderModule,
-    color: vk::Format,
+    output: Output,
 ) -> Result<Vec<vk::Pipeline>> {
     let keys: Vec<PipelineKey> = PipelineKey::all().collect();
     let stages: Vec<[vk::PipelineShaderStageCreateInfo; 2]> = keys
@@ -537,15 +582,16 @@ unsafe fn create_pipelines(
     let viewport = vk::PipelineViewportStateCreateInfo::default()
         .viewport_count(1)
         .scissor_count(1);
-    let multisample =
-        vk::PipelineMultisampleStateCreateInfo::default().rasterization_samples(vk::SampleCountFlags::TYPE_1);
+    let multisample = vk::PipelineMultisampleStateCreateInfo::default().rasterization_samples(output.samples);
     let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
     let dynamic = vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_states);
-    let formats = [color];
+    let formats = [output.color];
+    let view_mask = if output.views > 1 { (1 << output.views) - 1 } else { 0 };
     let mut renderings: Vec<_> = keys
         .iter()
         .map(|_| {
             vk::PipelineRenderingCreateInfo::default()
+                .view_mask(view_mask)
                 .color_attachment_formats(&formats)
                 .depth_attachment_format(DEPTH)
         })

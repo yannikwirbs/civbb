@@ -334,7 +334,8 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
         .collect();
     let mut gpus = Vec::with_capacity(2);
     for _ in &sides {
-        match Gpu::new(&renderer) {
+        // Single-sampled, as Unity's references are (ADRs 0048, 0120).
+        match Gpu::new(&renderer, 1) {
             Ok(gpu) => gpus.push(gpu),
             Err(e) => {
                 destroy(&renderer, gpus);

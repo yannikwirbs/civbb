@@ -22,7 +22,7 @@ pub mod texture;
 
 pub use ash::{self, vk};
 pub use context::{Candidate, Context, Window, pick_device};
-pub use forward::{Batches, Draw, Forward, View, batch};
+pub use forward::{Batches, Draw, Forward, Output, View, batch};
 pub use graph::{Access, BufferId, Graph, ImageDesc, ImageId, Load, Pass, Transients, Use};
 pub use memory::{Buffer, Image, MemoryLocation};
 pub use overlay::Overlay;

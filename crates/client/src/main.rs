@@ -20,6 +20,7 @@ const USAGE: &str = "usage:
                      [--avatar lean|bloated | --package <package.civpkg> --key <key-file>]
   civbb-client view [<package.civpkg>... --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F]
                     [--warmup W] [--lod L] [--world] [--trackers 3|6|10] [--turn smooth|snap]
+                    [--msaa N]
   civbb-client measure <package.civpkg> --key <key-file> [--avatars N] [--frames F] [--warmup W]
   civbb-client parity <reference.civpkg | unity-dir> <test.civpkg> --key <key-file> [--images <dir>]
   civbb-client rig <package.civpkg> --key <key-file>
@@ -41,7 +42,8 @@ the first frame (ADR 0113). A gamepad moves (left stick, click to run), turns an
 smooth, the default, or snap in 30-degree steps), jumps (A), crouches (B), lies prone (Y), uses the bench (X),
 cycles floor poses (D-pad down), flies (D-pad up) and
 cycles the camera (View/Back) alongside keyboard and mouse (ADR 0115). Tab or the pad's Start opens and closes the
-avatar's expression menu; the mouse picks, right click or Escape goes back (ADR 0117).
+avatar's expression menu; the mouse picks, right click or Escape goes back (ADR 0117). --msaa draws with N samples
+per pixel (default 4, 1 is off; as far as the GPU supports them, ADR 0120).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
 300) and through the viewer's frames on an offscreen 1280x720 target (N copies, same frames) and prints the times
@@ -159,6 +161,7 @@ fn run_view(args: &[String]) -> ExitCode {
     let mut world = false;
     let mut trackers = None;
     let mut turning = Turning::default();
+    let mut msaa = view::MSAA;
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let parsed = match arg.as_str() {
@@ -181,6 +184,7 @@ fn run_view(args: &[String]) -> ExitCode {
                 _ => None,
             })
             .map(|t| turning = t),
+            "--msaa" => it.next().and_then(|v| v.parse().ok()).map(|n| msaa = n),
             s if !s.starts_with('-') => {
                 packages.push(s.to_owned());
                 Some(())
@@ -237,6 +241,7 @@ fn run_view(args: &[String]) -> ExitCode {
         stations: if world { vec![test_station()] } else { Vec::new() },
         trackers,
         turning,
+        msaa,
     };
     match view::run(cfg) {
         Ok(s) => {
@@ -457,6 +462,7 @@ fn measure(package: &Path, key: &Path, avatars: u32, frames: u32, warmup: u32) -
         stations: Vec::new(),
         trackers: None,
         turning: Turning::default(),
+        msaa: view::MSAA,
     };
     let gpu = match view::run_headless(view, width, height) {
         Ok((s, device)) => match s.gpu_ms {

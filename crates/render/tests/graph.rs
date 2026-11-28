@@ -94,11 +94,11 @@ fn an_image_already_in_its_final_read_use_is_left_alone() {
 fn depth_attachments_and_transients() {
     let mut g = Graph::new();
     let target = import(&mut g, Use::Undefined, Use::Present);
-    let depth = g.transient(ImageDesc {
-        format: vk::Format::D32_SFLOAT,
-        extent: g.extent(target),
-        usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-    });
+    let depth = g.transient(ImageDesc::new(
+        vk::Format::D32_SFLOAT,
+        g.extent(target),
+        vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+    ));
     assert_eq!(g.extent(depth), vk::Extent2D { width: 4, height: 4 });
     g.add(
         Pass::new("draw")

@@ -41,7 +41,8 @@ pub struct Image {
 }
 
 impl Context {
-    /// Creates an image in device memory and a 2D view of `aspect` over all its mips and layers.
+    /// Creates an image in device memory and a view of `aspect` over all its mips and layers: 2D for one layer, a
+    /// 2D array for more.
     pub fn create_image(&self, name: &str, info: &vk::ImageCreateInfo, aspect: vk::ImageAspectFlags) -> Result<Image> {
         let d = self.device();
         // SAFETY: valid create infos; on failure what was created is destroyed before returning.
@@ -73,7 +74,11 @@ impl Context {
                     };
                     let view = vk::ImageViewCreateInfo::default()
                         .image(handle)
-                        .view_type(vk::ImageViewType::TYPE_2D)
+                        .view_type(if info.array_layers > 1 {
+                            vk::ImageViewType::TYPE_2D_ARRAY
+                        } else {
+                            vk::ImageViewType::TYPE_2D
+                        })
                         .format(info.format)
                         .subresource_range(range);
                     d.create_image_view(&view, None)

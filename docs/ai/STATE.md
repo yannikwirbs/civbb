@@ -311,6 +311,15 @@ What exists, by area. Read the section for the area you touch; update it when th
   PBR, Toon, Unlit x blend x culling; draws batched into runs, one indirect multi-draw per run, vertices pulled by
   address). Shaders are Slang in `crates/render/shaders/` (`skin`, `mesh`), compiled by `cargo xtask shaders`
   (Vulkan SDK 1.4.363.0 at `C:/VulkanSDK/1.4.363.0`) to committed SPIR-V; `ci` fails on a stale one.
+- MSAA and multiview (#60, ADR 0120): `forward::Output { color, samples, views }` fixes both per `Forward`; with
+  samples > 1 the forward pass draws into transient multisampled colour and depth and resolves into the target
+  (`Pass::resolve`, not stored); with views > 1 its pipelines carry the view mask (`Pass::views`), the target has
+  one layer per view (`Graph::import_layers`, `ImageDesc::layers`, array views from `create_image`), the view
+  buffer one record per view, picked by `SV_ViewID` and passed to fragments as a flat `view` varying. Device
+  selection requires `multiview`. `Context::samples(n)`. Viewer `--msaa N` (default 4, `view::MSAA`; `measure` 4),
+  parity 1 (Unity's references have none). 100 bloated, release, 1280x720 window: GPU 0.595 ms at 1x, 0.666 at 4x.
+  No alpha to coverage; the overlay stays one view, single-sampled. Tests: `draw.rs` (980 lines: split it before
+  adding more) `msaa_resolves_...`, `multiview_draws_...` (each layer equals its view drawn alone, 1x and 4x).
 - Culling (ADR 0077, #99): `civbb_client::cull` bounds each mesh instance by per-joint bind-space spheres moved by
   the frame's skinning matrices (padded for blendshapes) and drops instances outside the view frustum before
   skinning and drawing. The GPU culling pass with hierarchical Z is Phase 2 (#59).

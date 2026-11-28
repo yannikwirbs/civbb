@@ -13,8 +13,8 @@ use civbb_format::mesh::{Mesh, Submesh};
 use civbb_render::material::{MATERIAL_WORDS, pack};
 use civbb_render::skin::{Job, SkinnedMesh, Skinning};
 use civbb_render::{
-    Access, Batches, Capacity, Context, Error, Forward, Graph, MaterialId, MemoryLocation, Pass, Scene, Transients,
-    Use, View, batch, vk,
+    Access, Batches, Capacity, Context, Error, Forward, Graph, MaterialId, MemoryLocation, Output, Pass, Scene,
+    Transients, Use, View, batch, vk,
 };
 
 const SIZE: u32 = 64;
@@ -96,6 +96,22 @@ fn render(
     updates: &[(u32, [u32; MATERIAL_WORDS])],
     view: &View,
 ) -> Vec<u8> {
+    let one = vk::SampleCountFlags::TYPE_1;
+    render_views(ctx, scene, meshes, materials, updates, std::slice::from_ref(view), one)
+}
+
+/// As [`render`], with `samples` per pixel and each of `views` into its own layer by multiview (ADR 0120); returns
+/// the layers' pixels one after the other.
+fn render_views(
+    ctx: &Context,
+    scene: &mut Scene,
+    meshes: &[Mesh],
+    materials: &[MaterialId],
+    updates: &[(u32, [u32; MATERIAL_WORDS])],
+    views: &[View],
+    samples: vk::SampleCountFlags,
+) -> Vec<u8> {
+    let layers = views.len() as u32;
     let data: Vec<_> = meshes.iter().map(|m| scene.add_mesh(ctx, m).unwrap()).collect();
     let instances: Vec<_> = data.iter().map(|d| SkinnedMesh::new(ctx, scene, d).unwrap()).collect();
     let joints: Vec<Vec<Mat4>> = data.iter().map(|d| vec![IDENTITY; d.joint_count() as usize]).collect();
@@ -114,7 +130,12 @@ fn render(
     batch(&mut draws, &mut batches);
 
     let skinning = Skinning::new(ctx).unwrap();
-    let forward = Forward::new(ctx, scene, FORMAT, 1024).unwrap();
+    let output = Output {
+        color: FORMAT,
+        samples,
+        views: layers,
+    };
+    let forward = Forward::new(ctx, scene, output, 1024).unwrap();
     let info = vk::ImageCreateInfo::default()
         .image_type(vk::ImageType::TYPE_2D)
         .format(FORMAT)
@@ -124,14 +145,14 @@ fn render(
             depth: 1,
         })
         .mip_levels(1)
-        .array_layers(1)
+        .array_layers(layers)
         .samples(vk::SampleCountFlags::TYPE_1)
         .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC);
     let target = ctx.create_image("target", &info, vk::ImageAspectFlags::COLOR).unwrap();
     let readback = ctx
         .create_buffer(
             "readback",
-            u64::from(SIZE * SIZE * 4),
+            u64::from(SIZE * SIZE * 4 * layers),
             vk::BufferUsageFlags::TRANSFER_DST,
             MemoryLocation::GpuToCpu,
         )
@@ -146,7 +167,14 @@ fn render(
             width: SIZE,
             height: SIZE,
         };
-        let image = graph.import(target.handle, target.view, extent, Use::Undefined, Use::TransferSrc);
+        let image = graph.import_layers(
+            target.handle,
+            target.view,
+            extent,
+            layers,
+            Use::Undefined,
+            Use::TransferSrc,
+        );
         let skinned = graph.import_buffer(scene.skinned().handle, &[Access::VertexRead]);
         graph.add(
             Pass::new("skin")
@@ -158,7 +186,7 @@ fn render(
             scene,
             image,
             skinned,
-            view,
+            views,
             &batches,
             updates,
             [0.0, 0.0, 0.0, 1.0],
@@ -167,7 +195,7 @@ fn render(
         let region = vk::BufferImageCopy::default()
             .image_subresource(vk::ImageSubresourceLayers {
                 aspect_mask: vk::ImageAspectFlags::COLOR,
-                layer_count: 1,
+                layer_count: layers,
                 ..Default::default()
             })
             .image_extent(extent.into());
@@ -186,8 +214,13 @@ fn render(
         d.cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().memory_barriers(&[to_host]));
     })
     .unwrap();
-    let pixels = readback.mapped().unwrap()[..(SIZE * SIZE * 4) as usize].to_vec();
-    assert_eq!(pool.len(), 1, "one transient depth buffer");
+    let pixels = readback.mapped().unwrap()[..(SIZE * SIZE * 4 * layers) as usize].to_vec();
+    let multisampled = samples != vk::SampleCountFlags::TYPE_1;
+    assert_eq!(
+        pool.len(),
+        1 + multisampled as usize,
+        "a transient depth and multisampled colour"
+    );
     // SAFETY: `one_shot` waited for the GPU to finish; nothing uses these any more.
     unsafe {
         pool.destroy(ctx);
@@ -842,6 +875,106 @@ fn draws_toon_outlines_around_the_silhouette() {
     assert_near(pixel(&pixels, 32, 18), [255, 0, 0], 0, "outline above the face");
     assert_near(pixel(&pixels, 56, 32), [0, 0, 0], 0, "background past the outline");
     // SAFETY: `render` waited for the GPU to finish with the scene.
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+#[test]
+fn msaa_resolves_partly_covered_pixels_along_edges() {
+    let Some(ctx) = context() else { return };
+    let four = ctx.samples(4);
+    if four == vk::SampleCountFlags::TYPE_1 {
+        return eprintln!("skipped: no multisampling");
+    }
+    let capacity = Capacity {
+        vertices: 8,
+        indices: 12,
+        deltas: 0,
+        skinned: 8,
+        materials: 1,
+    };
+    let mut scene = Scene::new(&ctx, capacity).unwrap();
+    let red = material(unlit([1.0, 0.0, 0.0, 1.0], None), AlphaMode::Opaque);
+    let red = scene.add_material(&ctx, &red, &[]).unwrap();
+    // The top right corner moved left: the right edge slants across 32 rows of pixels.
+    let mut slanted = quad([-1.0, 1.0], [-1.0, 1.0], 0.0, 0);
+    slanted.positions[2][0] = 0.3;
+    let view = View::look_at([0.0, 0.0, 2.0], [0.0; 3], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+    let mut partly = |samples| {
+        let meshes = std::slice::from_ref(&slanted);
+        let pixels = render_views(&ctx, &mut scene, meshes, &[red], &[], &[view], samples);
+        let partial = pixels.chunks(4).filter(|p| p[0] != 0 && p[0] != 255).count();
+        (pixel(&pixels, 32, 32), partial)
+    };
+    let (centre, single) = partly(vk::SampleCountFlags::TYPE_1);
+    assert_eq!(
+        (centre, single),
+        ([255, 0, 0, 255], 0),
+        "single-sampled: covered or not"
+    );
+    let (centre, multi) = partly(four);
+    assert_eq!(centre, [255, 0, 0, 255], "resolved inside");
+    assert!(multi >= 16, "{multi} partly covered pixels along the slanted edge");
+    // SAFETY: `render_views` waited for the GPU to finish with the scene.
+    unsafe { scene.destroy(&ctx) };
+    assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+#[test]
+fn multiview_draws_each_view_into_its_own_layer() {
+    let Some(ctx) = context() else { return };
+    // Two quads per render, six renders.
+    let capacity = Capacity {
+        vertices: 48,
+        indices: 72,
+        deltas: 0,
+        skinned: 48,
+        materials: 2,
+    };
+    let mut scene = Scene::new(&ctx, capacity).unwrap();
+    let shiny = MaterialModel::Pbr(Pbr {
+        base_color: [1.0; 4],
+        base_color_tex: None,
+        metallic: 0.0,
+        roughness: 0.3,
+        metallic_roughness_tex: None,
+        normal_tex: None,
+        normal_scale: 1.0,
+        occlusion_tex: None,
+        emissive: [0.0; 3],
+        emissive_tex: None,
+    });
+    let opaque = AlphaMode::Opaque;
+    let shiny = scene.add_material(&ctx, &material(shiny, opaque), &[]).unwrap();
+    let red = scene
+        .add_material(&ctx, &material(unlit([1.0, 0.0, 0.0, 1.0], None), opaque), &[])
+        .unwrap();
+    // A small quad in front of a shiny one: it shifts between the eyes, and so does the highlight.
+    let meshes = [
+        quad([-1.5, 1.5], [-1.5, 1.5], 0.0, 0),
+        quad([-0.25, 0.25], [-0.25, 0.25], 0.5, 1),
+    ];
+    let eye = |x: f32| {
+        let mut v = View::look_at([x, 0.0, 2.0], [x, 0.0, 0.0], std::f32::consts::FRAC_PI_2, 1.0, 0.1);
+        v.light_dir = [0.0, 0.0, 1.0];
+        v
+    };
+    let views = [eye(-0.3), eye(0.3)];
+    let layer = (SIZE * SIZE * 4) as usize;
+    for samples in [vk::SampleCountFlags::TYPE_1, ctx.samples(4)] {
+        let mut draw = |views: &[View]| render_views(&ctx, &mut scene, &meshes, &[shiny, red], &[], views, samples);
+        let (left, right, both) = (draw(&views[..1]), draw(&views[1..]), draw(&views));
+        assert_ne!(left, right, "the eyes see different images");
+        for (i, mono) in [left, right].iter().enumerate() {
+            let stereo = &both[i * layer..][..layer];
+            let worst = stereo.iter().zip(mono).map(|(a, b)| a.abs_diff(*b)).max();
+            assert!(
+                worst <= Some(1),
+                "{samples:?} layer {i} differs from its view alone by {worst:?}"
+            );
+        }
+    }
+    // SAFETY: `render_views` waited for the GPU to finish with the scene.
     unsafe { scene.destroy(&ctx) };
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
 }

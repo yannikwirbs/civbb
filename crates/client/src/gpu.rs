@@ -8,8 +8,8 @@ use civbb_render::material::{MATERIAL_WORDS, pack};
 use civbb_render::overlay::{NO_TEXTURE, Vertex};
 use civbb_render::skin::{Job, SkinnedMesh, Skinning};
 use civbb_render::{
-    Access, Batches, Capacity, Context, Draw, Forward, FrameStatus, MaterialId, MeshData, Overlay, Pass, Renderer,
-    Result, Scene, View, batch,
+    Access, Batches, Capacity, Context, Draw, Forward, FrameStatus, MaterialId, MeshData, Output, Overlay, Pass,
+    Renderer, Result, Scene, View, batch, vk,
 };
 use civbb_ui::draw::Texture;
 
@@ -86,6 +86,8 @@ impl Built {
 /// Everything on the GPU: the scene with the packages and islands of the last snapshot, and the pipelines.
 pub(crate) struct Gpu {
     skinning: Skinning,
+    /// The forward pass's samples per pixel (ADR 0120).
+    samples: vk::SampleCountFlags,
     /// `None` until the first snapshot.
     built: Option<Built>,
     /// Snapshots synced so far.
@@ -93,9 +95,11 @@ pub(crate) struct Gpu {
 }
 
 impl Gpu {
-    pub(crate) fn new(renderer: &Renderer) -> Result<Self> {
+    /// The GPU side of a renderer drawing with up to `msaa` samples per pixel, as far as the device supports them.
+    pub(crate) fn new(renderer: &Renderer, msaa: u32) -> Result<Self> {
         Ok(Gpu {
             skinning: Skinning::new(renderer.context())?,
+            samples: renderer.context().samples(msaa),
             built: None,
             synced: 0,
         })
@@ -178,8 +182,12 @@ impl Gpu {
             None => (need, draws),
         };
         let scene = Scene::new(ctx, capacity)?;
+        let output = Output {
+            samples: self.samples,
+            ..Output::single(renderer.color_format()?)
+        };
         self.built = Some(Built {
-            forward: Forward::new(ctx, &scene, renderer.color_format()?, max_draws)?,
+            forward: Forward::new(ctx, &scene, output, max_draws)?,
             overlay: Overlay::new(ctx, &scene, renderer.color_format()?, MAX_OVERLAY)?,
             atlas: None,
             scene,
@@ -381,8 +389,16 @@ pub(crate) fn draw(
                 // SAFETY: the graph records this outside a rendering scope on the renderer's device.
                 .record(|d, cmd| unsafe { skinning.record(d, cmd, &jobs) }),
         );
-        b.forward
-            .add(graph, &b.scene, target, skinned, &view, batches, updates, clear);
+        b.forward.add(
+            graph,
+            &b.scene,
+            target,
+            skinned,
+            std::slice::from_ref(&view),
+            batches,
+            updates,
+            clear,
+        );
         b.overlay.add(graph, &b.scene, target, overlay);
     })?;
     Ok((status == FrameStatus::Presented).then_some((draws, skinned)))
@@ -439,7 +455,7 @@ mod tests {
             }
             Err(e) => panic!("{e}"),
         };
-        let mut gpu = Gpu::new(&renderer).unwrap();
+        let mut gpu = Gpu::new(&renderer, 1).unwrap();
         let mut scratch = Scratch::default();
         let lean = Package::new(civbb_corpus::generate(&civbb_corpus::lean()), Vec::new());
         let bloated = Package::new(civbb_corpus::generate(&civbb_corpus::bloated()), Vec::new());
