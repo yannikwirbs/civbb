@@ -71,5 +71,8 @@ Add a line to the matching file whenever something costs more than one attempt.
   `bin/win64/openxr_loader.dll`, instance creation starts SteamVR and then either reports no headset after ~10 s or
   blocks ~65 s and fails with ERROR_RUNTIME_FAILURE: give such runs a timeout over 90 s. Without the variable the
   loader is not found and nothing starts (the gate's case).
+- `openxr`'s `locate_views` (and space locations) fill an invalid orientation with the all-zero quaternion and an
+  invalid position with zeros: check the state flags before using a pose (`Frames::views` returns `None` without
+  ORIENTATION_VALID); a zero quaternion handed to `xrEndFrame` is XR_ERROR_POSE_INVALID.
 - A bevy system with more than 7 parameters fails clippy's `too_many_arguments` under `-D warnings`: group related
   ones into a tuple parameter (`(world, rules): (Res<WorldMesh>, Res<WorldRules>)`) instead of an `allow`.
