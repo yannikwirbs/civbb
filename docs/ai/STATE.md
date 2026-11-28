@@ -407,7 +407,11 @@ What exists, by area. Read the section for the area you touch; update it when th
   through `Island::set_param` (coerced to the entry's kind; `Island::params` reads), draws into `Overlay` (atlas
   `Arc` and the island key for icons), which `extract_system` copies into `Snapshot::overlay`. The viewer starts
   `ExpressionMenu::load_fonts` (a thread) at start; opening frees the cursor, closing recaptures outside orbit view.
-  Toggles persist only in the running animator (no saved parameters yet). Stick navigation: #158.
+  Toggles persist only in the running animator (no saved parameters yet). Sticks (#158): `ExpressionMenu::stick`
+  (x right, y up) replaces the mouse position by `Ring::stick` (full deflection at the outer radius, under 0.3 the
+  centre disc, puppets read the deflection); the viewer sets it from the pad's right stick from its first move until
+  the mouse moves; while the menu is open `Pad::menu_button` maps South to press/release and East to back, other
+  pad buttons do nothing and `Pad::apply(.., look: false)` keeps the right stick from turning. VR placement: #170.
 - Scaling and stations (#147, ADR 0114): `Player::eye_height` (`None` = the avatar's viewpoint height; chosen within
   0.2 to 5 m, `=`/`-` multiply by 1.1) gives `Player::scale` = eye over own, written to `Island::origin.scale`
   (viewpoint, cameras, bones, IK goals in avatar space follow); speeds and `Body::scale` (capsule, step) scale by

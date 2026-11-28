@@ -42,7 +42,8 @@ the first frame (ADR 0113). A gamepad moves (left stick, click to run), turns an
 smooth, the default, or snap in 30-degree steps), jumps (A), crouches (B), lies prone (Y), uses the bench (X),
 cycles floor poses (D-pad down), flies (D-pad up) and
 cycles the camera (View/Back) alongside keyboard and mouse (ADR 0115). Tab or the pad's Start opens and closes the
-avatar's expression menu; the mouse picks, right click or Escape goes back (ADR 0117). --msaa draws with N samples
+avatar's expression menu; the mouse picks, right click or Escape goes back (ADR 0117); on a pad the right stick
+points, A picks and B goes back (#158). --msaa draws with N samples
 per pixel (default 4, 1 is off; as far as the GPU supports them, ADR 0120).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +

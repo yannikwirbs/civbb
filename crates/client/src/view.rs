@@ -13,6 +13,7 @@ use civbb_format::material::ImageFormat;
 use civbb_format::math::{Mat4, Vec3};
 use civbb_format::mesh::Mesh;
 use civbb_render::{Renderer, Window};
+use civbb_ui::radial::Pointer;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
@@ -625,26 +626,42 @@ impl Viewer {
             key(KeyCode::KeyD) - key(KeyCode::KeyA),
         );
         let run = self.held.contains(&KeyCode::ShiftLeft) || self.held.contains(&KeyCode::ShiftRight);
+        let open = self.runtime.world.resource::<ExpressionMenu>().radial.is_open();
         let mut input = self.runtime.world.resource_mut::<Input>();
         (input.forward, input.right, input.run) = (forward, right, run);
-        let (mut cycle, mut menu) = (false, false);
+        let (mut cycle, mut menu, mut pointer, mut stick) = (false, false, Pointer::default(), false);
         while let Some(gilrs::Event { event, .. }) = self.pads.as_mut().and_then(|p| p.next_event()) {
+            use gilrs::{Axis, Button, EventType as E};
             match event {
-                gilrs::EventType::ButtonPressed(gilrs::Button::Start, _) => menu = true,
-                gilrs::EventType::ButtonPressed(b, _) => cycle |= self.pad.button(b, &mut input),
-                gilrs::EventType::AxisChanged(a, v, _) => self.pad.axis(a, v),
-                gilrs::EventType::Disconnected => self.pad.reset(),
+                E::ButtonPressed(Button::Start, _) => menu = true,
+                // The open menu takes the pad's buttons: South acts, East goes back, the rest do nothing (#158).
+                E::ButtonPressed(b, _) if open => _ = Pad::menu_button(b, true, &mut pointer),
+                E::ButtonReleased(b, _) if open => _ = Pad::menu_button(b, false, &mut pointer),
+                E::ButtonPressed(b, _) => cycle |= self.pad.button(b, &mut input),
+                E::AxisChanged(a, v, _) => {
+                    stick |= matches!(a, Axis::RightStickX | Axis::RightStickY);
+                    self.pad.axis(a, v);
+                }
+                E::Disconnected => self.pad.reset(),
                 _ => {}
             }
         }
-        self.pad.apply(&mut input, dt);
+        self.pad.apply(&mut input, dt, !open);
         if cycle {
             self.cycle_view();
         }
         let size = self.window.as_ref().map(|w| w.inner_size()).unwrap_or_default();
+        let right = self.pad.right();
         let mut m = self.runtime.world.resource_mut::<ExpressionMenu>();
         m.toggle |= menu;
         m.screen = [size.width as f32, size.height as f32];
+        // The right stick points from its first move until the mouse moves.
+        if stick || m.stick.is_some() {
+            m.stick = Some(right);
+        }
+        m.pointer.press |= pointer.press;
+        m.pointer.release |= pointer.release;
+        m.pointer.back |= pointer.back;
         let was_open = m.radial.is_open();
         self.runtime.step(dt);
         // The open menu frees the cursor; closing it gives look mode back outside orbit view (ADR 0117).
@@ -865,8 +882,9 @@ impl ApplicationHandler for Viewer {
                     self.camera.drag((position.x - x) as f32, (position.y - y) as f32);
                 }
                 self.cursor = Some((position.x, position.y));
-                self.runtime.world.resource_mut::<ExpressionMenu>().pointer.pos =
-                    [position.x as f32, position.y as f32];
+                let mut menu = self.runtime.world.resource_mut::<ExpressionMenu>();
+                menu.pointer.pos = [position.x as f32, position.y as f32];
+                menu.stick = None;
             }
             WindowEvent::MouseWheel { delta, .. } => self.camera.zoom(match delta {
                 MouseScrollDelta::LineDelta(_, y) => y,

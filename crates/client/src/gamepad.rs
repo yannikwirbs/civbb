@@ -1,6 +1,7 @@
 //! Gamepad input for the desktop player (design doc §18, ADR 0115): gilrs buttons and sticks onto the player's
 //! [`Input`], on top of keyboard and mouse, with snap or smooth turning.
 
+use civbb_ui::radial::Pointer;
 use gilrs::{Axis, Button};
 
 use crate::player::Input;
@@ -73,6 +74,26 @@ impl Pad {
         false
     }
 
+    /// While the expression menu is open: South acts (press and release, as the left mouse button) and East goes
+    /// back (as the right one) on `pointer`; the right stick points ([`Pad::right`]). Returns whether `button` is
+    /// one of them; the viewer drops every other button while the menu is open (#158).
+    pub fn menu_button(button: Button, pressed: bool, pointer: &mut Pointer) -> bool {
+        match button {
+            Button::South => {
+                pointer.press |= pressed;
+                pointer.release |= !pressed;
+            }
+            Button::East => pointer.back |= pressed,
+            _ => return false,
+        }
+        true
+    }
+
+    /// The right stick, x right and y up, -1 to 1: the expression menu's pointer while it is open.
+    pub fn right(&self) -> [f32; 2] {
+        self.sticks[1]
+    }
+
     /// A stick axis moved to `value`, -1 to 1 (y up).
     pub fn axis(&mut self, axis: Axis, value: f32) {
         let (stick, i) = match axis {
@@ -91,10 +112,12 @@ impl Pad {
     }
 
     /// Adds the sticks over a frame of `dt` seconds to `input`, which holds the keyboard's and mouse's already: the left
-    /// stick moves, the right one turns ([`Turning`]) and pitches the view.
-    pub fn apply(&mut self, input: &mut Input, dt: f32) {
+    /// stick moves, the right one turns ([`Turning`]) and pitches the view when `look` (not while it points in the
+    /// expression menu).
+    pub fn apply(&mut self, input: &mut Input, dt: f32, look: bool) {
         let centred = |[x, y]: [f32; 2]| x.hypot(y) < DEAD_ZONE;
         let [[mx, my], [tx, ty]] = self.sticks.map(|s| if centred(s) { [0.0; 2] } else { s });
+        let [tx, ty] = if look { [tx, ty] } else { [0.0; 2] };
         if centred(self.sticks[0]) {
             self.run = false;
         }
@@ -128,7 +151,7 @@ mod tests {
 
     fn frame(pad: &mut Pad, input: Input) -> Input {
         let mut input = input;
-        pad.apply(&mut input, DT);
+        pad.apply(&mut input, DT, true);
         input
     }
 
@@ -156,6 +179,22 @@ mod tests {
         assert_eq!((input.forward, input.right, input.run), (0.0, 0.0, false));
         pad.axis(Axis::LeftStickY, 1.0);
         assert!(!frame(&mut pad, Input::default()).run);
+    }
+
+    #[test]
+    fn the_open_menu_takes_south_east_and_the_right_stick() {
+        let mut pointer = Pointer::default();
+        assert!(Pad::menu_button(Button::South, true, &mut pointer));
+        assert!(Pad::menu_button(Button::South, false, &mut pointer));
+        assert!(Pad::menu_button(Button::East, true, &mut pointer));
+        assert!(!Pad::menu_button(Button::North, true, &mut pointer));
+        assert!(pointer.press && pointer.release && pointer.back);
+        let mut pad = Pad::default();
+        pad.axis(Axis::RightStickX, 0.9);
+        pad.axis(Axis::LeftStickY, 0.5);
+        let mut input = Input::default();
+        pad.apply(&mut input, DT, false);
+        assert_eq!((input.look, input.forward, pad.right()), ([0.0; 2], 0.5, [0.9, 0.0]));
     }
 
     #[test]
@@ -221,7 +260,7 @@ mod tests {
         pad.axis(Axis::LeftStickY, 1.0);
         pad.axis(Axis::RightStickX, 1.0);
         for _ in 0..60 {
-            pad.apply(&mut runtime.world.resource_mut::<Input>(), DT);
+            pad.apply(&mut runtime.world.resource_mut::<Input>(), DT, true);
             runtime.step(DT);
         }
         // One snap to the right, then a second of walking that way.

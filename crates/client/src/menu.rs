@@ -1,12 +1,13 @@
-//! The desktop expression menu (ADR 0117): the player avatar's radial menu, driven by the mouse, writing the player
-//! island's parameters and drawn into the [`Overlay`] that the extract step hands to the renderer.
+//! The desktop expression menu (ADR 0117): the player avatar's radial menu, driven by the mouse or a stick (#158),
+//! writing the player island's parameters and drawn into the [`Overlay`] that the extract step hands to the
+//! renderer.
 
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use bevy_ecs::prelude::*;
 use civbb_ui::draw::DrawList;
-use civbb_ui::radial::{Pointer, Radial, Writes};
+use civbb_ui::radial::{Pointer, Radial, Ring, Writes};
 use civbb_ui::text::{Atlas, Text};
 
 use crate::frame::Shows;
@@ -20,6 +21,9 @@ pub struct ExpressionMenu {
     pub radial: Radial,
     /// The mouse this frame; the viewer sets it, the system clears its presses after reading them.
     pub pointer: Pointer,
+    /// A stick pointing instead of the mouse (a pad's right stick, later a controller's thumbstick): its
+    /// deflection, x right and y up ([`Ring::stick`]); `None` points with [`ExpressionMenu::pointer`]'s position.
+    pub stick: Option<[f32; 2]>,
     /// The window's size in pixels.
     pub screen: [f32; 2],
     /// Open or close at the next frame (Tab, a pad's Start).
@@ -61,11 +65,14 @@ pub(crate) fn menu_system(
         m.text = m.fonts.take().and_then(|f| f.join().ok());
     }
     overlay.list.clear();
-    let pointer = m.pointer;
+    let mut pointer = m.pointer;
     m.pointer = Pointer {
         pos: pointer.pos,
         ..Default::default()
     };
+    if let Some(s) = m.stick {
+        pointer.pos = Ring::new(m.screen).stick(s);
+    }
     let toggle = std::mem::take(&mut m.toggle);
     let Some((e, (shows, mut island))) = player.island.and_then(|e| Some((e, q.get_mut(e).ok()?))) else {
         return;

@@ -1,6 +1,6 @@
 //! The expression menu on the frame schedule (ADR 0117): simulated mouse input opens the lean corpus avatar's menu,
 //! enters its page of toggles and flips one, which the avatar's animator then applies; the extract step hands the
-//! drawn menu to the renderer.
+//! drawn menu to the renderer. A stick does the same (#158).
 
 use civbb_client::extract::Snapshot;
 use civbb_client::frame::Runtime;
@@ -23,6 +23,60 @@ fn press_on(n: usize, i: usize) -> Pointer {
         press: true,
         ..Default::default()
     }
+}
+
+/// A stick pushed 0.8 of the way towards sector `i` of `n`.
+fn stick_to(n: usize, i: usize) -> [f32; 2] {
+    let a = Ring::middle(n, i);
+    [0.8 * a.sin(), 0.8 * a.cos()]
+}
+
+/// A frame with the stick at `stick`, pressing or not.
+fn point(runtime: &mut Runtime, stick: [f32; 2], press: bool) {
+    let mut m = runtime.world.resource_mut::<ExpressionMenu>();
+    // The mouse sits elsewhere: the stick decides.
+    m.pointer = Pointer {
+        pos: [0.0; 2],
+        press,
+        ..Default::default()
+    };
+    m.stick = Some(stick);
+    runtime.step(DT);
+}
+
+#[test]
+fn a_stick_enters_a_page_and_flips_a_toggle() {
+    let package = Package::new(civbb_corpus::generate(&civbb_corpus::lean()), Vec::new());
+    let root = &package.avatar.avatar().unwrap().expressions.as_ref().unwrap().menu;
+    let ControlKind::SubMenu(page) = &root.controls[0].kind else {
+        panic!("the root holds pages of toggles")
+    };
+    let (pages, toggles) = (root.controls.len(), page.controls.len());
+    let entry = page.controls[0].parameter.unwrap() as usize;
+    let mut runtime = Runtime::default();
+    runtime.add_player();
+    runtime.add_menu();
+    let e = runtime.spawn_package(&package, 0, true, Pose::IDENTITY);
+    runtime.world.resource_mut::<Player>().island = Some(e);
+    runtime.world.resource_mut::<ExpressionMenu>().screen = SCREEN;
+    runtime.step(DT);
+    let before = runtime.islands()[0].params()[entry];
+    runtime.world.resource_mut::<ExpressionMenu>().toggle = true;
+    // Centred, a press hovers the centre disc: back, which on the root page closes the menu.
+    point(&mut runtime, [0.0; 2], false);
+    point(&mut runtime, [0.1, 0.0], true);
+    assert!(!runtime.world.resource::<ExpressionMenu>().radial.is_open());
+    runtime.world.resource_mut::<ExpressionMenu>().toggle = true;
+    point(&mut runtime, stick_to(pages, 0), true);
+    point(&mut runtime, stick_to(toggles, 0), false);
+    assert_eq!(
+        runtime.islands()[0].params()[entry],
+        before,
+        "pointing alone flips nothing"
+    );
+    point(&mut runtime, stick_to(toggles, 0), true);
+    assert_eq!(runtime.islands()[0].params()[entry], 1.0 - before);
+    assert!(runtime.world.resource::<ExpressionMenu>().radial.is_open());
 }
 
 #[test]

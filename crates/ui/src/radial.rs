@@ -53,6 +53,13 @@ impl Ring {
     pub fn at(&self, r: f32, a: f32) -> [f32; 2] {
         [self.center[0] + r * a.sin(), self.center[1] - r * a.cos()]
     }
+
+    /// Where a stick deflected by `s` (x right, y up, within the unit disc) points: full deflection reaches the
+    /// outer radius, so the direction picks a sector, less than the centre disc's share (0.3) hovers the centre and
+    /// a puppet reads the deflection itself (#158).
+    pub fn stick(&self, s: [f32; 2]) -> [f32; 2] {
+        [self.center[0] + s[0] * self.outer, self.center[1] - s[1] * self.outer]
+    }
 }
 
 /// What the pointer is over.

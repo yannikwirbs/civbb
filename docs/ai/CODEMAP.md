@@ -61,7 +61,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
 - `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020),
 - `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`), a desktop
-- `src/menu.rs`: The desktop expression menu (ADR 0117): the player avatar's radial menu, driven by the mouse, writing the player
+- `src/menu.rs`: The desktop expression menu (ADR 0117): the player avatar's radial menu, driven by the mouse or a stick (#158),
 - `src/package.rs`: Packages as shared handles: a verified avatar, its compiled model and decoded textures, loaded on the I/O pool
 - `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
 - `src/player.rs`: The local player in desktop mode: input moves one island through the world (ADR 0110) and places the camera at its
