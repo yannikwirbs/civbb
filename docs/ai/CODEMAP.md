@@ -69,6 +69,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/station.rs`: Stations (design doc §7, ADR 0114): seats in the world that the player uses, sits in and leaves.
 - `src/tracking.rs`: Tracker input for the player (ADR 0113): the [`Trackers`] resource that sources fill, the system that calibrates
 - `src/view.rs`: Desktop viewer: N copies of each of several packages in a grid with animator and dynamics running, drawn in a
+- `src/vr.rs`: The VR player (design doc §18, ADR 0125): the controllers' sticks move and turn the player as a gamepad's do, the
 - `src/xr.rs`: The headset (ADRs 0122 to 0124): the OpenXR runtime creates the Vulkan instance and device through
 - `tests/alloc.rs`: Island steps and whole frames allocate nothing on the heap after warm-up (design doc §5 "Scheduling rules", #135,
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
@@ -81,6 +82,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `tests/player.rs`: The desktop player on the frame schedule (ADRs 0106, 0107, 0114): input moves and turns only the player's island and sets
 - `tests/tracking.rs`: Tracker input on the frame schedule (ADR 0113): the scripted source calibrates the player's avatar on its first
 - `tests/view.rs`: Viewer helpers without a window (ADR 0024): placement matrices agree with `Pose::point`, the grid is centred,
+- `tests/vr.rs`: The VR player on the frame schedule (ADR 0125), driven by simulated headset input: the left stick walks where the
 
 ## `crates/core` (civbb-core)
 
@@ -242,7 +244,7 @@ OpenXR: instance, HMD system, Vulkan creation through the runtime, session state
 
 Internal deps: none
 
-- `src/input.rs`: Controller input (ADR 0124): the action set with a grip and an aim pose per hand and a calibrate button, its
+- `src/input.rs`: Controller input (ADRs 0124, 0125): the action set with a grip and an aim pose and a stick per hand, jump, run and
 - `src/lib.rs`: OpenXR (ADR 0122): the instance and head-mounted system, and the runtime's creation of the Vulkan instance and
 - `src/session.rs`: The OpenXR session on a Vulkan device (ADR 0122), split for two threads (ADR 0123): [`Session`] handles the
 - `tests/runtime.rs`: On a real OpenXR runtime (ADR 0122): an instance with XR_KHR_vulkan_enable2, the head-mounted system, its two
@@ -393,6 +395,7 @@ Internal deps: none
 - `docs/adr/0122-xr-crate-and-vulkan-creation.md`: 0122: The `civbb-xr` crate, the OpenXR loader, and who creates the Vulkan device
 - `docs/adr/0123-xr-frame-pacing-and-stereo-frames.md`: 0123: XR frame pacing across the two threads, the play space's place, and what the first stereo frames leave out
 - `docs/adr/0124-xr-poses-into-trackers.md`: 0124: Headset and controller poses into `Trackers`: actions, sampling time, the play space's mapping, calibration
+- `docs/adr/0125-vr-player.md`: 0125: The VR player: sticks through the gamepad's logic, room scale by recentring the play space, posture from the head's height
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

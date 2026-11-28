@@ -1,5 +1,6 @@
 //! Tracker input for the player (ADR 0113): the [`Trackers`] resource that sources fill, the system that calibrates
-//! and turns it into the player island's IK targets, and its sources: the headset's and the viewer's scripted one.
+//! and turns it into the player island's IK targets, and the viewer's scripted source (the headset's is
+//! [`crate::vr`]).
 
 use std::collections::HashMap;
 use std::f32::consts::TAU;
@@ -7,7 +8,7 @@ use std::f32::consts::TAU;
 use bevy_ecs::prelude::*;
 use civbb_anim::ik::Goal;
 use civbb_anim::tracking::{self, Calibration, Devices, ROLES, Role};
-use civbb_core::math::{add, euler_to_quat, mul, qnormalize, scale};
+use civbb_core::math::{add, euler_to_quat, mul, scale};
 use civbb_core::schedule::Dt;
 
 use crate::frame::Shows;
@@ -45,33 +46,6 @@ pub(crate) fn trackers_system(
     if let Some(c) = trackers.calibrations.get(&shows.0.id) {
         island.targets = c.targets(&trackers.devices);
     }
-}
-
-/// The headset's poses for the frame being stepped (ADR 0124), in the play space: the XR loop writes them after
-/// `xrWaitFrame`, for its predicted display time; [`headset_system`] maps them into [`Trackers`].
-#[derive(Resource, Clone, Copy, Debug, Default)]
-pub struct HeadsetPoses(pub civbb_xr::Poses);
-
-/// A pose in the play space (OpenXR's: floor at y 0, forward -Z) as a device in tracking space: the play space's
-/// origin is the avatar's and its forward the avatar's (+Z), a half turn about +Y (ADR 0124).
-pub fn from_play_space(pose: &civbb_xr::xr::Posef) -> Goal {
-    let (p, o) = (pose.position, pose.orientation);
-    Goal {
-        pos: [-p.x, p.y, -p.z],
-        rot: qnormalize(mul([0.0, 1.0, 0.0, 0.0], [o.x, o.y, o.z, o.w])),
-    }
-}
-
-/// The headset source of `PosesIn`, before [`trackers_system`]: the head and both grips as the head and hand
-/// devices, nothing for the other roles; the calibrate button asks for calibration.
-pub(crate) fn headset_system(poses: Res<HeadsetPoses>, mut trackers: ResMut<Trackers>) {
-    let poses = &poses.0;
-    let mut devices = [None; ROLES];
-    devices[Role::Head as usize] = poses.head.as_ref().map(from_play_space);
-    devices[Role::LeftHand as usize] = poses.grips[0].as_ref().map(from_play_space);
-    devices[Role::RightHand as usize] = poses.grips[1].as_ref().map(from_play_space);
-    trackers.devices = devices;
-    trackers.calibrate |= poses.calibrate;
 }
 
 /// The scripted wearer is this many times the avatar's size.

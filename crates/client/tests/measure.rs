@@ -108,6 +108,7 @@ fn headless_frames_draw_two_packages_in_the_test_world_without_validation_errors
         stations: Vec::new(),
         trackers: None,
         turning: Default::default(),
+        steer: Default::default(),
         msaa: 4,
     };
     match view::run_headless(cfg, 320, 180) {

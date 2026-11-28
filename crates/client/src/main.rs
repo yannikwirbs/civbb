@@ -9,6 +9,7 @@ use civbb_client::gamepad::{self, Turning};
 use civbb_client::package::{self, Package, read as load_package};
 use civbb_client::station::Station;
 use civbb_client::tracking::Scripted;
+use civbb_client::vr::Steer;
 use civbb_client::{parity, view};
 use civbb_format::cost::{CpuTimes, GpuTimes, Measured};
 
@@ -20,7 +21,7 @@ const USAGE: &str = "usage:
                      [--avatar lean|bloated | --package <package.civpkg> --key <key-file>]
   civbb-client view [<package.civpkg>... --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F]
                     [--warmup W] [--lod L] [--world] [--trackers 3|6|10] [--turn smooth|snap]
-                    [--msaa N] [--xr]
+                    [--msaa N] [--xr [--steer head|hand]]
   civbb-client measure <package.civpkg> --key <key-file> [--avatars N] [--frames F] [--warmup W]
   civbb-client parity <reference.civpkg | unity-dir> <test.civpkg> --key <key-file> [--images <dir>]
   civbb-client rig <package.civpkg> --key <key-file>
@@ -45,11 +46,14 @@ cycles the camera (View/Back) alongside keyboard and mouse (ADR 0115). Tab or th
 avatar's expression menu; the mouse picks, right click or Escape goes back (ADR 0117); on a pad the right stick
 points, A picks and B goes back (#158). --msaa draws with N samples
 per pixel (default 4, 1 is off; as far as the GPU supports them, ADR 0120). --xr shows the same in the headset of
-the active OpenXR runtime, both eyes by multiview at the display rate, the play space on the ground below the
-camera, until the runtime ends the session or --frames F are shown; it also prints the frames the runtime waited
-for, did not want rendered and missed (ADRs 0122, 0123; the loader is CIVBB_OPENXR_LOADER's path, else
-openxr_loader beside the executable). In the headset the avatar's head and hands follow yours once calibrated:
-stand in the avatar's rest pose and press the left menu button (B on Index controllers; ADR 0124).
+the active OpenXR runtime, both eyes by multiview at the display rate, seen from the player's avatar, until the
+runtime ends the session or --frames F are shown; it also prints the frames the runtime waited for, did not want
+rendered and missed (ADRs 0122, 0123; the loader is CIVBB_OPENXR_LOADER's path, else openxr_loader beside the
+executable). In the headset the avatar's head and hands follow yours once calibrated: stand in the avatar's rest
+pose and press the left menu button (B on Index controllers; ADR 0124). The left stick moves where you look
+(--steer hand: where the left controller points; click it to run), the right stick turns (--turn), A jumps (the
+right menu button on Vive wands); walking in the room moves the avatar, walls stop it, and crouching or lying down
+is your head's height (ADR 0125).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
 300) and through the viewer's frames on an offscreen 1280x720 target (N copies, same frames) and prints the times
@@ -167,6 +171,7 @@ fn run_view(args: &[String]) -> ExitCode {
     let mut world = false;
     let mut trackers = None;
     let mut turning = Turning::default();
+    let mut steer = Steer::Head;
     let mut msaa = view::MSAA;
     let mut xr = false;
     let mut it = args.iter();
@@ -191,6 +196,12 @@ fn run_view(args: &[String]) -> ExitCode {
                 _ => None,
             })
             .map(|t| turning = t),
+            "--steer" => (match it.next().map(String::as_str) {
+                Some("head") => Some(Steer::Head),
+                Some("hand") => Some(Steer::Hand),
+                _ => None,
+            })
+            .map(|s| steer = s),
             "--msaa" => it.next().and_then(|v| v.parse().ok()).map(|n| msaa = n),
             "--xr" => {
                 xr = true;
@@ -252,6 +263,7 @@ fn run_view(args: &[String]) -> ExitCode {
         stations: if world { vec![test_station()] } else { Vec::new() },
         trackers,
         turning,
+        steer,
         msaa,
     };
     let ran = match xr {
@@ -483,6 +495,7 @@ fn measure(package: &Path, key: &Path, avatars: u32, frames: u32, warmup: u32) -
         stations: Vec::new(),
         trackers: None,
         turning: Turning::default(),
+        steer: Steer::Head,
         msaa: view::MSAA,
     };
     let gpu = match view::run_headless(view, width, height) {

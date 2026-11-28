@@ -387,6 +387,7 @@ pub fn run(reference: Reference, test: Side, images: Option<&Path>) -> Result<Pa
                     target: v.target,
                     fov_y: FOV_Y,
                     clear: BACKGROUND,
+                    stage: None,
                 };
                 let drawn = gpu::draw(&mut renderer, &mut gpus[k], &snapshots[k], &mut scratch[k])
                     .and_then(|_| renderer.read_last());

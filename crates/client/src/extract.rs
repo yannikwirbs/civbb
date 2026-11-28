@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
+use civbb_core::math::Pose;
 use civbb_core::{Counters, System, jobs};
 use civbb_format::material::Material;
 use civbb_format::math::{Mat4, Vec3};
@@ -26,6 +27,9 @@ pub struct Camera {
     pub fov_y: f32,
     /// The background, linear.
     pub clear: [f32; 4],
+    /// Where the headset's play space sits in the world, placed by the VR player (ADR 0125); `None` puts it below
+    /// the camera ([`crate::xr::stage`]).
+    pub stage: Option<Pose>,
 }
 
 /// One island as the renderer reads it.

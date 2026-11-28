@@ -30,3 +30,4 @@ them in whole or in part. Read an ADR together with the ones that supersede part
 - 0112: point 2 of 0111's spine solver (FABRIK instead of distributed CCD).
 - 0118: the last sentence of 0110 point 2 (the capsule's height follows the posture).
 - 0123: point 4 of 0122 (no per-eye swapchains; the depth swapchain is #175, not #163).
+- 0125: point 3 of 0124 (the play space moves relative to the avatar: room scale and the body turning after the head).

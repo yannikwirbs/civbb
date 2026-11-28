@@ -17,6 +17,7 @@ use crate::extract::{Camera, Snapshot};
 use crate::gpu::{Gpu, NEAR, Scratch, draw_views};
 use crate::render_thread::Present;
 use crate::view::{Config, Summary, Viewer};
+use crate::vr::Vr;
 
 /// Creates the Vulkan instance and device through an OpenXR runtime (XR_KHR_vulkan_enable2).
 pub struct ByRuntime<'a> {
@@ -80,8 +81,8 @@ impl Create for ByRuntime<'_> {
     }
 }
 
-/// Where the headset's play space sits in the world: on the ground below the camera, its forward (-Z) along the
-/// camera's look (ADR 0123; the VR player places it from #165 on).
+/// Where the headset's play space sits in the world without a VR player placing it (ADR 0125): on the ground below
+/// the camera, its forward (-Z) along the camera's look (ADR 0123).
 pub fn stage(camera: &Camera) -> Pose {
     let [x, _, z] = camera.eye;
     let (dx, dz) = (camera.target[0] - x, camera.target[2] - z);
@@ -163,7 +164,8 @@ impl Present for Headset {
             self.frames.end(time, None).map_err(target)?;
             return Ok(None);
         };
-        let eyes = eye_views(&stage(&snapshot.camera), &located);
+        let camera = &snapshot.camera;
+        let eyes = eye_views(&camera.stage.unwrap_or_else(|| stage(camera)), &located);
         let wait = Instant::now();
         let i = self.frames.acquire().map_err(target)? as usize;
         self.blocked_ms = wait.elapsed().as_secs_f32() * 1000.0;
@@ -258,8 +260,9 @@ pub fn run(cfg: Config) -> Result<(Summary, Pacing), String> {
             }
         }
     }
+    let vr = Vr::new(cfg.turning, cfg.steer);
     let mut viewer = Viewer::new(cfg);
-    viewer.add_headset();
+    viewer.add_headset(vr);
     let mut pacing = Pacing::default();
     let mut result = (viewer.start_on(renderer, 2, Box::new(headset)))
         .map_err(Into::into)

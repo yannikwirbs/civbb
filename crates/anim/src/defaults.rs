@@ -122,9 +122,11 @@ pub fn apply(doc: &mut Document) -> bool {
 /// The desktop player's speeds the blend trees place their gaits at, in m/s (ADR 0106): walk, run, strafe.
 const WALK: f32 = 2.0;
 const RUN: f32 = 4.0;
-/// Postures by `Upright` (ADR 0107 sets 1, 0.55 and 0.25).
-const CROUCH_BELOW: f32 = 0.7;
-const PRONE_BELOW: f32 = 0.4;
+/// Postures by `Upright` (ADR 0107 sets 1, 0.55 and 0.25; the VR player its head's height, ADR 0125): crouching
+/// below this, ...
+pub const CROUCH_BELOW: f32 = 0.7;
+/// ... prone below this.
+pub const PRONE_BELOW: f32 = 0.4;
 
 struct Merge<'a> {
     doc: &'a mut Document,

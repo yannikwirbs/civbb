@@ -32,7 +32,8 @@ use crate::package::Handle;
 use crate::player::{Input, Player, View, WorldRules};
 use crate::render_thread::{Drawn, Own, Present, RenderThread};
 use crate::station::Station;
-use crate::tracking::{HeadsetPoses, Scripted};
+use crate::tracking::Scripted;
+use crate::vr::{HeadsetPoses, Steer, Vr};
 
 /// Largest texture side the viewer decodes; larger textures are left out.
 const MAX_TEXTURE_SIDE: u32 = 8192;
@@ -60,8 +61,10 @@ pub struct Config {
     pub stations: Vec<Station>,
     /// Scripted trackers drive the player's avatar (ADR 0113).
     pub trackers: Option<Scripted>,
-    /// How a gamepad's right stick turns the player (ADR 0115).
+    /// How a gamepad's or, in VR, the right controller's stick turns the player (ADRs 0115, 0125).
     pub turning: Turning,
+    /// In VR, what the left stick's forward is (ADR 0125).
+    pub steer: Steer,
     /// Samples per pixel of the forward pass, as far as the device supports them (ADR 0120).
     pub msaa: u32,
 }
@@ -611,9 +614,9 @@ impl Viewer {
         self.limit.is_some_and(|l| self.timing.frames >= l)
     }
 
-    /// Makes the headset the player's tracker source (ADR 0124), its poses set by [`Viewer::headset`].
-    pub(crate) fn add_headset(&mut self) {
-        self.runtime.add_headset();
+    /// Makes the player a VR player (ADRs 0124, 0125), its headset's poses set by [`Viewer::headset`].
+    pub(crate) fn add_headset(&mut self, vr: Vr) {
+        self.runtime.add_headset(vr);
     }
 
     /// The headset's poses for the next [`Viewer::frame`].
@@ -664,6 +667,7 @@ impl Viewer {
             target: self.camera.target,
             fov_y: FOV_Y,
             clear: BACKGROUND,
+            stage: None,
         });
         let key = |k| f32::from(u8::from(self.held.contains(&k)));
         let (forward, right) = (

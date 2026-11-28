@@ -4,7 +4,7 @@
 use std::f32::consts::TAU;
 
 use bevy_ecs::prelude::*;
-use civbb_anim::defaults::POSE;
+use civbb_anim::defaults::{CROUCH_BELOW, POSE, PRONE_BELOW};
 use civbb_core::math::{add, dot, length, scale, sub};
 use civbb_core::schedule::Dt;
 use civbb_format::math::{Quat, Vec3};
@@ -61,6 +61,12 @@ pub struct Input {
     pub pose: bool,
     /// Start or stop flying once, where the world allows it.
     pub fly: bool,
+    /// Move the body this far in the world over the frame besides walking, through the world as walking does: the
+    /// headset's room-scale motion (ADR 0125).
+    pub step: Vec3,
+    /// The headset's height over the calibrated standing height, 0 to 1: sets the posture and `Upright` in place of
+    /// the crouch and prone toggles (ADR 0125); `None` on the desktop.
+    pub height: Option<f32>,
 }
 
 /// What the world allows the player (ADR 0119); worlds set it from their document in Phase 2.
@@ -89,6 +95,17 @@ impl Posture {
             Posture::Standing => 1.0,
             Posture::Crouching => 0.55,
             Posture::Prone => 0.25,
+        }
+    }
+
+    /// The posture whose band of the default locomotion layer holds `upright` (ADR 0125).
+    pub fn at(upright: f32) -> Self {
+        if upright < PRONE_BELOW {
+            Posture::Prone
+        } else if upright < CROUCH_BELOW {
+            Posture::Crouching
+        } else {
+            Posture::Standing
         }
     }
 
@@ -201,6 +218,8 @@ pub struct Player {
     pub floor_pose: Option<FloorPose>,
     /// Flying: no gravity, moving along the view (ADR 0119).
     pub flying: bool,
+    /// In VR, the `TrackingType` its trackers give (ADR 0125); `None` on the desktop.
+    pub vr: Option<f32>,
 }
 
 impl Default for Player {
@@ -221,6 +240,7 @@ impl Default for Player {
             station: None,
             floor_pose: None,
             flying: false,
+            vr: None,
         }
     }
 }
@@ -283,7 +303,10 @@ impl Player {
         self.yaw = (self.yaw + look).rem_euclid(TAU);
         self.turn = if dt > 0.0 { look / dt } else { 0.0 };
         // Getting up only where the taller capsule fits; otherwise the posture stays.
-        let wanted = self.posture.toggled(input.crouch, input.prone);
+        let wanted = match input.height {
+            Some(h) => Posture::at(h),
+            None => self.posture.toggled(input.crouch, input.prone),
+        };
         if wanted.height() <= self.posture.height() || world.fits(self.pos, wanted.height(), self.scale) {
             self.posture = wanted;
         }
@@ -296,6 +319,10 @@ impl Player {
         let along = f / n * if input.run { RUN } else { WALK };
         let side = r / n * STRAFE;
         let (forward, right) = (self.forward(), self.right());
+        let room = match (still, dt > 0.0) {
+            (false, true) => scale(input.step, 1.0 / dt),
+            _ => [0.0; 3],
+        };
         let mut body = Body {
             pos: self.pos,
             vertical: self.vertical,
@@ -306,11 +333,12 @@ impl Player {
         if self.flying {
             let (sp, cp) = self.pitch.sin_cos();
             let ahead = [forward[0] * cp, sp, forward[2] * cp];
-            body.fly(world, add(scale(ahead, along), scale(right, side)), dt);
+            let velocity = add(scale(ahead, along), scale(right, side));
+            body.fly(world, add(velocity, room), dt);
         } else {
             body.step(
                 world,
-                add(scale(forward, along), scale(right, side)),
+                add(add(scale(forward, along), scale(right, side)), room),
                 input.jump && !still,
                 dt,
             );
@@ -331,7 +359,7 @@ impl Player {
 
     /// The platform values the player provides (ADR 0107), given what `input` holds and the avatar's own eye height
     /// `own`: velocity in avatar space (x right, z forward, avatar metres), turn rate (positive to the right), ground
-    /// contact, posture, gestures, AFK, desktop tracking, stations and scale (ADR 0114).
+    /// contact, posture, gestures, AFK, desktop or VR tracking (ADR 0125), stations and scale (ADR 0114).
     pub fn platform_values(&self, input: &Input, own: f32) -> [(Platform, f32); 20] {
         use Platform::*;
         let flag = |b: bool| f32::from(u8::from(b));
@@ -345,10 +373,10 @@ impl Player {
             (VelocityMagnitude, length(v)),
             (AngularY, -self.turn),
             (Grounded, flag(self.grounded)),
-            (Upright, self.posture.upright()),
+            (Upright, input.height.unwrap_or(self.posture.upright())),
             (Afk, flag(input.afk)),
-            (TrackingType, 3.0),
-            (VrMode, 0.0),
+            (TrackingType, self.vr.unwrap_or(3.0)),
+            (VrMode, flag(self.vr.is_some())),
             (GestureLeft, f32::from(left)),
             (GestureRight, f32::from(right)),
             // A key press closes the fist all the way.
@@ -411,6 +439,7 @@ pub(crate) fn player_system(
     player.step(&input, dt.0, &world);
     (input.jump, input.look, input.crouch, input.prone) = (false, [0.0; 2], false, false);
     (input.resize, input.interact, input.pose, input.fly) = (None, false, false, false);
+    input.step = [0.0; 3];
     let Some((mut island, _)) = player.island.and_then(|e| islands.get_mut(e).ok()) else {
         return;
     };

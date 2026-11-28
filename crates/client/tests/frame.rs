@@ -324,6 +324,7 @@ fn the_extract_step_copies_every_island_in_spawn_order() {
         target: [0.0, 1.0, 0.0],
         fov_y: 0.9,
         clear: [0.0, 0.0, 0.0, 1.0],
+        stage: None,
     };
     runtime.world.insert_resource(camera);
     for _ in 0..3 {
