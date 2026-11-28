@@ -3,13 +3,16 @@
 Read at the start of every session; update at the end. Keep it short: the queue lives in GitHub issues, what
 exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in `docs/adr/README.md`.
 
-**Milestone:** M1.3 Desktop mode, locomotion and IK (https://github.com/yannikwirbs/civbb/milestones).
+**Milestone:** M1.4 OpenXR (https://github.com/yannikwirbs/civbb/milestones).
 
 ## Next
 
-#153 (basisu panics decoding Cokoro's textures in dev builds), then #154 (scale its posture heights from
-`Body::scale`), then #70. M1.2 stays open only for #136's owner check (Tracy
-screenshot); close M1.2 once posted. Stick navigation of the radial menu is #158 (M1.4).
+Start M1.4: it holds only #60 (MSAA, multiview stereo), #158 (stick navigation of the radial menu) and #160 (native
+locomotion menu page). First file M1.4's issues from the design doc's OpenXR and VR sections (`grep -n -i openxr
+docs/design-doc.md`; frame loop §4 "Poses in", late latching, controllers, hand tracking, VR IK from ADRs
+0111 to 0113), then take the lowest. M1.3's code is done; it stays open only for #157 (owner's gamepad check), M1.2
+only for #136 (Tracy screenshot): close each once the owner posts. The floor poses (ADR 0119) were checked by bone
+positions only, never looked at in a window: worth a capture (`view --world`, X) when the viewer is next run.
 
 ## Now
 
@@ -24,7 +27,8 @@ screenshot); close M1.2 once posted. Stick navigation of the radial menu is #158
   scales the avatar, speeds and capsule; `Station` component, the test world's bench; world stations are #156).
   #148 (ADR 0115: gilrs pads merged into `Input`, snap or smooth turning, `view --turn`; owner check #157).
   #149 (ADRs 0116, 0117: `civbb-ui` crate, cosmic-text labels from system fonts, radial expression menu on Tab,
-  overlay pass in `civbb-render`).
+  overlay pass in `civbb-render`). #153 (no dev overflow checks for `basisu`), #154 (ADR 0118: capsule height by
+  posture), #70 (ADR 0119: floor poses on `civbb/pose`, flight by `WorldRules`; follow-ups #159, #160, #161).
 - **Phase 0's gate is passed** (ADR 0084; table of all 13 Unity exports there, every red state after rest
   itemised with a Phase 1 issue). Phase 1 is split into milestones M1.1 to M1.9: M1.1 Native content model (#100)
   first, then ECS client runtime, desktop mode/locomotion/IK, OpenXR, protocol/instance server/nodes, voice,
@@ -62,12 +66,13 @@ screenshot); close M1.2 once posted. Stick navigation of the radial menu is #158
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-27 (24): #147 closed (ADR 0114: eye height sets the avatar's scale, speeds, capsule and jump follow;
-  scale and station platform values; `Station` component, E sits or leaves, a bench in the test world). Filed #156.
-  Next: #148.
 - 2026-11-27 (25): #148 closed (ADR 0115: `gamepad::Pad` maps gilrs buttons and sticks onto `Input` on top of
   keys and mouse; `Turning::Smooth` 120°/s or `Snap` 30°; Linux CI installs libudev-dev). Filed #157 (owner's pad
   check). Next: #149.
 - 2026-11-28 (26): #149 closed (ADRs 0116, 0117: `civbb-ui` with `draw`, `text` (cosmic-text 0.19, system fonts,
   one RGBA8 glyph atlas) and `radial`; `civbb_render::overlay`; client `menu` system and `Overlay` resource; Tab or
   Start opens the menu). Filed #158 (stick navigation, M1.4). Next: #153.
+- 2026-11-28 (27): #153 closed (basisu's XUASTC weight wraps by design; dev overflow checks off for it, all 13
+  corpus packages decode in dev). #154 closed (ADR 0118: `Body::height` by posture 1.6/1.0/0.5, getting up only where
+  `WorldMesh::fits`). #70 closed (ADR 0119: floor sitting and lying in the default Action layer on `civbb/pose`, X;
+  flight along the view, F, where `WorldRules::flight`). Filed #159, #160, #161. Next: start M1.4.
