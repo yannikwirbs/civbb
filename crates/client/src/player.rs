@@ -59,6 +59,15 @@ pub struct Input {
     pub interact: bool,
     /// Cycle the floor pose once: none, sitting, lying (ADR 0119).
     pub pose: bool,
+    /// Start or stop flying once, where the world allows it.
+    pub fly: bool,
+}
+
+/// What the world allows the player (ADR 0119); worlds set it from their document in Phase 2.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WorldRules {
+    /// Flying.
+    pub flight: bool,
 }
 
 /// How upright the player is.
@@ -190,6 +199,8 @@ pub struct Player {
     pub station: Option<Station>,
     /// The floor pose held.
     pub floor_pose: Option<FloorPose>,
+    /// Flying: no gravity, moving along the view (ADR 0119).
+    pub flying: bool,
 }
 
 impl Default for Player {
@@ -209,6 +220,7 @@ impl Default for Player {
             scale: 1.0,
             station: None,
             floor_pose: None,
+            flying: false,
         }
     }
 }
@@ -291,12 +303,18 @@ impl Player {
             height: self.posture.height(),
             scale: self.scale,
         };
-        body.step(
-            world,
-            add(scale(forward, along), scale(right, side)),
-            input.jump && !still,
-            dt,
-        );
+        if self.flying {
+            let (sp, cp) = self.pitch.sin_cos();
+            let ahead = [forward[0] * cp, sp, forward[2] * cp];
+            body.fly(world, add(scale(ahead, along), scale(right, side)), dt);
+        } else {
+            body.step(
+                world,
+                add(scale(forward, along), scale(right, side)),
+                input.jump && !still,
+                dt,
+            );
+        }
         (self.pos, self.vertical, self.grounded) = (body.pos, body.vertical, body.grounded);
         self.velocity = if dt > 0.0 {
             scale(sub(self.pos, start), 1.0 / dt)
@@ -369,7 +387,7 @@ pub(crate) fn player_system(
     mut input: ResMut<Input>,
     mut player: ResMut<Player>,
     mut camera: ResMut<Camera>,
-    world: Res<WorldMesh>,
+    (world, rules): (Res<WorldMesh>, Res<WorldRules>),
     stations: Query<&Station>,
     mut islands: Query<(&mut Island, &Shows)>,
 ) {
@@ -389,9 +407,10 @@ pub(crate) fn player_system(
     if (player.island.and_then(|e| islands.get(e).ok())).is_none_or(|(island, _)| entry(island).is_none()) {
         input.pose = false;
     }
+    player.flying = rules.flight && (player.flying != input.fly);
     player.step(&input, dt.0, &world);
     (input.jump, input.look, input.crouch, input.prone) = (false, [0.0; 2], false, false);
-    (input.resize, input.interact, input.pose) = (None, false, false);
+    (input.resize, input.interact, input.pose, input.fly) = (None, false, false, false);
     let Some((mut island, _)) = player.island.and_then(|e| islands.get_mut(e).ok()) else {
         return;
     };
@@ -554,6 +573,40 @@ mod tests {
             DT,
         );
         assert!(p.floor_pose.is_none() && p.grounded && p.vertical == 0.0, "{p:?}");
+    }
+
+    #[test]
+    fn flying_moves_along_the_view_without_gravity_and_stops_at_the_ground() {
+        let mut p = Player {
+            flying: true,
+            pitch: std::f32::consts::FRAC_PI_4,
+            ..Default::default()
+        };
+        let ahead = Input {
+            forward: 1.0,
+            ..Default::default()
+        };
+        for _ in 0..60 {
+            step(&mut p, &ahead, DT);
+        }
+        let d = WALK * std::f32::consts::FRAC_1_SQRT_2;
+        assert!(close(p.pos, [0.0, d, d]) && !p.grounded, "{p:?}");
+        // Hovering in place, then down into the ground, which holds.
+        for _ in 0..60 {
+            step(&mut p, &Input::default(), DT);
+        }
+        assert!(close(p.pos, [0.0, d, d]), "{p:?}");
+        p.pitch = -std::f32::consts::FRAC_PI_4;
+        for _ in 0..120 {
+            step(&mut p, &ahead, DT);
+        }
+        assert!(p.pos[1].abs() < 1e-3 && p.pos[2] > 2.0 * d, "{p:?}");
+        // Landing on foot again after flight stops.
+        (p.flying, p.pos[1]) = (false, 1.0);
+        for _ in 0..60 {
+            step(&mut p, &Input::default(), DT);
+        }
+        assert!(p.grounded && p.pos[1].abs() < 1e-5, "{p:?}");
     }
 
     #[test]

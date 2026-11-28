@@ -1,7 +1,7 @@
 //! The desktop player on the frame schedule (ADRs 0106, 0107, 0114): input moves and turns only the player's island and sets
 //! its platform values, the camera
 //! sits at its viewpoint in first person with its own head shrunk away, the extract step sees the moved island, and
-//! floor poses write `civbb/pose` where the avatar has it (ADR 0119).
+//! floor poses write `civbb/pose` where the avatar has it and flight toggles only where the world allows it (ADR 0119).
 
 use civbb_client::extract::{Camera, Snapshot};
 use civbb_client::frame::Runtime;
@@ -266,5 +266,25 @@ fn floor_poses_write_the_pose_entry_only_on_avatars_that_have_it() {
                 assert_eq!(value, FloorPose::value(want));
             }
         }
+    }
+}
+
+#[test]
+fn flight_toggles_only_where_the_world_allows_it() {
+    use civbb_client::player::WorldRules;
+    let package = Package::new(civbb_corpus::generate(&civbb_corpus::lean()), Vec::new());
+    for allowed in [false, true] {
+        let mut runtime = Runtime::default();
+        runtime.add_player();
+        runtime.world.insert_resource(WorldRules { flight: allowed });
+        let e = runtime.spawn_package(&package, 0, true, Pose::IDENTITY);
+        runtime.world.resource_mut::<Player>().island = Some(e);
+        runtime.world.resource_mut::<Input>().fly = true;
+        runtime.step(DT);
+        assert_eq!(runtime.world.resource::<Player>().flying, allowed);
+        // A world that stops allowing it brings the player down.
+        runtime.world.insert_resource(WorldRules { flight: false });
+        runtime.step(DT);
+        assert!(!runtime.world.resource::<Player>().flying);
     }
 }

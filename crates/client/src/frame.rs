@@ -17,7 +17,7 @@ use crate::extract::{Camera, Snapshot, extract_system};
 use crate::island::Island;
 use crate::menu::{ExpressionMenu, Overlay, menu_system};
 use crate::package::Handle;
-use crate::player::{Input, Player, player_system};
+use crate::player::{Input, Player, WorldRules, player_system};
 use crate::tracking::{Scripted, Trackers, scripted_system, trackers_system};
 
 /// The client's worker pool, made on first use: [`jobs::default_workers`] workers, pool threads kept to performance
@@ -195,6 +195,7 @@ impl Runtime {
         self.world.init_resource::<Camera>();
         self.world.init_resource::<Input>();
         self.world.init_resource::<Player>();
+        self.world.init_resource::<WorldRules>();
         if !self.world.contains_resource::<WorldMesh>() {
             self.world.insert_resource(WorldMesh::plane());
         }

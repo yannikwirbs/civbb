@@ -28,7 +28,7 @@ use crate::gamepad::{Pad, Turning};
 use crate::gpu::Gpu;
 use crate::menu::ExpressionMenu;
 use crate::package::Handle;
-use crate::player::{Input, Player, View};
+use crate::player::{Input, Player, View, WorldRules};
 use crate::render_thread::{Drawn, RenderThread};
 use crate::station::Station;
 use crate::tracking::Scripted;
@@ -438,6 +438,8 @@ impl Viewer {
         if let Some(world) = &cfg.world {
             (runtime.world).insert_resource(WorldMesh::from_document(&world.avatar, Pose::IDENTITY));
             runtime.spawn_package(world, u64::MAX, false, Pose::IDENTITY);
+            // The generated test world allows flight (ADR 0119).
+            runtime.world.insert_resource(WorldRules { flight: true });
         }
         runtime.add_player();
         runtime.add_menu();
@@ -817,6 +819,7 @@ impl ApplicationHandler for Viewer {
                     KeyCode::KeyZ => self.runtime.world.resource_mut::<Input>().prone = true,
                     KeyCode::KeyE => self.runtime.world.resource_mut::<Input>().interact = true,
                     KeyCode::KeyX => self.runtime.world.resource_mut::<Input>().pose = true,
+                    KeyCode::KeyF => self.runtime.world.resource_mut::<Input>().fly = true,
                     KeyCode::Equal => self.runtime.world.resource_mut::<Input>().resize = Some(RESIZE),
                     KeyCode::Minus => self.runtime.world.resource_mut::<Input>().resize = Some(1.0 / RESIZE),
                     _ => {

@@ -55,9 +55,9 @@ impl Pad {
         }
     }
 
-    /// A button pressed. South jumps, East crouches, North lies prone, West uses a station (as Space, C, Z and E), a
-    /// click of the left stick runs. Returns whether it asks to cycle the view (Select, as V), the viewer's job. Start
-    /// is left for the menu (#149).
+    /// A button pressed. South jumps, East crouches, North lies prone, West uses a station (as Space, C, Z and E),
+    /// D-pad down cycles floor poses and up flies (as X and F), a click of the left stick runs. Returns whether it
+    /// asks to cycle the view (Select, as V), the viewer's job. Start is left for the menu (#149).
     pub fn button(&mut self, button: Button, input: &mut Input) -> bool {
         match button {
             Button::South => input.jump = true,
@@ -65,6 +65,7 @@ impl Pad {
             Button::North => input.prone = true,
             Button::West => input.interact = true,
             Button::DPadDown => input.pose = true,
+            Button::DPadUp => input.fly = true,
             Button::LeftThumb => self.run = true,
             Button::Select => return true,
             _ => {}
@@ -167,11 +168,12 @@ mod tests {
             Button::North,
             Button::West,
             Button::DPadDown,
+            Button::DPadUp,
         ] {
             assert!(!pad.button(b, &mut input));
         }
         assert!((input.jump, input.crouch, input.prone, input.interact) == (true, true, true, true));
-        assert!(input.pose);
+        assert!(input.pose && input.fly);
         assert!(pad.button(Button::Select, &mut input));
         // Start (the menu, #149) and the rest change nothing yet.
         let mut other = Input::default();

@@ -238,6 +238,15 @@ impl Body {
     }
 }
 
+impl Body {
+    /// Moves by `velocity` (m/s, any direction) over `dt` seconds without gravity, steps or ground snapping, sliding
+    /// along the world; a flying body is never grounded (ADR 0119).
+    pub fn fly(&mut self, world: &WorldMesh, velocity: Vec3, dt: f32) {
+        let (pos, _) = world.slide(self.pos, scale(velocity, dt), self.pos[1], self.height, self.scale);
+        (self.pos, self.vertical, self.grounded) = (pos, 0.0, false);
+    }
+}
+
 fn face_normal(t: &[Vec3; 3]) -> Vec3 {
     let n = cross(sub(t[1], t[0]), sub(t[2], t[0]));
     let l = length(n);

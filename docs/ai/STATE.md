@@ -410,7 +410,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   overrides and world eye-height limits: #156 (Phase 2). Floor poses (ADR 0119): `Player::floor_pose`
   (`FloorPose` Sitting/Lying), X or D-pad down cycles it (`Input::pose`), only when the island's document has
   `defaults::POSE`; posed the body neither walks, turns nor jumps, moving or jumping ends it; the player system
-  writes `FloorPose::value` into that entry.
+  writes `FloorPose::value` into that entry. Flight (ADR 0119): `Player::flying`, F or D-pad up toggles it
+  (`Input::fly`) only while `WorldRules::flight` (resource, off by default; `view --world` turns it on; the world
+  format's rule is #161, the server check #159); `Body::fly` slides along the view direction without gravity,
+  never grounded. Native radial menu page for both: #160.
 - Character controller (#144, ADR 0110; Jolt deferred to Phase 2 world content): `controller.rs`, `WorldMesh`
   (static world triangles, brute force; `plane()` is `add_player`'s default, `from_document` takes rigid meshes)
   and `Body::step` (vertical capsule r 0.25, `Body::height` by `Posture::height` 1.6/1.0/0.5 (ADR 0118: getting up
