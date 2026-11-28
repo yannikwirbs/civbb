@@ -1,0 +1,13 @@
+[package]
+name = "civbb-xr"
+description = "OpenXR: instance, HMD system, Vulkan creation through the runtime, session state and frame loop (ADR 0122)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+openxr = "0.22.0"
+
+[lints]
+workspace = true

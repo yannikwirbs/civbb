@@ -20,7 +20,7 @@ const USAGE: &str = "usage:
                      [--avatar lean|bloated | --package <package.civpkg> --key <key-file>]
   civbb-client view [<package.civpkg>... --key <key-file> | --avatar lean|bloated] [--copies N] [--frames F]
                     [--warmup W] [--lod L] [--world] [--trackers 3|6|10] [--turn smooth|snap]
-                    [--msaa N]
+                    [--msaa N] [--xr]
   civbb-client measure <package.civpkg> --key <key-file> [--avatars N] [--frames F] [--warmup W]
   civbb-client parity <reference.civpkg | unity-dir> <test.civpkg> --key <key-file> [--images <dir>]
   civbb-client rig <package.civpkg> --key <key-file>
@@ -44,7 +44,9 @@ cycles floor poses (D-pad down), flies (D-pad up) and
 cycles the camera (View/Back) alongside keyboard and mouse (ADR 0115). Tab or the pad's Start opens and closes the
 avatar's expression menu; the mouse picks, right click or Escape goes back (ADR 0117); on a pad the right stick
 points, A picks and B goes back (#158). --msaa draws with N samples
-per pixel (default 4, 1 is off; as far as the GPU supports them, ADR 0120).
+per pixel (default 4, 1 is off; as far as the GPU supports them, ADR 0120). --xr opens an OpenXR session on the
+active runtime and submits cleared frames (each eye tinted) until the runtime ends it or --frames F are shown
+(ADR 0122; the loader is CIVBB_OPENXR_LOADER's path, else openxr_loader beside the executable).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
 300) and through the viewer's frames on an offscreen 1280x720 target (N copies, same frames) and prints the times
@@ -163,6 +165,7 @@ fn run_view(args: &[String]) -> ExitCode {
     let mut trackers = None;
     let mut turning = Turning::default();
     let mut msaa = view::MSAA;
+    let mut xr = false;
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         let parsed = match arg.as_str() {
@@ -186,6 +189,10 @@ fn run_view(args: &[String]) -> ExitCode {
             })
             .map(|t| turning = t),
             "--msaa" => it.next().and_then(|v| v.parse().ok()).map(|n| msaa = n),
+            "--xr" => {
+                xr = true;
+                Some(())
+            }
             s if !s.starts_with('-') => {
                 packages.push(s.to_owned());
                 Some(())
@@ -196,6 +203,18 @@ fn run_view(args: &[String]) -> ExitCode {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
         }
+    }
+    if xr {
+        return match civbb_client::xr::run(frames) {
+            Ok(n) => {
+                println!("{n} frames shown");
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("civbb-client: {e}");
+                ExitCode::FAILURE
+            }
+        };
     }
     // Each package loads on the I/O pool while the window opens and frames run (ADR 0104).
     let loads = match (packages.is_empty(), key, corpus) {

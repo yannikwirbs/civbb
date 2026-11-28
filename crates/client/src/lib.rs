@@ -19,5 +19,6 @@ mod render_thread;
 pub mod station;
 pub mod tracking;
 pub mod view;
+pub mod xr;
 
 pub use island::{Island, Model};

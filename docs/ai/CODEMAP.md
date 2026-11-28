@@ -48,7 +48,7 @@ Internal deps: civbb-core, civbb-format
 
 Client: wires the avatar systems into per-avatar islands and frames; a headless benchmark and a desktop viewer in Phase 0.
 
-Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-format, civbb-render, civbb-ui
+Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-format, civbb-render, civbb-ui, civbb-xr
 
 - `src/affinity.rs`: Pins the calling thread to a performance core, so one-worker timings on hybrid CPUs do not depend on where the
 - `src/bench.rs`: Headless CPU benchmark: N avatar islands stepped for a number of frames at each worker count (design doc §21).
@@ -69,6 +69,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/station.rs`: Stations (design doc §7, ADR 0114): seats in the world that the player uses, sits in and leaves.
 - `src/tracking.rs`: Tracker input for the player (ADR 0113): the [`Trackers`] resource that sources fill, the system that calibrates
 - `src/view.rs`: Desktop viewer: N copies of each of several packages in a grid with animator and dynamics running, drawn in a
+- `src/xr.rs`: The XR session on the renderer's device (ADR 0122): the OpenXR runtime creates the Vulkan instance and device
 - `tests/alloc.rs`: Island steps and whole frames allocate nothing on the heap after warm-up (design doc §5 "Scheduling rules", #135,
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
 - `tests/controller.rs`: The character controller over the test world (ADR 0110, #144): stairs and the 30° ramp climb to the platform on
@@ -234,6 +235,16 @@ Internal deps: civbb-format
 - `src/radial/tests.rs`: Tests of the radial menu: pointer input to parameter writes, and what an open page draws.
 - `src/radial.rs`: The radial expression menu (design doc §7, ADR 0117): pages of controls around a ring, driven by a pointer,
 - `src/text.rs`: Labels: shaped and rasterised by cosmic-text from the system's fonts into one glyph atlas (ADR 0116).
+
+## `crates/xr` (civbb-xr)
+
+OpenXR: instance, HMD system, Vulkan creation through the runtime, session state and frame loop (ADR 0122).
+
+Internal deps: none
+
+- `src/lib.rs`: OpenXR (ADR 0122): the instance and head-mounted system, and the runtime's creation of the Vulkan instance and
+- `src/session.rs`: The OpenXR session on a Vulkan device (ADR 0122): its state machine, stage or local space, the colour swapchain
+- `tests/runtime.rs`: On a real OpenXR runtime (ADR 0122): an instance with XR_KHR_vulkan_enable2, the head-mounted system, its two
 
 ## `tools/corpus` (civbb-corpus)
 

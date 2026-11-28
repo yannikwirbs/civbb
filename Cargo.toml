@@ -26,6 +26,7 @@ civbb-dynamics = { path = "crates/dynamics" }
 civbb-format = { path = "crates/format" }
 civbb-render = { path = "crates/render" }
 civbb-ui = { path = "crates/ui" }
+civbb-xr = { path = "crates/xr" }
 civbb-corpus = { path = "tools/corpus" }
 # The client's ECS (design doc §4, ADR 0103); no reflection or async executor until a crate needs them.
 bevy_ecs = { version = "0.20.1", default-features = false, features = ["std"] }

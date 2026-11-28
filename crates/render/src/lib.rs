@@ -43,6 +43,8 @@ pub enum Error {
     Memory(String),
     /// A Vulkan call failed.
     Vk(vk::Result),
+    /// A [`Create`] other than [`Direct`] failed for its own reasons (ADR 0122).
+    Create(String),
 }
 
 impl fmt::Display for Error {
@@ -52,6 +54,7 @@ impl fmt::Display for Error {
             Error::NoDevice => write!(f, "no Vulkan 1.3 device with the features the renderer needs"),
             Error::Memory(e) => write!(f, "GPU memory: {e}"),
             Error::Vk(r) => write!(f, "Vulkan error: {r}"),
+            Error::Create(e) => write!(f, "creating the Vulkan instance or device: {e}"),
         }
     }
 }
