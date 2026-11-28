@@ -407,7 +407,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   yaw, exit, `seated`), `nearest`; E (`Input::interact`) sits within 1.5 m (scaled), jump or E leaves to the exit;
   seated the body neither moves nor turns, the view pitches. Test world bench (`civbb_corpus::world::{SEAT, EXIT}`,
   0.45 m, behind the player) is spawned by `view --world` via `Config::stations`. World stations, station animation
-  overrides and world eye-height limits: #156 (Phase 2).
+  overrides and world eye-height limits: #156 (Phase 2). Floor poses (ADR 0119): `Player::floor_pose`
+  (`FloorPose` Sitting/Lying), X or D-pad down cycles it (`Input::pose`), only when the island's document has
+  `defaults::POSE`; posed the body neither walks, turns nor jumps, moving or jumping ends it; the player system
+  writes `FloorPose::value` into that entry.
 - Character controller (#144, ADR 0110; Jolt deferred to Phase 2 world content): `controller.rs`, `WorldMesh`
   (static world triangles, brute force; `plane()` is `add_player`'s default, `from_document` takes rigid meshes)
   and `Body::step` (vertical capsule r 0.25, `Body::height` by `Posture::height` 1.6/1.0/0.5 (ADR 0118: getting up
@@ -422,7 +425,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   emotes stay empty, #151) and adds `civbb/locomotion` (Base: standing/crouching/prone 2D freeform trees on
   `VelocityX`/`VelocityZ`, falling on `Grounded`, postures at `Upright` 0.7/0.4), `civbb/hand_left`/`_right`
   (Gesture: any-state per gesture value, fist blended by its weight, masked per hand) and `civbb/action` (AFK,
-  sitting; raises the Action group) to empty groups, plus the platform entries they read. `defaults::Poser`
+  sitting, floor sitting and lying on `civbb/pose` 1/2, an owner-synced int 0..=2 (ADR 0119); raises the Action
+  group) to empty groups, plus the platform entries they read. `defaults::Poser`
   grounds each key: the pose's lowest human bone at the rest pose's lowest. Muscle signs on our rig: front-back
   of spine, chest, neck, head and arms positive backwards, nods positive up, upper leg in-out positive out, upper
   leg front-back 0.6 standing (more negative is forward), stretch 1 straight, finger stretch +1 open. Only the

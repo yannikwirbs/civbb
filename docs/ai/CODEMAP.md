@@ -375,6 +375,7 @@ Internal deps: none
 - `docs/adr/0116-text-rendering.md`: 0116: Text through cosmic-text with system fonts, rasterised into one glyph atlas on the CPU
 - `docs/adr/0117-ui-crate-and-radial-menu.md`: 0117: The `ui` crate: widgets emit a screen-space triangle list; the radial expression menu as its first widget
 - `docs/adr/0118-capsule-height-by-posture.md`: 0118: The character capsule's height follows the posture; getting up only where it fits
+- `docs/adr/0119-native-locomotion-extras.md`: 0119: Native locomotion extras: floor poses in the default Action layer, flight in the player, gated by world rules
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

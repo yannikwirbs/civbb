@@ -37,6 +37,10 @@ pub enum Kind {
     Afk,
     /// Seated on a chair.
     Sit,
+    /// Sitting on the floor, legs out in front, leaning back a little (ADR 0119).
+    FloorSit,
+    /// Lying on the back (ADR 0119).
+    Lie,
     /// A hand gesture on both hands.
     Hands(Hand),
 }
@@ -224,6 +228,22 @@ fn pose(kind: Kind, t: f32) -> P {
             p.both("Forearm Stretch", bend(60.0));
             p
         }
+        Kind::FloorSit => {
+            let mut p = stand();
+            p.both("Upper Leg Front-Back", thigh(90.0));
+            p.both("Lower Leg Stretch", bend(5.0));
+            p.set("Spine Front-Back", 0.15);
+            p.both("Arm Front-Back", -0.2);
+            p.both("Forearm Stretch", bend(30.0));
+            p
+        }
+        Kind::Lie => {
+            let mut p = stand();
+            p.both("Lower Leg Stretch", bend(10.0));
+            p.set("Head Nod Down-Up", -0.3);
+            p.pitch = (-90f32).to_radians();
+            p
+        }
         Kind::Hands(h) => hands(h),
     }
 }
@@ -309,7 +329,7 @@ impl Kind {
             Kind::Gait { style, .. } => (style.sizes().0, true),
             Kind::Fall => (1.0, true),
             Kind::Land { deep } => (if deep { 0.6 } else { 0.35 }, false),
-            Kind::Afk | Kind::Sit | Kind::Hands(_) => (1.0, true),
+            Kind::Afk | Kind::Sit | Kind::FloorSit | Kind::Lie | Kind::Hands(_) => (1.0, true),
         }
     }
 
@@ -318,7 +338,7 @@ impl Kind {
         match self {
             Kind::Gait { forward, right, .. } => forward != 0.0 || right != 0.0,
             Kind::Idle | Kind::Fall | Kind::Land { .. } => true,
-            Kind::Afk | Kind::Sit | Kind::Hands(_) => false,
+            Kind::Afk | Kind::Sit | Kind::FloorSit | Kind::Lie | Kind::Hands(_) => false,
         }
     }
 }

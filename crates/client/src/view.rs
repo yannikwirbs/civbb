@@ -816,6 +816,7 @@ impl ApplicationHandler for Viewer {
                     KeyCode::KeyC => self.runtime.world.resource_mut::<Input>().crouch = true,
                     KeyCode::KeyZ => self.runtime.world.resource_mut::<Input>().prone = true,
                     KeyCode::KeyE => self.runtime.world.resource_mut::<Input>().interact = true,
+                    KeyCode::KeyX => self.runtime.world.resource_mut::<Input>().pose = true,
                     KeyCode::Equal => self.runtime.world.resource_mut::<Input>().resize = Some(RESIZE),
                     KeyCode::Minus => self.runtime.world.resource_mut::<Input>().resize = Some(1.0 / RESIZE),
                     _ => {

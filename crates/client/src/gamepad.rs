@@ -64,6 +64,7 @@ impl Pad {
             Button::East => input.crouch = true,
             Button::North => input.prone = true,
             Button::West => input.interact = true,
+            Button::DPadDown => input.pose = true,
             Button::LeftThumb => self.run = true,
             Button::Select => return true,
             _ => {}
@@ -160,10 +161,17 @@ mod tests {
     fn buttons_ask_once_as_their_keys_do() {
         let mut pad = Pad::default();
         let mut input = Input::default();
-        for b in [Button::South, Button::East, Button::North, Button::West] {
+        for b in [
+            Button::South,
+            Button::East,
+            Button::North,
+            Button::West,
+            Button::DPadDown,
+        ] {
             assert!(!pad.button(b, &mut input));
         }
         assert!((input.jump, input.crouch, input.prone, input.interact) == (true, true, true, true));
+        assert!(input.pose);
         assert!(pad.button(Button::Select, &mut input));
         // Start (the menu, #149) and the rest change nothing yet.
         let mut other = Input::default();

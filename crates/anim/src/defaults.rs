@@ -11,9 +11,12 @@ use civbb_format::animator::{
     InterruptionSource, Layer, LayerBlending, LayerGroup, Mask, Motion, State, StateMachine, Transition,
     TransitionDest, Unwritten,
 };
-use civbb_format::state::{Entry, EntryIndex, Platform};
+use civbb_format::state::{Entry, EntryIndex, EntryKind, Platform, Range, SyncMode};
 
 use crate::action::at_rest;
+
+/// The content entry the default Action layer's floor poses play on (ADR 0119): 0 none, 1 sitting, 2 lying.
+pub const POSE: &str = "civbb/pose";
 
 /// What the generator makes for an SDK proxy clip called `name` (trailing digits and spaces ignored unless they follow
 /// `_`: creators duplicate clips as `proxy_stand_still3`); `None` for names it does not cover (emotes, #151).
@@ -354,11 +357,12 @@ impl Merge<'_> {
         layer
     }
 
-    /// AFK and sitting, raising the Action group while they play.
+    /// AFK, sitting and the floor poses, raising the Action group while they play.
     fn action(&mut self) -> Layer {
         let group = self.group("Action", 0.0);
         let afk = self.entry(Platform::Afk);
         let seated = self.entry(Platform::Seated);
+        let pose = self.pose_entry();
         let weight = |goal| Action::GroupWeight {
             group,
             goal,
@@ -371,12 +375,21 @@ impl Merge<'_> {
         };
         let afk_clip = self.clip("civbb/afk", Kind::Afk);
         let sit_clip = self.clip("civbb/sit", Kind::Sit);
+        let floor_clip = self.clip("civbb/floor_sit", Kind::FloorSit);
+        let lie_clip = self.clip("civbb/lie", Kind::Lie);
+        let posed = |value: f32, mode| Condition {
+            param: pose,
+            mode,
+            threshold: value,
+        };
         let mut idle = state(
             "Idle",
             afk_clip.clone(),
             vec![
                 to(1, vec![cond(afk, ConditionMode::If)]),
                 to(2, vec![cond(seated, ConditionMode::If)]),
+                to(3, vec![posed(1.0, ConditionMode::Equals)]),
+                to(4, vec![posed(2.0, ConditionMode::Equals)]),
             ],
         );
         idle.motion = None;
@@ -389,7 +402,33 @@ impl Merge<'_> {
             vec![to(0, vec![cond(seated, ConditionMode::IfNot)])],
         );
         sit.actions = vec![weight(1.0)];
-        layer("civbb/action", group, vec![idle, away, sit])
+        let mut floor = state(
+            "Sitting on the floor",
+            floor_clip,
+            vec![to(0, vec![posed(1.0, ConditionMode::NotEqual)])],
+        );
+        floor.actions = vec![weight(1.0)];
+        let mut lie = state(
+            "Lying",
+            lie_clip,
+            vec![to(0, vec![posed(2.0, ConditionMode::NotEqual)])],
+        );
+        lie.actions = vec![weight(1.0)];
+        layer("civbb/action", group, vec![idle, away, sit, floor, lie])
+    }
+
+    /// The [`POSE`] entry, added if missing: an int 0 to 2 the owner syncs and the player writes.
+    fn pose_entry(&mut self) -> EntryIndex {
+        let state = &mut self.doc.state;
+        state.find(POSE).unwrap_or_else(|| {
+            state.entries.push(Entry {
+                range: Some(Range::Int { min: 0, max: 2 }),
+                sync: SyncMode::Owner,
+                external: true,
+                ..Entry::new(POSE, EntryKind::Int, 0.0)
+            });
+            (state.entries.len() - 1) as EntryIndex
+        })
     }
 }
 

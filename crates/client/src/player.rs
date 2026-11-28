@@ -4,6 +4,7 @@
 use std::f32::consts::TAU;
 
 use bevy_ecs::prelude::*;
+use civbb_anim::defaults::POSE;
 use civbb_core::math::{add, dot, length, scale, sub};
 use civbb_core::schedule::Dt;
 use civbb_format::math::{Quat, Vec3};
@@ -56,6 +57,8 @@ pub struct Input {
     pub resize: Option<f32>,
     /// Use the nearest station, or leave the one sat in, once.
     pub interact: bool,
+    /// Cycle the floor pose once: none, sitting, lying (ADR 0119).
+    pub pose: bool,
 }
 
 /// How upright the player is.
@@ -113,6 +116,26 @@ impl Posture {
     }
 }
 
+/// A pose held on the spot, played by the default Action layer on [`POSE`] (ADR 0119).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FloorPose {
+    /// Sitting on the floor.
+    Sitting,
+    /// Lying on the back.
+    Lying,
+}
+
+impl FloorPose {
+    /// The [`POSE`] value.
+    pub fn value(pose: Option<Self>) -> f32 {
+        match pose {
+            None => 0.0,
+            Some(FloorPose::Sitting) => 1.0,
+            Some(FloorPose::Lying) => 2.0,
+        }
+    }
+}
+
 /// Where the camera is.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum View {
@@ -165,6 +188,8 @@ pub struct Player {
     pub scale: f32,
     /// The station sat in.
     pub station: Option<Station>,
+    /// The floor pose held.
+    pub floor_pose: Option<FloorPose>,
 }
 
 impl Default for Player {
@@ -183,6 +208,7 @@ impl Default for Player {
             eye_height: None,
             scale: 1.0,
             station: None,
+            floor_pose: None,
         }
     }
 }
@@ -231,14 +257,28 @@ impl Player {
             (self.velocity, self.turn) = ([0.0; 3], 0.0);
             return;
         }
-        self.yaw = (self.yaw + input.look[0]).rem_euclid(TAU);
-        self.turn = if dt > 0.0 { input.look[0] / dt } else { 0.0 };
+        // A floor pose holds the body still; moving or jumping ends it, on the next frame's input.
+        let was_posed = self.floor_pose.is_some();
+        let moving = input.forward != 0.0 || input.right != 0.0 || input.jump;
+        self.floor_pose = match (input.pose, self.floor_pose) {
+            (true, None) => Some(FloorPose::Sitting),
+            (true, Some(FloorPose::Sitting)) => Some(FloorPose::Lying),
+            (true, Some(FloorPose::Lying)) => None,
+            (false, p) => p.filter(|_| !moving),
+        };
+        let still = was_posed || self.floor_pose.is_some();
+        let look = if still { 0.0 } else { input.look[0] };
+        self.yaw = (self.yaw + look).rem_euclid(TAU);
+        self.turn = if dt > 0.0 { look / dt } else { 0.0 };
         // Getting up only where the taller capsule fits; otherwise the posture stays.
         let wanted = self.posture.toggled(input.crouch, input.prone);
         if wanted.height() <= self.posture.height() || world.fits(self.pos, wanted.height(), self.scale) {
             self.posture = wanted;
         }
-        let (f, r) = (input.forward.clamp(-1.0, 1.0), input.right.clamp(-1.0, 1.0));
+        let (f, r) = match still {
+            true => (0.0, 0.0),
+            false => (input.forward.clamp(-1.0, 1.0), input.right.clamp(-1.0, 1.0)),
+        };
         // Diagonal input is not faster than straight input.
         let n = (f * f + r * r).sqrt().max(1.0) / (self.posture.speed() * self.scale);
         let along = f / n * if input.run { RUN } else { WALK };
@@ -251,7 +291,12 @@ impl Player {
             height: self.posture.height(),
             scale: self.scale,
         };
-        body.step(world, add(scale(forward, along), scale(right, side)), input.jump, dt);
+        body.step(
+            world,
+            add(scale(forward, along), scale(right, side)),
+            input.jump && !still,
+            dt,
+        );
         (self.pos, self.vertical, self.grounded) = (body.pos, body.vertical, body.grounded);
         self.velocity = if dt > 0.0 {
             scale(sub(self.pos, start), 1.0 / dt)
@@ -339,14 +384,22 @@ pub(crate) fn player_system(
         player.sit(s);
         input.interact = false;
     }
+    // Floor poses only on avatars whose Action layer is the default one (ADR 0119).
+    let entry = |island: &Island| island.model().controller().and_then(|c| c.state.find(POSE));
+    if (player.island.and_then(|e| islands.get(e).ok())).is_none_or(|(island, _)| entry(island).is_none()) {
+        input.pose = false;
+    }
     player.step(&input, dt.0, &world);
     (input.jump, input.look, input.crouch, input.prone) = (false, [0.0; 2], false, false);
-    (input.resize, input.interact) = (None, false);
+    (input.resize, input.interact, input.pose) = (None, false, false);
     let Some((mut island, _)) = player.island.and_then(|e| islands.get_mut(e).ok()) else {
         return;
     };
     for (p, v) in player.platform_values(&input, viewpoint[1]) {
         island.set_platform(p, v);
+    }
+    if let Some(e) = entry(&island) {
+        island.set_param(e, FloorPose::value(player.floor_pose));
     }
     island.origin.pos = player.pos;
     island.origin.rot = player.rotation();
@@ -461,6 +514,46 @@ mod tests {
         // v² / 2g, give or take the integration.
         assert!((top - JUMP * JUMP / (2.0 * GRAVITY)).abs() < 0.03, "{top}");
         assert!(p.grounded && p.pos[1].abs() < 1e-5 && p.vertical == 0.0, "{p:?}");
+    }
+
+    #[test]
+    fn floor_poses_cycle_hold_the_body_and_end_on_moving() {
+        let mut p = Player::default();
+        let pose = Input {
+            pose: true,
+            ..Default::default()
+        };
+        let walk = Input {
+            forward: 1.0,
+            look: [0.5, 0.0],
+            ..Default::default()
+        };
+        step(&mut p, &pose, DT);
+        assert_eq!(p.floor_pose, Some(FloorPose::Sitting));
+        step(&mut p, &pose, DT);
+        assert_eq!(p.floor_pose, Some(FloorPose::Lying));
+        step(&mut p, &pose, DT);
+        assert_eq!(p.floor_pose, None);
+        step(&mut p, &pose, DT);
+        // Moving ends the pose without a step or a turn that frame, then walks.
+        step(&mut p, &walk, DT);
+        assert!(
+            p.floor_pose.is_none() && close(p.pos, [0.0; 3]) && p.yaw == 0.0,
+            "{p:?}"
+        );
+        step(&mut p, &walk, DT);
+        assert!(p.pos[2] > 0.0 && p.yaw == 0.5, "{p:?}");
+        // So does jumping, without jumping.
+        step(&mut p, &pose, DT);
+        step(
+            &mut p,
+            &Input {
+                jump: true,
+                ..Default::default()
+            },
+            DT,
+        );
+        assert!(p.floor_pose.is_none() && p.grounded && p.vertical == 0.0, "{p:?}");
     }
 
     #[test]

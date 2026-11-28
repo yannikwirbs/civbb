@@ -1,7 +1,7 @@
 //! Built-in locomotion (ADR 0108) on the generated humanoid: proxy names, the merged layers, and the poses they
-//! play judged by where bones end up (feet on the floor, legs alternating, crouched, prone, seated).
+//! play judged by where bones end up (feet on the floor, legs alternating, crouched, prone, seated, floor poses).
 
-use civbb_anim::defaults::{Hand, Kind, Style, apply, proxy};
+use civbb_anim::defaults::{Hand, Kind, POSE, Style, apply, proxy};
 use civbb_anim::frames::derive;
 use civbb_anim::muscle::find;
 use civbb_anim::{Controller, Instance};
@@ -333,6 +333,31 @@ fn afk_and_sitting_play_on_the_action_layer() {
         knee[2] > hips[2] + 0.3 && (knee[1] - hips[1]).abs() < 0.15,
         "knee {knee:?} hips {hips:?}"
     );
+}
+
+#[test]
+fn floor_poses_play_on_the_pose_entry_and_stay_on_the_floor() {
+    let mut r = Run::new();
+    let pose = r.doc.state.find(POSE).expect("the pose entry") as usize;
+    r.step(10);
+    let (head, standing) = (r.at(HumanBone::Head), r.at(HumanBone::Hips)[1]);
+    // Sitting: hips down near the floor, knees ahead of them.
+    r.i.params[pose] = 1.0;
+    r.step(60);
+    let (knee, hips) = (r.at(HumanBone::LeftLowerLeg), r.at(HumanBone::Hips));
+    assert!(hips[1] < 0.4 * standing, "hips {hips:?} standing {standing}");
+    assert!(knee[2] > hips[2] + 0.2, "knee {knee:?} hips {hips:?}");
+    assert!((r.low() - floor()).abs() < 0.01);
+    // Lying on the back: head and hips low, the head behind the hips (avatars face +Z).
+    r.i.params[pose] = 2.0;
+    r.step(60);
+    let (h, hips) = (r.at(HumanBone::Head), r.at(HumanBone::Hips));
+    assert!(h[1] < 0.35 && hips[1] < 0.35, "head {h:?} hips {hips:?}");
+    assert!(h[2] < hips[2] - 0.4, "head behind the hips: {h:?} {hips:?}");
+    assert!((r.low() - floor()).abs() < 0.01);
+    r.i.params[pose] = 0.0;
+    r.step(60);
+    assert!((r.at(HumanBone::Head)[1] - head[1]).abs() < 0.01, "and stands again");
 }
 
 #[test]

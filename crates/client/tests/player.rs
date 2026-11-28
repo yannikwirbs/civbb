@@ -1,6 +1,7 @@
 //! The desktop player on the frame schedule (ADRs 0106, 0107, 0114): input moves and turns only the player's island and sets
 //! its platform values, the camera
-//! sits at its viewpoint in first person with its own head shrunk away, and the extract step sees the moved island.
+//! sits at its viewpoint in first person with its own head shrunk away, the extract step sees the moved island, and
+//! floor poses write `civbb/pose` where the avatar has it (ADR 0119).
 
 use civbb_client::extract::{Camera, Snapshot};
 use civbb_client::frame::Runtime;
@@ -236,4 +237,34 @@ fn using_a_station_seats_the_player_and_jumping_leaves() {
     runtime.world.resource_mut::<Input>().interact = true;
     runtime.step(DT);
     assert_eq!(runtime.world.resource::<Player>().station, None);
+}
+
+#[test]
+fn floor_poses_write_the_pose_entry_only_on_avatars_that_have_it() {
+    use civbb_anim::defaults::POSE;
+    use civbb_client::player::FloorPose;
+    let plain = civbb_corpus::generate(&civbb_corpus::lean());
+    let mut posing = plain.clone();
+    posing
+        .state
+        .entries
+        .push(Entry::new(POSE, civbb_format::state::EntryKind::Int, 0.0));
+    for (avatar, poses) in [(posing, true), (plain, false)] {
+        let entry = avatar.state.find(POSE);
+        let package = Package::new(avatar, Vec::new());
+        let mut runtime = Runtime::default();
+        runtime.add_player();
+        let e = runtime.spawn_package(&package, 0, true, Pose::IDENTITY);
+        runtime.world.resource_mut::<Player>().island = Some(e);
+        for want in [Some(FloorPose::Sitting), Some(FloorPose::Lying)] {
+            runtime.world.resource_mut::<Input>().pose = true;
+            runtime.step(DT);
+            let player = runtime.world.resource::<Player>().floor_pose;
+            assert_eq!(player, want.filter(|_| poses));
+            if let Some(entry) = entry {
+                let value = runtime.island_mut(0).animator_mut().expect("an animator").params[entry as usize];
+                assert_eq!(value, FloorPose::value(want));
+            }
+        }
+    }
 }

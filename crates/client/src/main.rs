@@ -34,9 +34,11 @@ load in the background and appear as they are ready. Drag to
 orbit, scroll to zoom; CPU and GPU frame times are in the title. With --frames it exits after W + F frames
 (default W 60; the first creates the swapchain) and prints a summary of the last F. --lod draws every mesh at level L of its LOD chain (0 is full, default; past a mesh's last level, its
 last). --world shows the generated test world (ground, stairs, ramps, a platform, a wall) and the player walks
-through it (ADR 0110); E sits on its bench and gets up again, = and - scale the avatar (ADR 0114). --trackers drives the player's avatar with scripted 3-, 6- or 10-point trackers, calibrated on
+through it (ADR 0110); E sits on its bench and gets up again, = and - scale the avatar (ADR 0114). X cycles
+floor poses (sitting, lying, none) on avatars without their own Action layer (ADR 0119). --trackers drives the player's avatar with scripted 3-, 6- or 10-point trackers, calibrated on
 the first frame (ADR 0113). A gamepad moves (left stick, click to run), turns and looks (right stick; --turn
-smooth, the default, or snap in 30-degree steps), jumps (A), crouches (B), lies prone (Y), uses the bench (X) and
+smooth, the default, or snap in 30-degree steps), jumps (A), crouches (B), lies prone (Y), uses the bench (X),
+cycles floor poses (D-pad down) and
 cycles the camera (View/Back) alongside keyboard and mouse (ADR 0115). Tab or the pad's Start opens and closes the
 avatar's expression menu; the mouse picks, right click or Escape goes back (ADR 0117).
 
