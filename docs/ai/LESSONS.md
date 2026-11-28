@@ -76,3 +76,9 @@ Add a line to the matching file whenever something costs more than one attempt.
   ORIENTATION_VALID); a zero quaternion handed to `xrEndFrame` is XR_ERROR_POSE_INVALID.
 - A bevy system with more than 7 parameters fails clippy's `too_many_arguments` under `-D warnings`: group related
   ones into a tuple parameter (`(world, rules): (Res<WorldMesh>, Res<WorldRules>)`) instead of an `allow`.
+- Tracking-space devices from the headset have the half turn of ADR 0124 in their rotation: a device rotation of
+  identity is an OpenXR head facing +Z, backwards. Build test head poses in the play space (orientation identity =
+  looking ahead, -Z), not from rest bone rotations, or heading-based logic (the VR body follow) turns the body.
+- `Input::forward`/`right` are rewritten by the viewer each frame and sources (`Pad::apply`, `vr_system`) add onto
+  them, clamped: a runtime test that steps many frames without resetting them accumulates the stick to full
+  deflection on both axes.

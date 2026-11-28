@@ -494,11 +494,24 @@ What exists, by area. Read the section for the area you touch; update it when th
   (devices, `calibrate` request, calibrations by package id, in memory only, #155) and `trackers_system` after the
   player's in `PosesIn` (overwrites the player island's targets, `look` included, once its avatar is calibrated);
   `Runtime::add_trackers(Option<Scripted>)`; `view --trackers 3|6|10` plays scripted paths on a user 1.1x the
-  avatar, calibrating on the first frame. Headset source (#164, ADR 0124): `HeadsetPoses` resource,
-  `headset_system` before `trackers_system` (`Runtime::add_headset`, instead of `add_trackers`): head and grips as
-  `Head`/`LeftHand`/`RightHand` through `tracking::from_play_space` (a half turn about +Y: the play space's origin
-  and forward are the avatar's; user metres), calibrate button ORed into `Trackers::calibrate`. Bones are placed by walking parents up to an
-  anchor (no pose cache). Bench (`reach` in `bench.rs` sets all three goals and the pitch on every island):
+  avatar, calibrating on the first frame. Headset source (#164, ADR 0124; moved into `vr.rs` by #165): head and
+  grips as `Head`/`LeftHand`/`RightHand` through `vr::from_play_space(&Vr::play, ..)`, calibrate button ORed into
+  `Trackers::calibrate`. Bones are placed by walking parents up to an anchor (no pose cache).
+- VR player (#165, ADR 0125): `vr.rs`, `Runtime::add_headset(Vr)` (`HeadsetPoses`, `Trackers`, `Vr` resources;
+  `vr_system` before the player's, then `trackers_system` and `stage_system` after it). `Vr::play` = tracking space
+  from the play space (starts as the half turn about +Y; user metres); `vr::stage(player, play, ratio)` = the
+  avatar origin carrying it at calibration ratio (1 before) times the player's scale, written to `Camera::stage`
+  (the render thread's `Headset::present` uses it, else `xr::stage(camera)`). Each free frame (not seated, posed,
+  interacting or posing): the body turns after the head past `FOLLOW` 45° (`play` turned back), then the head's
+  horizontal offset becomes `Input::step` (world metres, moved through `WorldMesh` like walking) and is taken off
+  `play`, so the head stays above the origin and walls push the view back. Sticks feed `Vr::pad` (a `Pad`: dead
+  zones, `Turning`, click to run); the left stick turned from the steering yaw (`Steer::Head` or `Hand` = left aim,
+  `view --xr --steer hand`) into body forward and right. `Input::height` (calibrated: head y × ratio / eye height)
+  sets `Upright` and `Posture::at` (bands 0.7/0.4 = `defaults::CROUCH_BELOW`/`PRONE_BELOW`). `Player::vr` =
+  TrackingType (`tracking_type`: 6/4/3), `VRMode` 1, view always first person. XR actions (`crates/xr/src/input.rs`):
+  grip, aim, `stick` per hand, `run` (left stick click), `jump` (right A; Vive right menu), calibrate. No VR use
+  button for stations yet (#176). The viewer rewrites `Input::forward/right` each frame and `vr_system` adds onto
+  them: runtime tests reset them per frame. Bench (`reach` in `bench.rs` sets all three goals and the pitch on every island):
   IK 4.5 µs per avatar on 1 worker (lean and bloated alike), bloated 100 avatars 6.96 to 7.74 ms/frame on 1 worker,
   unchanged at 13 workers (0.81 ms).
 - Benchmark on the reference PC (release, bloated, #132): 100 avatars 7.03 ms/frame on 1 worker, 0.756 ms on 16

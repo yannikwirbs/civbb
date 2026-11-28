@@ -7,15 +7,15 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#165 (VR player). #164 left (ADR 0124): `Runtime::add_headset` makes `HeadsetPoses` (set by `xr::frame_loop` after
-each wait) the player's tracker source; `tracking::from_play_space` maps play space to tracking space as a half
-turn about +Y with the play space's origin at the avatar's. #165 places the stage from the player: `stage = avatar
-origin (pos, yaw) ∘ that half turn`, plus the room-scale shift, and the render thread's eyes must use the same
-stage (today `xr::stage(camera)` in `Headset::present`; the snapshot could carry it). New buttons and sticks go into
-the action set in `crates/xr/src/input.rs` (it is attached once in `Session::new`; sets cannot change after).
-Calibration is a button press only (no keyboard in `view --xr`). No headset here: owner steps on #174. Depth layer
-is #175. The floor poses (ADR 0119) and the locomotion page (ADR 0121) were checked by tests only, never looked at
-in a window: worth a capture (`view --world`, X, Tab) when the viewer is next run.
+#166 (controller gestures and finger curl). #165 left (ADR 0125): `vr.rs` with `vr_system` before the player's
+system (sticks through `Vr::pad`, room-scale recentring into `Input::step`, body follow past 45°, `Input::height`
+posture, devices into `Trackers`) and `stage_system` after it. New controls go into the one action set in
+`crates/xr/src/input.rs` (`Profile` table per interaction profile; `Poses` carries their state; attached once in
+`Session::new`) and are read in `vr_system`, which writes `Input` (gestures are `Input::gestures`, ADR 0107; the
+weight is fist-only on the desktop). Watch the binding conflicts already taken: left menu (B on Index) calibrates,
+right A jumps, the left stick click runs. #176 (a VR use button for stations) is small and can ride along. No
+headset here: owner steps on #174. The floor poses (ADR 0119) and the locomotion page (ADR 0121) were checked by
+tests only, never looked at in a window: worth a capture (`view --world`, X, Tab) when the viewer is next run.
 
 ## Now
 
@@ -23,7 +23,9 @@ in a window: worth a capture (`view --world`, X, Tab) when the viewer is next ru
   navigation of the radial menu, #160 locomotion page in the menu (ADR 0121), #162 `civbb-xr` crate, session and
   `view --xr` cleared frames (ADR 0122; OpenXR loader from `CIVBB_OPENXR_LOADER`), #163 `view --xr` renders the
   viewer in stereo by multiview into the swapchain, paced by `xrWaitFrame` on the simulation thread (ADR 0123), #164
-  head and grip poses at the predicted display time into `Trackers`, calibrate button (ADR 0124).
+  head and grip poses at the predicted display time into `Trackers`, calibrate button (ADR 0124), #165 VR player:
+  sticks, snap or smooth turning, room scale through the world, posture from head height, VR platform values (ADR
+  0125).
 - **M1.3 code done** (open for #157 only): #141 desktop player (ADR 0106), #142 its platform values (ADR 0107), #143 built-in locomotion
   (ADR 0108: generated muscle-space clips grounded per avatar, proxy substitutes, default Base and Action layers
   merged at load by the viewer only), #152 default Gesture layer (ADR 0109). Emotes are #151 (M1.8).
@@ -63,7 +65,7 @@ in a window: worth a capture (`view --world`, X, Tab) when the viewer is next ru
 
 ## Blockers and needs-user
 
-- #174 (needs-user): headset check; its last two comments are the current steps (#163's stereo frames; #164's head and hands after calibration). No headset on this
+- #174 (needs-user): headset check; its last three comments are the current steps (#163's stereo frames; #164's head and hands after calibration; #165's walking, turning and room scale). No headset on this
   PC as far as SteamVR sees.
 - An untracked `tracy/` folder of Tracy executables sits in the repo root (the owner's, for #136?): not committed;
   delete it or add it to `.gitignore`.
@@ -78,9 +80,6 @@ in a window: worth a capture (`view --world`, X, Tab) when the viewer is next ru
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-28 (29): #160 closed (ADR 0121: client "Locomotion" page appended to the root, synthetic entries past
-  the island's routed to `Player`). #162 closed (ADR 0122: `civbb_render::Create` seam, `civbb-xr` with openxr 0.22
-  loaded at run time, session, swapchain, frame loop; `view --xr` clears each eye; unrun in a headset). Next: #163.
 - 2026-11-28 (30): #163 closed (ADR 0123): `xrWaitFrame` on the simulation thread, begin/locate/draw/end on the
   render thread through a `Present` seam; `Renderer::external`/`frame_into`, `View::eye`; both eyes by multiview,
   culled by either eye; `view --xr` takes every viewer option and reports missed periods. Filed #175 (depth layer).
@@ -88,3 +87,7 @@ The newest three; `SESSIONS.md` has them all.
 - 2026-11-28 (31): #164 closed (ADR 0124): action set (grip, aim, calibrate) attached in `Session::new`,
   `Session::poses(time)` after each wait; client `HeadsetPoses`, `headset_system`, `from_play_space` (half turn
   about +Y), `Runtime::add_headset`; scripted-pose test through the runtime. Owner steps on #174. Next: #165.
+- 2026-11-28 (32): #165 closed (ADR 0125): `vr.rs` (`Vr::play` moves the play space relative to the avatar: head
+  recentred into `Input::step` through the world, body follows the head past 45°, seats hold it), sticks through a
+  `Pad`, `--steer head|hand`, posture from head height, `Player::vr`, `Camera::stage` to the render thread; stick,
+  run and jump actions. `tests/vr.rs` (6 tests). Filed #176. Owner steps on #174. Next: #166.
