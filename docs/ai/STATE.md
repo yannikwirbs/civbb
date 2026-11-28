@@ -372,6 +372,12 @@ What exists, by area. Read the section for the area you touch; update it when th
   its look (until #165); `Pacing` counts frames waited for, unrendered, missed periods (`xr::missed`). Test
   `xr::tests::stereo_layers_differ_by_the_eye_offset` (lean, 256 px, 90 degrees, 64 mm at 1.5 m: 5.56 px measured,
   5.46 expected). Never run against a headset (none here; #174 has the steps).
+- Poses (#164, ADR 0124): `civbb_xr::Poses` (`head`, `grips`, `aims` per hand, `None` without valid orientation and
+  position; `calibrate` = pressed since the last sync) from `Session::poses(time)`, which syncs the action set made
+  and attached in `Session::new` (`input.rs`: grip and aim per hand, calibrate on the left menu button, B on Index;
+  bindings for simple, Touch, Vive, Index) and locates the VIEW space and action spaces in its own stage/local
+  space. `xr::frame_loop` sets them after each wait (`Viewer::headset`); `view --xr` adds them as the player's
+  source (`Viewer::add_headset`, `Runtime::add_headset`) and refuses `--trackers`.
 - Overlay and UI (#149, ADRs 0116, 0117): `civbb_render::overlay::Overlay` draws a screen-space triangle list after
   the forward pass (`overlay.slang`: 48-byte vertices pulled by address, window pixels, colour times an optional
   bindless texture, straight alpha, no depth; at most 65536 vertices a frame in the client, `MAX_OVERLAY`).
@@ -488,7 +494,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   (devices, `calibrate` request, calibrations by package id, in memory only, #155) and `trackers_system` after the
   player's in `PosesIn` (overwrites the player island's targets, `look` included, once its avatar is calibrated);
   `Runtime::add_trackers(Option<Scripted>)`; `view --trackers 3|6|10` plays scripted paths on a user 1.1x the
-  avatar, calibrating on the first frame. Mapping play space to avatar space is the source's job (M1.4). Bones are placed by walking parents up to an
+  avatar, calibrating on the first frame. Headset source (#164, ADR 0124): `HeadsetPoses` resource,
+  `headset_system` before `trackers_system` (`Runtime::add_headset`, instead of `add_trackers`): head and grips as
+  `Head`/`LeftHand`/`RightHand` through `tracking::from_play_space` (a half turn about +Y: the play space's origin
+  and forward are the avatar's; user metres), calibrate button ORed into `Trackers::calibrate`. Bones are placed by walking parents up to an
   anchor (no pose cache). Bench (`reach` in `bench.rs` sets all three goals and the pitch on every island):
   IK 4.5 µs per avatar on 1 worker (lean and bloated alike), bloated 100 avatars 6.96 to 7.74 ms/frame on 1 worker,
   unchanged at 13 workers (0.81 ms).
