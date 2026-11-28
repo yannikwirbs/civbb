@@ -8,8 +8,8 @@ use civbb_render::material::{MATERIAL_WORDS, pack};
 use civbb_render::overlay::{NO_TEXTURE, Vertex};
 use civbb_render::skin::{Job, SkinnedMesh, Skinning};
 use civbb_render::{
-    Access, Batches, Capacity, Context, Draw, Forward, FrameStatus, MaterialId, MeshData, Output, Overlay, Pass,
-    Renderer, Result, Scene, View, batch, vk,
+    Access, Batches, Capacity, Context, Draw, External, Forward, FrameStatus, Graph, ImageId, MaterialId, MeshData,
+    Output, Overlay, Pass, Renderer, Result, Scene, View, batch, vk,
 };
 use civbb_ui::draw::Texture;
 
@@ -50,6 +50,9 @@ struct Instance {
 /// Overlay vertices a frame can draw (ADR 0117).
 const MAX_OVERLAY: u32 = 1 << 16;
 
+/// The near plane's distance in metres, for the desktop camera and a headset's eyes.
+pub(crate) const NEAR: f32 = 0.05;
+
 /// A scene and what is in it.
 struct Built {
     scene: Scene,
@@ -86,8 +89,9 @@ impl Built {
 /// Everything on the GPU: the scene with the packages and islands of the last snapshot, and the pipelines.
 pub(crate) struct Gpu {
     skinning: Skinning,
-    /// The forward pass's samples per pixel (ADR 0120).
+    /// The forward pass's samples per pixel and views by multiview (ADR 0120).
     samples: vk::SampleCountFlags,
+    views: u32,
     /// `None` until the first snapshot.
     built: Option<Built>,
     /// Snapshots synced so far.
@@ -95,11 +99,13 @@ pub(crate) struct Gpu {
 }
 
 impl Gpu {
-    /// The GPU side of a renderer drawing with up to `msaa` samples per pixel, as far as the device supports them.
-    pub(crate) fn new(renderer: &Renderer, msaa: u32) -> Result<Self> {
+    /// The GPU side of a renderer drawing with up to `msaa` samples per pixel, as far as the device supports them,
+    /// and `views` views at once into as many target layers (2 for a headset, ADR 0120).
+    pub(crate) fn new(renderer: &Renderer, msaa: u32, views: u32) -> Result<Self> {
         Ok(Gpu {
             skinning: Skinning::new(renderer.context())?,
             samples: renderer.context().samples(msaa),
+            views,
             built: None,
             synced: 0,
         })
@@ -184,6 +190,7 @@ impl Gpu {
         let scene = Scene::new(ctx, capacity)?;
         let output = Output {
             samples: self.samples,
+            views: self.views,
             ..Output::single(renderer.color_format()?)
         };
         self.built = Some(Built {
@@ -317,6 +324,7 @@ pub(crate) struct Scratch {
     batches: Batches,
     updates: Vec<(u32, [u32; MATERIAL_WORDS])>,
     overlay: Vec<Vertex>,
+    frusta: Vec<Frustum>,
 }
 
 /// Skins and draws the islands of `snapshot`, each with its own instance in `gpu`, from the snapshot's camera;
@@ -327,19 +335,31 @@ pub(crate) fn draw(
     snapshot: &Snapshot,
     s: &mut Scratch,
 ) -> Result<Option<(usize, usize)>> {
-    gpu.sync(renderer, snapshot)?;
-    let Camera {
-        eye,
-        target,
-        fov_y,
-        clear,
-    } = snapshot.camera;
-    s.draws.clear();
-    s.updates.clear();
+    let Camera { eye, target, fov_y, .. } = snapshot.camera;
     let extent = renderer.extent().unwrap_or_default();
     let aspect = extent.width.max(1) as f32 / extent.height.max(1) as f32;
-    let view = View::look_at(eye, target, fov_y, aspect, 0.05);
-    let frustum = Frustum::new(&view.view_proj);
+    let view = View::look_at(eye, target, fov_y, aspect, NEAR);
+    draw_views(renderer, gpu, snapshot, s, &[view], None)
+}
+
+/// As [`draw`] from `views`, one per layer of the target by multiview (the eyes of a headset), into `into` or the
+/// renderer's own target. A mesh is drawn when any view sees it; the screen-space overlay only with one view.
+pub(crate) fn draw_views(
+    renderer: &mut Renderer,
+    gpu: &mut Gpu,
+    snapshot: &Snapshot,
+    s: &mut Scratch,
+    views: &[View],
+    into: Option<External>,
+) -> Result<Option<(usize, usize)>> {
+    gpu.sync(renderer, snapshot)?;
+    let clear = snapshot.camera.clear;
+    s.draws.clear();
+    s.updates.clear();
+    s.frusta.clear();
+    s.frusta.extend(views.iter().map(|v| Frustum::new(&v.view_proj)));
+    let n = views.len() as f32;
+    let eye: [f32; 3] = std::array::from_fn(|k| views.iter().map(|v| v.eye[k]).sum::<f32>() / n);
     let b = gpu.built.as_mut().expect("synced above");
     // An island's records are rewritten only when they change; the first frame writes them all.
     for island in &snapshot.islands {
@@ -366,7 +386,7 @@ pub(crate) fn draw(
             let Some(joints) = joints else { continue };
             // A mesh wholly outside the view is neither skinned nor drawn (ADR 0077).
             let seen = u.bounds[m].world_box(joints, &island.weights[m]);
-            if !seen.is_some_and(|(lo, hi)| frustum.sees(lo, hi)) {
+            if !seen.is_some_and(|(lo, hi)| s.frusta.iter().any(|f| f.sees(lo, hi))) {
                 continue;
             }
             let materials = instance.maps[m].as_deref().unwrap_or(&u.materials);
@@ -381,7 +401,7 @@ pub(crate) fn draw(
     batch(&mut s.draws, &mut s.batches);
     let (draws, skinned) = (s.draws.len(), jobs.len());
     let (batches, updates, overlay, skinning) = (&s.batches, &s.updates, &s.overlay, &gpu.skinning);
-    let status = renderer.frame(|graph, target| {
+    let build = graph_of(|graph, target| {
         let skinned = graph.import_buffer(b.scene.skinned().handle, &[Access::VertexRead]);
         graph.add(
             Pass::new("skin")
@@ -389,19 +409,22 @@ pub(crate) fn draw(
                 // SAFETY: the graph records this outside a rendering scope on the renderer's device.
                 .record(|d, cmd| unsafe { skinning.record(d, cmd, &jobs) }),
         );
-        b.forward.add(
-            graph,
-            &b.scene,
-            target,
-            skinned,
-            std::slice::from_ref(&view),
-            batches,
-            updates,
-            clear,
-        );
-        b.overlay.add(graph, &b.scene, target, overlay);
-    })?;
+        b.forward
+            .add(graph, &b.scene, target, skinned, views, batches, updates, clear);
+        if views.len() == 1 {
+            b.overlay.add(graph, &b.scene, target, overlay);
+        }
+    });
+    let status = match into {
+        Some(t) => renderer.frame_into(t, build)?,
+        None => renderer.frame(build)?,
+    };
     Ok((status == FrameStatus::Presented).then_some((draws, skinned)))
+}
+
+/// `build` as what [`Renderer::frame`] takes, so a closure's parameter types are inferred before it is passed on.
+fn graph_of<'a, F: FnOnce(&mut Graph<'a>, ImageId)>(build: F) -> F {
+    build
 }
 
 /// Uploads the snapshot's glyph atlas when its version changed and writes its overlay's vertices into `out`, with
@@ -455,7 +478,7 @@ mod tests {
             }
             Err(e) => panic!("{e}"),
         };
-        let mut gpu = Gpu::new(&renderer, 1).unwrap();
+        let mut gpu = Gpu::new(&renderer, 1, 1).unwrap();
         let mut scratch = Scratch::default();
         let lean = Package::new(civbb_corpus::generate(&civbb_corpus::lean()), Vec::new());
         let bloated = Package::new(civbb_corpus::generate(&civbb_corpus::bloated()), Vec::new());

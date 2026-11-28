@@ -11,7 +11,7 @@ use xr::sys::platform::{
 
 pub mod session;
 
-pub use session::{Session, Status, Target};
+pub use session::{Frames, Session, Status};
 
 /// The environment variable naming the OpenXR loader library to load instead of the system search's.
 pub const LOADER_VAR: &str = "CIVBB_OPENXR_LOADER";

@@ -26,7 +26,7 @@ pub use forward::{Batches, Draw, Forward, Output, View, batch};
 pub use graph::{Access, BufferId, Graph, ImageDesc, ImageId, Load, Pass, Transients, Use};
 pub use memory::{Buffer, Image, MemoryLocation};
 pub use overlay::Overlay;
-pub use renderer::{FRAMES_IN_FLIGHT, FrameStatus, HEADLESS_FORMAT, Renderer};
+pub use renderer::{External, FRAMES_IN_FLIGHT, FrameStatus, HEADLESS_FORMAT, Renderer};
 pub use scene::{Capacity, MaterialId, MeshData, Scene};
 pub use swapchain::choose_format;
 
@@ -45,6 +45,8 @@ pub enum Error {
     Vk(vk::Result),
     /// A [`Create`] other than [`Direct`] failed for its own reasons (ADR 0122).
     Create(String),
+    /// The owner of an [`External`] target (an OpenXR runtime) failed to hand it over or take it back.
+    Target(String),
 }
 
 impl fmt::Display for Error {
@@ -55,6 +57,7 @@ impl fmt::Display for Error {
             Error::Memory(e) => write!(f, "GPU memory: {e}"),
             Error::Vk(r) => write!(f, "Vulkan error: {r}"),
             Error::Create(e) => write!(f, "creating the Vulkan instance or device: {e}"),
+            Error::Target(e) => write!(f, "the frame's target: {e}"),
         }
     }
 }

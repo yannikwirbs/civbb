@@ -286,3 +286,24 @@ fn look_at_is_reverse_z_with_y_down() {
     assert!(close(ndc([0.0, 1.0, 2.9]), [0.0, 0.0, 1.0]));
     assert!(ndc([0.0, 1.0, -1000.0])[2] < 1e-4);
 }
+
+#[test]
+fn eye_views_have_asymmetric_edges() {
+    // Turned 90 degrees left: looking along -X, its right is -Z.
+    let h = std::f32::consts::FRAC_PI_4.sin();
+    let fov = [-1.0f32.atan(), 0.5f32.atan(), 0.25f32.atan(), -1.0f32.atan()];
+    let v = View::eye([0.0, 1.0, 3.0], [0.0, h, 0.0, h], fov, 0.1);
+    assert_eq!(v.eye, [0.0, 1.0, 3.0]);
+    let ndc = |p| {
+        let c = clip(&v.view_proj, p);
+        [c[0] / c[3], c[1] / c[3], c[2] / c[3]]
+    };
+    let close = |a: [f32; 3], b: [f32; 3]| a.iter().zip(&b).all(|(x, y)| (x - y).abs() < 1e-5);
+    // Two metres ahead, at each edge of the view; depth near / distance. Straight ahead is off-centre: a third
+    // of the way right (tangents -1 to 0.5) and 0.6 up (-1 to 0.25).
+    assert!(close(ndc([-2.0, 1.0, 3.0]), [1.0 / 3.0, -0.6, 0.05]));
+    assert!(close(ndc([-2.0, 1.0, 5.0]), [-1.0, -0.6, 0.05]));
+    assert!(close(ndc([-2.0, 1.0, 2.0]), [1.0, -0.6, 0.05]));
+    assert!(close(ndc([-2.0, 1.5, 3.0]), [1.0 / 3.0, -1.0, 0.05]));
+    assert!(close(ndc([-2.0, -1.0, 3.0]), [1.0 / 3.0, 1.0, 0.05]));
+}

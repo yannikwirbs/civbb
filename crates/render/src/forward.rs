@@ -2,8 +2,8 @@
 //! scene's shared buffers and textures from the bindless array (design doc §6 "GPU-driven path", ADR 0023).
 
 use ash::vk;
-use civbb_core::math::mat4_mul;
-use civbb_format::math::{Mat4, Vec3};
+use civbb_core::math::{dot, mat4_mul, normalize, rotate};
+use civbb_format::math::{Mat4, Quat, Vec3};
 
 use crate::graph::{Access, BufferId, Graph, ImageDesc, ImageId, Load, Pass};
 use crate::material::{MATERIAL_WORDS, PipelineKey, Shader};
@@ -110,6 +110,58 @@ impl View {
             view_proj: mat4_mul(&proj, &view),
             eye,
             light_dir: unit(LIGHT_TOWARDS),
+            light_color: LIGHT_COLOR,
+            ambient: AMBIENT,
+        }
+    }
+
+    /// An eye at `pos` turned by `rot` (looking along its -Z, +Y up, as OpenXR's views) with an asymmetric field of
+    /// view: `fov` is the angles of the left, right, up and down edges in radians (left and down negative), with an
+    /// infinite far plane and reverse Z at `near`; lit as [`View::look_at`].
+    pub fn eye(pos: Vec3, rot: Quat, fov: [f32; 4], near: f32) -> Self {
+        let [a, b, c] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]].map(|axis| rotate(rot, axis));
+        let view: Mat4 = [
+            a[0],
+            b[0],
+            c[0],
+            0.0,
+            a[1],
+            b[1],
+            c[1],
+            0.0,
+            a[2],
+            b[2],
+            c[2],
+            0.0,
+            -dot(a, pos),
+            -dot(b, pos),
+            -dot(c, pos),
+            1.0,
+        ];
+        let [l, r, u, d] = fov.map(f32::tan);
+        // Y flipped for Vulkan's downward clip Y; depth = near / distance.
+        let proj: Mat4 = [
+            2.0 / (r - l),
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            -2.0 / (u - d),
+            0.0,
+            0.0,
+            (r + l) / (r - l),
+            -(u + d) / (u - d),
+            0.0,
+            -1.0,
+            0.0,
+            0.0,
+            near,
+            0.0,
+        ];
+        View {
+            view_proj: mat4_mul(&proj, &view),
+            eye: pos,
+            light_dir: normalize(LIGHT_TOWARDS),
             light_color: LIGHT_COLOR,
             ambient: AMBIENT,
         }

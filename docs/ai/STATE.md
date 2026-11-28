@@ -355,14 +355,23 @@ What exists, by area. Read the section for the area you touch; update it when th
   from an info; `Direct` is `Context::new`'s path) and `Context::create(validation, window, creator)`; `Context::entry`;
   `Error::Create`. `civbb-xr` (engine crate, `openxr` 0.22 `loaded`: `CIVBB_OPENXR_LOADER` path, else the system
   search): `Xr::new` (instance with XR_KHR_vulkan_enable2, HMD system, `views`, `blend`, `vulkan` min/max as
-  `VK_MAKE_API_VERSION`), `create_vulkan_instance`/`vulkan_physical_device`/`create_vulkan_device` in raw handles;
-  `Session::new(xr, instance, physical, device, queue_family, formats)` (stage else local space, one colour swapchain
-  with 2 array layers, else one per eye; usage colour attachment + transfer dst; size = largest recommended),
-  `poll` (begins on READY, ends on STOPPING, `Status::Exit` on EXITING/LOSS_PENDING), `wait`, `begin`, `views`,
-  `acquire` (`[Target { image, layer }; 2]`), `release`, `end(time, Some(views))`. Client `xr.rs`: `ByRuntime`
-  (implements `Create`; keeps the loader's `vkGetInstanceProcAddr`), `xr::run(frames)` behind `view --xr [--frames
-  F]` clears each eye (left warm, right cool) with a transfer clear, images back in COLOR_ATTACHMENT_OPTIMAL, fence
-  wait per frame. No depth swapchain yet (#163). Never run against a headset (none here; #174 has the steps).
+  `VK_MAKE_API_VERSION`), `create_vulkan_instance`/`vulkan_physical_device`/`create_vulkan_device` in raw handles.
+  Client `xr.rs`: `ByRuntime` (implements `Create`; keeps the loader's `vkGetInstanceProcAddr`).
+- Stereo frames (#163, ADR 0123): `Session::new(..) -> (Session, Frames)`: `Session` on the simulation thread
+  (`poll`: begins on READY, `Status::Stopping` on STOPPING for the caller to settle and `end`, `Status::Exit` on
+  EXITING/LOSS_PENDING; `wait`, `request_exit`), `Frames` on the render thread (`begin`, `views(time)` = `None`
+  without a valid orientation, `acquire` = image index, `release`, `end(time, views)`; one colour swapchain of 2
+  layers, usage colour attachment + transfer dst, size = largest recommended; stage space else local; no per-eye
+  fallback, no depth: #175). `civbb_render::Renderer::external(ctx, format, w, h)` + `frame_into(External { image,
+  view, layers, last })`; `View::eye(pos, rot, fov [l, r, u, d], near)` (asymmetric, reverse Z);
+  `Context::read_image(image, w, h, layers)`; `Error::Target`. Client: `render_thread::Present` (`Own` = `gpu::draw`;
+  `xr::Headset`), `RenderThread::draw(snapshot, pace)`; `gpu::draw_views(.., views, into)` (multiview with
+  `Gpu::new(renderer, msaa, views)`, culled by the union of the eyes' frusta, LOD from their midpoint, no overlay
+  with 2 views); `xr::run(view::Config) -> (Summary, Pacing)` drives `Viewer` (`start_on`, `pace`, `settle`, `done`,
+  `warm`): poll, wait, `Viewer::frame`; `xr::stage(camera)` puts the play space on the ground below the camera facing
+  its look (until #165); `Pacing` counts frames waited for, unrendered, missed periods (`xr::missed`). Test
+  `xr::tests::stereo_layers_differ_by_the_eye_offset` (lean, 256 px, 90 degrees, 64 mm at 1.5 m: 5.56 px measured,
+  5.46 expected). Never run against a headset (none here; #174 has the steps).
 - Overlay and UI (#149, ADRs 0116, 0117): `civbb_render::overlay::Overlay` draws a screen-space triangle list after
   the forward pass (`overlay.slang`: 48-byte vertices pulled by address, window pixels, colour times an optional
   bindless texture, straight alpha, no depth; at most 65536 vertices a frame in the client, `MAX_OVERLAY`).

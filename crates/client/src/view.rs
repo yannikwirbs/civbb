@@ -30,7 +30,7 @@ use crate::gpu::Gpu;
 use crate::menu::ExpressionMenu;
 use crate::package::Handle;
 use crate::player::{Input, Player, View, WorldRules};
-use crate::render_thread::{Drawn, RenderThread};
+use crate::render_thread::{Drawn, Own, Present, RenderThread};
 use crate::station::Station;
 use crate::tracking::Scripted;
 
@@ -401,7 +401,7 @@ struct Timing {
     window: Option<(Instant, u32, f32, f32, f32)>,
 }
 
-struct Viewer {
+pub(crate) struct Viewer {
     // Dropped in this order: the render thread (joined, destroying the renderer), then the window.
     render: Option<RenderThread>,
     window: Option<winit::window::Window>,
@@ -437,11 +437,13 @@ struct Viewer {
     last: Option<Instant>,
     timing: Timing,
     validation_errors: u32,
-    error: Option<String>,
+    pub(crate) error: Option<String>,
+    /// The XR runtime's frame the next [`Viewer::frame`] is for, if it paces them (ADR 0123).
+    pub(crate) pace: Option<civbb_xr::xr::FrameState>,
 }
 
 impl Viewer {
-    fn new(cfg: Config) -> Self {
+    pub(crate) fn new(cfg: Config) -> Self {
         let mut runtime = Runtime::default();
         if let Some(world) = &cfg.world {
             (runtime.world).insert_resource(WorldMesh::from_document(&world.avatar, Pose::IDENTITY));
@@ -487,6 +489,7 @@ impl Viewer {
             timing: Timing::default(),
             validation_errors: 0,
             error: None,
+            pace: None,
         }
     }
 
@@ -568,7 +571,7 @@ impl Viewer {
         event_loop.exit();
     }
 
-    fn summary(&self) -> Summary {
+    pub(crate) fn summary(&self) -> Summary {
         let t = &self.timing;
         let n = t.frames.max(1) as f32;
         Summary {
@@ -586,15 +589,47 @@ impl Viewer {
 
     /// Hands `renderer` to a new render thread.
     fn start(&mut self, renderer: Renderer) -> civbb_render::Result<()> {
+        self.start_on(renderer, 1, Box::new(Own))
+    }
+
+    /// Hands `renderer` to a new render thread drawing `views` at once through `present`.
+    pub(crate) fn start_on(
+        &mut self,
+        renderer: Renderer,
+        views: u32,
+        present: Box<dyn Present>,
+    ) -> civbb_render::Result<()> {
         self.device = renderer.context().device_name();
-        let gpu = Gpu::new(&renderer, self.msaa)?;
-        self.render = Some(RenderThread::spawn(renderer, gpu));
+        let gpu = Gpu::new(&renderer, self.msaa, views)?;
+        self.render = Some(RenderThread::spawn(renderer, gpu, present));
         self.free = Some(Snapshot::default());
         Ok(())
     }
 
+    /// Whether the frames asked for are done.
+    pub(crate) fn done(&self) -> bool {
+        self.limit.is_some_and(|l| self.timing.frames >= l)
+    }
+
+    /// Whether every load is done and the warm-up is over: frames are being measured.
+    pub(crate) fn warm(&self) -> bool {
+        self.loads.is_empty() && self.warmup == 0
+    }
+
+    /// Waits until the render thread has handed back the snapshot it holds, if any: no frame is being drawn.
+    pub(crate) fn settle(&mut self) -> civbb_render::Result<()> {
+        if self.free.is_none()
+            && let Some(render) = &mut self.render
+        {
+            let (s, drawn) = render.drawn();
+            self.drawn(&drawn?);
+            self.free = Some(s);
+        }
+        Ok(())
+    }
+
     /// Ends the render thread after the frames handed to it; fails if one of them failed.
-    fn shutdown(&mut self) -> civbb_render::Result<()> {
+    pub(crate) fn shutdown(&mut self) -> civbb_render::Result<()> {
         let Some(render) = self.render.take() else {
             return Ok(());
         };
@@ -603,7 +638,7 @@ impl Viewer {
     }
 
     /// Steps the avatars and extracts frame N while the render thread draws frame N-1, then hands N over.
-    fn frame(&mut self) -> civbb_render::Result<()> {
+    pub(crate) fn frame(&mut self) -> civbb_render::Result<()> {
         if self.render.is_none() {
             return Ok(());
         }
@@ -683,7 +718,8 @@ impl Viewer {
             }
         };
         std::mem::swap(&mut snapshot, &mut *self.runtime.world.resource_mut::<Snapshot>());
-        self.render.as_mut().expect("checked above").draw(snapshot);
+        let pace = self.pace.take();
+        self.render.as_mut().expect("checked above").draw(snapshot, pace);
         let main = start.elapsed().as_secs_f32() * 1000.0 - waited;
         self.timing.pending.push_back((main, systems));
         Ok(())
@@ -897,7 +933,7 @@ impl ApplicationHandler for Viewer {
                 if self.error.is_some() {
                     return event_loop.exit();
                 }
-                if self.limit.is_some_and(|l| self.timing.frames >= l) {
+                if self.done() {
                     event_loop.exit();
                 }
                 if let Some(w) = &self.window {

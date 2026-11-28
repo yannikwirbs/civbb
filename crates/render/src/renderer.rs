@@ -24,6 +24,19 @@ pub enum FrameStatus {
     Skipped,
 }
 
+/// An image owned elsewhere (an OpenXR swapchain's) that one frame draws into ([`Renderer::frame_into`]).
+#[derive(Clone, Copy, Debug)]
+pub struct External {
+    /// The image, its contents undefined at the frame's start.
+    pub image: vk::Image,
+    /// A view of all its layers: an array view for more than one.
+    pub view: vk::ImageView,
+    /// Its array layers.
+    pub layers: u32,
+    /// How its owner uses it after the frame (the layout it expects).
+    pub last: Use,
+}
+
 struct Frame {
     pool: vk::CommandPool,
     cmd: vk::CommandBuffer,
@@ -43,6 +56,8 @@ pub struct Renderer {
     gpu_ms: Option<f32>,
     blocked_ms: f32,
     swapchain: Option<Swapchain>,
+    /// For a renderer of [`External`] targets, their format.
+    external: Option<vk::Format>,
     extent: vk::Extent2D,
     stale: bool,
     current: usize,
@@ -87,6 +102,14 @@ impl Renderer {
         Ok(r)
     }
 
+    /// A renderer on `ctx` whose frames draw into images owned elsewhere (an OpenXR swapchain's), handed to each
+    /// [`Renderer::frame_into`]: `width` by `height` images in `format`.
+    pub fn external(ctx: Context, format: vk::Format, width: u32, height: u32) -> Result<Self> {
+        let mut r = Self::with_context(ctx, width, height)?;
+        r.external = Some(format);
+        Ok(r)
+    }
+
     fn with_context(ctx: Context, width: u32, height: u32) -> Result<Self> {
         let mut r = Renderer {
             frames: Vec::new(),
@@ -96,6 +119,7 @@ impl Renderer {
             gpu_ms: None,
             blocked_ms: 0.0,
             swapchain: None,
+            external: None,
             extent: vk::Extent2D { width, height },
             stale: true,
             current: 0,
@@ -156,9 +180,10 @@ impl Renderer {
         &self.ctx
     }
 
-    /// The window's new size in pixels; the swapchain follows on the next frame. Headless renderers keep theirs.
+    /// The window's new size in pixels; the swapchain follows on the next frame. Headless and external renderers
+    /// keep theirs.
     pub fn resize(&mut self, width: u32, height: u32) {
-        if !self.offscreen.is_empty() {
+        if !self.offscreen.is_empty() || self.external.is_some() {
             return;
         }
         self.extent = vk::Extent2D { width, height };
@@ -167,6 +192,9 @@ impl Renderer {
 
     /// The format frames are drawn in: the surface format the swapchain uses (for creating pipelines).
     pub fn color_format(&self) -> Result<vk::Format> {
+        if let Some(format) = self.external {
+            return Ok(format);
+        }
         if !self.offscreen.is_empty() {
             return Ok(HEADLESS_FORMAT);
         }
@@ -188,9 +216,9 @@ impl Renderer {
         self.blocked_ms
     }
 
-    /// The swapchain's current size, once it exists; a headless renderer's size.
+    /// The swapchain's current size, once it exists; a headless or external renderer's size.
     pub fn extent(&self) -> Option<vk::Extent2D> {
-        if !self.offscreen.is_empty() {
+        if !self.offscreen.is_empty() || self.external.is_some() {
             return Some(self.extent);
         }
         self.swapchain.as_ref().map(|s| s.extent)
@@ -199,11 +227,30 @@ impl Renderer {
     /// Renders one frame: `build` adds passes to the frame's graph, given the swapchain image as an imported
     /// image (undefined contents, presented after the graph), or headless this frame's offscreen image.
     pub fn frame<'a>(&mut self, build: impl FnOnce(&mut Graph<'a>, ImageId)) -> Result<FrameStatus> {
+        assert!(self.external.is_none(), "an external renderer draws with frame_into");
+        self.frame_on(None, build)
+    }
+
+    /// As [`Renderer::frame`] into `target`, imported with its layers and left in its `last` use; nothing is
+    /// presented. The frame's commands are submitted when this returns, so the target's owner may take it back.
+    pub fn frame_into<'a>(
+        &mut self,
+        target: External,
+        build: impl FnOnce(&mut Graph<'a>, ImageId),
+    ) -> Result<FrameStatus> {
+        self.frame_on(Some(target), build)
+    }
+
+    fn frame_on<'a>(
+        &mut self,
+        into: Option<External>,
+        build: impl FnOnce(&mut Graph<'a>, ImageId),
+    ) -> Result<FrameStatus> {
         if self.extent.width == 0 || self.extent.height == 0 {
             return Ok(FrameStatus::Skipped);
         }
         let headless = !self.offscreen.is_empty();
-        if !headless && (self.stale || self.swapchain.is_none()) {
+        if into.is_none() && !headless && (self.stale || self.swapchain.is_none()) {
             self.recreate()?;
         }
         let frame = &self.frames[self.current];
@@ -224,11 +271,12 @@ impl Renderer {
             }
             // The fence wait finished the frame before last, the oldest that could use a transient image.
             self.transients.next_frame(&self.ctx);
-            // The target, and for a window the swapchain and the image index to present.
-            let (image, view, extent, last, present) = match &self.swapchain {
+            // The target and its layers, and for a window the swapchain and the image index to present.
+            let (image, view, extent, layers, last, present) = match &self.swapchain {
+                _ if let Some(t) = into => (t.image, t.view, self.extent, t.layers, t.last, None),
                 _ if headless => {
                     let o = &self.offscreen[self.current];
-                    (o.handle, o.view, self.extent, Use::TransferSrc, None)
+                    (o.handle, o.view, self.extent, 1, Use::TransferSrc, None)
                 }
                 Some(sc) => {
                     let index =
@@ -250,6 +298,7 @@ impl Renderer {
                         sc.images[index],
                         sc.views[index],
                         sc.extent,
+                        1,
                         Use::Present,
                         Some((sc, index)),
                     )
@@ -269,7 +318,7 @@ impl Renderer {
                 device.cmd_write_timestamp2(frame.cmd, vk::PipelineStageFlags2::ALL_COMMANDS, *queries, first);
             }
             let mut graph = Graph::new();
-            let target = graph.import(image, view, extent, Use::Undefined, last);
+            let target = graph.import_layers(image, view, extent, layers, Use::Undefined, last);
             build(&mut graph, target);
             graph.record(&self.ctx, &mut self.transients, frame.cmd)?;
             if timed {
@@ -322,48 +371,9 @@ impl Renderer {
     pub fn read_last(&self) -> Result<Vec<u8>> {
         assert!(!self.offscreen.is_empty(), "read_last needs a headless renderer");
         let last = &self.offscreen[(self.current + FRAMES_IN_FLIGHT - 1) % FRAMES_IN_FLIGHT];
-        let (width, height) = (self.extent.width, self.extent.height);
-        let buffer = self.ctx.create_buffer(
-            "read back",
-            u64::from(width) * u64::from(height) * 4,
-            vk::BufferUsageFlags::TRANSFER_DST,
-            crate::memory::MemoryLocation::GpuToCpu,
-        )?;
-        // Submitted after the frame on the same queue: the graph's final barrier orders its writes before the copy.
-        let copied = self.ctx.one_shot(|d, cmd| {
-            let region = vk::BufferImageCopy::default()
-                .image_subresource(vk::ImageSubresourceLayers {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    mip_level: 0,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                })
-                .image_extent(vk::Extent3D {
-                    width,
-                    height,
-                    depth: 1,
-                });
-            let host = vk::MemoryBarrier2::default()
-                .src_stage_mask(vk::PipelineStageFlags2::COPY)
-                .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
-                .dst_stage_mask(vk::PipelineStageFlags2::HOST)
-                .dst_access_mask(vk::AccessFlags2::HOST_READ);
-            // SAFETY: the image is in `TransferSrc` after every headless frame; the buffer holds all its texels.
-            unsafe {
-                d.cmd_copy_image_to_buffer(
-                    cmd,
-                    last.handle,
-                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                    buffer.handle,
-                    &[region],
-                );
-                d.cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().memory_barriers(&[host]));
-            }
-        });
-        let texels = copied.map(|()| buffer.mapped().expect("GpuToCpu memory is mapped").to_vec());
-        // SAFETY: `one_shot` waited for the copy, or never submitted it.
-        unsafe { self.ctx.destroy_buffer(buffer) };
-        texels
+        // The image is in `TransferSrc` after every headless frame.
+        self.ctx
+            .read_image(last.handle, self.extent.width, self.extent.height, 1)
     }
 
     fn recreate(&mut self) -> Result<()> {

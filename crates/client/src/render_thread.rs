@@ -6,14 +6,57 @@ use std::sync::mpsc::{Receiver, Sender, SyncSender, channel, sync_channel};
 use std::thread::JoinHandle;
 use std::time::Instant;
 
-use civbb_render::Renderer;
+use civbb_render::{Renderer, Result};
+use civbb_xr::xr::FrameState;
 
 use crate::extract::Snapshot;
 use crate::gpu::{Gpu, Scratch, draw};
 
 enum Message {
-    Frame(Snapshot),
+    Frame(Snapshot, Option<FrameState>),
     Resize(u32, u32),
+}
+
+/// Where the render thread's frames go: the renderer's own target (a window, or offscreen) or a headset.
+pub(crate) trait Present: Send {
+    /// Draws `snapshot`, for an XR runtime's frame `pace` if it paces them: the draws and skinned meshes, or `None`
+    /// when the frame was skipped.
+    fn present(
+        &mut self,
+        renderer: &mut Renderer,
+        gpu: &mut Gpu,
+        snapshot: &Snapshot,
+        pace: Option<FrameState>,
+        scratch: &mut Scratch,
+    ) -> Result<Option<(usize, usize)>>;
+
+    /// How long the last frame waited for the target's owner, in milliseconds: not CPU work.
+    fn blocked_ms(&self) -> f32 {
+        0.0
+    }
+
+    /// Destroys what it made on the renderer's device.
+    ///
+    /// # Safety
+    ///
+    /// The GPU is idle.
+    unsafe fn destroy(&mut self, _renderer: &Renderer) {}
+}
+
+/// Frames into the renderer's own target, through [`draw`].
+pub(crate) struct Own;
+
+impl Present for Own {
+    fn present(
+        &mut self,
+        renderer: &mut Renderer,
+        gpu: &mut Gpu,
+        snapshot: &Snapshot,
+        _: Option<FrameState>,
+        scratch: &mut Scratch,
+    ) -> Result<Option<(usize, usize)>> {
+        draw(renderer, gpu, snapshot, scratch)
+    }
 }
 
 /// What the render thread did with one snapshot.
@@ -27,7 +70,7 @@ pub(crate) struct Drawn {
 }
 
 /// A snapshot handed back with what became of it.
-pub(crate) type Handed = (Snapshot, civbb_render::Result<Drawn>);
+pub(crate) type Handed = (Snapshot, Result<Drawn>);
 
 /// The render thread and its two channels: snapshots in (at most one waiting), drawn snapshots out.
 pub(crate) struct RenderThread {
@@ -37,13 +80,14 @@ pub(crate) struct RenderThread {
 }
 
 impl RenderThread {
-    /// Starts the thread; it ends when an error is handed back or after [`RenderThread::end`], destroying `gpu`.
-    pub(crate) fn spawn(renderer: Renderer, gpu: Gpu) -> Self {
+    /// Starts the thread presenting through `present`; it ends when an error is handed back or after
+    /// [`RenderThread::end`], destroying `present` and `gpu`.
+    pub(crate) fn spawn(renderer: Renderer, gpu: Gpu, present: Box<dyn Present>) -> Self {
         let (to, inbox) = sync_channel(1);
         let (outbox, from) = channel();
         let thread = std::thread::Builder::new()
             .name("render".into())
-            .spawn(move || run(renderer, gpu, &inbox, &outbox))
+            .spawn(move || run(renderer, gpu, present, &inbox, &outbox))
             .expect("the OS starts a thread");
         Self {
             to: Some(to),
@@ -52,9 +96,9 @@ impl RenderThread {
         }
     }
 
-    /// Hands `snapshot` over to be drawn.
-    pub(crate) fn draw(&mut self, snapshot: Snapshot) {
-        self.send(Message::Frame(snapshot));
+    /// Hands `snapshot` over to be drawn, for the XR runtime's frame `pace` if it paces them.
+    pub(crate) fn draw(&mut self, snapshot: Snapshot, pace: Option<FrameState>) {
+        self.send(Message::Frame(snapshot, pace));
     }
 
     /// Resizes the window's swapchain before the next snapshot.
@@ -86,7 +130,7 @@ impl RenderThread {
 
     /// Ends the thread after the snapshots already handed over; returns the validation errors reported, or the
     /// error one of those snapshots failed with.
-    pub(crate) fn end(mut self) -> civbb_render::Result<u32> {
+    pub(crate) fn end(mut self) -> Result<u32> {
         self.to = None;
         let thread = self.thread.take().expect("joined only here and in drop");
         let errors = thread.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic));
@@ -108,18 +152,27 @@ impl Drop for RenderThread {
 }
 
 /// The thread's loop; returns the validation errors reported.
-fn run(mut renderer: Renderer, mut gpu: Gpu, inbox: &Receiver<Message>, outbox: &Sender<Handed>) -> u32 {
+fn run(
+    mut renderer: Renderer,
+    mut gpu: Gpu,
+    mut present: Box<dyn Present>,
+    inbox: &Receiver<Message>,
+    outbox: &Sender<Handed>,
+) -> u32 {
     let mut scratch = Scratch::default();
     while let Ok(m) = inbox.recv() {
         match m {
             Message::Resize(width, height) => renderer.resize(width, height),
-            Message::Frame(snapshot) => {
+            Message::Frame(snapshot, pace) => {
                 let start = Instant::now();
                 let zone = civbb_core::profile::zone("render");
-                let drawn = draw(&mut renderer, &mut gpu, &snapshot, &mut scratch).map(|counts| Drawn {
-                    counts,
-                    cpu_ms: start.elapsed().as_secs_f32() * 1000.0 - renderer.blocked_ms(),
-                    gpu_ms: renderer.gpu_ms(),
+                let drawn = (present.present(&mut renderer, &mut gpu, &snapshot, pace, &mut scratch)).map(|counts| {
+                    let blocked = renderer.blocked_ms() + present.blocked_ms();
+                    Drawn {
+                        counts,
+                        cpu_ms: start.elapsed().as_secs_f32() * 1000.0 - blocked,
+                        gpu_ms: renderer.gpu_ms(),
+                    }
                 });
                 drop(zone);
                 let failed = drawn.is_err();
@@ -133,7 +186,10 @@ fn run(mut renderer: Renderer, mut gpu: Gpu, inbox: &Receiver<Message>, outbox: 
     // SAFETY: after the wait nothing is in flight.
     unsafe {
         let _ = renderer.context().device().device_wait_idle();
+        present.destroy(&renderer);
         gpu.destroy(&renderer);
     }
+    // Before the renderer: a headset's swapchain goes before the device it was made on.
+    drop(present);
     errors
 }

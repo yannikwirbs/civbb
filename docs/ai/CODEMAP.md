@@ -69,7 +69,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/station.rs`: Stations (design doc §7, ADR 0114): seats in the world that the player uses, sits in and leaves.
 - `src/tracking.rs`: Tracker input for the player (ADR 0113): the [`Trackers`] resource that sources fill, the system that calibrates
 - `src/view.rs`: Desktop viewer: N copies of each of several packages in a grid with animator and dynamics running, drawn in a
-- `src/xr.rs`: The XR session on the renderer's device (ADR 0122): the OpenXR runtime creates the Vulkan instance and device
+- `src/xr.rs`: The headset (ADRs 0122, 0123): the OpenXR runtime creates the Vulkan instance and device through
 - `tests/alloc.rs`: Island steps and whole frames allocate nothing on the heap after warm-up (design doc §5 "Scheduling rules", #135,
 - `tests/bench.rs`: `civbb-client bench` end to end: a tiny run prints a JSON report with one run per worker count, of a corpus
 - `tests/controller.rs`: The character controller over the test world (ADR 0110, #144): stairs and the 30° ramp climb to the platform on
@@ -243,7 +243,7 @@ OpenXR: instance, HMD system, Vulkan creation through the runtime, session state
 Internal deps: none
 
 - `src/lib.rs`: OpenXR (ADR 0122): the instance and head-mounted system, and the runtime's creation of the Vulkan instance and
-- `src/session.rs`: The OpenXR session on a Vulkan device (ADR 0122): its state machine, stage or local space, the colour swapchain
+- `src/session.rs`: The OpenXR session on a Vulkan device (ADR 0122), split for two threads (ADR 0123): [`Session`] handles the
 - `tests/runtime.rs`: On a real OpenXR runtime (ADR 0122): an instance with XR_KHR_vulkan_enable2, the head-mounted system, its two
 
 ## `tools/corpus` (civbb-corpus)
@@ -390,6 +390,7 @@ Internal deps: none
 - `docs/adr/0120-msaa-and-multiview.md`: 0120: MSAA by render-pass resolve and stereo by multiview in the forward pass
 - `docs/adr/0121-locomotion-menu-page.md`: 0121: The client's locomotion page in the radial menu
 - `docs/adr/0122-xr-crate-and-vulkan-creation.md`: 0122: The `civbb-xr` crate, the OpenXR loader, and who creates the Vulkan device
+- `docs/adr/0123-xr-frame-pacing-and-stereo-frames.md`: 0123: XR frame pacing across the two threads, the play space's place, and what the first stereo frames leave out
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

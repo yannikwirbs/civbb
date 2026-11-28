@@ -206,6 +206,52 @@ impl Context {
         }
     }
 
+    /// Copies the first `layers` layers of a `width` by `height` image of 4-byte texels, in `TransferSrc`, back:
+    /// rows tightly packed from the top, layer after layer. Submitted on the queue after the work that wrote it.
+    pub fn read_image(&self, image: vk::Image, width: u32, height: u32, layers: u32) -> Result<Vec<u8>> {
+        let buffer = self.create_buffer(
+            "read back",
+            u64::from(width) * u64::from(height) * 4 * u64::from(layers),
+            vk::BufferUsageFlags::TRANSFER_DST,
+            MemoryLocation::GpuToCpu,
+        )?;
+        // Submitted after the frame on the same queue: the graph's final barrier orders its writes before the copy.
+        let copied = self.one_shot(|d, cmd| {
+            let region = vk::BufferImageCopy::default()
+                .image_subresource(vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: 0,
+                    base_array_layer: 0,
+                    layer_count: layers,
+                })
+                .image_extent(vk::Extent3D {
+                    width,
+                    height,
+                    depth: 1,
+                });
+            let host = vk::MemoryBarrier2::default()
+                .src_stage_mask(vk::PipelineStageFlags2::COPY)
+                .src_access_mask(vk::AccessFlags2::TRANSFER_WRITE)
+                .dst_stage_mask(vk::PipelineStageFlags2::HOST)
+                .dst_access_mask(vk::AccessFlags2::HOST_READ);
+            // SAFETY: the image is in `TransferSrc` per the contract; the buffer holds all its texels.
+            unsafe {
+                d.cmd_copy_image_to_buffer(
+                    cmd,
+                    image,
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    buffer.handle,
+                    &[region],
+                );
+                d.cmd_pipeline_barrier2(cmd, &vk::DependencyInfo::default().memory_barriers(&[host]));
+            }
+        });
+        let texels = copied.map(|()| buffer.mapped().expect("GpuToCpu memory is mapped").to_vec());
+        // SAFETY: `one_shot` waited for the copy, or never submitted it.
+        unsafe { self.destroy_buffer(buffer) };
+        texels
+    }
+
     /// Copies `data` to `buffer` at byte `offset` through a staging buffer, made visible to every later command.
     pub fn upload(&self, buffer: &Buffer, offset: u64, data: &[u8]) -> Result<()> {
         let size = data.len() as u64;

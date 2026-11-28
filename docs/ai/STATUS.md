@@ -7,14 +7,14 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#163 (`view --xr`: stereo frames into the XR swapchain at the display rate). #162 left: `civbb_client::xr::run`
-opens the session on a `Context::create(.., ByRuntime)` device and clears each eye's layer; #163 replaces the clear
-with the forward pass (multiview, `Output { views: 2 }`, the swapchain imported per frame with
-`Graph::import_layers`), view records from `Session::views` (pose and asymmetric fov per eye, stage space), a
-depth swapchain submitted through XR_KHR_composition_layer_depth where offered (ADR 0122 point 4), and decides how
-the render thread (ADR 0103 point 5) and `xrWaitFrame` pace each other. `view.rs` is 921 lines: the XR viewer goes
-in its own module. Teardown order: session before context. No headset here: all checks off-device, the owner's in
-#174 (steps posted there). M1.4's queue: #163 to #174 (`tools/issue.sh queue`).
+#164 (head and controller poses for the predicted display time into `Trackers`). #163 left (ADR 0123): the
+simulation thread owns `civbb_xr::Session` (events, `xrWaitFrame`) and sets `Viewer::pace` (the `FrameState`)
+before each `Viewer::frame`; #164 locates the action spaces there at `pace.predicted_display_time` (the action set
+must be attached to the session before the first `xrSyncActions`, once per session, so `Session::new` or a
+`Session` method takes it). The render thread owns `Frames` (begin, locate the eyes, acquire, draw, release, end).
+Play space to world is `xr::stage(camera)` (ground below the orbit camera) until #165 places it from the player; the
+tracking-to-avatar mapping #164 needs is the same pose, so take it from one place. No headset here: everything is
+checked off-device; the owner's steps for #163 are on #174. Depth layer is #175. M1.4's queue: #164 to #175.
 The floor poses (ADR 0119) and the locomotion page (ADR 0121) were checked by tests only, never looked at in a
 window: worth a capture (`view --world`, X, Tab) when the viewer is next run.
 
@@ -22,7 +22,8 @@ window: worth a capture (`view --world`, X, Tab) when the viewer is next run.
 
 - **M1.4 started** (2026-11-28): issues #162 to #174 filed; #60 MSAA and multiview (ADR 0120), #158 stick
   navigation of the radial menu, #160 locomotion page in the menu (ADR 0121), #162 `civbb-xr` crate, session and
-  `view --xr` cleared frames (ADR 0122; OpenXR loader from `CIVBB_OPENXR_LOADER`).
+  `view --xr` cleared frames (ADR 0122; OpenXR loader from `CIVBB_OPENXR_LOADER`), #163 `view --xr` renders the
+  viewer in stereo by multiview into the swapchain, paced by `xrWaitFrame` on the simulation thread (ADR 0123).
 - **M1.3 code done** (open for #157 only): #141 desktop player (ADR 0106), #142 its platform values (ADR 0107), #143 built-in locomotion
   (ADR 0108: generated muscle-space clips grounded per avatar, proxy substitutes, default Base and Action layers
   merged at load by the viewer only), #152 default Gesture layer (ADR 0109). Emotes are #151 (M1.8).
@@ -55,14 +56,14 @@ window: worth a capture (`view --world`, X, Tab) when the viewer is next run.
   (ADR 0097).
 - Parity rerun after any change to materials, dynamics or the renderer: `tools/parity.sh --against <last run>
   <out dir>` (~1 min with a warm texture cache). The ADR 0084 table must not regress; Yumeka's rest worst view is 0.1197, 0.0003
-  under red. Last full run: `corpus/local/unity-ref/scores/s60` (#60): every report byte-identical to s140.
+  under red. Last full run: `corpus/local/unity-ref/scores/s163` (#163): every report byte-identical to s60.
 - Session cost: ADRs 0091 and 0092 (2026-11-26). Measured over 9 sessions (`docs/iteration-baseline.md`): $5.5 and
   13.6 M cache-read tokens per closed issue, against $9.2 and 28.1 M before.
 - Toolchain: Rust 1.100.0, pinned by `rust-toolchain.toml` (ADR 0045).
 
 ## Blockers and needs-user
 
-- #174 (needs-user): headset check; a first step for #162's cleared frames is in its comments. No headset on this
+- #174 (needs-user): headset check; the current steps (#163's stereo frames, 10 lean avatars) are its last comment. No headset on this
   PC as far as SteamVR sees.
 - An untracked `tracy/` folder of Tracy executables sits in the repo root (the owner's, for #136?): not committed;
   delete it or add it to `.gitignore`.
@@ -77,13 +78,13 @@ window: worth a capture (`view --world`, X, Tab) when the viewer is next run.
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-28 (27): #153 closed (basisu's XUASTC weight wraps by design; dev overflow checks off for it, all 13
-  corpus packages decode in dev). #154 closed (ADR 0118: `Body::height` by posture 1.6/1.0/0.5, getting up only where
-  `WorldMesh::fits`). #70 closed (ADR 0119: floor sitting and lying in the default Action layer on `civbb/pose`, X;
-  flight along the view, F, where `WorldRules::flight`). Filed #159, #160, #161. Next: start M1.4.
 - 2026-11-28 (28): M1.4 started, #162 to #174 filed. #60 closed (ADR 0120: MSAA by resolve, multiview by view mask
   and `SV_ViewID`; viewer `--msaa` default 4, parity 1, s60 byte-identical to s140). #158 closed (`Ring::stick`,
   `ExpressionMenu::stick`, `Pad::menu_button`). Next: #160.
 - 2026-11-28 (29): #160 closed (ADR 0121: client "Locomotion" page appended to the root, synthetic entries past
   the island's routed to `Player`). #162 closed (ADR 0122: `civbb_render::Create` seam, `civbb-xr` with openxr 0.22
   loaded at run time, session, swapchain, frame loop; `view --xr` clears each eye; unrun in a headset). Next: #163.
+- 2026-11-28 (30): #163 closed (ADR 0123): `xrWaitFrame` on the simulation thread, begin/locate/draw/end on the
+  render thread through a `Present` seam; `Renderer::external`/`frame_into`, `View::eye`; both eyes by multiview,
+  culled by either eye; `view --xr` takes every viewer option and reports missed periods. Filed #175 (depth layer).
+  Parity s163 byte-identical to s60. Next: #164.

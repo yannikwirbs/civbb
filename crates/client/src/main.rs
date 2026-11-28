@@ -44,9 +44,11 @@ cycles floor poses (D-pad down), flies (D-pad up) and
 cycles the camera (View/Back) alongside keyboard and mouse (ADR 0115). Tab or the pad's Start opens and closes the
 avatar's expression menu; the mouse picks, right click or Escape goes back (ADR 0117); on a pad the right stick
 points, A picks and B goes back (#158). --msaa draws with N samples
-per pixel (default 4, 1 is off; as far as the GPU supports them, ADR 0120). --xr opens an OpenXR session on the
-active runtime and submits cleared frames (each eye tinted) until the runtime ends it or --frames F are shown
-(ADR 0122; the loader is CIVBB_OPENXR_LOADER's path, else openxr_loader beside the executable).
+per pixel (default 4, 1 is off; as far as the GPU supports them, ADR 0120). --xr shows the same in the headset of
+the active OpenXR runtime, both eyes by multiview at the display rate, the play space on the ground below the
+camera, until the runtime ends the session or --frames F are shown; it also prints the frames the runtime waited
+for, did not want rendered and missed (ADRs 0122, 0123; the loader is CIVBB_OPENXR_LOADER's path, else
+openxr_loader beside the executable).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
 300) and through the viewer's frames on an offscreen 1280x720 target (N copies, same frames) and prints the times
@@ -204,18 +206,6 @@ fn run_view(args: &[String]) -> ExitCode {
             return ExitCode::from(2);
         }
     }
-    if xr {
-        return match civbb_client::xr::run(frames) {
-            Ok(n) => {
-                println!("{n} frames shown");
-                ExitCode::SUCCESS
-            }
-            Err(e) => {
-                eprintln!("civbb-client: {e}");
-                ExitCode::FAILURE
-            }
-        };
-    }
     // Each package loads on the I/O pool while the window opens and frames run (ADR 0104).
     let loads = match (packages.is_empty(), key, corpus) {
         (false, Some(key), None) => (packages.into_iter())
@@ -263,13 +253,23 @@ fn run_view(args: &[String]) -> ExitCode {
         turning,
         msaa,
     };
-    match view::run(cfg) {
-        Ok(s) => {
+    let ran = match xr {
+        true => civbb_client::xr::run(cfg).map(|(s, pacing)| (s, Some(pacing))),
+        false => view::run(cfg).map(|s| (s, None)),
+    };
+    match ran {
+        Ok((s, pacing)) => {
             if frames.is_some() {
                 let gpu = s.gpu_ms.map_or("n/a".into(), |g| format!("{g:.3} ms"));
                 println!(
                     "{} frames: CPU {:.3} ms/frame (simulation {:.3} ms, schedule {:.3} ms, render thread {:.3} ms), GPU {gpu}, {} draws, {} skinned meshes, {} validation errors",
                     s.frames, s.cpu_ms, s.main_ms, s.systems_ms, s.render_ms, s.draws, s.skinned, s.validation_errors
+                );
+            }
+            if let Some(p) = pacing {
+                println!(
+                    "XR: {} frames waited for, {} not to be rendered, {} display periods missed, period {:.3} ms",
+                    p.frames, p.unrendered, p.missed, p.period_ms
                 );
             }
             if s.validation_errors > 0 {
