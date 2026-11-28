@@ -60,7 +60,12 @@ impl Text {
         Self::with_fonts(FontSystem::new())
     }
 
-    /// With the given fonts, for tests.
+    /// Without fonts: labels draw nothing (until the system's are scanned, or in tests).
+    pub fn without_fonts() -> Self {
+        Self::with_fonts(FontSystem::new_with_fonts([]))
+    }
+
+    /// With the given fonts.
     pub fn with_fonts(fonts: FontSystem) -> Self {
         Self {
             fonts,

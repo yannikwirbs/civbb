@@ -48,7 +48,7 @@ Internal deps: civbb-core, civbb-format
 
 Client: wires the avatar systems into per-avatar islands and frames; a headless benchmark and a desktop viewer in Phase 0.
 
-Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-format, civbb-render
+Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-format, civbb-render, civbb-ui
 
 - `src/affinity.rs`: Pins the calling thread to a performance core, so one-worker timings on hybrid CPUs do not depend on where the
 - `src/bench.rs`: Headless CPU benchmark: N avatar islands stepped for a number of frames at each worker count (design doc §21).
@@ -61,6 +61,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `src/island.rs`: One avatar island: its compiled systems and running state, stepped animator, constraints, IK, dynamics (ADR 0020).
 - `src/lib.rs`: Client: wires the avatar systems into per-avatar islands and runs simulation frames (design doc §5, ADR 0020),
 - `src/main.rs`: `civbb-client`: the client binary; in Phase 0 a headless benchmark of N avatar islands (`bench`), a desktop
+- `src/menu.rs`: The desktop expression menu (ADR 0117): the player avatar's radial menu, driven by the mouse, writing the player
 - `src/package.rs`: Packages as shared handles: a verified avatar, its compiled model and decoded textures, loaded on the I/O pool
 - `src/parity.rs`: FLIP parity: a test avatar and a reference rendered with the same camera rig, states and poses, compared per view
 - `src/player.rs`: The local player in desktop mode: input moves one island through the world (ADR 0110) and places the camera at its
@@ -74,6 +75,7 @@ Internal deps: civbb-anim, civbb-core, civbb-corpus, civbb-dynamics, civbb-forma
 - `tests/cull.rs`: Frustum culling of mesh instances (ADR 0077): the bounds hold every skinned vertex in every parity state, and
 - `tests/frame.rs`: Islands and frames (ADR 0020): animator toggles reach node activity, contact values reach parameters one frame
 - `tests/measure.rs`: `civbb-client measure` (ADR 0032): debug builds refuse, release builds print CPU times and, with a device, GPU
+- `tests/menu.rs`: The expression menu on the frame schedule (ADR 0117): simulated mouse input opens the lean corpus avatar's menu,
 - `tests/parity.rs`: FLIP parity scoring without a device (ADR 0033): FLIP of an image against itself is 0, a known perturbation
 - `tests/player.rs`: The desktop player on the frame schedule (ADRs 0106, 0107, 0114): input moves and turns only the player's island and sets
 - `tests/tracking.rs`: Tracker input on the frame schedule (ADR 0113): the scripted source calibrates the player's avatar on its first

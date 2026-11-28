@@ -26,6 +26,7 @@ use crate::extract::{Camera, Snapshot};
 use crate::frame::Runtime;
 use crate::gamepad::{Pad, Turning};
 use crate::gpu::Gpu;
+use crate::menu::ExpressionMenu;
 use crate::package::Handle;
 use crate::player::{Input, Player, View};
 use crate::render_thread::{Drawn, RenderThread};
@@ -439,6 +440,8 @@ impl Viewer {
             runtime.spawn_package(world, u64::MAX, false, Pose::IDENTITY);
         }
         runtime.add_player();
+        runtime.add_menu();
+        runtime.world.resource_mut::<ExpressionMenu>().load_fonts();
         runtime.world.spawn_batch(cfg.stations.clone());
         if let Some(scripted) = cfg.trackers.clone() {
             runtime.add_trackers(Some(scripted));
@@ -614,9 +617,10 @@ impl Viewer {
         let run = self.held.contains(&KeyCode::ShiftLeft) || self.held.contains(&KeyCode::ShiftRight);
         let mut input = self.runtime.world.resource_mut::<Input>();
         (input.forward, input.right, input.run) = (forward, right, run);
-        let mut cycle = false;
+        let (mut cycle, mut menu) = (false, false);
         while let Some(gilrs::Event { event, .. }) = self.pads.as_mut().and_then(|p| p.next_event()) {
             match event {
+                gilrs::EventType::ButtonPressed(gilrs::Button::Start, _) => menu = true,
                 gilrs::EventType::ButtonPressed(b, _) => cycle |= self.pad.button(b, &mut input),
                 gilrs::EventType::AxisChanged(a, v, _) => self.pad.axis(a, v),
                 gilrs::EventType::Disconnected => self.pad.reset(),
@@ -627,7 +631,17 @@ impl Viewer {
         if cycle {
             self.cycle_view();
         }
+        let size = self.window.as_ref().map(|w| w.inner_size()).unwrap_or_default();
+        let mut m = self.runtime.world.resource_mut::<ExpressionMenu>();
+        m.toggle |= menu;
+        m.screen = [size.width as f32, size.height as f32];
+        let was_open = m.radial.is_open();
         self.runtime.step(dt);
+        // The open menu frees the cursor; closing it gives look mode back outside orbit view (ADR 0117).
+        let open = self.runtime.world.resource::<ExpressionMenu>().radial.is_open();
+        if open != was_open {
+            self.capture(!open && self.runtime.world.resource::<Player>().view != View::Orbit);
+        }
         let systems = start.elapsed().as_secs_f32() * 1000.0;
         // Frame N-1's snapshot comes back once drawn; waiting for it is not this thread's work.
         let mut waited = 0.0;
@@ -759,12 +773,23 @@ impl ApplicationHandler for Viewer {
                 ..
             } => {
                 let pressed = state == ElementState::Pressed;
-                if self.runtime.world.resource::<Player>().view == View::Orbit {
+                let mut menu = self.runtime.world.resource_mut::<ExpressionMenu>();
+                if menu.radial.is_open() {
+                    // Both may come in one frame.
+                    menu.pointer.press |= pressed;
+                    menu.pointer.release |= !pressed;
+                    self.dragging = false;
+                } else if self.runtime.world.resource::<Player>().view == View::Orbit {
                     self.dragging = pressed;
                 } else if pressed {
                     self.capture(true);
                 }
             }
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Right,
+                ..
+            } => self.runtime.world.resource_mut::<ExpressionMenu>().pointer.back = true,
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
@@ -783,7 +808,11 @@ impl ApplicationHandler for Viewer {
                 match code {
                     KeyCode::Space => self.runtime.world.resource_mut::<Input>().jump = true,
                     KeyCode::KeyV => self.cycle_view(),
-                    KeyCode::Escape => self.capture(false),
+                    KeyCode::Escape => {
+                        self.runtime.world.resource_mut::<ExpressionMenu>().pointer.back = true;
+                        self.capture(false);
+                    }
+                    KeyCode::Tab => self.runtime.world.resource_mut::<ExpressionMenu>().toggle = true,
                     KeyCode::KeyC => self.runtime.world.resource_mut::<Input>().crouch = true,
                     KeyCode::KeyZ => self.runtime.world.resource_mut::<Input>().prone = true,
                     KeyCode::KeyE => self.runtime.world.resource_mut::<Input>().interact = true,
@@ -824,6 +853,8 @@ impl ApplicationHandler for Viewer {
                     self.camera.drag((position.x - x) as f32, (position.y - y) as f32);
                 }
                 self.cursor = Some((position.x, position.y));
+                self.runtime.world.resource_mut::<ExpressionMenu>().pointer.pos =
+                    [position.x as f32, position.y as f32];
             }
             WindowEvent::MouseWheel { delta, .. } => self.camera.zoom(match delta {
                 MouseScrollDelta::LineDelta(_, y) => y,

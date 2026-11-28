@@ -81,10 +81,10 @@ pub struct Radial {
 /// Parameter writes the menu asks for, in order.
 pub type Writes = Vec<(EntryIndex, f32)>;
 
-const BACKGROUND: [f32; 4] = [0.01, 0.012, 0.016, 0.8];
-const SECTOR: [f32; 4] = [0.03, 0.035, 0.05, 0.85];
-const HOVERED: [f32; 4] = [0.1, 0.13, 0.2, 0.9];
-const ON: [f32; 4] = [0.03, 0.2, 0.3, 0.9];
+const BACKGROUND: [f32; 4] = [0.01, 0.012, 0.016, 0.85];
+const SECTOR: [f32; 4] = [0.03, 0.035, 0.05, 0.93];
+const HOVERED: [f32; 4] = [0.1, 0.13, 0.2, 0.95];
+const ON: [f32; 4] = [0.03, 0.2, 0.3, 0.95];
 const ACCENT: [f32; 4] = [0.1, 0.5, 0.8, 1.0];
 const LABEL: [f32; 4] = [0.9, 0.9, 0.9, 1.0];
 /// Radians left empty between sectors.

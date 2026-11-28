@@ -37,7 +37,8 @@ last). --world shows the generated test world (ground, stairs, ramps, a platform
 through it (ADR 0110); E sits on its bench and gets up again, = and - scale the avatar (ADR 0114). --trackers drives the player's avatar with scripted 3-, 6- or 10-point trackers, calibrated on
 the first frame (ADR 0113). A gamepad moves (left stick, click to run), turns and looks (right stick; --turn
 smooth, the default, or snap in 30-degree steps), jumps (A), crouches (B), lies prone (Y), uses the bench (X) and
-cycles the camera (View/Back) alongside keyboard and mouse (ADR 0115).
+cycles the camera (View/Back) alongside keyboard and mouse (ADR 0115). Tab or the pad's Start opens and closes the
+avatar's expression menu; the mouse picks, right click or Escape goes back (ADR 0117).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
 300) and through the viewer's frames on an offscreen 1280x720 target (N copies, same frames) and prints the times

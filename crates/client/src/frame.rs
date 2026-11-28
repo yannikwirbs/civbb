@@ -15,6 +15,7 @@ use crate::affinity;
 use crate::controller::WorldMesh;
 use crate::extract::{Camera, Snapshot, extract_system};
 use crate::island::Island;
+use crate::menu::{ExpressionMenu, Overlay, menu_system};
 use crate::package::Handle;
 use crate::player::{Input, Player, player_system};
 use crate::tracking::{Scripted, Trackers, scripted_system, trackers_system};
@@ -198,6 +199,15 @@ impl Runtime {
             self.world.insert_resource(WorldMesh::plane());
         }
         self.schedule.add_systems(player_system.in_set(Step::PosesIn));
+    }
+
+    /// Adds the expression menu (ADR 0117, after [`Self::add_player`]): the [`ExpressionMenu`] and [`Overlay`]
+    /// resources and, before the player system, the system that drives the player avatar's menu.
+    pub fn add_menu(&mut self) {
+        self.world.init_resource::<ExpressionMenu>();
+        self.world.init_resource::<Overlay>();
+        self.schedule
+            .add_systems(menu_system.before(player_system).in_set(Step::PosesIn));
     }
 
     /// Adds tracker input for the player (ADR 0113, after [`Self::add_player`]): the [`Trackers`] resource and, after

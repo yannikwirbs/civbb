@@ -639,6 +639,7 @@ dependencies = [
  "civbb-dynamics",
  "civbb-format",
  "civbb-render",
+ "civbb-ui",
  "flip-rs",
  "gilrs",
  "image",

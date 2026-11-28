@@ -10,6 +10,7 @@ pub mod frame;
 pub mod gamepad;
 mod gpu;
 pub mod island;
+pub mod menu;
 pub mod package;
 #[cfg(feature = "parity")]
 pub mod parity;

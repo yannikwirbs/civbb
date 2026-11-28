@@ -1,7 +1,5 @@
 //! Tests of the radial menu: pointer input to parameter writes, and what an open page draws.
 
-use cosmic_text::FontSystem;
-
 use super::*;
 
 const SCREEN: [f32; 2] = [1000.0, 800.0];
@@ -176,7 +174,7 @@ fn the_page_draws_a_sector_per_control_and_icons() {
     let mut m = menu();
     m.controls[1].icon = Some(4);
     let mut r = Radial::default();
-    let mut text = Text::with_fonts(FontSystem::new_with_fonts([]));
+    let mut text = Text::without_fonts();
     let mut list = DrawList::default();
     r.draw(&m, &[0.0; 12], &mut text, &mut list, SCREEN);
     assert!(list.vertices.is_empty(), "closed");

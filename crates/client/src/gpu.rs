@@ -5,11 +5,13 @@ use std::collections::HashMap;
 
 use civbb_format::material::ColorSpace;
 use civbb_render::material::{MATERIAL_WORDS, pack};
+use civbb_render::overlay::{NO_TEXTURE, Vertex};
 use civbb_render::skin::{Job, SkinnedMesh, Skinning};
 use civbb_render::{
-    Access, Batches, Capacity, Context, Draw, Forward, FrameStatus, MaterialId, MeshData, Pass, Renderer, Result,
-    Scene, View, batch,
+    Access, Batches, Capacity, Context, Draw, Forward, FrameStatus, MaterialId, MeshData, Overlay, Pass, Renderer,
+    Result, Scene, View, batch,
 };
+use civbb_ui::draw::Texture;
 
 use crate::cull::{Frustum, MeshBounds};
 use crate::extract::{Camera, Snapshot};
@@ -45,10 +47,16 @@ struct Instance {
     seen: u64,
 }
 
+/// Overlay vertices a frame can draw (ADR 0117).
+const MAX_OVERLAY: u32 = 1 << 16;
+
 /// A scene and what is in it.
 struct Built {
     scene: Scene,
     forward: Forward,
+    overlay: Overlay,
+    /// The glyph atlas's bindless slot and the version uploaded into it (ADR 0116).
+    atlas: Option<(u32, u64)>,
     capacity: Capacity,
     max_draws: u32,
     /// By package id.
@@ -66,6 +74,7 @@ impl Built {
         // SAFETY: per the contract.
         unsafe {
             self.forward.destroy(ctx);
+            self.overlay.destroy(ctx);
             for m in self.instances.into_values().chain(free).flat_map(|i| i.meshes) {
                 m.destroy(ctx);
             }
@@ -171,6 +180,8 @@ impl Gpu {
         let scene = Scene::new(ctx, capacity)?;
         self.built = Some(Built {
             forward: Forward::new(ctx, &scene, renderer.color_format()?, max_draws)?,
+            overlay: Overlay::new(ctx, &scene, renderer.color_format()?, MAX_OVERLAY)?,
+            atlas: None,
             scene,
             capacity,
             max_draws,
@@ -297,6 +308,7 @@ pub(crate) struct Scratch {
     draws: Vec<Draw>,
     batches: Batches,
     updates: Vec<(u32, [u32; MATERIAL_WORDS])>,
+    overlay: Vec<Vertex>,
 }
 
 /// Skins and draws the islands of `snapshot`, each with its own instance in `gpu`, from the snapshot's camera;
@@ -334,6 +346,7 @@ pub(crate) fn draw(
             }
         }
     }
+    overlay(renderer.context(), b, snapshot, &mut s.overlay)?;
     let b = &*b;
     let mut jobs = Vec::new();
     for island in &snapshot.islands {
@@ -359,7 +372,7 @@ pub(crate) fn draw(
     }
     batch(&mut s.draws, &mut s.batches);
     let (draws, skinned) = (s.draws.len(), jobs.len());
-    let (batches, updates, skinning) = (&s.batches, &s.updates, &gpu.skinning);
+    let (batches, updates, overlay, skinning) = (&s.batches, &s.updates, &s.overlay, &gpu.skinning);
     let status = renderer.frame(|graph, target| {
         let skinned = graph.import_buffer(b.scene.skinned().handle, &[Access::VertexRead]);
         graph.add(
@@ -370,8 +383,42 @@ pub(crate) fn draw(
         );
         b.forward
             .add(graph, &b.scene, target, skinned, &view, batches, updates, clear);
+        b.overlay.add(graph, &b.scene, target, overlay);
     })?;
     Ok((status == FrameStatus::Presented).then_some((draws, skinned)))
+}
+
+/// Uploads the snapshot's glyph atlas when its version changed and writes its overlay's vertices into `out`, with
+/// bindless slots for the atlas and the icons' package textures.
+fn overlay(ctx: &Context, b: &mut Built, snapshot: &Snapshot, out: &mut Vec<Vertex>) -> Result<()> {
+    let o = &snapshot.overlay;
+    if let Some(atlas) = (o.atlas.as_ref()).filter(|a| b.atlas.is_none_or(|(_, version)| version != a.version)) {
+        let slot = b.atlas.map(|(slot, _)| slot);
+        if slot.is_some() {
+            // Rare (new glyphs): the frames in flight may still sample the old atlas.
+            // SAFETY: this thread is the only one using the device (ADR 0103 point 5).
+            unsafe { ctx.device().device_wait_idle()? };
+        }
+        // SAFETY: a new slot, or the GPU is idle after the wait above.
+        let slot = unsafe { (b.scene).put_flat_texture(ctx, slot, atlas.width, atlas.height, &atlas.rgba)? };
+        b.atlas = Some((slot, atlas.version));
+    }
+    let icons = (o.icons)
+        .and_then(|key| b.instances.get(&key))
+        .map(|i| &b.uploads[&i.package].bindless);
+    let atlas = b.atlas.map_or(NO_TEXTURE, |(slot, _)| slot);
+    out.clear();
+    out.extend(o.list.vertices.iter().map(|v| Vertex {
+        pos: v.pos,
+        uv: v.uv,
+        color: v.color,
+        texture: match v.texture {
+            Texture::None => NO_TEXTURE,
+            Texture::Atlas => atlas,
+            Texture::Icon(i) => icons.and_then(|t| t.get(i as usize)).copied().unwrap_or(NO_TEXTURE),
+        },
+    }));
+    Ok(())
 }
 
 #[cfg(test)]

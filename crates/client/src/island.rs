@@ -227,6 +227,20 @@ impl Island {
         }
     }
 
+    /// The animator's parameter values by entry; empty without an animator.
+    pub fn params(&self) -> &[f32] {
+        self.animator.as_ref().map_or(&[], |a| &a.params)
+    }
+
+    /// Sets a parameter for the next step, converted to its entry's type; ignored without an animator or entry.
+    pub fn set_param(&mut self, entry: EntryIndex, value: f32) {
+        if let (Some(c), Some(i)) = (&self.model.controller, &mut self.animator)
+            && let (Some(e), Some(p)) = (c.state.entries.get(entry as usize), i.params.get_mut(entry as usize))
+        {
+            *p = coerce(e.kind, value);
+        }
+    }
+
     /// The running animator, to set parameters between frames.
     pub fn animator_mut(&mut self) -> Option<&mut Instance> {
         self.animator.as_mut()

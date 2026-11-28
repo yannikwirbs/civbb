@@ -11,6 +11,7 @@ use civbb_format::mesh::Mesh;
 
 use crate::frame::{Shows, Spawned, Workers};
 use crate::island::Island;
+use crate::menu::Overlay;
 use crate::package::Handle;
 use crate::view::skin_matrices;
 
@@ -52,6 +53,8 @@ pub struct Snapshot {
     pub camera: Camera,
     /// Every island, in spawn order.
     pub islands: Vec<IslandSnapshot>,
+    /// Screen-space UI over the frame (ADR 0117).
+    pub overlay: Overlay,
 }
 
 /// One island to copy: its key, the package it shows, the island.
@@ -156,9 +159,19 @@ pub(crate) fn extract_system(
     q: Query<(Entity, &Spawned, &Shows, &Island)>,
     camera: Res<Camera>,
     workers: Res<Workers>,
+    overlay: Option<Res<Overlay>>,
     mut snapshot: ResMut<Snapshot>,
     mut counters: ResMut<Counters>,
 ) {
+    let s = &mut snapshot.overlay;
+    match overlay {
+        // Field by field: the vertex list keeps its allocation.
+        Some(o) => {
+            s.list.vertices.clone_from(&o.list.vertices);
+            (s.atlas, s.icons) = (o.atlas.clone(), o.icons);
+        }
+        None => *s = Overlay::default(),
+    }
     let mut all: Vec<_> = q.iter().collect();
     all.sort_unstable_by_key(|(_, spawned, ..)| **spawned);
     let islands = all
