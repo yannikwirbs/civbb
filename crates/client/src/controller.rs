@@ -8,7 +8,7 @@ use civbb_format::math::Vec3;
 
 /// The capsule's radius in metres.
 pub const RADIUS: f32 = 0.25;
-/// The capsule's height in metres, from the feet (the body's position) to the top.
+/// The standing capsule's height in metres, from the feet (the body's position) to the top.
 pub const HEIGHT: f32 = 1.6;
 /// The highest step climbed, in metres.
 pub const STEP: f32 = 0.3;
@@ -63,10 +63,10 @@ impl WorldMesh {
     }
 
     /// Moves a capsule standing at `pos` by `delta` and pushes it out of the triangles; returns where it ends and what
-    /// it touched. Edges up to a step above `floor`, the feet's height before the move, are stood on. The capsule and
-    /// the step are `size` times their constants.
-    fn slide(&self, mut pos: Vec3, delta: Vec3, floor: f32, size: f32) -> (Vec3, Touch) {
-        let (radius, height, step_height) = (RADIUS * size, HEIGHT * size, STEP * size);
+    /// it touched. Edges up to a step above `floor`, the feet's height before the move, are stood on. The capsule is
+    /// `height` high; it, its radius and the step are `size` times that and their constants.
+    fn slide(&self, mut pos: Vec3, delta: Vec3, floor: f32, height: f32, size: f32) -> (Vec3, Touch) {
+        let (radius, height, step_height) = (RADIUS * size, height * size, STEP * size);
         let n = (length(delta) / (radius * 0.5)).ceil().clamp(1.0, MAX_SUBSTEPS);
         let step = scale(delta, 1.0 / n);
         let mut touch = Touch::default();
@@ -128,6 +128,20 @@ impl WorldMesh {
         }
         (pos, touch)
     }
+
+    /// Whether a capsule `height` high standing at `pos`, `size` times its height and [`RADIUS`], overlaps no
+    /// triangle by more than the ground skin: where a body may stand up to that height.
+    pub fn fits(&self, pos: Vec3, height: f32, size: f32) -> bool {
+        let radius = RADIUS * size;
+        let (a, b) = (
+            [pos[0], pos[1] + radius, pos[2]],
+            [pos[0], pos[1] + height * size - radius, pos[2]],
+        );
+        self.triangles.iter().all(|t| {
+            let (on_axis, on_t) = closest_segment_triangle(a, b, t);
+            length(sub(on_axis, on_t)) >= radius - SKIN
+        })
+    }
 }
 
 /// What a move touched.
@@ -141,7 +155,7 @@ struct Touch {
     ceiling: bool,
 }
 
-/// A character: where it stands, its vertical speed, whether it is on the ground and its size.
+/// A character: where it stands, its vertical speed, whether it is on the ground, its height and its size.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Body {
     /// The feet: the capsule's bottom.
@@ -150,7 +164,10 @@ pub struct Body {
     pub vertical: f32,
     /// Standing on walkable ground.
     pub grounded: bool,
-    /// The capsule and the step are this many times [`RADIUS`], [`HEIGHT`] and [`STEP`]; the jump reaches this many
+    /// The capsule's height in metres before `scale`: [`HEIGHT`] standing, lower crouching or prone; at least
+    /// twice [`RADIUS`].
+    pub height: f32,
+    /// The capsule and the step are this many times `height`, [`RADIUS`] and [`STEP`]; the jump reaches this many
     /// times its height (ADR 0114).
     pub scale: f32,
 }
@@ -167,25 +184,49 @@ impl Body {
         }
         self.vertical -= GRAVITY * dt;
         let across = [walk[0] * dt, 0.0, walk[2] * dt];
-        let (mut pos, touch) = world.slide(self.pos, across, self.pos[1], self.scale);
+        let (mut pos, touch) = world.slide(self.pos, across, self.pos[1], self.height, self.scale);
         if was_grounded && touch.blocked {
             // Step up: lifted, across, set down; kept if it gets further and lands on walkable ground.
-            let (up, _) = world.slide(self.pos, [0.0, STEP * self.scale, 0.0], self.pos[1], self.scale);
-            let (over, _) = world.slide(up, across, self.pos[1], self.scale);
-            let (down, landed) = world.slide(over, [0.0, self.pos[1] - up[1] - SKIN, 0.0], self.pos[1], self.scale);
+            let (up, _) = world.slide(
+                self.pos,
+                [0.0, STEP * self.scale, 0.0],
+                self.pos[1],
+                self.height,
+                self.scale,
+            );
+            let (over, _) = world.slide(up, across, self.pos[1], self.height, self.scale);
+            let (down, landed) = world.slide(
+                over,
+                [0.0, self.pos[1] - up[1] - SKIN, 0.0],
+                self.pos[1],
+                self.height,
+                self.scale,
+            );
             let further = |p: Vec3| (p[0] - self.pos[0]).hypot(p[2] - self.pos[2]);
             if landed.ground && further(down) > further(pos) + 1e-4 {
                 pos = down;
             }
         }
-        let (mut pos, touch) = world.slide(pos, [0.0, self.vertical * dt, 0.0], self.pos[1], self.scale);
+        let (mut pos, touch) = world.slide(
+            pos,
+            [0.0, self.vertical * dt, 0.0],
+            self.pos[1],
+            self.height,
+            self.scale,
+        );
         if touch.ceiling && self.vertical > 0.0 {
             self.vertical = 0.0;
         }
         self.grounded = touch.ground && self.vertical <= 0.0;
         if was_grounded && !jump && !self.grounded {
             // Down stairs and ramps: snapped to ground up to a step below, else falling.
-            let (down, landed) = world.slide(pos, [0.0, -STEP * self.scale, 0.0], self.pos[1], self.scale);
+            let (down, landed) = world.slide(
+                pos,
+                [0.0, -STEP * self.scale, 0.0],
+                self.pos[1],
+                self.height,
+                self.scale,
+            );
             if landed.ground {
                 (pos, self.grounded) = (down, true);
             }
@@ -334,6 +375,7 @@ mod tests {
                 pos: [0.0; 3],
                 vertical: 0.0,
                 grounded: true,
+                height: HEIGHT,
                 scale: 1.0,
             };
             for _ in 0..60 {
@@ -353,6 +395,7 @@ mod tests {
             pos: [0.0; 3],
             vertical: 0.0,
             grounded: true,
+            height: HEIGHT,
             scale: 1.0,
         };
         body.step(&world, [0.0; 3], false, 1.0 / 60.0);

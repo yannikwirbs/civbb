@@ -410,7 +410,8 @@ What exists, by area. Read the section for the area you touch; update it when th
   overrides and world eye-height limits: #156 (Phase 2).
 - Character controller (#144, ADR 0110; Jolt deferred to Phase 2 world content): `controller.rs`, `WorldMesh`
   (static world triangles, brute force; `plane()` is `add_player`'s default, `from_document` takes rigid meshes)
-  and `Body::step` (vertical capsule r 0.25, h 1.6; overlap resolution in substeps of r/2; walkable ≤ 45° pushes
+  and `Body::step` (vertical capsule r 0.25, `Body::height` by `Posture::height` 1.6/1.0/0.5 (ADR 0118: getting up
+  only where `WorldMesh::fits`); overlap resolution in substeps of r/2; walkable ≤ 45° pushes
   straight up; an edge or corner contact below the feet's sphere and within the 0.3 m step of the frame's starting
   feet height is a step edge, lifted onto; taller risers up to 0.3 m by up-across-down; snap down a step when walking
   off, else fall; `Grounded` = walkable within 1 cm). Test world `civbb_corpus::world()` (CC0 rigid meshes, avatar

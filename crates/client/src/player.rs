@@ -9,7 +9,7 @@ use civbb_core::schedule::Dt;
 use civbb_format::math::{Quat, Vec3};
 use civbb_format::state::Platform;
 
-use crate::controller::{Body, WorldMesh};
+use crate::controller::{Body, HEIGHT, RADIUS, WorldMesh};
 use crate::extract::Camera;
 use crate::frame::Shows;
 use crate::island::Island;
@@ -77,6 +77,15 @@ impl Posture {
             Posture::Standing => 1.0,
             Posture::Crouching => 0.55,
             Posture::Prone => 0.25,
+        }
+    }
+
+    /// The capsule's height in metres at scale 1 (ADR 0118): prone it is a ball.
+    pub fn height(self) -> f32 {
+        match self {
+            Posture::Standing => HEIGHT,
+            Posture::Crouching => 1.0,
+            Posture::Prone => 2.0 * RADIUS,
         }
     }
 
@@ -224,7 +233,11 @@ impl Player {
         }
         self.yaw = (self.yaw + input.look[0]).rem_euclid(TAU);
         self.turn = if dt > 0.0 { input.look[0] / dt } else { 0.0 };
-        self.posture = self.posture.toggled(input.crouch, input.prone);
+        // Getting up only where the taller capsule fits; otherwise the posture stays.
+        let wanted = self.posture.toggled(input.crouch, input.prone);
+        if wanted.height() <= self.posture.height() || world.fits(self.pos, wanted.height(), self.scale) {
+            self.posture = wanted;
+        }
         let (f, r) = (input.forward.clamp(-1.0, 1.0), input.right.clamp(-1.0, 1.0));
         // Diagonal input is not faster than straight input.
         let n = (f * f + r * r).sqrt().max(1.0) / (self.posture.speed() * self.scale);
@@ -235,6 +248,7 @@ impl Player {
             pos: self.pos,
             vertical: self.vertical,
             grounded: self.grounded,
+            height: self.posture.height(),
             scale: self.scale,
         };
         body.step(world, add(scale(forward, along), scale(right, side)), input.jump, dt);

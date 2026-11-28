@@ -1,7 +1,8 @@
 //! The character controller over the test world (ADR 0110, #144): stairs and the 30° ramp climb to the platform on
-//! the ground all the way, the 60° ramp does not, walls slide, edges drop and stairs lead back down.
+//! the ground all the way, the 60° ramp does not, walls slide, edges drop and stairs lead back down; a prone body
+//! crawls under a low slab and gets up only past it (ADR 0118).
 
-use civbb_client::controller::{Body, RADIUS, WorldMesh};
+use civbb_client::controller::{Body, HEIGHT, RADIUS, WorldMesh};
 use civbb_core::math::Pose;
 use civbb_corpus::world::{FRONT, PLATFORM, STEP};
 use civbb_format::math::Vec3;
@@ -17,6 +18,7 @@ fn body(pos: Vec3) -> Body {
         pos,
         vertical: 0.0,
         grounded: true,
+        height: HEIGHT,
         scale: 1.0,
     }
 }
@@ -120,4 +122,79 @@ fn stairs_lead_down_on_the_ground() {
     let path = walk(&w, &mut b, [0.0, 0.0, -2.0], 2.5);
     assert!(path.iter().all(|&(_, g)| g), "left the ground on the way down");
     assert!(b.pos[1].abs() < 1e-3 && (b.pos[2] - 2.0).abs() < 0.05, "{b:?}");
+}
+
+#[test]
+fn prone_crawls_under_a_low_overhang_and_stands_up_only_past_it() {
+    use civbb_client::player::{Input, Player, Posture};
+    // The plane and a slab over x -1..1, z 1..3: its underside 0.8 m up, its front face up to 1.2 m.
+    let mut w = WorldMesh::plane();
+    let (x, low, high) = (1.0, 0.8, 1.2);
+    w.triangles.extend([
+        [[-x, low, 1.0], [x, low, 3.0], [-x, low, 3.0]],
+        [[-x, low, 1.0], [x, low, 1.0], [x, low, 3.0]],
+        [[-x, low, 1.0], [-x, high, 1.0], [x, high, 1.0]],
+        [[-x, low, 1.0], [x, high, 1.0], [x, low, 1.0]],
+    ]);
+    let forward = Input {
+        forward: 1.0,
+        ..Default::default()
+    };
+    let run = |p: &mut Player, input: &Input, seconds: f32| {
+        for _ in 0..(seconds / DT).round() as usize {
+            p.step(input, DT, &w);
+        }
+    };
+    // Standing and crouching, the slab's front stops the capsule (crouching, at its lower edge, 5 cm below the top
+    // sphere's centre).
+    for (posture, seconds) in [(Posture::Standing, 1.0), (Posture::Crouching, 2.0)] {
+        let mut p = Player {
+            posture,
+            ..Default::default()
+        };
+        run(&mut p, &forward, seconds);
+        let stop = 1.0 - RADIUS;
+        assert!(
+            p.pos[2] > stop - 1e-3 && p.pos[2] < stop + 0.01,
+            "{posture:?}: {:?}",
+            p.pos
+        );
+    }
+    // Prone it passes under, on the ground.
+    let mut p = Player {
+        posture: Posture::Prone,
+        ..Default::default()
+    };
+    run(&mut p, &forward, 4.0);
+    assert!(
+        p.grounded && p.pos[1].abs() < 1e-4 && (p.pos[2] - 2.0).abs() < 0.05,
+        "{:?}",
+        p.pos
+    );
+    // Beneath it neither standing nor crouching fits.
+    for input in [
+        Input {
+            prone: true,
+            ..Default::default()
+        },
+        Input {
+            crouch: true,
+            ..Default::default()
+        },
+    ] {
+        p.step(&input, DT, &w);
+        assert_eq!(p.posture, Posture::Prone, "{input:?}");
+    }
+    // Out from under it, it stands.
+    run(&mut p, &forward, 3.0);
+    assert!(p.pos[2] > 3.0 + RADIUS, "{:?}", p.pos);
+    p.step(
+        &Input {
+            prone: true,
+            ..Default::default()
+        },
+        DT,
+        &w,
+    );
+    assert_eq!(p.posture, Posture::Standing);
 }
