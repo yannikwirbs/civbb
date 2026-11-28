@@ -412,6 +412,10 @@ What exists, by area. Read the section for the area you touch; update it when th
   centre disc, puppets read the deflection); the viewer sets it from the pad's right stick from its first move until
   the mouse moves; while the menu is open `Pad::menu_button` maps South to press/release and East to back, other
   pad buttons do nothing and `Pad::apply(.., look: false)` keeps the right stick from turning. VR placement: #170.
+  Locomotion page (#160, ADR 0121): `with_locomotion` appends a "Locomotion" submenu to a copy of the root (rebuilt per
+  package id, `civbb/pose` presence and `WorldRules::flight`): Stand/Sit/Lie down on synthetic entry n (the island's
+  parameter count), Fly on n + 1; the menu reads `fill`'s buffer (island params then those two from `Player`) and
+  routes writes at or past n to `Player::floor_pose`/`flying`.
 - Scaling and stations (#147, ADR 0114): `Player::eye_height` (`None` = the avatar's viewpoint height; chosen within
   0.2 to 5 m, `=`/`-` multiply by 1.1) gives `Player::scale` = eye over own, written to `Island::origin.scale`
   (viewpoint, cameras, bones, IK goals in avatar space follow); speeds and `Body::scale` (capsule, step) scale by
@@ -426,7 +430,7 @@ What exists, by area. Read the section for the area you touch; update it when th
   writes `FloorPose::value` into that entry. Flight (ADR 0119): `Player::flying`, F or D-pad up toggles it
   (`Input::fly`) only while `WorldRules::flight` (resource, off by default; `view --world` turns it on; the world
   format's rule is #161, the server check #159); `Body::fly` slides along the view direction without gravity,
-  never grounded. Native radial menu page for both: #160.
+  never grounded. Radial menu page for both: ADR 0121 (see the expression menu).
 - Character controller (#144, ADR 0110; Jolt deferred to Phase 2 world content): `controller.rs`, `WorldMesh`
   (static world triangles, brute force; `plane()` is `add_player`'s default, `from_document` takes rigid meshes)
   and `Body::step` (vertical capsule r 0.25, `Body::height` by `Posture::height` 1.6/1.0/0.5 (ADR 0118: getting up

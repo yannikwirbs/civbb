@@ -377,6 +377,7 @@ Internal deps: none
 - `docs/adr/0118-capsule-height-by-posture.md`: 0118: The character capsule's height follows the posture; getting up only where it fits
 - `docs/adr/0119-native-locomotion-extras.md`: 0119: Native locomotion extras: floor poses in the default Action layer, flight in the player, gated by world rules
 - `docs/adr/0120-msaa-and-multiview.md`: 0120: MSAA by render-pass resolve and stereo by multiview in the forward pass
+- `docs/adr/0121-locomotion-menu-page.md`: 0121: The client's locomotion page in the radial menu
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

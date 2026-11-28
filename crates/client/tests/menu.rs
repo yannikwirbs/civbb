@@ -1,6 +1,7 @@
 //! The expression menu on the frame schedule (ADR 0117): simulated mouse input opens the lean corpus avatar's menu,
 //! enters its page of toggles and flips one, which the avatar's animator then applies; the extract step hands the
-//! drawn menu to the renderer. A stick does the same (#158).
+//! drawn menu to the renderer. A stick does the same (#158); the client's locomotion page sets floor poses and flight
+//! (ADR 0121).
 
 use civbb_client::extract::Snapshot;
 use civbb_client::frame::Runtime;
@@ -138,4 +139,57 @@ fn the_mouse_opens_the_menu_and_flips_a_toggle() {
     assert!(!runtime.world.resource::<ExpressionMenu>().radial.is_open());
     assert!(runtime.world.resource::<Snapshot>().overlay.list.vertices.is_empty());
     assert_eq!(runtime.islands()[0].active()[node], !before, "toggles outlast the menu");
+}
+
+#[test]
+fn the_locomotion_page_sets_floor_poses_and_flight() {
+    use civbb_anim::defaults::POSE;
+    use civbb_client::player::{FloorPose, WorldRules};
+    use civbb_format::state::{Entry, EntryKind};
+    let mut avatar = civbb_corpus::generate(&civbb_corpus::lean());
+    avatar.state.entries.push(Entry::new(POSE, EntryKind::Int, 0.0));
+    let entry = avatar.state.find(POSE).unwrap() as usize;
+    let pages = avatar
+        .avatar()
+        .unwrap()
+        .expressions
+        .as_ref()
+        .unwrap()
+        .menu
+        .controls
+        .len()
+        + 1;
+    let package = Package::new(avatar, Vec::new());
+    let mut runtime = Runtime::default();
+    runtime.add_player();
+    runtime.add_menu();
+    runtime.world.insert_resource(WorldRules { flight: true });
+    let e = runtime.spawn_package(&package, 0, true, Pose::IDENTITY);
+    runtime.world.resource_mut::<Player>().island = Some(e);
+    runtime.world.resource_mut::<ExpressionMenu>().screen = SCREEN;
+    runtime.world.resource_mut::<ExpressionMenu>().toggle = true;
+    runtime.step(DT);
+    // The locomotion page is the root's last: stand, sit, lie down, fly.
+    let press = |runtime: &mut Runtime, n, i| {
+        runtime.world.resource_mut::<ExpressionMenu>().pointer = press_on(n, i);
+        runtime.step(DT);
+    };
+    press(&mut runtime, pages, pages - 1);
+    for (i, want) in [(1, Some(FloorPose::Sitting)), (2, Some(FloorPose::Lying)), (0, None)] {
+        press(&mut runtime, 4, i);
+        assert_eq!(runtime.world.resource::<Player>().floor_pose, want);
+        assert_eq!(
+            runtime.islands()[0].params()[entry],
+            FloorPose::value(want),
+            "as the keys write it"
+        );
+    }
+    press(&mut runtime, 4, 3);
+    assert!(runtime.world.resource::<Player>().flying);
+    press(&mut runtime, 4, 3);
+    assert!(!runtime.world.resource::<Player>().flying);
+    // A world without flight drops Fly from the open page: three sectors left.
+    runtime.world.insert_resource(WorldRules { flight: false });
+    press(&mut runtime, 3, 2);
+    assert_eq!(runtime.world.resource::<Player>().floor_pose, Some(FloorPose::Lying));
 }
