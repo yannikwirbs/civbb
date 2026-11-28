@@ -22,6 +22,6 @@ Read before working on atlasing, mips, KTX2 or the Basis Universal encoder. Add 
   lets a bigger codec "fit"; compare like with like (best-compressed PNG).
 - `local_avatars_atlas_and_shrink` is `#[ignore]`d (two minutes of codec-ladder encodes, and CI has no corpus/local):
   run it with `--ignored` after changing `atlas` or `texture`.
-- Decoding corpus textures in a dev-profile test (`package::read` on Cokoro) panics inside `basisu` at
-  `xuastc/bc7_fast.rs:48` (#153); release builds decode it. Headless checks that need only the document should read
-  it with `Package::decode_verified` + `document()` and skip textures.
+- `basisu` 0.1's XUASTC-to-BC7 weight `16 - fx - fy + w11` wraps below zero in u32 and comes back to 0..=16, so dev
+  overflow checks panicked on Cokoro (#153). The root `Cargo.toml` turns them off for `basisu` in dev (release
+  behaviour); the fuzz workspace still has them, so a fuzz crash at `bc7_fast.rs:48` is this known wrap.

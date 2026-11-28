@@ -40,3 +40,9 @@ opt-level = 1
 # Optimise dependencies in dev builds: crypto, decoding and later the renderer are unusably slow at opt-level 0.
 [profile.dev.package."*"]
 opt-level = 2
+
+# `basisu` 0.1's XUASTC-to-BC7 path computes the bilinear weight `16 - fx - fy + w11` in u32 (`xuastc/bc7_fast.rs`):
+# the intermediate wraps below zero and the sum always comes back to 0..=16 (fx, fy are masked to 0..=15), so
+# release is correct but dev overflow checks panic on real textures (#153). The fuzz workspace keeps its checks.
+[profile.dev.package.basisu]
+overflow-checks = false
