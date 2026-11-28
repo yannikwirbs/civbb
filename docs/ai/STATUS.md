@@ -7,16 +7,21 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-Start M1.4: it holds only #60 (MSAA, multiview stereo), #158 (stick navigation of the radial menu) and #160 (native
-locomotion menu page). First file M1.4's issues from the design doc's OpenXR and VR sections (`grep -n -i openxr
-docs/design-doc.md`; frame loop §4 "Poses in", late latching, controllers, hand tracking, VR IK from ADRs
-0111 to 0113), then take the lowest. M1.3's code is done; it stays open only for #157 (owner's gamepad check), M1.2
-only for #136 (Tracy screenshot): close each once the owner posts. The floor poses (ADR 0119) were checked by bone
-positions only, never looked at in a window: worth a capture (`view --world`, X) when the viewer is next run.
+#160 (native locomotion page in the radial menu), then #162 (the `civbb-xr` crate). M1.4's queue is #160, #162 to
+#174 (`tools/issue.sh queue`). #160: `civbb_ui::radial` works on a format `Menu` whose controls write avatar
+entries; floor poses and flight live on `Player`, not in the island's parameters, so the client-owned page needs a
+small design (an ADR): e.g. a synthetic page appended to the root with entries the menu system intercepts. Its VR
+half waits for #170. #162: `Context::new` creates instance and device itself; XR_KHR_vulkan_enable2 has the runtime
+create both, so the device create info (features 1.0 to 1.3 incl. `multiview`, which `mesh.spv` now needs) must be
+built in one place both paths share. SteamVR is the active runtime here; whether a headset is attached is unknown
+(ask in #174 before relying on it). The floor poses (ADR 0119) were checked by bone positions only, never looked at
+in a window: worth a capture (`view --world`, X) when the viewer is next run.
 
 ## Now
 
-- **M1.3 started**: #141 desktop player (ADR 0106), #142 its platform values (ADR 0107), #143 built-in locomotion
+- **M1.4 started** (2026-11-28): issues #162 to #174 filed; #60 MSAA and multiview (ADR 0120), #158 stick
+  navigation of the radial menu.
+- **M1.3 code done** (open for #157 only): #141 desktop player (ADR 0106), #142 its platform values (ADR 0107), #143 built-in locomotion
   (ADR 0108: generated muscle-space clips grounded per avatar, proxy substitutes, default Base and Action layers
   merged at load by the viewer only), #152 default Gesture layer (ADR 0109). Emotes are #151 (M1.8).
   #144 test world and character controller (ADR 0110: own capsule controller, Jolt deferred to Phase 2;
@@ -48,7 +53,7 @@ positions only, never looked at in a window: worth a capture (`view --world`, X)
   (ADR 0097).
 - Parity rerun after any change to materials, dynamics or the renderer: `tools/parity.sh --against <last run>
   <out dir>` (~1 min with a warm texture cache). The ADR 0084 table must not regress; Yumeka's rest worst view is 0.1197, 0.0003
-  under red. Last full run: `corpus/local/unity-ref/scores/s140` (#140): every report byte-identical to s129.
+  under red. Last full run: `corpus/local/unity-ref/scores/s60` (#60): every report byte-identical to s140.
 - Session cost: ADRs 0091 and 0092 (2026-11-26). Measured over 9 sessions (`docs/iteration-baseline.md`): $5.5 and
   13.6 M cache-read tokens per closed issue, against $9.2 and 28.1 M before.
 - Toolchain: Rust 1.100.0, pinned by `rust-toolchain.toml` (ADR 0045).
@@ -66,9 +71,6 @@ positions only, never looked at in a window: worth a capture (`view --world`, X)
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-27 (25): #148 closed (ADR 0115: `gamepad::Pad` maps gilrs buttons and sticks onto `Input` on top of
-  keys and mouse; `Turning::Smooth` 120°/s or `Snap` 30°; Linux CI installs libudev-dev). Filed #157 (owner's pad
-  check). Next: #149.
 - 2026-11-28 (26): #149 closed (ADRs 0116, 0117: `civbb-ui` with `draw`, `text` (cosmic-text 0.19, system fonts,
   one RGBA8 glyph atlas) and `radial`; `civbb_render::overlay`; client `menu` system and `Overlay` resource; Tab or
   Start opens the menu). Filed #158 (stick navigation, M1.4). Next: #153.
@@ -76,3 +78,6 @@ The newest three; `SESSIONS.md` has them all.
   corpus packages decode in dev). #154 closed (ADR 0118: `Body::height` by posture 1.6/1.0/0.5, getting up only where
   `WorldMesh::fits`). #70 closed (ADR 0119: floor sitting and lying in the default Action layer on `civbb/pose`, X;
   flight along the view, F, where `WorldRules::flight`). Filed #159, #160, #161. Next: start M1.4.
+- 2026-11-28 (28): M1.4 started, #162 to #174 filed. #60 closed (ADR 0120: MSAA by resolve, multiview by view mask
+  and `SV_ViewID`; viewer `--msaa` default 4, parity 1, s60 byte-identical to s140). #158 closed (`Ring::stick`,
+  `ExpressionMenu::stick`, `Pad::menu_button`). Next: #160.

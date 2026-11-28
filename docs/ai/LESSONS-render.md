@@ -89,3 +89,8 @@ Read before working on `civbb-render`, the viewer, parity renders, shaders or wi
   arguments for `Start-Process -ArgumentList`.
 - Window captures by title prefix: match `civbb-client`, not `CIVBB`: the VS Code window's title starts with the repo
   name and gets captured instead (with the owner's account details on it; delete such a capture unread).
+- `SV_ViewID` in a Slang shader adds the SPIR-V `MultiView` capability to the whole module (`mesh.spv`), so every
+  device that builds those pipelines must enable Vulkan 1.1 `multiview`, single-view passes included (it reads 0
+  there). Any other device creation path (OpenXR's `xrCreateVulkanDeviceKHR`, #162) must enable it too.
+- Scripted doc edits keyed on a whole sentence fail when the file wraps it differently than you wrote it: grep the
+  line first and key on what is there.
