@@ -64,3 +64,6 @@ Add a line to the matching file whenever something costs more than one attempt.
 - Removing a probe line with the Edit tool: an `old_string` that starts with the newline before the line, replaced
   by an empty string, joined the lines around it (`...;    assert!(`). Match the line with its own indentation and
   trailing newline, or restore the file with `git checkout --` when the probe was its only change.
+- `if let (true, Some(x)) = (flag, opt.take())` runs `take()` whatever `flag` is: the tuple is built before the
+  pattern is matched, so the option is emptied on frames where `flag` is false (a held menu button lost its
+  release, #149). Test the flag first, or `opt.filter(|_| flag)` and clear it inside.

@@ -7,12 +7,9 @@ exists in `STATE.md`, the full session log in `SESSIONS.md`, superseded ADRs in 
 
 ## Next
 
-#149 (radial expression menu, desktop). Needs two ADRs first (text rendering crate, the `ui` crate's shape) and a
-new engine crate (layer in `tools/xtask/src/main.rs`). The pad's Start button is kept for the menu (ADR 0115:
-`gamepad::Pad::button` ignores it now); opening the menu should release cursor capture as Escape does
-(`Viewer::capture`). Then the queue in order (#153, #154, #70). #154 should scale its posture heights from
-`Body::scale`. M1.2 stays open only for #136's owner
-check (Tracy screenshot); close M1.2 once posted.
+#153 (basisu panics decoding Cokoro's textures in dev builds), then #154 (scale its posture heights from
+`Body::scale`), then #70. M1.2 stays open only for #136's owner check (Tracy
+screenshot); close M1.2 once posted. Stick navigation of the radial menu is #158 (M1.4).
 
 ## Now
 
@@ -26,6 +23,8 @@ check (Tracy screenshot); close M1.2 once posted.
   tracker devices by role, calibration, `Trackers` resource, `view --trackers 3|6|10`). #147 (ADR 0114: eye height
   scales the avatar, speeds and capsule; `Station` component, the test world's bench; world stations are #156).
   #148 (ADR 0115: gilrs pads merged into `Input`, snap or smooth turning, `view --turn`; owner check #157).
+  #149 (ADRs 0116, 0117: `civbb-ui` crate, cosmic-text labels from system fonts, radial expression menu on Tab,
+  overlay pass in `civbb-render`).
 - **Phase 0's gate is passed** (ADR 0084; table of all 13 Unity exports there, every red state after rest
   itemised with a Phase 1 issue). Phase 1 is split into milestones M1.1 to M1.9: M1.1 Native content model (#100)
   first, then ECS client runtime, desktop mode/locomotion/IK, OpenXR, protocol/instance server/nodes, voice,
@@ -63,11 +62,12 @@ check (Tracy screenshot); close M1.2 once posted.
 
 The newest three; `SESSIONS.md` has them all.
 
-- 2026-11-27 (23): #146 closed (ADR 0113: `civbb_anim::tracking` devices and calibration, round trip through the
-  10-point solver within 1 mm; client `Trackers` resource and system, `view --trackers`). Filed #155. Next: #147.
 - 2026-11-27 (24): #147 closed (ADR 0114: eye height sets the avatar's scale, speeds, capsule and jump follow;
   scale and station platform values; `Station` component, E sits or leaves, a bench in the test world). Filed #156.
   Next: #148.
 - 2026-11-27 (25): #148 closed (ADR 0115: `gamepad::Pad` maps gilrs buttons and sticks onto `Input` on top of
   keys and mouse; `Turning::Smooth` 120°/s or `Snap` 30°; Linux CI installs libudev-dev). Filed #157 (owner's pad
   check). Next: #149.
+- 2026-11-28 (26): #149 closed (ADRs 0116, 0117: `civbb-ui` with `draw`, `text` (cosmic-text 0.19, system fonts,
+  one RGBA8 glyph atlas) and `radial`; `civbb_render::overlay`; client `menu` system and `Overlay` resource; Tab or
+  Start opens the menu). Filed #158 (stick navigation, M1.4). Next: #153.

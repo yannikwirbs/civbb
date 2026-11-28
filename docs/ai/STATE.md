@@ -342,6 +342,16 @@ What exists, by area. Read the section for the area you touch; update it when th
   sizes it exactly (parity allocates as before). Package GPU data is never freed short of a rebuild; no range
   allocator or VRAM budget yet.
 
+- Overlay and UI (#149, ADRs 0116, 0117): `civbb_render::overlay::Overlay` draws a screen-space triangle list after
+  the forward pass (`overlay.slang`: 48-byte vertices pulled by address, window pixels, colour times an optional
+  bindless texture, straight alpha, no depth; at most 65536 vertices a frame in the client, `MAX_OVERLAY`).
+  `Scene::put_flat_texture` adds a mip-less linear RGBA8 slot or replaces one (the caller waits idle first; the
+  client does when the glyph atlas's version changes, i.e. when new glyphs appear). `civbb-ui`: `draw::DrawList`
+  (rect, sector, disc, line), `text::Text` (cosmic-text 0.19; `Text::new` scans system fonts, 1.56 s in a dev test;
+  one 1024² atlas, shelf packing, cleared at `begin` after an overflow; `without_fonts` draws no labels), `radial`
+  (ADR 0117's geometry and controls; `update` pushes `(entry, value)` writes, `draw` the page or puppet). No bundled
+  font, no taffy, no SDF yet.
+
 ## Runtime (`core`, `anim`, `dynamics`, `client`)
 
 - Animated materials (ADRs 0025, 0099): `civbb_anim::material` reads and writes a `MaterialField` as stored;
@@ -381,7 +391,14 @@ What exists, by area. Read the section for the area you touch; update it when th
   half/quarter speed), Shift+F1..F8 gestures, AFK while unfocused; it sets the island's platform values each frame
   (`Island::set_platform`). Gamepads (#148, ADR 0115): `gamepad.rs`, `Pad` (all pads merged; `button`, `axis`,
   `reset`, `apply` adds the sticks to the keys' `Input` each frame), `Turning::Smooth(rad/s)`/`Snap(rad)`; the
-  viewer polls gilrs in `Viewer::frame`, `view --turn smooth|snap`. Start is unbound (menu, #149).
+  viewer polls gilrs in `Viewer::frame`, `view --turn smooth|snap`. Start opens the expression menu (#149).
+- Expression menu (#149, ADR 0117): `menu.rs`, `Runtime::add_menu` (`ExpressionMenu` and `Overlay` resources;
+  `menu_system` in `PosesIn` before the player's): reads the player island's package menu, applies `Tab`/Start
+  toggles and the viewer's `Pointer` (position, press, release, back; presses cleared after each frame), writes
+  through `Island::set_param` (coerced to the entry's kind; `Island::params` reads), draws into `Overlay` (atlas
+  `Arc` and the island key for icons), which `extract_system` copies into `Snapshot::overlay`. The viewer starts
+  `ExpressionMenu::load_fonts` (a thread) at start; opening frees the cursor, closing recaptures outside orbit view.
+  Toggles persist only in the running animator (no saved parameters yet). Stick navigation: #158.
 - Scaling and stations (#147, ADR 0114): `Player::eye_height` (`None` = the avatar's viewpoint height; chosen within
   0.2 to 5 m, `=`/`-` multiply by 1.1) gives `Player::scale` = eye over own, written to `Island::origin.scale`
   (viewpoint, cameras, bones, IK goals in avatar space follow); speeds and `Body::scale` (capsule, step) scale by
