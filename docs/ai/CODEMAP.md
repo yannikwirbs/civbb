@@ -203,7 +203,7 @@ Internal deps: civbb-core, civbb-format
 - `shaders/mesh.slang`: Forward uber-shaders: one vertex shader pulling skinned vertices, fragment shaders for PBR, Toon and Unlit
 - `shaders/overlay.slang`: Screen-space UI (ADR 0117): triangles in window pixels pulled by address, in plain colour or times a texture of
 - `shaders/skin.slang`: Compute skinning and sparse blendshapes (design doc §6, ADR 0022). Compiled by `cargo xtask shaders`.
-- `src/context.rs`: The Vulkan instance with validation in debug builds, device selection and the logical device with its one queue.
+- `src/context.rs`: The Vulkan instance with validation in debug builds, device selection and the logical device with its one queue;
 - `src/forward.rs`: The forward pass: draws sorted into runs by pipeline, one indirect multi-draw per run, vertices pulled from the
 - `src/graph.rs`: Render graph: passes declare the images they draw to and the buffers they read and write; the graph plans the
 - `src/lib.rs`: Renderer: a Vulkan 1.3 bootstrap, a render graph, compute skinning and a GPU-driven forward pass (design doc §6,
@@ -378,6 +378,7 @@ Internal deps: none
 - `docs/adr/0119-native-locomotion-extras.md`: 0119: Native locomotion extras: floor poses in the default Action layer, flight in the player, gated by world rules
 - `docs/adr/0120-msaa-and-multiview.md`: 0120: MSAA by render-pass resolve and stereo by multiview in the forward pass
 - `docs/adr/0121-locomotion-menu-page.md`: 0121: The client's locomotion page in the radial menu
+- `docs/adr/0122-xr-crate-and-vulkan-creation.md`: 0122: The `civbb-xr` crate, the OpenXR loader, and who creates the Vulkan device
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

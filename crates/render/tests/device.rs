@@ -1,7 +1,8 @@
 //! On a real device, headless: a two-pass graph clears an image and clears half of it again, the copy back reads
-//! the expected pixels, and validation (on in debug builds) reports no errors. Skips without a Vulkan device.
+//! the expected pixels, and validation (on in debug builds) reports no errors; a [`Create`] other than [`Direct`] makes
+//! the instance and device (ADR 0122). Skips without a Vulkan device.
 
-use civbb_render::{Context, Error, Graph, Load, Pass, Transients, Use, vk};
+use civbb_render::{Context, Create, Direct, Error, Graph, Load, Pass, Transients, Use, ash, vk};
 
 const SIZE: u32 = 64;
 const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
@@ -181,4 +182,59 @@ fn clears_and_reads_back() {
         d.free_memory(image_mem, None);
     }
     assert_eq!(ctx.validation_errors(), 0, "validation reported errors (see stderr)");
+}
+
+/// A creator that passes through to [`Direct`] but requires the last physical device and counts its calls.
+#[derive(Default)]
+struct Requiring {
+    calls: u32,
+    required: Option<vk::PhysicalDevice>,
+}
+
+impl Create for Requiring {
+    unsafe fn instance(
+        &mut self,
+        entry: &ash::Entry,
+        info: &vk::InstanceCreateInfo<'_>,
+    ) -> Result<ash::Instance, Error> {
+        self.calls += 1;
+        // SAFETY: per the trait's contract.
+        unsafe { Direct.instance(entry, info) }
+    }
+
+    unsafe fn physical(&mut self, instance: &ash::Instance) -> Result<Option<vk::PhysicalDevice>, Error> {
+        self.calls += 1;
+        // SAFETY: plain query on the instance just created.
+        self.required = unsafe { instance.enumerate_physical_devices()? }.last().copied();
+        Ok(self.required)
+    }
+
+    unsafe fn device(
+        &mut self,
+        instance: &ash::Instance,
+        physical: vk::PhysicalDevice,
+        info: &vk::DeviceCreateInfo<'_>,
+    ) -> Result<ash::Device, Error> {
+        self.calls += 1;
+        // SAFETY: per the trait's contract.
+        unsafe { Direct.device(instance, physical, info) }
+    }
+}
+
+#[test]
+fn a_creator_makes_the_instance_and_device_on_the_device_it_requires() {
+    let mut creator = Requiring::default();
+    // SAFETY: no window.
+    match unsafe { Context::create(cfg!(debug_assertions), None, &mut creator) } {
+        Ok(ctx) => {
+            assert_eq!(creator.calls, 3);
+            assert_eq!(Some(ctx.physical()), creator.required);
+        }
+        // Without a driver, or when the last device lacks the features: then no device was created.
+        Err(e @ (Error::Load(_) | Error::NoDevice)) => {
+            eprintln!("skipped: {e}");
+            assert!(creator.calls <= 2);
+        }
+        Err(e) => panic!("{e}"),
+    }
 }

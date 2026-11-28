@@ -1,4 +1,5 @@
-//! The Vulkan instance with validation in debug builds, device selection and the logical device with its one queue.
+//! The Vulkan instance with validation in debug builds, device selection and the logical device with its one queue;
+//! created directly or by another party such as an OpenXR runtime (ADR 0122).
 
 use std::cmp::Reverse;
 use std::ffi::{CStr, c_char, c_void};
@@ -21,6 +22,66 @@ pub struct Window {
     pub display: RawDisplayHandle,
     /// The window.
     pub window: RawWindowHandle,
+}
+
+/// Who creates the Vulkan instance and device (ADR 0122): the context itself ([`Direct`]) or a party that adds its
+/// own extensions and decides the physical device, such as an OpenXR runtime (XR_KHR_vulkan_enable2). The context
+/// builds the create infos either way and owns, and destroys, what was created.
+pub trait Create {
+    /// Creates the instance from `info`.
+    ///
+    /// # Safety
+    ///
+    /// `info` and everything it points to are valid for the call.
+    unsafe fn instance(&mut self, entry: &ash::Entry, info: &vk::InstanceCreateInfo<'_>) -> Result<ash::Instance>;
+
+    /// The physical device the creator requires, or `None` to let the context select one.
+    ///
+    /// # Safety
+    ///
+    /// `instance` came from [`Create::instance`].
+    unsafe fn physical(&mut self, instance: &ash::Instance) -> Result<Option<vk::PhysicalDevice>>;
+
+    /// Creates the device on `physical` from `info`.
+    ///
+    /// # Safety
+    ///
+    /// `physical` belongs to `instance` and supports what `info` asks for; `info` is valid for the call.
+    unsafe fn device(
+        &mut self,
+        instance: &ash::Instance,
+        physical: vk::PhysicalDevice,
+        info: &vk::DeviceCreateInfo<'_>,
+    ) -> Result<ash::Device>;
+}
+
+/// Plain Vulkan calls, for the desktop and headless paths.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Direct;
+
+impl Create for Direct {
+    unsafe fn instance(&mut self, entry: &ash::Entry, info: &vk::InstanceCreateInfo<'_>) -> Result<ash::Instance> {
+        // SAFETY: the create info is valid per this function's contract.
+        unsafe { entry.create_instance(info, None) }.map_err(|e| match e {
+            // A loader without any driver (CI runners).
+            vk::Result::ERROR_INCOMPATIBLE_DRIVER => Error::NoDevice,
+            e => e.into(),
+        })
+    }
+
+    unsafe fn physical(&mut self, _: &ash::Instance) -> Result<Option<vk::PhysicalDevice>> {
+        Ok(None)
+    }
+
+    unsafe fn device(
+        &mut self,
+        instance: &ash::Instance,
+        physical: vk::PhysicalDevice,
+        info: &vk::DeviceCreateInfo<'_>,
+    ) -> Result<ash::Device> {
+        // SAFETY: per this function's contract.
+        Ok(unsafe { instance.create_device(physical, info, None)? })
+    }
 }
 
 /// What device selection needs to know about one physical device.
@@ -107,12 +168,25 @@ impl Context {
     ///
     /// `window`'s handles must be valid and the window must outlive the context.
     pub unsafe fn new(validation: bool, window: Option<Window>) -> Result<Self> {
+        // SAFETY: per this function's contract.
+        unsafe { Self::create(validation, window, &mut Direct) }
+    }
+
+    /// As [`Context::new`], with `creator` creating the instance and device and perhaps deciding the physical
+    /// device (ADR 0122).
+    ///
+    /// # Safety
+    ///
+    /// As [`Context::new`]; `creator` creates from the infos it is given.
+    pub unsafe fn create(validation: bool, window: Option<Window>, creator: &mut dyn Create) -> Result<Self> {
         // SAFETY: loading the system Vulkan library runs its initialisation; nothing else is loaded under that name.
         let entry = unsafe { ash::Entry::load() }.map_err(|e| Error::Load(e.to_string()))?;
         // SAFETY: plain queries and creation with valid create infos; the window's handles are valid per contract.
-        let instance = unsafe { create_instance(entry, validation, window)? };
+        let instance = unsafe { create_instance(entry, validation, window, creator)? };
         let surface = instance.surface.as_ref().map(|(l, s)| (l, *s));
-        let (physical, queue_family) = select(&instance.instance, surface)?;
+        // SAFETY: the instance came from the creator.
+        let required = unsafe { creator.physical(&instance.instance)? };
+        let (physical, queue_family) = select(&instance.instance, surface, required)?;
         let priorities = [1.0];
         let queues = [vk::DeviceQueueCreateInfo::default()
             .queue_family_index(queue_family)
@@ -148,7 +222,7 @@ impl Context {
             .push_next(&mut features12)
             .push_next(&mut features11);
         // SAFETY: `physical` came from this instance and supports everything requested (`select`).
-        let device = unsafe { instance.instance.create_device(physical, &info, None)? };
+        let device = unsafe { creator.device(&instance.instance, physical, &info)? };
         // SAFETY: the queue family was created with one queue.
         let queue = unsafe { device.get_device_queue(queue_family, 0) };
         let allocator = Allocator::new(&AllocatorCreateDesc {
@@ -175,6 +249,11 @@ impl Context {
             queue,
             instance,
         })
+    }
+
+    /// The Vulkan library's entry points.
+    pub fn entry(&self) -> &ash::Entry {
+        &self.instance.entry
     }
 
     /// The instance.
@@ -249,7 +328,12 @@ impl Drop for Context {
 /// # Safety
 ///
 /// `window`'s handles must be valid.
-unsafe fn create_instance(entry: ash::Entry, validation: bool, window: Option<Window>) -> Result<Instance> {
+unsafe fn create_instance(
+    entry: ash::Entry,
+    validation: bool,
+    window: Option<Window>,
+    creator: &mut dyn Create,
+) -> Result<Instance> {
     // SAFETY: plain query.
     let layers = unsafe { entry.enumerate_instance_layer_properties()? };
     let validation = validation && {
@@ -277,11 +361,7 @@ unsafe fn create_instance(entry: ash::Entry, validation: bool, window: Option<Wi
         .enabled_layer_names(&layer_names)
         .enabled_extension_names(&extensions);
     // SAFETY: the create info and the names it points to are alive for the call.
-    let instance = unsafe { entry.create_instance(&info, None) }.map_err(|e| match e {
-        // A loader without any driver (CI runners).
-        vk::Result::ERROR_INCOMPATIBLE_DRIVER => Error::NoDevice,
-        e => e.into(),
-    })?;
+    let instance = unsafe { creator.instance(&entry, &info)? };
     let mut instance = Instance {
         instance,
         debug: None,
@@ -318,14 +398,16 @@ unsafe fn create_instance(entry: ash::Entry, validation: bool, window: Option<Wi
     Ok(instance)
 }
 
-/// Gathers a [`Candidate`] per physical device and picks one.
+/// Gathers a [`Candidate`] per physical device, or only for `required`, and picks one.
 fn select(
     instance: &ash::Instance,
     surface: Option<(&khr::surface::Instance, vk::SurfaceKHR)>,
+    required: Option<vk::PhysicalDevice>,
 ) -> Result<(vk::PhysicalDevice, u32)> {
     // SAFETY: plain queries on handles from this instance.
     unsafe {
-        let devices = instance.enumerate_physical_devices()?;
+        let mut devices = instance.enumerate_physical_devices()?;
+        devices.retain(|&d| required.is_none_or(|r| r == d));
         let mut candidates = Vec::with_capacity(devices.len());
         for &pd in &devices {
             let props = instance.get_physical_device_properties(pd);
