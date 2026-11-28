@@ -199,6 +199,7 @@ Internal deps: civbb-core, civbb-format
 
 - `examples/clear.rs`: Opens a window and clears it every frame, following resizes; the real window loop lives in the client (#27).
 - `shaders/mesh.slang`: Forward uber-shaders: one vertex shader pulling skinned vertices, fragment shaders for PBR, Toon and Unlit
+- `shaders/overlay.slang`: Screen-space UI (ADR 0117): triangles in window pixels pulled by address, in plain colour or times a texture of
 - `shaders/skin.slang`: Compute skinning and sparse blendshapes (design doc §6, ADR 0022). Compiled by `cargo xtask shaders`.
 - `src/context.rs`: The Vulkan instance with validation in debug builds, device selection and the logical device with its one queue.
 - `src/forward.rs`: The forward pass: draws sorted into runs by pipeline, one indirect multi-draw per run, vertices pulled from the
@@ -206,6 +207,7 @@ Internal deps: civbb-core, civbb-format
 - `src/lib.rs`: Renderer: a Vulkan 1.3 bootstrap, a render graph, compute skinning and a GPU-driven forward pass (design doc §6,
 - `src/material.rs`: Materials as the uber-shaders read them: one fixed-size record per material in the material buffer, and the
 - `src/memory.rs`: GPU buffers (each with its device address) and images allocated with `gpu-allocator`, plus one-shot submits and
+- `src/overlay.rs`: The overlay pass: screen-space UI triangles drawn over the frame after the forward pass, vertices pulled by
 - `src/renderer.rs`: Renders frames to a window: two frames in flight, acquire, record a frame's graph, submit and present,
 - `src/scene.rs`: The GPU-resident data draws reach: shared rest-vertex, attribute, blendshape, index and skinned-vertex buffers,
 - `src/skin.rs`: Compute skinning and sparse blendshapes: once per mesh per frame, applying only shapes with non-zero weight
@@ -215,8 +217,21 @@ Internal deps: civbb-core, civbb-format
 - `tests/draw.rs`: The GPU-driven forward pass on a real device (ADR 0023): quads through skinning, shared buffers, bindless
 - `tests/forward.rs`: The forward pass without a device (ADRs 0023, 0034): pipeline keys, material records, outline draws, draw batching
 - `tests/graph.rs`: Render graph planning (ADRs 0021, 0023), no device needed: image transitions before each pass and into each
+- `tests/overlay.rs`: The overlay pass on a real device (ADR 0117): plain and textured triangles in window pixels, blended over the
 - `tests/select.rs`: Device and surface format choice (ADR 0021), no device needed.
 - `tests/skin.rs`: Compute skinning and sparse blendshapes (ADR 0022): the active shape list without a device, and on a device the
+
+## `crates/ui` (civbb-ui)
+
+Retained-mode UI drawn by the renderer: the radial expression menu, its draw list and text (ADR 0117).
+
+Internal deps: civbb-format
+
+- `src/draw.rs`: The draw list widgets emit: a screen-space triangle list the renderer's overlay pass draws (ADR 0117).
+- `src/lib.rs`: Retained-mode UI drawn by the renderer as a screen-space overlay (design doc §4, ADR 0117).
+- `src/radial/tests.rs`: Tests of the radial menu: pointer input to parameter writes, and what an open page draws.
+- `src/radial.rs`: The radial expression menu (design doc §7, ADR 0117): pages of controls around a ring, driven by a pointer,
+- `src/text.rs`: Labels: shaped and rasterised by cosmic-text from the system's fonts into one glyph atlas (ADR 0116).
 
 ## `tools/corpus` (civbb-corpus)
 
@@ -355,6 +370,8 @@ Internal deps: none
 - `docs/adr/0113-tracker-input-and-calibration.md`: 0113: Tracker input as a resource, and calibration by eye height and per-device offsets
 - `docs/adr/0114-avatar-scaling-and-stations.md`: 0114: Avatar scaling by eye height, and stations as client components
 - `docs/adr/0115-gamepad-input-and-turning.md`: 0115: Gamepad input through gilrs, merged into the player's input, with snap or smooth turning
+- `docs/adr/0116-text-rendering.md`: 0116: Text through cosmic-text with system fonts, rasterised into one glyph atlas on the CPU
+- `docs/adr/0117-ui-crate-and-radial-menu.md`: 0117: The `ui` crate: widgets emit a screen-space triangle list; the radial expression menu as its first widget
 - `docs/adr/README.md`: Architecture decision records
 - `docs/ai/LESSONS-anim.md`: Lessons: animation and dynamics
 - `docs/ai/LESSONS-data.md`: Lessons: avatar data

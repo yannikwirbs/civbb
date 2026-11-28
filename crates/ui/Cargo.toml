@@ -1,0 +1,14 @@
+[package]
+name = "civbb-ui"
+description = "Retained-mode UI drawn by the renderer: the radial expression menu, its draw list and text (ADR 0117)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+civbb-format.workspace = true
+cosmic-text = "0.19.0"
+
+[lints]
+workspace = true
