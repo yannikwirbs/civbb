@@ -137,6 +137,48 @@ impl Textures {
         self.insert(ctx, image, uploaded)
     }
 
+    /// Uploads a linear RGBA8 image without mips (UI glyph atlases, ADR 0116) into slot `index`, or a new slot when
+    /// `None`, and returns the slot.
+    ///
+    /// # Safety
+    ///
+    /// When replacing, the GPU no longer uses the slot's image.
+    ///
+    /// # Panics
+    ///
+    /// If `rgba` is not `width * height * 4` bytes, a side is 0 or over 16384, the array is full or `index` is
+    /// not a slot.
+    pub(crate) unsafe fn put_flat(
+        &mut self,
+        ctx: &Context,
+        index: Option<u32>,
+        width: u32,
+        height: u32,
+        rgba: &[u8],
+    ) -> Result<u32> {
+        assert_eq!(
+            rgba.len() as u64,
+            u64::from(width) * u64::from(height) * 4,
+            "RGBA8 texel count"
+        );
+        let image = self.create(ctx, width, height, 1, vk::Format::R8G8B8A8_UNORM)?;
+        let uploaded = upload_levels(ctx, &image, width, height, &[rgba.to_vec()]);
+        let Some(index) = index else {
+            return self.insert(ctx, image, uploaded);
+        };
+        assert!((index as usize) < self.images.len(), "texture slot {index}");
+        if let Err(e) = uploaded {
+            // SAFETY: the upload waited for the GPU or never submitted.
+            unsafe { ctx.destroy_image(image) };
+            return Err(e);
+        }
+        self.write(ctx, index, &image);
+        let old = std::mem::replace(&mut self.images[index as usize], image);
+        // SAFETY: per the contract the GPU no longer uses it, and the slot now names the new image.
+        unsafe { ctx.destroy_image(old) };
+        Ok(index)
+    }
+
     /// Uploads a BC7 image with all its mips, `levels[0]` the full size (ADR 0029), and returns its index in the
     /// array.
     ///
@@ -205,6 +247,13 @@ impl Textures {
             return Err(e);
         }
         let index = self.images.len() as u32;
+        self.write(ctx, index, &image);
+        self.images.push(image);
+        Ok(index)
+    }
+
+    /// Points slot `index` of the array at `image`.
+    fn write(&self, ctx: &Context, index: u32, image: &Image) {
         let infos = [vk::DescriptorImageInfo {
             sampler: self.sampler,
             image_view: image.view,
@@ -216,10 +265,8 @@ impl Textures {
             .dst_array_element(index)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .image_info(&infos);
-        // SAFETY: the element is unused by pending work (update-unused-while-pending) and the image is ready.
+        // SAFETY: the element is new or no longer used by the GPU (`put_flat`), and the image is ready.
         unsafe { ctx.device().update_descriptor_sets(&[write], &[]) };
-        self.images.push(image);
-        Ok(index)
     }
 
     /// Destroys the images and the array.

@@ -232,6 +232,29 @@ impl Scene {
         self.textures.add(ctx, width, height, rgba, srgb)
     }
 
+    /// Uploads a linear RGBA8 texture without mips (UI glyph atlases, ADR 0116) into bindless slot `index`, or a new
+    /// slot when `None`, and returns the slot.
+    ///
+    /// # Safety
+    ///
+    /// When replacing, the GPU no longer uses the slot's texture.
+    ///
+    /// # Panics
+    ///
+    /// If `rgba` is not `width * height * 4` bytes, a side is 0 or over 16384, the array is full or `index` is not
+    /// a slot.
+    pub unsafe fn put_flat_texture(
+        &mut self,
+        ctx: &Context,
+        index: Option<u32>,
+        width: u32,
+        height: u32,
+        rgba: &[u8],
+    ) -> Result<u32> {
+        // SAFETY: per the contract.
+        unsafe { self.textures.put_flat(ctx, index, width, height, rgba) }
+    }
+
     /// Uploads a BC7 texture with all its mips, full size first, and returns its bindless index (ADR 0029).
     ///
     /// # Panics
