@@ -1,7 +1,9 @@
 //! The OpenXR session on a Vulkan device (ADR 0122), split for two threads (ADR 0123): [`Session`] handles the
 //! runtime's events and waits for each frame (the simulation thread), [`Frames`] begins, draws into and ends them
-//! (the render thread). Stage or local space; one colour swapchain with a layer per eye.
+//! (the render thread). Stage or local space; one colour swapchain with a layer per eye; the controller actions
+//! (ADR 0124).
 
+use crate::input::{Input, Poses};
 use crate::xr::sys::platform::{VkDevice, VkFormat, VkImage, VkInstance, VkPhysicalDevice};
 use crate::{Error, Result, VIEWS, Xr, xr};
 
@@ -20,6 +22,8 @@ pub enum Status {
 
 /// The session's events and frame pacing, for the thread that simulates frames.
 pub struct Session {
+    // The actions and their spaces go before the session.
+    input: Input,
     waiter: xr::FrameWaiter,
     session: xr::Session<xr::Vulkan>,
     instance: xr::Instance,
@@ -47,7 +51,7 @@ pub struct Frames {
 
 impl Session {
     /// Creates the session on `device` (its queue 0 of `queue_family`), a stage space (local without one) and a
-    /// colour swapchain of two layers in the first of `formats` the runtime offers.
+    /// colour swapchain of two layers in the first of `formats` the runtime offers; attaches the controller actions.
     ///
     /// # Safety
     ///
@@ -80,6 +84,11 @@ impl Session {
             xr::ReferenceSpaceType::LOCAL
         };
         let space = session.create_reference_space(kind, xr::Posef::IDENTITY)?;
+        let input = Input::new(
+            &xr.instance,
+            &session,
+            session.create_reference_space(kind, xr::Posef::IDENTITY)?,
+        )?;
         let offered = session.enumerate_swapchain_formats()?;
         let format = (formats.iter().copied())
             .find(|f| offered.contains(f))
@@ -119,6 +128,7 @@ impl Session {
             size,
         };
         let session = Self {
+            input,
             waiter,
             session,
             instance: xr.instance.clone(),
@@ -171,6 +181,12 @@ impl Session {
     /// display period and whether to render it. Hand every frame waited for to [`Frames::begin`].
     pub fn wait(&mut self) -> Result<xr::FrameState> {
         Ok(self.waiter.wait()?)
+    }
+
+    /// The head and hands at `time` (the predicted display time [`Session::wait`] gave), in the space [`Frames`]
+    /// draws in, and whether calibration was asked for. Only while [`Status::Running`].
+    pub fn poses(&self, time: xr::Time) -> Result<Poses> {
+        self.input.poses(&self.session, time)
     }
 }
 

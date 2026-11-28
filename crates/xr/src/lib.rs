@@ -9,8 +9,10 @@ use xr::sys::platform::{
     VkDevice, VkDeviceCreateInfo, VkGetInstanceProcAddr, VkInstance, VkInstanceCreateInfo, VkPhysicalDevice,
 };
 
+mod input;
 pub mod session;
 
+pub use input::Poses;
 pub use session::{Frames, Session, Status};
 
 /// The environment variable naming the OpenXR loader library to load instead of the system search's.

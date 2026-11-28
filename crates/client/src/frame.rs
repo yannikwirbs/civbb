@@ -18,7 +18,7 @@ use crate::island::Island;
 use crate::menu::{ExpressionMenu, Overlay, menu_system};
 use crate::package::Handle;
 use crate::player::{Input, Player, WorldRules, player_system};
-use crate::tracking::{Scripted, Trackers, scripted_system, trackers_system};
+use crate::tracking::{HeadsetPoses, Scripted, Trackers, headset_system, scripted_system, trackers_system};
 
 /// The client's worker pool, made on first use: [`jobs::default_workers`] workers, pool threads kept to performance
 /// cores and no more of them than those cores have logical CPUs (ADR 0103).
@@ -228,6 +228,17 @@ impl Runtime {
                     .add_systems(trackers_system.after(player_system).in_set(Step::PosesIn));
             }
         }
+    }
+
+    /// Adds the headset as the player's tracker source (ADR 0124, after [`Self::add_player`], instead of
+    /// [`Self::add_trackers`]): the [`HeadsetPoses`] and [`Trackers`] resources and, after the player system, the
+    /// systems that map the poses into devices, then calibrate and set the player island's IK targets.
+    pub fn add_headset(&mut self) {
+        self.world.init_resource::<HeadsetPoses>();
+        self.world.init_resource::<Trackers>();
+        let systems = (headset_system, trackers_system).chain();
+        self.schedule
+            .add_systems(systems.after(player_system).in_set(Step::PosesIn));
     }
 
     /// Adds `island` as an entity, after every island already spawned.

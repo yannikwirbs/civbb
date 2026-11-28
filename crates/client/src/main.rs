@@ -48,7 +48,8 @@ per pixel (default 4, 1 is off; as far as the GPU supports them, ADR 0120). --xr
 the active OpenXR runtime, both eyes by multiview at the display rate, the play space on the ground below the
 camera, until the runtime ends the session or --frames F are shown; it also prints the frames the runtime waited
 for, did not want rendered and missed (ADRs 0122, 0123; the loader is CIVBB_OPENXR_LOADER's path, else
-openxr_loader beside the executable).
+openxr_loader beside the executable). In the headset the avatar's head and hands follow yours once calibrated:
+stand in the avatar's rest pose and press the left menu button (B on Index controllers; ADR 0124).
 
 measure runs a package's avatar through bench on one worker (N avatars, default 100, W + F frames, default 60 +
 300) and through the viewer's frames on an offscreen 1280x720 target (N copies, same frames) and prints the times

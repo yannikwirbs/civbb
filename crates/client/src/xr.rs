@@ -1,6 +1,7 @@
-//! The headset (ADRs 0122, 0123): the OpenXR runtime creates the Vulkan instance and device through
+//! The headset (ADRs 0122 to 0124): the OpenXR runtime creates the Vulkan instance and device through
 //! [`civbb_render::Create`], and `view --xr` runs the viewer in the headset: frames paced by `xrWaitFrame` on the
-//! simulation thread, both eyes drawn by multiview into the swapchain on the render thread.
+//! simulation thread, which samples the head and hands for the player's trackers, both eyes drawn by multiview into
+//! the swapchain on the render thread.
 
 use std::ffi::c_void;
 use std::time::{Duration, Instant};
@@ -195,6 +196,9 @@ impl Present for Headset {
 /// Opens a session and runs the viewer of `cfg` in the headset until the runtime ends the session, or for
 /// `cfg.frames` frames past the warm-up: what the viewer measured and how the runtime paced it.
 pub fn run(cfg: Config) -> Result<(Summary, Pacing), String> {
+    if cfg.trackers.is_some() {
+        return Err("scripted trackers and the headset both drive the player: use one".into());
+    }
     let xr = Xr::new().map_err(|e| e.to_string())?;
     println!(
         "OpenXR: {}, {} x {} per eye",
@@ -255,6 +259,7 @@ pub fn run(cfg: Config) -> Result<(Summary, Pacing), String> {
         }
     }
     let mut viewer = Viewer::new(cfg);
+    viewer.add_headset();
     let mut pacing = Pacing::default();
     let mut result = (viewer.start_on(renderer, 2, Box::new(headset)))
         .map_err(Into::into)
@@ -271,7 +276,8 @@ pub fn run(cfg: Config) -> Result<(Summary, Pacing), String> {
     Ok((viewer.summary(), pacing))
 }
 
-/// Polls the session and hands each frame the runtime waits for to the viewer, until the session exits; asks it to
+/// Polls the session and hands each frame the runtime waits for to the viewer with the head and hands at its
+/// predicted display time, until the session exits; asks it to
 /// once the viewer's frames are done.
 fn frame_loop(
     session: &mut Session,
@@ -313,6 +319,7 @@ fn frame_loop(
             pacing.period_ms = period as f32 / 1e6;
         }
         last = Some(time);
+        viewer.headset(session.poses(state.predicted_display_time)?);
         viewer.pace = Some(state);
         viewer.frame()?;
     }

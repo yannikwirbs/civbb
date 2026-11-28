@@ -32,7 +32,7 @@ use crate::package::Handle;
 use crate::player::{Input, Player, View, WorldRules};
 use crate::render_thread::{Drawn, Own, Present, RenderThread};
 use crate::station::Station;
-use crate::tracking::Scripted;
+use crate::tracking::{HeadsetPoses, Scripted};
 
 /// Largest texture side the viewer decodes; larger textures are left out.
 const MAX_TEXTURE_SIDE: u32 = 8192;
@@ -609,6 +609,16 @@ impl Viewer {
     /// Whether the frames asked for are done.
     pub(crate) fn done(&self) -> bool {
         self.limit.is_some_and(|l| self.timing.frames >= l)
+    }
+
+    /// Makes the headset the player's tracker source (ADR 0124), its poses set by [`Viewer::headset`].
+    pub(crate) fn add_headset(&mut self) {
+        self.runtime.add_headset();
+    }
+
+    /// The headset's poses for the next [`Viewer::frame`].
+    pub(crate) fn headset(&mut self, poses: civbb_xr::Poses) {
+        self.runtime.world.insert_resource(HeadsetPoses(poses));
     }
 
     /// Whether every load is done and the warm-up is over: frames are being measured.
